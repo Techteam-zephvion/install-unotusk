@@ -1,0 +1,40 @@
+# UNOTUSK — docker-compose.override.yml
+#
+# Overrides for local development / testing.
+# This file is NOT used in production customer installs.
+# Activate: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+
+services:
+
+  # Use local builds instead of GHCR images in dev
+  us:
+    image: unotusk/us:local
+    build:
+      context: ../../Unotusk/US
+    environment:
+      RUST_LOG: debug
+
+  ups:
+    image: unotusk/ups:local
+    build:
+      context: ../../Unotusk/UPS
+    environment:
+      RUST_LOG: debug
+
+  ai-pie:
+    image: unotusk/ai-pie:local
+    build:
+      context: ../../Unotusk/AI-PIE
+      dockerfile: Dockerfile
+    environment:
+      LOG_LEVEL: debug
+
+  # Expose Qdrant dashboard locally in dev
+  qdrant:
+    ports:
+      - "6333:6333"   # REST API + dashboard
+
+  # Expose Phoenix dashboard locally in dev
+  phoenix:
+    ports:
+      - "6006:6006"   # Web UI

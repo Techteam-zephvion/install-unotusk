@@ -1,0 +1,28 @@
+# Git
+.git/
+dist/
+*.tar.gz
+*.sha256
+
+# Secrets — never commit
+.env
+.secrets
+*.key
+*.crt
+*.pem
+*.csr
+*.srl
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Temporary
+tmp/
+TMP_*/

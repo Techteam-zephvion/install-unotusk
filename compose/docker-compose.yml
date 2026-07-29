@@ -1,0 +1,253 @@
+# UNOTUSK — Customer-local deployment stack
+#
+# Services:
+#   postgres  — Shared PostgreSQL 16 (databases: auth, company)
+#   qdrant    — Vector store for AI-PIE
+#   phoenix   — Arize Phoenix observability for AI-PIE
+#   us        — Auth Service (OIDC, JWT, mTLS)
+#   ups       — Company Server (license heartbeat, degraded mode)
+#   ai-pie    — Intelligence engine (FastAPI)
+#
+# Architecture:
+#   postgres → us → ups → ai-pie
+#   qdrant + phoenix → ai-pie
+#
+# The UNOTUSK Platform (cloud) is NOT part of this stack.
+# UPS reaches Platform outbound for license heartbeat only.
+# Platform never has inbound access into customer infrastructure.
+#
+# Quickstart:
+#   cp .env.example .env   # edit required values
+#   docker compose up -d
+
+networks:
+  unotusk_internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  phoenix_data:
+  us_data:
+  ups_data:
+  ai_pie_data:
+  logs:
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unotusk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-unotusk}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unotusk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── Qdrant ─────────────────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.15.1
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/6333"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── Arize Phoenix ──────────────────────────────────────────────────────────
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    restart: unless-stopped
+    volumes:
+      - phoenix_data:/root/.phoenix
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── US — Auth Service ──────────────────────────────────────────────────────
+  us:
+    image: ghcr.io/unotusk/us:${UNOTUSK_VERSION:-latest}
+    hostname: auth-server
+    restart: unless-stopped
+    env_file:
+      - ./US/.env
+    environment:
+      HTTP_LISTEN_ADDR: 0.0.0.0:3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/auth
+      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      PLATFORM_TOKEN_AUDIENCE: ${PLATFORM_TOKEN_AUDIENCE:-platform.unotusk.com}
+      ORG_ID: ${ORG_ID}
+      RUST_LOG: ${LOG_LEVEL:-info}
+    ports:
+      - "3000:3000"     # OIDC HTTP (login/callback/healthz)
+      - "8444:8444"     # UAC admin pairing
+      - "50052:50052"   # gRPC mTLS
+    volumes:
+      - us_data:/app/data
+      - ./US/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - auth-server
+          - us
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── UPS — Company Server ───────────────────────────────────────────────────
+  ups:
+    image: ghcr.io/unotusk/ups:${UNOTUSK_VERSION:-latest}
+    hostname: company-server
+    restart: unless-stopped
+    env_file:
+      - ./UPS/.env
+    environment:
+      HEALTH_LISTEN_ADDR: 0.0.0.0:8080
+      AUTH_GRPC_ENDPOINT: https://auth-server:50052
+      DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/company
+      PLATFORM_URL: ${PLATFORM_URL:?PLATFORM_URL is required}
+      PLATFORM_LICENSE_KEY: ${PLATFORM_LICENSE_KEY:?PLATFORM_LICENSE_KEY is required}
+      LICENSE_HEARTBEAT_INTERVAL_SECS: ${LICENSE_HEARTBEAT_INTERVAL:-60}
+      LICENSE_GRACE_PERIOD_SECS: ${LICENSE_GRACE_PERIOD:-18000}
+      PLATFORM_CA_CERT: /app/certs/platform/ca.crt
+      PLATFORM_CLIENT_TLS_CERT: /app/certs/platform/client.crt
+      PLATFORM_CLIENT_TLS_KEY: /app/certs/platform/client.key
+      ORG_ID: ${ORG_ID:?ORG_ID is required}
+      US_JWKS_URL: http://auth-server:3000/.well-known/jwks.json
+      PLATFORM_JWKS_PUSH_URL: ${PLATFORM_JWKS_PUSH_URL}
+      JWKS_PUSH_SECRET: ${JWKS_PUSH_SECRET}
+      RUST_LOG: ${LOG_LEVEL:-info}
+    ports:
+      - "50051:50051"   # gRPC business mTLS
+    volumes:
+      - ups_data:/app/data
+      - ./UPS/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - company-server
+          - ups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      us:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── AI-PIE — Intelligence Engine ───────────────────────────────────────────
+  ai-pie:
+    image: ghcr.io/unotusk/ai-pie:${UNOTUSK_VERSION:-latest}
+    restart: unless-stopped
+    env_file:
+      - ./AI-PIE/.env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      ONTOLOGY_DB_PATH: /app/data/ontology.db
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      GITHUB_ORG: ${GITHUB_ORG_NAME:-}
+      JIRA_URL: ${JIRA_URL:-}
+    volumes:
+      - ai_pie_data:/app/data
+      - ./AI-PIE/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - ai-pie
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+      ups:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
