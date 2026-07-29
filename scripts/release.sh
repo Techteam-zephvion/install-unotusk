@@ -74,9 +74,9 @@ success "Tag pushed — GitHub Actions will create the release and upload assets
 
 echo ""
 echo -e "${BOLD}Release ${VERSION} triggered.${RESET}"
-echo "  Monitor: https://github.com/unotusk/install/actions"
-echo "  Release: https://github.com/unotusk/install/releases/tag/${VERSION}"
+echo "  Monitor: https://github.com/Techteam-zephvion/install-unotusk/actions"
+echo "  Release: https://github.com/Techteam-zephvion/install-unotusk/releases/tag/${VERSION}"
 echo ""
 echo "  Bootstrap URL: https://install.unotusk.com"
-echo "  Direct asset:  https://github.com/unotusk/install/releases/download/${VERSION}/unotusk-installer.tar.gz"
+echo "  Direct asset:  https://github.com/Techteam-zephvion/install-unotusk/releases/download/${VERSION}/unotusk-installer.tar.gz"
 echo ""

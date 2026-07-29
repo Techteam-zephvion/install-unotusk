@@ -28,8 +28,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-GITHUB_ORG="unotusk"
-GITHUB_REPO="install"
+GITHUB_ORG="Techteam-zephvion"
+GITHUB_REPO="install-unotusk"
 COMPOSE_BASE_URL="https://raw.githubusercontent.com/${GITHUB_ORG}/${GITHUB_REPO}/${INSTALLER_VERSION}/compose"
 LOG_FILE="/var/log/unotusk-install.log"
 STATE_FILE="${INSTALL_DIR}/.install-state"

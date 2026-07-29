@@ -20,8 +20,8 @@
 set -Eeuo pipefail
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-GITHUB_ORG="unotusk"
-GITHUB_REPO="install"
+GITHUB_ORG="Techteam-zephvion"
+GITHUB_REPO="install-unotusk"
 INSTALL_DIR="/opt/unotusk"
 LOG_FILE="/var/log/unotusk-install.log"
 INSTALLER_BINARY="unotusk-installer.tar.gz"
