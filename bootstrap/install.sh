@@ -176,9 +176,33 @@ if docker compose version &>/dev/null; then
   success "Docker Compose plugin: $(docker compose version --short 2>/dev/null || echo 'OK')"
 else
   info "Installing Docker Compose plugin..."
-  apt-get install -y -qq docker-compose-plugin >> "$LOG_FILE" 2>&1
-  docker compose version &>/dev/null || fail "Docker Compose plugin installation failed."
-  success "Docker Compose plugin installed."
+
+  # Strategy 1: apt-get (works when Docker's official apt repo is configured)
+  if apt-get install -y -qq docker-compose-plugin >> "$LOG_FILE" 2>&1 \
+       && docker compose version &>/dev/null; then
+    success "Docker Compose plugin installed via apt."
+
+  else
+    # Strategy 2: direct binary from GitHub releases (works regardless of how
+    # Docker was installed — e.g. pre-installed via Pop!_OS / Snap / manual)
+    info "apt install failed — falling back to direct binary install..."
+    COMPOSE_VER=$(curl -fsSL \
+      "https://api.github.com/repos/docker/compose/releases/latest" \
+      | grep '"tag_name"' | head -1 \
+      | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+    [[ -z "$COMPOSE_VER" ]] && fail "Could not resolve Docker Compose version from GitHub."
+
+    COMPOSE_URL="https://github.com/docker/compose/releases/download/${COMPOSE_VER}/docker-compose-linux-${ARCH}"
+    mkdir -p /usr/lib/docker/cli-plugins
+    curl -fsSL "$COMPOSE_URL" \
+      -o /usr/lib/docker/cli-plugins/docker-compose >> "$LOG_FILE" 2>&1 \
+      || fail "Docker Compose binary download failed. Check $LOG_FILE"
+    chmod +x /usr/lib/docker/cli-plugins/docker-compose
+
+    docker compose version &>/dev/null \
+      || fail "Docker Compose plugin installation failed. Check $LOG_FILE"
+    success "Docker Compose plugin installed: $(docker compose version --short 2>/dev/null)"
+  fi
 fi
 
 # ── Create installation directory ─────────────────────────────────────────────
