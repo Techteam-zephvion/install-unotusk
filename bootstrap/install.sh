@@ -68,22 +68,41 @@ source /etc/os-release
 DISTRO="${ID:-unknown}"
 DISTRO_VER="${VERSION_ID:-0}"
 DISTRO_MAJOR="${DISTRO_VER%%.*}"
+ID_LIKE_LIST="${ID_LIKE:-}"   # e.g. "ubuntu" on Pop!_OS, "ubuntu debian" on Mint
 
-case "$DISTRO" in
+# Resolve effective upstream distro from ID_LIKE when ID is a derivative
+resolve_distro() {
+  local id="$1" like="$2"
+  case "$id" in
+    ubuntu|debian) echo "$id"; return ;;
+  esac
+  # Walk ID_LIKE list — first match wins
+  for token in $like; do
+    case "$token" in
+      ubuntu) echo "ubuntu"; return ;;
+      debian) echo "debian"; return ;;
+    esac
+  done
+  echo "$id"   # unknown / unsupported
+}
+
+EFFECTIVE_DISTRO=$(resolve_distro "$DISTRO" "$ID_LIKE_LIST")
+
+case "$EFFECTIVE_DISTRO" in
   ubuntu)
     if [[ "$DISTRO_MAJOR" -lt 22 ]]; then
-      fail "Ubuntu ${DISTRO_VER} is not supported. Requires Ubuntu 22.04 or 24.04."
+      fail "${PRETTY_NAME:-$DISTRO} is not supported. Requires Ubuntu 22.04+."
     fi
-    success "OS: Ubuntu ${DISTRO_VER}"
+    success "OS: ${PRETTY_NAME:-Ubuntu ${DISTRO_VER}} (Ubuntu-compatible)"
     ;;
   debian)
     if [[ "$DISTRO_MAJOR" -lt 11 ]]; then
-      fail "Debian ${DISTRO_VER} is not supported. Requires Debian 11 (Bullseye) or newer."
+      fail "${PRETTY_NAME:-$DISTRO} is not supported. Requires Debian 11+."
     fi
-    success "OS: Debian ${DISTRO_VER}"
+    success "OS: ${PRETTY_NAME:-Debian ${DISTRO_VER}} (Debian-compatible)"
     ;;
   *)
-    fail "Unsupported OS: ${PRETTY_NAME:-$DISTRO}. UNOTUSK requires Ubuntu 22.04+/24.04 or Debian 11+."
+    fail "Unsupported OS: ${PRETTY_NAME:-$DISTRO}. UNOTUSK requires Ubuntu 22.04+/24.04 or Debian 11+ (or a derivative)."
     ;;
 esac
 
