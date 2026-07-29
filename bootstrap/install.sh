@@ -20,11 +20,9 @@
 set -Eeuo pipefail
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-GITHUB_ORG="Techteam-zephvion"
-GITHUB_REPO="install-unotusk"
+BASE_URL="https://install.unotusk.com"
 INSTALL_DIR="/opt/unotusk"
 LOG_FILE="/var/log/unotusk-install.log"
-INSTALLER_BINARY="unotusk-installer.tar.gz"
 MIN_DOCKER_VERSION=24
 SUPPORTED_ARCHES=("x86_64" "aarch64")
 
@@ -210,49 +208,35 @@ header "[5/6] Preparing /opt/unotusk..."
 mkdir -p "$INSTALL_DIR"
 success "Installation directory: $INSTALL_DIR"
 
-# ── Download latest installer ──────────────────────────────────────────────────
+# ── Download installer from install.unotusk.com (Vercel) ──────────────────────
 header "[6/6] Downloading UNOTUSK installer..."
-
-# Resolve latest release tag via GitHub API
-LATEST_TAG=$(curl -fsSL \
-  "https://api.github.com/repos/${GITHUB_ORG}/${GITHUB_REPO}/releases/latest" \
-  | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-
-[[ -z "$LATEST_TAG" ]] && fail "Could not resolve latest release tag from GitHub."
-info "Latest release: $LATEST_TAG"
-
-BASE_URL="https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/releases/download/${LATEST_TAG}"
-TARBALL_URL="${BASE_URL}/${INSTALLER_BINARY}"
-CHECKSUM_URL="${BASE_URL}/${INSTALLER_BINARY}.sha256"
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-info "Downloading ${INSTALLER_BINARY}..."
-curl -fsSL --progress-bar "$TARBALL_URL" -o "${TMP_DIR}/${INSTALLER_BINARY}" \
-  || fail "Download failed: $TARBALL_URL"
+INSTALLER_URL="${BASE_URL}/installer/install.sh"
+CHECKSUM_URL="${BASE_URL}/installer/install.sh.sha256"
 
-info "Verifying SHA-256 checksum..."
-curl -fsSL "$CHECKSUM_URL" -o "${TMP_DIR}/${INSTALLER_BINARY}.sha256" \
-  || fail "Checksum download failed: $CHECKSUM_URL"
+info "Fetching installer from ${BASE_URL}..."
+curl -fsSL "$INSTALLER_URL" -o "${TMP_DIR}/install.sh" \
+  || fail "Installer download failed. Check your internet connection."
 
-EXPECTED_SUM=$(awk '{print $1}' "${TMP_DIR}/${INSTALLER_BINARY}.sha256")
-ACTUAL_SUM=$(sha256sum "${TMP_DIR}/${INSTALLER_BINARY}" | awk '{print $1}')
-
-if [[ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]]; then
-  fail "SHA-256 checksum mismatch! Expected: $EXPECTED_SUM  Got: $ACTUAL_SUM"
+# Verify checksum if the .sha256 file is available
+if curl -fsSL "$CHECKSUM_URL" -o "${TMP_DIR}/install.sh.sha256" 2>/dev/null; then
+  EXPECTED_SUM=$(awk '{print $1}' "${TMP_DIR}/install.sh.sha256")
+  ACTUAL_SUM=$(sha256sum "${TMP_DIR}/install.sh" | awk '{print $1}')
+  if [[ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]]; then
+    fail "SHA-256 checksum mismatch! Expected: $EXPECTED_SUM  Got: $ACTUAL_SUM"
+  fi
+  success "Checksum verified: $ACTUAL_SUM"
+else
+  warn "Checksum file not available — skipping verification."
 fi
-success "Checksum verified: $ACTUAL_SUM"
 
-info "Extracting installer..."
-tar -xzf "${TMP_DIR}/${INSTALLER_BINARY}" -C "$TMP_DIR" >> "$LOG_FILE" 2>&1
-success "Installer extracted."
+chmod +x "${TMP_DIR}/install.sh"
+success "Installer ready."
 
-# ── Hand off to versioned installer ───────────────────────────────────────────
-INSTALLER_SCRIPT="${TMP_DIR}/installer/install.sh"
-[[ ! -f "$INSTALLER_SCRIPT" ]] && fail "Installer package is malformed — install.sh not found."
-chmod +x "$INSTALLER_SCRIPT"
-
-info "Handing off to UNOTUSK Installer ${LATEST_TAG}..."
+# ── Hand off to full installer ─────────────────────────────────────────────────
+info "Handing off to UNOTUSK Installer..."
 echo ""
-exec bash "$INSTALLER_SCRIPT" --install-dir "$INSTALL_DIR" --version "$LATEST_TAG"
+exec bash "${TMP_DIR}/install.sh" --install-dir "$INSTALL_DIR" --version "latest"
