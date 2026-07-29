@@ -1,4 +1,4 @@
-# UNOTUSK Installer Infrastructure
+# UNOTUSK - Installer Infrastructure
 
 > **One-command enterprise deployment** — `curl -fsSL https://install.unotusk.com | bash`
 
