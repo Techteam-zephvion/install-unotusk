@@ -32,7 +32,7 @@ SUPPORTED_ARCHES=("x86_64" "aarch64")
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
-log()     { echo -e "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG_FILE" 2>/dev/null || true; }
+log()     { { echo -e "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG_FILE"; } 2>/dev/null || true; }
 info()    { local m="  ${CYAN}→${RESET} $*"; echo -e "$m"; log "$m"; }
 success() { local m="  ${GREEN}✔${RESET} $*"; echo -e "$m"; log "$m"; }
 warn()    { local m="  ${YELLOW}⚠${RESET} $*"; echo -e "$m"; log "$m"; }
@@ -50,7 +50,11 @@ echo ""
 
 # ── Root check ─────────────────────────────────────────────────────────────────
 if [[ "$EUID" -ne 0 ]]; then
-  fail "Please run as root:  sudo bash <(curl -fsSL https://install.unotusk.com)"
+  echo -e "  ${RED}✘${RESET}  Run as root:"
+  echo ""
+  echo "      curl -fsSL https://install.unotusk.com | sudo bash"
+  echo ""
+  exit 1
 fi
 success "Running as root."
 
