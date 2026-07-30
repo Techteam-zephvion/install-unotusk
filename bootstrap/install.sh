@@ -240,3 +240,4 @@ success "Installer ready."
 info "Handing off to UNOTUSK Installer..."
 echo ""
 exec bash "${TMP_DIR}/install.sh" --install-dir "$INSTALL_DIR" --version "latest"
+# Deploy: 2026-07-30T03:36:59Z
