@@ -1,23 +1,17 @@
-# UNOTUSK — Customer-local deployment stack
-#
-# Services:
-#   postgres  — Shared PostgreSQL 16 (databases: auth, company)
-#   qdrant    — Vector store for AI-PIE
-#   phoenix   — Arize Phoenix observability for AI-PIE
-#   us        — Auth Service (OIDC, JWT, mTLS)
-#   ups       — Company Server (license heartbeat, degraded mode)
-#   ai-pie    — Intelligence engine (FastAPI)
+# UNOTUSK Customer Stack
 #
 # Architecture:
-#   postgres → us → ups → ai-pie
-#   qdrant + phoenix → ai-pie
+#   Internet/LAN → 443/80 → Caddy → (internal Docker network)
+#                                     US:7000   Auth Service
+#                                     UPS:7001  Company Server
+#                                     AI-PIE:7002
+#                                     UAC:7003  Admin Pairing
 #
-# The UNOTUSK Platform (cloud) is NOT part of this stack.
-# UPS reaches Platform outbound for license heartbeat only.
-# Platform never has inbound access into customer infrastructure.
+# Only Caddy is exposed on the host. All other services are internal.
+# gRPC (US:50052, UPS:50051) is proxied via Caddy h2 on 443.
 #
 # Quickstart:
-#   cp .env.example .env   # edit required values
+#   cp .env.example .env   # fill required values
 #   docker compose up -d
 
 networks:
@@ -34,6 +28,8 @@ volumes:
   us_data:
   ups_data:
   ai_pie_data:
+  caddy_data:
+  caddy_config:
   logs:
 
 services:
@@ -61,9 +57,7 @@ services:
       - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
+      options: { max-size: "50m", max-file: "3" }
 
   # ── Qdrant ─────────────────────────────────────────────────────────────────
   qdrant:
@@ -76,7 +70,7 @@ services:
     networks:
       - unotusk_internal
     healthcheck:
-      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/6333"]
+      test: ["CMD-SHELL", "bash -c 'cat </dev/null >/dev/tcp/localhost/6333'"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -85,9 +79,7 @@ services:
       - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
+      options: { max-size: "50m", max-file: "3" }
 
   # ── Arize Phoenix ──────────────────────────────────────────────────────────
   phoenix:
@@ -108,11 +100,10 @@ services:
       - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
+      options: { max-size: "50m", max-file: "3" }
 
   # ── US — Auth Service ──────────────────────────────────────────────────────
+  # Internal only — Caddy proxies HTTP on 7000, gRPC mTLS on 7002
   us:
     image: ghcr.io/unotusk/us:${UNOTUSK_VERSION:-latest}
     hostname: auth-server
@@ -120,16 +111,18 @@ services:
     env_file:
       - ./US/.env
     environment:
-      HTTP_LISTEN_ADDR: 0.0.0.0:3000
+      HTTP_LISTEN_ADDR: 0.0.0.0:7000
+      GRPC_LISTEN_ADDR: 0.0.0.0:7002
+      UAC_PAIRING_ADDR: 0.0.0.0:7003
       DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/auth
-      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      UPS_LICENSE_STATUS_URL: http://company-server:7001/license/status
       PLATFORM_TOKEN_AUDIENCE: ${PLATFORM_TOKEN_AUDIENCE:-platform.unotusk.com}
       ORG_ID: ${ORG_ID}
       RUST_LOG: ${LOG_LEVEL:-info}
-    ports:
-      - "3000:3000"     # OIDC HTTP (login/callback/healthz)
-      - "8444:8444"     # UAC admin pairing
-      - "50052:50052"   # gRPC mTLS
+    expose:
+      - "7000"   # HTTP  (OIDC, /healthz)
+      - "7002"   # gRPC mTLS
+      - "7003"   # UAC admin pairing
     volumes:
       - us_data:/app/data
       - ./US/certs:/app/certs:ro
@@ -143,7 +136,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:3000/healthz"]
+      test: ["CMD", "curl", "-sf", "http://localhost:7000/healthz"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -152,11 +145,10 @@ services:
       - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
+      options: { max-size: "100m", max-file: "5" }
 
   # ── UPS — Company Server ───────────────────────────────────────────────────
+  # Internal only — Caddy proxies gRPC mTLS on 7004
   ups:
     image: ghcr.io/unotusk/ups:${UNOTUSK_VERSION:-latest}
     hostname: company-server
@@ -164,8 +156,9 @@ services:
     env_file:
       - ./UPS/.env
     environment:
-      HEALTH_LISTEN_ADDR: 0.0.0.0:8080
-      AUTH_GRPC_ENDPOINT: https://auth-server:50052
+      HEALTH_LISTEN_ADDR: 0.0.0.0:7001
+      GRPC_LISTEN_ADDR: 0.0.0.0:7004
+      AUTH_GRPC_ENDPOINT: https://auth-server:7002
       DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/company
       PLATFORM_URL: ${PLATFORM_URL:?PLATFORM_URL is required}
       PLATFORM_LICENSE_KEY: ${PLATFORM_LICENSE_KEY:?PLATFORM_LICENSE_KEY is required}
@@ -175,12 +168,13 @@ services:
       PLATFORM_CLIENT_TLS_CERT: /app/certs/platform/client.crt
       PLATFORM_CLIENT_TLS_KEY: /app/certs/platform/client.key
       ORG_ID: ${ORG_ID:?ORG_ID is required}
-      US_JWKS_URL: http://auth-server:3000/.well-known/jwks.json
+      US_JWKS_URL: http://auth-server:7000/.well-known/jwks.json
       PLATFORM_JWKS_PUSH_URL: ${PLATFORM_JWKS_PUSH_URL}
       JWKS_PUSH_SECRET: ${JWKS_PUSH_SECRET}
       RUST_LOG: ${LOG_LEVEL:-info}
-    ports:
-      - "50051:50051"   # gRPC business mTLS
+    expose:
+      - "7001"   # HTTP health
+      - "7004"   # gRPC mTLS (business)
     volumes:
       - ups_data:/app/data
       - ./UPS/certs:/app/certs:ro
@@ -196,7 +190,7 @@ services:
       us:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
+      test: ["CMD", "curl", "-sf", "http://localhost:7001/healthz"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -205,9 +199,7 @@ services:
       - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
+      options: { max-size: "100m", max-file: "5" }
 
   # ── AI-PIE — Intelligence Engine ───────────────────────────────────────────
   ai-pie:
@@ -216,13 +208,16 @@ services:
     env_file:
       - ./AI-PIE/.env
     environment:
+      LISTEN_ADDR: 0.0.0.0:7005
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       ONTOLOGY_DB_PATH: /app/data/ontology.db
       PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
-      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      UPS_LICENSE_STATUS_URL: http://company-server:7001/license/status
       GITHUB_ORG: ${GITHUB_ORG_NAME:-}
       JIRA_URL: ${JIRA_URL:-}
+    expose:
+      - "7005"   # HTTP API
     volumes:
       - ai_pie_data:/app/data
       - ./AI-PIE/certs:/app/certs:ro
@@ -239,7 +234,7 @@ services:
       ups:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:7005/health"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -248,6 +243,38 @@ services:
       - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
+      options: { max-size: "100m", max-file: "5" }
+
+  # ── Caddy — Reverse Proxy ──────────────────────────────────────────────────
+  # The ONLY service with host ports (80, 443).
+  # Handles TLS termination and routes to all internal services.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP → redirect to HTTPS
+      - "443:443"   # HTTPS + gRPC-TLS
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - unotusk_internal
+    depends_on:
+      us:
+        condition: service_healthy
+      ups:
+        condition: service_healthy
+      ai-pie:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options: { max-size: "50m", max-file: "3" }

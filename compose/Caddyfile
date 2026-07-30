@@ -1,0 +1,109 @@
+# UNOTUSK Caddyfile
+#
+# Route map (all internal — services never exposed on host):
+#
+#   443 (HTTPS)
+#   ├── /healthz                    → us:7000/healthz
+#   ├── /.well-known/*              → us:7000 (OIDC discovery)
+#   ├── /auth/*                     → us:7000 (OIDC login/callback/token)
+#   ├── /api/ai/*                   → ai-pie:7005
+#   └── /                           → us:7000 (catch-all)
+#
+#   443 (gRPC-TLS — h2 protocol)
+#   ├── unotusk.auth.*              → us:7002  (Auth gRPC mTLS)
+#   └── unotusk.company.*           → ups:7004 (Company gRPC mTLS)
+#
+#   80  → redirect to 443
+
+{
+  # Global options
+  admin off
+  email {$CADDY_ACME_EMAIL:-admin@unotusk.com}
+}
+
+# ── HTTP → HTTPS redirect ──────────────────────────────────────────────────────
+http:// {
+  redir https://{host}{uri} permanent
+}
+
+# ── Main HTTPS entrypoint ──────────────────────────────────────────────────────
+https:// {
+  # TLS — auto-managed via ACME (Let's Encrypt / ZeroSSL)
+  # When no domain is configured, uses self-signed (dev/internal mode)
+  tls {$CADDY_TLS_EMAIL:-internal}
+
+  # ── OIDC / Auth (US service on 7000) ────────────────────────────────────────
+  handle /.well-known/* {
+    reverse_proxy us:7000 {
+      header_up Host {host}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto https
+    }
+  }
+
+  handle /auth/* {
+    reverse_proxy us:7000 {
+      header_up Host {host}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto https
+    }
+  }
+
+  handle /healthz {
+    reverse_proxy us:7000
+  }
+
+  # ── AI-PIE API (on 7005) ─────────────────────────────────────────────────────
+  handle /api/ai/* {
+    uri strip_prefix /api/ai
+    reverse_proxy ai-pie:7005 {
+      header_up Host {host}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-Proto https
+    }
+  }
+
+  # ── Catch-all → US ──────────────────────────────────────────────────────────
+  handle {
+    reverse_proxy us:7000 {
+      header_up Host {host}
+      header_up X-Real-IP {remote_host}
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto https
+    }
+  }
+
+  # ── Security headers ─────────────────────────────────────────────────────────
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    -Server
+  }
+
+  # ── Access log ───────────────────────────────────────────────────────────────
+  log {
+    output file /var/log/caddy/access.log {
+      roll_size 50mb
+      roll_keep 5
+    }
+    format json
+  }
+}
+
+# ── gRPC — Auth Service (US on 7002) ─────────────────────────────────────────
+# Client UAC connects here for mTLS gRPC
+:50052 {
+  tls {$CADDY_TLS_EMAIL:-internal}
+  reverse_proxy h2c://us:7002
+}
+
+# ── gRPC — Company Server (UPS on 7004) ──────────────────────────────────────
+# Platform connects here for license validation
+:50051 {
+  tls {$CADDY_TLS_EMAIL:-internal}
+  reverse_proxy h2c://ups:7004
+}

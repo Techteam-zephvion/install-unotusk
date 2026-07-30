@@ -37,7 +37,7 @@ VERSION_FILE="${INSTALL_DIR}/.unotusk-version"
 MIN_RAM_MB=3584        # 3.5 GB — hard minimum
 WARN_RAM_MB=7168       # 7 GB — recommended
 MIN_DISK_MB=10240      # 10 GB
-REQUIRED_PORTS=(3000 8444 50051 50052)
+REQUIRED_PORTS=(80 443)           # Caddy reverse proxy — only external ports
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
