@@ -244,8 +244,11 @@ _effective_distro() {
   case "$id" in
     ubuntu|debian) echo "$id"; return ;;
   esac
+  # IFS=$'\n\t' disables space-splitting — must split ID_LIKE explicitly
+  local -a tokens
+  IFS=' ' read -ra tokens <<< "$id_like"
   local token
-  for token in $id_like; do
+  for token in "${tokens[@]:-}"; do
     case "$token" in
       ubuntu|debian) echo "$token"; return ;;
     esac
