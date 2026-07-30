@@ -1,8 +1,9 @@
 # Git
 .git/
-dist/
-*.tar.gz
-*.sha256
+
+# dist/unotusk-installer.tar.gz(.sha256) is committed intentionally — Vercel
+# serves it at install.unotusk.com/dist/... for bootstrap/install.sh to fetch
+# from a private repo without GitHub auth. Rebuilt by scripts/release.sh.
 
 # Secrets — never commit
 .env

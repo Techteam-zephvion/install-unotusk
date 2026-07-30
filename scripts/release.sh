@@ -44,17 +44,7 @@ TARBALL="${DIST_DIR}/unotusk-installer.tar.gz"
 mkdir -p "$DIST_DIR"
 
 info "Building installer tarball..."
-tar -czf "$TARBALL" \
-  --transform "s|^|installer/|" \
-  --exclude="*.DS_Store" \
-  installer/install.sh \
-  installer/uninstall.sh \
-  installer/update.sh \
-  installer/doctor.sh \
-  installer/backup.sh \
-  installer/restore.sh \
-  installer/verify.sh \
-  installer/rollback.sh
+tar -czf "$TARBALL" --exclude="*.DS_Store" installer
 
 success "Tarball: $TARBALL ($(du -sh "$TARBALL" | cut -f1))"
 
@@ -63,14 +53,23 @@ sha256sum "$TARBALL" > "${TARBALL}.sha256"
 CHECKSUM=$(awk '{print $1}' "${TARBALL}.sha256")
 success "SHA-256: $CHECKSUM"
 
+# ── Commit dist/ so Vercel serves it (install-unotusk is a private repo, so
+#    bootstrap/install.sh fetches the tarball from install.unotusk.com/dist/
+#    rather than an anonymous GitHub archive/release URL) ─────────────────────
+info "Committing built tarball..."
+git add "$TARBALL" "${TARBALL}.sha256"
+git commit -m "chore(release): build installer tarball for ${VERSION}"
+success "Tarball committed."
+
 # ── Tag and push ──────────────────────────────────────────────────────────────
 info "Creating git tag: $VERSION"
 git tag -a "$VERSION" -m "Release $VERSION"
 success "Tag created."
 
-info "Pushing tag to origin..."
+info "Pushing main and tag to origin..."
+git push origin main
 git push origin "$VERSION"
-success "Tag pushed — GitHub Actions will create the release and upload assets."
+success "Pushed — Vercel redeploys dist/, GitHub Actions publishes the release."
 
 echo ""
 echo -e "${BOLD}Release ${VERSION} triggered.${RESET}"
@@ -78,5 +77,5 @@ echo "  Monitor: https://github.com/Techteam-zephvion/install-unotusk/actions"
 echo "  Release: https://github.com/Techteam-zephvion/install-unotusk/releases/tag/${VERSION}"
 echo ""
 echo "  Bootstrap URL: https://install.unotusk.com"
-echo "  Direct asset:  https://github.com/Techteam-zephvion/install-unotusk/releases/download/${VERSION}/unotusk-installer.tar.gz"
+echo "  Tarball:       https://install.unotusk.com/dist/unotusk-installer.tar.gz"
 echo ""

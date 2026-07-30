@@ -10,7 +10,7 @@
 #    3. Installs Docker Engine if missing
 #    4. Installs Docker Compose plugin if missing
 #    5. Creates /opt/unotusk
-#    6. Downloads the latest versioned installer tarball from GitHub Releases
+#    6. Downloads the installer tarball from install.unotusk.com (Vercel)
 #    7. Verifies its SHA-256 checksum
 #    8. Extracts and executes the real installer
 #
@@ -208,17 +208,33 @@ header "[5/6] Preparing /opt/unotusk..."
 mkdir -p "$INSTALL_DIR"
 success "Installation directory: $INSTALL_DIR"
 
-# ── Download installer package from GitHub ────────────────────────────────────
+# ── Download installer package from Vercel (install.unotusk.com) ──────────────
+# install-unotusk is a private GitHub repo, so anonymous GitHub archive/release
+# URLs 404. Vercel has repo access regardless of visibility and serves the
+# pre-built tarball as a static asset — same approach as the bootstrap script
+# itself.
 header "[6/6] Downloading UNOTUSK installer package..."
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-INSTALLER_TAR_URL="https://github.com/Techteam-zephvion/install-unotusk/archive/refs/heads/main.tar.gz"
+INSTALLER_TAR_URL="${BASE_URL}/dist/unotusk-installer.tar.gz"
+INSTALLER_SHA_URL="${BASE_URL}/dist/unotusk-installer.tar.gz.sha256"
 
-info "Downloading installer package from GitHub..."
+info "Downloading installer package from ${BASE_URL}..."
 curl -fsSL "$INSTALLER_TAR_URL" -o "${TMP_DIR}/installer.tar.gz" \
   || fail "Installer package download failed. Check your internet connection."
+
+if curl -fsSL "$INSTALLER_SHA_URL" -o "${TMP_DIR}/installer.tar.gz.sha256" 2>/dev/null; then
+  EXPECTED_SUM=$(awk '{print $1}' "${TMP_DIR}/installer.tar.gz.sha256")
+  ACTUAL_SUM=$(sha256sum "${TMP_DIR}/installer.tar.gz" | awk '{print $1}')
+  if [[ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]]; then
+    fail "SHA-256 checksum mismatch! Expected: $EXPECTED_SUM  Got: $ACTUAL_SUM"
+  fi
+  success "Checksum verified: $ACTUAL_SUM"
+else
+  warn "Checksum file not available — skipping verification."
+fi
 
 info "Extracting installer archive..."
 tar -xzf "${TMP_DIR}/installer.tar.gz" -C "$TMP_DIR" \

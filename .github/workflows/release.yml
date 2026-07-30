@@ -23,17 +23,7 @@ jobs:
       - name: Build installer tarball
         run: |
           mkdir -p dist
-          tar -czf dist/unotusk-installer.tar.gz \
-            --transform "s|^|installer/|" \
-            --exclude="*.DS_Store" \
-            installer/install.sh \
-            installer/uninstall.sh \
-            installer/update.sh \
-            installer/doctor.sh \
-            installer/backup.sh \
-            installer/restore.sh \
-            installer/verify.sh \
-            installer/rollback.sh
+          tar -czf dist/unotusk-installer.tar.gz --exclude="*.DS_Store" installer
 
       - name: Generate SHA-256 checksum
         run: |
@@ -65,8 +55,8 @@ jobs:
             ### Manual verification
 
             ```bash
-            wget https://github.com/unotusk/install/releases/download/${{ steps.version.outputs.VERSION }}/unotusk-installer.tar.gz
-            wget https://github.com/unotusk/install/releases/download/${{ steps.version.outputs.VERSION }}/unotusk-installer.tar.gz.sha256
+            wget https://install.unotusk.com/dist/unotusk-installer.tar.gz
+            wget https://install.unotusk.com/dist/unotusk-installer.tar.gz.sha256
             sha256sum --check unotusk-installer.tar.gz.sha256
             ```
 
