@@ -46,7 +46,7 @@ readonly BASE_URL="https://install.unotusk.com"
 # Resource thresholds
 readonly MIN_CPU_CORES=2
 readonly MIN_RAM_MB=8192     # 8 GB  — hard minimum
-readonly WARN_RAM_MB=16384   # 16 GB — recommended
+readonly WARN_RAM_MB=14336   # 14 GB — warn below this (16 GB machines report ~15 GB)
 readonly MIN_DISK_MB=20480   # 20 GB — hard minimum
 
 # Docker
