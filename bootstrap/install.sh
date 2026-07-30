@@ -208,30 +208,31 @@ header "[5/6] Preparing /opt/unotusk..."
 mkdir -p "$INSTALL_DIR"
 success "Installation directory: $INSTALL_DIR"
 
-# ── Download installer from install.unotusk.com (Vercel) ──────────────────────
-header "[6/6] Downloading UNOTUSK installer..."
+# ── Download installer package from GitHub ────────────────────────────────────
+header "[6/6] Downloading UNOTUSK installer package..."
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-INSTALLER_URL="${BASE_URL}/installer/install.sh"
-CHECKSUM_URL="${BASE_URL}/installer/install.sh.sha256"
+INSTALLER_TAR_URL="https://github.com/Techteam-zephvion/install-unotusk/archive/refs/heads/main.tar.gz"
 
-info "Fetching installer from ${BASE_URL}..."
-curl -fsSL "$INSTALLER_URL" -o "${TMP_DIR}/install.sh" \
-  || fail "Installer download failed. Check your internet connection."
+info "Downloading installer package from GitHub..."
+curl -fsSL "$INSTALLER_TAR_URL" -o "${TMP_DIR}/installer.tar.gz" \
+  || fail "Installer package download failed. Check your internet connection."
 
-# Verify checksum if the .sha256 file is available
-if curl -fsSL "$CHECKSUM_URL" -o "${TMP_DIR}/install.sh.sha256" 2>/dev/null; then
-  EXPECTED_SUM=$(awk '{print $1}' "${TMP_DIR}/install.sh.sha256")
-  ACTUAL_SUM=$(sha256sum "${TMP_DIR}/install.sh" | awk '{print $1}')
-  if [[ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]]; then
-    fail "SHA-256 checksum mismatch! Expected: $EXPECTED_SUM  Got: $ACTUAL_SUM"
-  fi
-  success "Checksum verified: $ACTUAL_SUM"
-else
-  warn "Checksum file not available — skipping verification."
+info "Extracting installer archive..."
+tar -xzf "${TMP_DIR}/installer.tar.gz" -C "$TMP_DIR" \
+  || fail "Failed to extract installer archive."
+
+# Dynamically locate the installer subdirectory inside the extracted repository
+INSTALLER_SRC_DIR=$(find "$TMP_DIR" -type d -name "installer" | head -1)
+if [[ -z "$INSTALLER_SRC_DIR" ]]; then
+  fail "Could not find 'installer' directory inside the downloaded package."
 fi
+
+# Move everything inside the installer directory to the top level of TMP_DIR
+mv "$INSTALLER_SRC_DIR"/* "$TMP_DIR/" 2>/dev/null || true
+mv "$INSTALLER_SRC_DIR"/.* "$TMP_DIR/" 2>/dev/null || true
 
 chmod +x "${TMP_DIR}/install.sh"
 success "Installer ready."
@@ -240,4 +241,3 @@ success "Installer ready."
 info "Handing off to UNOTUSK Installer..."
 echo ""
 exec bash "${TMP_DIR}/install.sh" --install-dir "$INSTALL_DIR" --version "latest"
-# Deploy: 2026-07-30T03:36:59Z
