@@ -1,0 +1,10 @@
+# ==============================================================================
+# UNOTUSK Database Schema Migrations List
+# ==============================================================================
+
+migrations:
+  - file: "001_init.sql"
+    description: "Initial database schemas setup"
+    
+  - file: "002_add_indexing.sql"
+    description: "Secondary indexes addition"

@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "channel": "stable",
+  "images": {
+    "postgres": "postgres:16-alpine",
+    "redis": "redis:7-alpine",
+    "qdrant": "qdrant/qdrant:v1.15.1",
+    "phoenix": "arizephoenix/phoenix:latest",
+    "us": "ghcr.io/unotusk/us:v2.0.0",
+    "ups": "ghcr.io/unotusk/ups:v2.0.0",
+    "ai-pie": "ghcr.io/unotusk/ai-pie:v2.0.0",
+    "caddy": "caddy:2.7-alpine"
+  },
+  "templates": {
+    "compose": "templates/docker-compose.yml",
+    "caddy": "templates/Caddyfile"
+  }
+}

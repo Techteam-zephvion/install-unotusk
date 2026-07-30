@@ -1,0 +1,70 @@
+# ==============================================================================
+# UNOTUSK Configuration Registry Schema Definitions
+# ==============================================================================
+
+settings:
+  - name: ORG_NAME
+    description: "Organization Name"
+    type: "string"
+    required: true
+    default: "UnotuskOrg"
+
+  - name: ORG_ID
+    description: "Organization UUID"
+    type: "string"
+    required: true
+    generator: "uuid"
+
+  - name: LICENSE_KEY
+    description: "License Key"
+    type: "string"
+    required: true
+    format: "license"
+
+  - name: PLATFORM_URL
+    description: "Platform API URL"
+    type: "string"
+    required: true
+    format: "url"
+    default: "https://platform.unotusk.com:50051"
+
+  - name: HOSTNAME
+    description: "Domain or Hostname for HTTPS"
+    type: "string"
+    required: true
+    default: "localhost"
+
+  - name: TIMEZONE
+    description: "System Timezone"
+    type: "string"
+    required: true
+    default: "UTC"
+
+  - name: CERT_OPTION
+    description: "Ingress TLS Certificate Option (selfsigned, custom, letsencrypt)"
+    type: "string"
+    required: true
+    default: "selfsigned"
+
+  - name: ADMIN_EMAIL
+    description: "Administrator Email Address"
+    type: "string"
+    required: true
+    format: "email"
+
+  - name: OIDC_PROVIDER
+    description: "Enterprise OIDC Provider (e.g. keycloak, okta, google, none)"
+    type: "string"
+    required: false
+    default: "none"
+
+  - name: GITHUB_ORG
+    description: "GitHub Organization integration"
+    type: "string"
+    required: false
+
+  - name: JIRA_URL
+    description: "Jira base URL integration"
+    type: "string"
+    required: false
+    format: "url"

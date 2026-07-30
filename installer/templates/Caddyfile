@@ -1,0 +1,52 @@
+# ==============================================================================
+# UNOTUSK Reverse Proxy Routing — Caddyfile
+# ==============================================================================
+
+{$HOSTNAME} {
+    # Logging configuration
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+
+    # TLS placeholder (will be replaced by bootstrap/config scripts)
+    # #TLS_CONFIG#
+
+    # ── US Service (OIDC & Auth) ──
+    reverse_proxy /oidc/* us:3000
+    reverse_proxy /healthz us:3000
+    reverse_proxy /readyz us:3000
+    reverse_proxy /.well-known/jwks.json us:3000
+
+    # ── US Admin Pairing ──
+    reverse_proxy /admin/* us:8444
+
+    # ── AI-PIE Engine ──
+    reverse_proxy /api/pie/* ai-pie:8000
+    reverse_proxy /health ai-pie:8000
+
+    # ── Arize Phoenix Observability ──
+    # Phoenix runs its UI on 6006
+    route /phoenix* {
+        uri strip_prefix /phoenix
+        reverse_proxy phoenix:6006
+    }
+
+    # ── US gRPC mTLS Interface ──
+    reverse_proxy /auth.gRPC/* {
+        transport http {
+            versions h2c
+        }
+        to us:50052
+    }
+
+    # ── UPS gRPC mTLS Interface ──
+    reverse_proxy /company.gRPC/* {
+        transport http {
+            versions h2c
+        }
+        to ups:50051
+    }
+}

@@ -1,0 +1,233 @@
+# ==============================================================================
+# UNOTUSK Platform — Service Container Orchestration
+# ==============================================================================
+
+networks:
+  unotusk_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  phoenix_data:
+  us_data:
+  ups_data:
+  ai_pie_data:
+  caddy_data:
+  caddy_config:
+  logs:
+
+services:
+
+  # ── PostgreSQL — relational databases for US and UPS metadata ──
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unotusk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unotusk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Redis — Shared in-memory cache and session state ──
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
+    volumes:
+      - redis_data:/data
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Qdrant — AI reasoning vector database ──
+  qdrant:
+    image: qdrant/qdrant:v1.15.1
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/6333"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Arize Phoenix — AI observability framework ──
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    restart: unless-stopped
+    volumes:
+      - phoenix_data:/root/.phoenix
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── US — Auth Service (OIDC issuer, JWT pair verification) ──
+  us:
+    image: unotusk/us:local
+    hostname: auth-server
+    restart: unless-stopped
+    env_file:
+      - ./US/.env
+    environment:
+      HTTP_LISTEN_ADDR: 0.0.0.0:3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/auth
+      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      PLATFORM_TOKEN_AUDIENCE: ${PLATFORM_TOKEN_AUDIENCE:-platform.unotusk.com}
+      RUST_LOG: ${LOG_LEVEL:-info}
+    volumes:
+      - us_data:/app/data
+      - ./US/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - auth-server
+          - us
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  # ── UPS — Company Server (outbound heartbeat, licensing) ──
+  ups:
+    image: unotusk/ups:local
+    hostname: company-server
+    restart: unless-stopped
+    env_file:
+      - ./UPS/.env
+    environment:
+      HEALTH_LISTEN_ADDR: 0.0.0.0:8080
+      AUTH_GRPC_ENDPOINT: https://auth-server:50052
+      DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/company
+      PLATFORM_URL: ${PLATFORM_URL}
+      PLATFORM_LICENSE_KEY: ${PLATFORM_LICENSE_KEY}
+      PLATFORM_CA_CERT: /app/certs/platform/ca.crt
+      PLATFORM_CLIENT_TLS_CERT: /app/certs/platform/client.crt
+      PLATFORM_CLIENT_TLS_KEY: /app/certs/platform/client.key
+      US_JWKS_URL: http://auth-server:3000/.well-known/jwks.json
+      RUST_LOG: ${LOG_LEVEL:-info}
+    volumes:
+      - ups_data:/app/data
+      - ./UPS/certs:/app/certs:ro
+      - ./UPS/certs/platform:/app/certs/platform:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - company-server
+          - ups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      us:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  # ── AI PIE — Core AI engineering reasoning backend ──
+  ai-pie:
+    image: unotusk/ai-pie:local
+    restart: unless-stopped
+    env_file:
+      - ./AI-PIE/.env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      ONTOLOGY_DB_PATH: /app/data/ontology.db
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+    volumes:
+      - ai_pie_data:/app/data
+      - ./AI-PIE/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - ai-pie
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+      ups:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; ctx.load_cert_chain(certfile='/app/certs/dev/client.pem', keyfile='/app/certs/dev/client.key'); urllib.request.urlopen('https://localhost:8000/health', context=ctx)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Caddy — Unified HTTPS Reverse Proxy Gateway ──
+  caddy:
+    image: caddy:2.7-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./templates/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./caddy/certs:/etc/caddy/certs:ro
+    networks:
+      - unotusk_internal
+    depends_on:
+      us:
+        condition: service_healthy
+      ups:
+        condition: service_healthy
+      ai-pie:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
