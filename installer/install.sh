@@ -168,10 +168,10 @@ ask() {
   fi
   local input=""
   if [[ -n "$default" ]]; then
-    read -r -p "  ${CYAN}?${RESET} ${prompt} [${default}]: " input
+    read -r -p "  ${CYAN}?${RESET} ${prompt} [${default}]: " input < /dev/tty
     printf -v "$var_name" '%s' "${input:-${default}}"
   else
-    read -r -p "  ${CYAN}?${RESET} ${prompt}: " input
+    read -r -p "  ${CYAN}?${RESET} ${prompt}: " input < /dev/tty
     printf -v "$var_name" '%s' "$input"
   fi
 }
@@ -185,7 +185,7 @@ ask_secret() {
     return
   fi
   local input=""
-  read -r -s -p "  ${CYAN}?${RESET} ${prompt}: " input; echo
+  read -r -s -p "  ${CYAN}?${RESET} ${prompt}: " input < /dev/tty; echo
   printf -v "$var_name" '%s' "$input"
 }
 
