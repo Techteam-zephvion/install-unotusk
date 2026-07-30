@@ -313,8 +313,8 @@ check_internet() {
   header "Internet connectivity"
   local -ra targets=(
     "https://install.unotusk.com"
-    "https://registry-1.docker.io"
-    "https://api.github.com"
+    "https://hub.docker.com"
+    "https://one.one.one.one"
   )
   local target
   for target in "${targets[@]}"; do
