@@ -227,6 +227,9 @@ ORG_NAME="$ORG_NAME"
 ORG_ID="$ORG_ID"
 LICENSE_KEY="$LICENSE_KEY"
 PLATFORM_URL="$PLATFORM_URL"
+GITHUB_CLIENT_ID="$GITHUB_CLIENT_ID"
+GITHUB_CLIENT_SECRET="$GITHUB_CLIENT_SECRET"
+GITHUB_CALLBACK_URL="$GITHUB_CALLBACK_URL"
 GITHUB_ORG="$GITHUB_ORG"
 JIRA_URL="$JIRA_URL"
 OIDC_PROVIDER="$OIDC_PROVIDER"
@@ -256,6 +259,18 @@ EOF
   QDRANT_API_KEY="${q_key:-$(generate_secure_token)}"
   REDIS_PASSWORD="${r_pw:-$(generate_secure_token)}"
   JWKS_PUSH_SECRET="${j_sec:-$(generate_secure_token)}"
+
+  # US requires TOKEN_ENC_KEY: a base64-encoded 32-byte AES-256-GCM key for
+  # encrypting GitHub/OIDC tokens at rest. generate_secure_token() strips to
+  # alphanumeric and truncates to 24 chars — not valid base64, not 32 bytes.
+  # Needs its own generator, and the same idempotent-preserve pattern as the
+  # secrets above (rotating it on every reconfigure would invalidate every
+  # stored token).
+  local token_enc_key
+  if [ -f "$INSTALL_DIR/US/.env" ]; then
+    token_enc_key=$(grep '^TOKEN_ENC_KEY=' "$INSTALL_DIR/US/.env" | cut -d= -f2- || true)
+  fi
+  TOKEN_ENC_KEY="${token_enc_key:-$(openssl rand -base64 32)}"
 
   # Write main stack configuration env file
   cat > "$ENV_FILE" <<EOF
@@ -294,14 +309,34 @@ LOG_LEVEL=info
 EOF
 
   # Write configurations for individual docker contexts
+  #
+  # CA_CERT/GRPC_TLS_CERT/GRPC_TLS_KEY: generate_certificates() (§ below)
+  # writes these to US/certs/{ca,server}.{crt,key}, mounted read-only into
+  # the container at /app/certs — these are Config::from_env()'s required()
+  # fields, with no default, so without these three lines US crashes at
+  # boot on "missing required env var: CA_CERT" before it ever reaches
+  # auth-mechanism config.
+  #
+  # GitHub OAuth, not OIDC: /oidc/* has no route wiring in US's router
+  # (AMEND-008's migration was never finished — GitHub OAuth is what's
+  # actually live). The previous OIDC_CLIENT_ID/OIDC_REDIRECT_URI values
+  # here were placeholders that were never a working OIDC client, and
+  # OIDC_ISSUER/OIDC_CLIENT_SECRET were never written at all — Config::
+  # from_env() required all four unconditionally, so every install crashed
+  # regardless of which auth mechanism was intended.
   cat > "$INSTALL_DIR/US/.env" <<EOF
 LOG_LEVEL=info
 PLATFORM_TOKEN_AUDIENCE=platform.unotusk.com
 ORG_ID=$ORG_ID
 ORG_NAME=$ORG_NAME
+TOKEN_ENC_KEY=$TOKEN_ENC_KEY
+CA_CERT=/app/certs/ca.crt
+GRPC_TLS_CERT=/app/certs/server.crt
+GRPC_TLS_KEY=/app/certs/server.key
+GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET=$GITHUB_CLIENT_SECRET
+GITHUB_CALLBACK_URL=$GITHUB_CALLBACK_URL
 OIDC_PROVIDER=$OIDC_PROVIDER
-OIDC_CLIENT_ID=$ORG_NAME-oidc
-OIDC_REDIRECT_URI=https://$HOSTNAME/oidc/callback
 EOF
 
   cat > "$INSTALL_DIR/UPS/.env" <<EOF

@@ -26,7 +26,7 @@ settings:
     type: "string"
     required: true
     format: "url"
-    default: "https://platform.unotusk.com:50051"
+    default: "https://platform.unotusk.com"
 
   - name: HOSTNAME
     description: "Domain or Hostname for HTTPS"
@@ -53,10 +53,26 @@ settings:
     format: "email"
 
   - name: OIDC_PROVIDER
-    description: "Enterprise OIDC Provider (e.g. keycloak, okta, google, none)"
+    description: "Enterprise OIDC Provider (e.g. keycloak, okta, google, none) — NOT YET LIVE, see GITHUB_CLIENT_ID below"
     type: "string"
     required: false
     default: "none"
+
+  - name: GITHUB_CLIENT_ID
+    description: "GitHub OAuth App Client ID (login mechanism — register an OAuth App at https://github.com/settings/developers)"
+    type: "string"
+    required: true
+
+  - name: GITHUB_CLIENT_SECRET
+    description: "GitHub OAuth App Client Secret"
+    type: "string"
+    required: true
+
+  - name: GITHUB_CALLBACK_URL
+    description: "GitHub OAuth callback URL (must match the OAuth App's registered callback exactly)"
+    type: "string"
+    required: true
+    format: "url"
 
   - name: GITHUB_ORG
     description: "GitHub Organization integration"

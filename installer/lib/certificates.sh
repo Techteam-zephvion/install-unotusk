@@ -27,11 +27,20 @@ generate_certificates() {
   log_info "Generating local CA and service certificates..."
 
   # ── 1. Create Internal Root CA ──
+  # -addext (not just -x509's implicit defaults): plain `openssl req -x509`
+  # produces an X.509v1 certificate with no extensions. rustls (every Rust
+  # TLS client/server in this stack — tonic's gRPC mTLS listeners
+  # especially) rejects v1 certs outright with "UnsupportedCertVersion" —
+  # confirmed this breaks the US<->UPS gRPC mTLS handshake universally.
+  # basicConstraints=CA:TRUE is also what actually makes this a valid CA
+  # rather than just a self-signed leaf cert.
   log_to_file_info "Generating local CA key and root certificate..."
   openssl req -x509 -newkey rsa:4096 -days 3650 -nodes \
     -keyout "$INSTALL_DIR/US/certs/ca.key" \
     -out "$INSTALL_DIR/US/certs/ca.crt" \
     -subj "/C=US/O=Unotusk/CN=UnotuskInternalCA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
     &>>"$INSTALL_LOG" || {
       log_fatal_err \
         "Failed to generate internal CA certificates." \
@@ -46,17 +55,26 @@ generate_certificates() {
   cp "$INSTALL_DIR/US/certs/ca.crt" "$INSTALL_DIR/caddy/certs/ca.crt"
 
   # ── 2. Create Auth Service (US) server certs ──
+  # -addext on the CSR + -copy_extensions=copy on the signing step: carries
+  # basicConstraints/keyUsage/extendedKeyUsage/subjectAltName through to the
+  # signed cert, producing a v3 cert rustls/tonic will accept — see the CA
+  # generation step above for why v1 (the default) breaks mTLS entirely.
   log_to_file_info "Generating auth-server certificates..."
   openssl req -newkey rsa:2048 -nodes \
     -keyout "$INSTALL_DIR/US/certs/server.key" \
     -out "$INSTALL_DIR/US/certs/server.csr" \
     -subj "/C=US/O=Unotusk/CN=auth-server" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=serverAuth,clientAuth" \
+    -addext "subjectAltName=DNS:auth-server,DNS:us,DNS:localhost" \
     &>>"$INSTALL_LOG"
-  
+
   openssl x509 -req -in "$INSTALL_DIR/US/certs/server.csr" \
     -CA "$INSTALL_DIR/US/certs/ca.crt" \
     -CAkey "$INSTALL_DIR/US/certs/ca.key" \
     -CAcreateserial \
+    -copy_extensions=copy \
     -out "$INSTALL_DIR/US/certs/server.crt" \
     -days 365 &>>"$INSTALL_LOG"
 
@@ -66,12 +84,17 @@ generate_certificates() {
     -keyout "$INSTALL_DIR/UPS/certs/client.key" \
     -out "$INSTALL_DIR/UPS/certs/client.csr" \
     -subj "/C=US/O=Unotusk/CN=company-server" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=clientAuth" \
+    -addext "subjectAltName=DNS:company-server,DNS:ups" \
     &>>"$INSTALL_LOG"
-  
+
   openssl x509 -req -in "$INSTALL_DIR/UPS/certs/client.csr" \
     -CA "$INSTALL_DIR/US/certs/ca.crt" \
     -CAkey "$INSTALL_DIR/US/certs/ca.key" \
     -CAcreateserial \
+    -copy_extensions=copy \
     -out "$INSTALL_DIR/UPS/certs/client.crt" \
     -days 365 &>>"$INSTALL_LOG"
 
@@ -82,6 +105,9 @@ generate_certificates() {
     -keyout "$INSTALL_DIR/UPS/certs/platform/client.key" \
     -out "$INSTALL_DIR/UPS/certs/platform/client.crt" \
     -subj "/C=US/O=Unotusk/CN=platform-client-placeholder" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=clientAuth" \
     &>>"$INSTALL_LOG"
   cp "$INSTALL_DIR/UPS/certs/platform/client.crt" "$INSTALL_DIR/UPS/certs/platform/ca.crt"
 
@@ -91,12 +117,17 @@ generate_certificates() {
     -keyout "$INSTALL_DIR/AI-PIE/certs/dev/client.key" \
     -out "$INSTALL_DIR/AI-PIE/certs/dev/client.csr" \
     -subj "/C=US/O=Unotusk/CN=ai-pie" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=clientAuth,serverAuth" \
+    -addext "subjectAltName=DNS:ai-pie" \
     &>>"$INSTALL_LOG"
-  
+
   openssl x509 -req -in "$INSTALL_DIR/AI-PIE/certs/dev/client.csr" \
     -CA "$INSTALL_DIR/US/certs/ca.crt" \
     -CAkey "$INSTALL_DIR/US/certs/ca.key" \
     -CAcreateserial \
+    -copy_extensions=copy \
     -out "$INSTALL_DIR/AI-PIE/certs/dev/client.pem" \
     -days 365 &>>"$INSTALL_LOG"
 
@@ -113,12 +144,17 @@ generate_certificates() {
         -keyout "$INSTALL_DIR/caddy/certs/server.key" \
         -out "$INSTALL_DIR/caddy/certs/server.csr" \
         -subj "/C=US/O=Unotusk/CN=$HOSTNAME" \
+        -addext "basicConstraints=critical,CA:FALSE" \
+        -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+        -addext "extendedKeyUsage=serverAuth" \
+        -addext "subjectAltName=DNS:$HOSTNAME" \
         &>>"$INSTALL_LOG"
-      
+
       openssl x509 -req -in "$INSTALL_DIR/caddy/certs/server.csr" \
         -CA "$INSTALL_DIR/US/certs/ca.crt" \
         -CAkey "$INSTALL_DIR/US/certs/ca.key" \
         -CAcreateserial \
+        -copy_extensions=copy \
         -out "$INSTALL_DIR/caddy/certs/server.crt" \
         -days 365 &>>"$INSTALL_LOG"
 
@@ -139,6 +175,10 @@ generate_certificates() {
           -keyout "$INSTALL_DIR/caddy/certs/server.key" \
           -out "$INSTALL_DIR/caddy/certs/server.crt" \
           -subj "/C=US/O=Unotusk/CN=$HOSTNAME-custom-fallback" \
+          -addext "basicConstraints=critical,CA:FALSE" \
+          -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+          -addext "extendedKeyUsage=serverAuth" \
+          -addext "subjectAltName=DNS:$HOSTNAME" \
           &>>"$INSTALL_LOG"
       fi
 
