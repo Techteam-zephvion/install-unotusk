@@ -79,8 +79,68 @@ settings:
     type: "string"
     required: false
 
+  # AI-PIE ingestion/generation settings — previously collected by no wizard
+  # field at all; AI-PIE/.env only ever got LOG_LEVEL/GITHUB_ORG/JIRA_URL,
+  # so a real install had no Claude access, no embeddings, and no working
+  # GitHub App ingestion despite all three being core to the product.
+
+  - name: CF_AIG_TOKEN
+    description: "Cloudflare AI Gateway auth token (Zephvion-managed — mint one per customer at dash.cloudflare.com, AI Gateway > unotuskmvp > Create authentication token, scoped to AI Gateway:Run only). Never a partner-supplied value."
+    type: "string"
+    required: true
+
+  - name: CF_AIG_BASE_URL
+    description: "Cloudflare AI Gateway base URL for this deployment"
+    type: "string"
+    required: true
+    format: "url"
+    default: "https://gateway.ai.cloudflare.com/v1/5c34da760e86d900ee5274d71ad9191e/unotuskmvp/anthropic"
+
+  - name: VOYAGE_API_KEY
+    description: "Voyage AI API key (code/decision embeddings — required for ingestion)"
+    type: "string"
+    required: true
+
+  # GITHUB_APP_ID/PRIVATE_KEY are the same across every customer (one
+  # Zephvion-owned production GitHub App) — NOT the AI-PIE-repo-only test
+  # app currently in this repo's own dev .env, which should be treated as
+  # compromised (exposed in this session's transcript) and never reused.
+  # A real production app needs registering before this is usable; left
+  # optional so a fresh install without it degrades to "no GitHub
+  # ingestion" rather than failing the whole wizard.
+  - name: GITHUB_APP_ID
+    description: "Zephvion's production GitHub App ID (same value for every customer — NOT any test/dev app)"
+    type: "string"
+    required: false
+
+  - name: GITHUB_APP_PRIVATE_KEY
+    description: "Zephvion's production GitHub App private key, PEM contents (same value for every customer)"
+    type: "string"
+    required: false
+
+  - name: GITHUB_APP_INSTALLATION_ID
+    description: "GitHub App installation ID for this customer's org (install Zephvion's AI-PIE Ingestion App at github.com/organizations/<org>/settings/installations, then copy the installation ID from the URL)"
+    type: "string"
+    required: false
+
   - name: JIRA_URL
     description: "Jira base URL integration"
     type: "string"
     required: false
     format: "url"
+
+  - name: JIRA_EMAIL
+    description: "Jira account email (for API token auth)"
+    type: "string"
+    required: false
+    format: "email"
+
+  - name: JIRA_TOKEN
+    description: "Jira API token"
+    type: "string"
+    required: false
+
+  - name: JIRA_PROJECT_KEY
+    description: "Jira project key (e.g. KAN)"
+    type: "string"
+    required: false

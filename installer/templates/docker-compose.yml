@@ -179,6 +179,14 @@ services:
       ONTOLOGY_DB_PATH: /app/data/ontology.db
       PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
       UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      # AMEND-007: AI-PIE validates bearer tokens against US's auth gRPC
+      # directly. Was never overridden here — defaulted to settings.py's
+      # localhost:50052, which inside this container means itself, not the
+      # us service. auth-server is us's network alias.
+      AUTH_GRPC_ENDPOINT: auth-server:50052
+      AUTH_CLIENT_CA_CERT: /app/certs/auth-client/ca.pem
+      AUTH_CLIENT_TLS_CERT: /app/certs/auth-client/cert.pem
+      AUTH_CLIENT_TLS_KEY: /app/certs/auth-client/key.pem
     volumes:
       - ai_pie_data:/app/data
       - ./AI-PIE/certs:/app/certs:ro

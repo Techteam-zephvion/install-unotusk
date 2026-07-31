@@ -131,6 +131,32 @@ generate_certificates() {
     -out "$INSTALL_DIR/AI-PIE/certs/dev/client.pem" \
     -days 365 &>>"$INSTALL_LOG"
 
+  # ── 5b. AI-PIE auth-client cert (AMEND-007 — AI-PIE validates bearer
+  # tokens against US's auth gRPC directly, mTLS-enforced unconditionally
+  # by US's gRPC listener). Distinct from the dev cert above (UPS
+  # health-check path) — this was never generated at all before, so
+  # AUTH_GRPC_ENDPOINT connections from AI-PIE to US had no client identity
+  # to mTLS-handshake with.
+  log_to_file_info "Generating AI-PIE auth-client certificates..."
+  mkdir -p "$INSTALL_DIR/AI-PIE/certs/auth-client"
+  openssl req -newkey rsa:2048 -nodes \
+    -keyout "$INSTALL_DIR/AI-PIE/certs/auth-client/key.pem" \
+    -out "$INSTALL_DIR/AI-PIE/certs/auth-client/cert.csr" \
+    -subj "/C=US/O=Unotusk/CN=ai-pie-auth-client" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=clientAuth" \
+    &>>"$INSTALL_LOG"
+
+  openssl x509 -req -in "$INSTALL_DIR/AI-PIE/certs/auth-client/cert.csr" \
+    -CA "$INSTALL_DIR/US/certs/ca.crt" \
+    -CAkey "$INSTALL_DIR/US/certs/ca.key" \
+    -CAcreateserial \
+    -copy_extensions=copy \
+    -out "$INSTALL_DIR/AI-PIE/certs/auth-client/cert.pem" \
+    -days 365 &>>"$INSTALL_LOG"
+  cp "$INSTALL_DIR/US/certs/ca.crt" "$INSTALL_DIR/AI-PIE/certs/auth-client/ca.pem"
+
   # ── 6. Ingress Certificate Setup (Caddy) ──
   local caddyfile_target="$INSTALL_DIR/templates/Caddyfile"
   if [ -f "$caddyfile_target" ]; then
