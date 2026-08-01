@@ -56,9 +56,33 @@ compose_pull_images() {
   fi
 
   log_to_file_info "Pulling Docker images from registry..."
-  if ! execute_compose pull; then
+  # Pull per-service rather than as one batch: `docker compose pull` (no
+  # args) aborts the entire batch on the first failing image, so a private
+  # unotusk/* image (not published to any registry yet — tracked gap, needs
+  # a CI pipeline pushing to one before this is a real customer-facing
+  # install path) would prevent genuinely public images (redis, caddy,
+  # postgres, qdrant, phoenix) from ever being attempted.
+  local services
+  services=$(cd "$INSTALL_DIR" && docker compose config --services 2>/dev/null)
+  while IFS= read -r svc; do
+    [ -z "$svc" ] && continue
+    execute_compose pull "$svc" || log_to_file_warn "Registry pull failed for '$svc' — will check for a locally cached image below."
+  done <<< "$services"
+
+  # `--images <service>` includes that service's depends_on closure (e.g.
+  # `--images us` also lists postgres), so check the deduplicated whole-file
+  # image list once here rather than per-service.
+  local missing=()
+  local all_images
+  all_images=$(cd "$INSTALL_DIR" && docker compose config --images 2>/dev/null)
+  while IFS= read -r img; do
+    [ -z "$img" ] && continue
+    docker image inspect "$img" &>/dev/null || missing+=("$img")
+  done <<< "$all_images"
+
+  if [ ${#missing[@]} -ne 0 ]; then
     log_fatal_err \
-      "Failed to pull Docker images from registry." \
+      "Failed to pull Docker images from registry, and these are missing locally too: ${missing[*]}" \
       "Verify registry connectivity, check DNS resolvers, and try again." \
       "https://docs.unotusk.com/ops/installation#image-pull-errors" \
       "140"

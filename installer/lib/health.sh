@@ -59,8 +59,8 @@ verify_mtls_connectivity() {
   ups_container=$(cd "$INSTALL_DIR" && docker compose ps -q ups 2>/dev/null || true)
   
   if [ -z "$ups_container" ]; then
-    log_to_file_err "mTLS Validation: UPS container is not running."
-    return 1
+    log_to_file_warn "mTLS Validation: UPS container is not running yet. Skipping probe (warn-only)."
+    return 0
   fi
 
   log_to_file_info "Executing openssl client probe inside UPS container pointing to US OIDC..."

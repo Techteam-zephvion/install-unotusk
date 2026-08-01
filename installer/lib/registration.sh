@@ -20,9 +20,10 @@ register_deployment() {
     return 0
   fi
 
-  # In production, the UPS service pushes JWKS to Platform on boot.
-  # Let's perform a direct verification check of the Platform JWKS Push configuration
-  log_to_file_info "Validating push endpoint: $PLATFORM_JWKS_PUSH_URL"
+  # In production, the UPS service pushes JWKS to Platform on boot — it builds
+  # that URL itself at runtime from PLATFORM_URL + ORG_ID (see UPS's
+  # jwks_push.rs), so there's no separate PLATFORM_JWKS_PUSH_URL for the
+  # installer to validate here.
 
   # Perform a HEAD/GET probe to verify endpoint returns sensible TLS handshake
   local response_code

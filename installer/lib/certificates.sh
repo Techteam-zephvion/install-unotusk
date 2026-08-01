@@ -98,6 +98,30 @@ generate_certificates() {
     -out "$INSTALL_DIR/UPS/certs/client.crt" \
     -days 365 &>>"$INSTALL_LOG"
 
+  # ── 3b. Company Server (UPS) SERVER certs ──
+  # Distinct from the client cert above: UPS also runs its own gRPC server
+  # (ClientService, port 50051) — config.rs requires CA_CERT/SERVER_TLS_CERT/
+  # SERVER_TLS_KEY for that listener, separate from the client identity UPS
+  # uses to call US. Never generated before this, so UPS could never boot.
+  log_to_file_info "Generating company-server server certificates..."
+  openssl req -newkey rsa:2048 -nodes \
+    -keyout "$INSTALL_DIR/UPS/certs/server.key" \
+    -out "$INSTALL_DIR/UPS/certs/server.csr" \
+    -subj "/C=US/O=Unotusk/CN=company-server" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=serverAuth,clientAuth" \
+    -addext "subjectAltName=DNS:company-server,DNS:ups,DNS:localhost" \
+    &>>"$INSTALL_LOG"
+
+  openssl x509 -req -in "$INSTALL_DIR/UPS/certs/server.csr" \
+    -CA "$INSTALL_DIR/US/certs/ca.crt" \
+    -CAkey "$INSTALL_DIR/US/certs/ca.key" \
+    -CAcreateserial \
+    -copy_extensions=copy \
+    -out "$INSTALL_DIR/UPS/certs/server.crt" \
+    -days 365 &>>"$INSTALL_LOG"
+
   # ── 4. Generate Platform placeholder certs for UPS ──
   # Real certs are pushed during cloud setup; these allow boot without errors
   log_to_file_info "Generating platform client placeholder certificates..."
@@ -111,21 +135,55 @@ generate_certificates() {
     &>>"$INSTALL_LOG"
   cp "$INSTALL_DIR/UPS/certs/platform/client.crt" "$INSTALL_DIR/UPS/certs/platform/ca.crt"
 
-  # ── 5. AI-PIE local dev cert (for health check mTLS validation) ──
-  log_to_file_info "Generating AI-PIE dev certificates..."
+  # ── 5. AI-PIE local dev mTLS bundle (its OWN mTLS enforcement — a
+  # separate, self-contained trust domain from the shared US/UPS/AI-PIE-
+  # auth-client CA above, matching AI-PIE's own scripts/gen_dev_mtls_certs.py
+  # exactly: a throwaway dev CA plus a server cert (server.pem/server.key,
+  # what build_ssl_kwargs() in security/mtls.py loads for AI-PIE's own
+  # listener) and a client cert (client.pem/client.key, what the compose
+  # healthcheck presents when probing that listener). Previously this only
+  # generated client.key/client.pem — signed by the WRONG CA (the shared
+  # one, not AI-PIE's own) — and never generated server.pem/server.key/
+  # ca.pem at all, so AI-PIE's own process refused to start.
+  log_to_file_info "Generating AI-PIE dev mTLS CA and certificates..."
+  openssl req -x509 -newkey rsa:2048 -days 365 -nodes \
+    -keyout "$INSTALL_DIR/AI-PIE/certs/dev/ca.key" \
+    -out "$INSTALL_DIR/AI-PIE/certs/dev/ca.pem" \
+    -subj "/C=US/O=Unotusk/CN=AI PIE Dev CA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
+    &>>"$INSTALL_LOG"
+
+  openssl req -newkey rsa:2048 -nodes \
+    -keyout "$INSTALL_DIR/AI-PIE/certs/dev/server.key" \
+    -out "$INSTALL_DIR/AI-PIE/certs/dev/server.csr" \
+    -subj "/C=US/O=Unotusk/CN=localhost" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=serverAuth" \
+    -addext "subjectAltName=DNS:localhost,DNS:ai-pie" \
+    &>>"$INSTALL_LOG"
+
+  openssl x509 -req -in "$INSTALL_DIR/AI-PIE/certs/dev/server.csr" \
+    -CA "$INSTALL_DIR/AI-PIE/certs/dev/ca.pem" \
+    -CAkey "$INSTALL_DIR/AI-PIE/certs/dev/ca.key" \
+    -CAcreateserial \
+    -copy_extensions=copy \
+    -out "$INSTALL_DIR/AI-PIE/certs/dev/server.pem" \
+    -days 365 &>>"$INSTALL_LOG"
+
   openssl req -newkey rsa:2048 -nodes \
     -keyout "$INSTALL_DIR/AI-PIE/certs/dev/client.key" \
     -out "$INSTALL_DIR/AI-PIE/certs/dev/client.csr" \
-    -subj "/C=US/O=Unotusk/CN=ai-pie" \
+    -subj "/C=US/O=Unotusk/CN=aipie-dev-client" \
     -addext "basicConstraints=critical,CA:FALSE" \
     -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
-    -addext "extendedKeyUsage=clientAuth,serverAuth" \
-    -addext "subjectAltName=DNS:ai-pie" \
+    -addext "extendedKeyUsage=clientAuth" \
     &>>"$INSTALL_LOG"
 
   openssl x509 -req -in "$INSTALL_DIR/AI-PIE/certs/dev/client.csr" \
-    -CA "$INSTALL_DIR/US/certs/ca.crt" \
-    -CAkey "$INSTALL_DIR/US/certs/ca.key" \
+    -CA "$INSTALL_DIR/AI-PIE/certs/dev/ca.pem" \
+    -CAkey "$INSTALL_DIR/AI-PIE/certs/dev/ca.key" \
     -CAcreateserial \
     -copy_extensions=copy \
     -out "$INSTALL_DIR/AI-PIE/certs/dev/client.pem" \

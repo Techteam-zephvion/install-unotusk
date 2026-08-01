@@ -65,6 +65,14 @@ deploy_installer_resources() {
   # Copy templates
   cp -r "$INSTALLER_ROOT/templates/"* "$INSTALL_DIR/templates/" 2>/dev/null || true
 
+  # execute_compose (compose.sh) runs `docker compose` from $INSTALL_DIR with
+  # no -f flag, so it needs docker-compose.yml directly there — not just
+  # inside templates/. Every relative volume path in the file (./US/certs,
+  # ./scripts/init-databases.sh, ./templates/Caddyfile, ...) assumes
+  # $INSTALL_DIR itself is the compose project directory, so this must be a
+  # copy at $INSTALL_DIR root, not a move out of templates/.
+  cp "$INSTALLER_ROOT/templates/docker-compose.yml" "$INSTALL_DIR/docker-compose.yml"
+
   # Copy scripts
   cp -r "$INSTALLER_ROOT/scripts/"* "$INSTALL_DIR/scripts/" 2>/dev/null || true
 

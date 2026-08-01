@@ -101,10 +101,32 @@ services:
       - ./US/.env
     environment:
       HTTP_LISTEN_ADDR: 0.0.0.0:3000
+      # config.rs defaults ADMIN_LISTEN_ADDR to 127.0.0.1:8444 (loopback
+      # *inside* the container) — Docker's published-port NAT delivers
+      # traffic to the container's external interface, never to its own
+      # loopback, so the admin pairing endpoint was unreachable from the
+      # host no matter what port was published. The pairing cert's SAN
+      # already includes "localhost" unconditionally (admin_pki.rs), so
+      # this bind-address change doesn't invalidate it.
+      ADMIN_LISTEN_ADDR: 0.0.0.0:8444
       DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/auth
       UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
       PLATFORM_TOKEN_AUDIENCE: ${PLATFORM_TOKEN_AUDIENCE:-platform.unotusk.com}
       RUST_LOG: ${LOG_LEVEL:-info}
+    ports:
+      - "3100:3000"   # OIDC/GitHub OAuth HTTP (login/callback/healthz/jwks) —
+                       # never published before this; UCA/UAC run on the host
+                       # and could never reach login without it. Host-side
+                       # port picked to avoid colliding with other local dev
+                       # servers commonly bound to 3000 — container-internal
+                       # port stays 3000 (HTTP_LISTEN_ADDR above), only the
+                       # host mapping changed.
+      - "8444:8444"   # UAC administrative pairing (US's own admin listener,
+                       # distinct from UPS's on 8443)
+      - "50052:50052" # gRPC mTLS — UCA (a host app, unlike UPS/AI-PIE which
+                       # reach this over the internal Docker network as
+                       # "auth-server:50052") needs this reachable directly
+                       # to exchange_ref() after GitHub OAuth completes.
     volumes:
       - us_data:/app/data
       - ./US/certs:/app/certs:ro
@@ -136,6 +158,11 @@ services:
     environment:
       HEALTH_LISTEN_ADDR: 0.0.0.0:8080
       AUTH_GRPC_ENDPOINT: https://auth-server:50052
+      CA_CERT: /app/certs/ca.crt
+      SERVER_TLS_CERT: /app/certs/server.crt
+      SERVER_TLS_KEY: /app/certs/server.key
+      AUTH_CLIENT_TLS_CERT: /app/certs/client.crt
+      AUTH_CLIENT_TLS_KEY: /app/certs/client.key
       DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/company
       PLATFORM_URL: ${PLATFORM_URL}
       PLATFORM_LICENSE_KEY: ${PLATFORM_LICENSE_KEY}
@@ -144,6 +171,13 @@ services:
       PLATFORM_CLIENT_TLS_KEY: /app/certs/platform/client.key
       US_JWKS_URL: http://auth-server:3000/.well-known/jwks.json
       RUST_LOG: ${LOG_LEVEL:-info}
+    ports:
+      - "8443:8443"   # UAC administrative pairing — never published before this;
+                       # UAC runs on the host, outside unotusk_internal, and could
+                       # never reach this listener without it.
+      - "50051:50051" # gRPC business API (ClientService) — UCA calls this
+                       # directly after exchange_ref() to attach_to_client();
+                       # same host-app-reachability gap as US's 50052.
     volumes:
       - ups_data:/app/data
       - ./UPS/certs:/app/certs:ro
@@ -187,6 +221,11 @@ services:
       AUTH_CLIENT_CA_CERT: /app/certs/auth-client/ca.pem
       AUTH_CLIENT_TLS_CERT: /app/certs/auth-client/cert.pem
       AUTH_CLIENT_TLS_KEY: /app/certs/auth-client/key.pem
+    ports:
+      - "8000:8000"   # UCA's "Ask"/spec-generation calls hit this directly
+                       # (confusingly named UPS_BASE_URL in UCA's config,
+                       # but it targets AI-PIE, not UPS) — never published
+                       # before this, same host-reachability gap as US/UPS.
     volumes:
       - ai_pie_data:/app/data
       - ./AI-PIE/certs:/app/certs:ro

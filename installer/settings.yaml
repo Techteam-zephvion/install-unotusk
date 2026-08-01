@@ -74,6 +74,11 @@ settings:
     required: true
     format: "url"
 
+  - name: ADMIN_USER_IDS
+    description: "Comma-separated GitHub numeric user IDs to grant admin privileges on first login (e.g. the org's UAC operators) — find via https://api.github.com/users/<username>, the 'id' field. UPS refuses to start without this."
+    type: "string"
+    required: true
+
   - name: GITHUB_ORG
     description: "GitHub Organization integration"
     type: "string"

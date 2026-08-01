@@ -1,0 +1,250 @@
+# UNOTUSK — customer-local deployment stack.
+#
+# Runs the entire customer-side of the UNOTUSK Hybrid Architecture:
+# US (Auth Service) -> UPS (Company Server, license/degraded-mode source
+# of truth) -> AI PIE (intelligence engine), plus their required data
+# stores (Postgres for US/UPS, Qdrant + Phoenix for AI PIE).
+#
+# The Unotusk Platform (cloud, Render) and Neon Postgres are NOT part of
+# this stack — US/UPS reach Platform outbound over the internet for
+# license heartbeat/validation; Platform never has inbound access here.
+#
+# Each service keeps its own .env file (US/.env, UPS/.env, AI-PIE/.env) —
+# copy from that service's .env.example. The root .env.example in this
+# directory documents the variables that matter for the stack as a whole
+# (cross-service URLs, ports, Postgres/Qdrant credentials) but does not
+# replace the per-service .env files.
+#
+# Start:    docker compose up -d
+# Stop:     docker compose down
+# Logs:     docker compose logs -f
+# Upgrade:  docker compose pull && docker compose up -d --build
+# Backup:   see README "Backup" section (pg_dump + named-volume snapshot)
+
+networks:
+  unotusk_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  phoenix_data:
+  us_data:
+  ups_data:
+  ai_pie_data:
+  logs:
+
+services:
+
+  # ── PostgreSQL — shared instance, separate databases for US and UPS ──
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unotusk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unotusk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Qdrant — AI PIE vector store (code lane + decision lane) ────────
+  qdrant:
+    image: qdrant/qdrant:v1.15.1
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/6333"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Arize Phoenix — AI PIE observability + drift detection ──────────
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    restart: unless-stopped
+    volumes:
+      - phoenix_data:/root/.phoenix
+    networks:
+      - unotusk_internal
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ── US — Auth Service. The ONLY service exposed outside this stack ──
+  us:
+    build:
+      context: ./US
+    image: unotusk/us:local
+    hostname: auth-server
+    restart: unless-stopped
+    env_file:
+      - ./US/.env
+    environment:
+      # Override .env's loopback-only default so the port is reachable
+      # from the host and from other containers.
+      HTTP_LISTEN_ADDR: 0.0.0.0:3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/auth
+      # UPS is the license/degraded-mode source of truth; US queries it as
+      # a policy-enforcement point before granting/maintaining UCA/UAC
+      # session access (see US README "Degraded Mode Awareness").
+      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      # AMEND-014: signed-token audience must match what UP (Platform)
+      # expects; the signing key itself is generated on first boot and
+      # persisted in the us_data volume, never committed.
+      PLATFORM_TOKEN_AUDIENCE: ${PLATFORM_TOKEN_AUDIENCE:-platform.unotusk.com}
+      RUST_LOG: ${LOG_LEVEL:-info}
+    ports:
+      - "3000:3000"     # OIDC HTTP (login/callback/healthz/readyz)
+      - "8444:8444"     # UAC administrative pairing (AMEND-012)
+      - "50052:50052"   # gRPC mTLS
+    volumes:
+      - us_data:/app/data
+      - ./US/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - auth-server
+          - us
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  # ── UPS — Company Server. Source of truth for license / degraded-mode
+  #        state (UNOTUSK_LICENSE_DEGRADED_MODE.md). Internal only. ────
+  ups:
+    build:
+      context: ./UPS
+    image: unotusk/ups:local
+    hostname: company-server
+    restart: unless-stopped
+    env_file:
+      - ./UPS/.env
+    environment:
+      HEALTH_LISTEN_ADDR: 0.0.0.0:8080
+      AUTH_GRPC_ENDPOINT: https://auth-server:50052
+      DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/company
+      # Outbound heartbeat to the cloud-hosted Platform (Render + Neon) —
+      # the only network call this stack makes to Platform. Platform never
+      # calls back into customer infrastructure.
+      PLATFORM_URL: ${PLATFORM_URL:?set PLATFORM_URL in .env, e.g. https://platform.unotusk.com:50051}
+      PLATFORM_LICENSE_KEY: ${PLATFORM_LICENSE_KEY:?set PLATFORM_LICENSE_KEY in .env}
+      LICENSE_HEARTBEAT_INTERVAL_SECS: ${LICENSE_HEARTBEAT_INTERVAL:-60}
+      LICENSE_GRACE_PERIOD_SECS: ${LICENSE_GRACE_PERIOD:-18000}
+      # Platform's own root CA (issued at onboarding, distinct from the
+      # local dev CA used for US<->UPS<->UAC mTLS) plus this instance's
+      # Platform-issued client identity.
+      PLATFORM_CA_CERT: /app/certs/platform/ca.crt
+      PLATFORM_CLIENT_TLS_CERT: /app/certs/platform/client.crt
+      PLATFORM_CLIENT_TLS_KEY: /app/certs/platform/client.key
+      # AMEND-014: periodic push of US's JWKS to Platform, so Platform can
+      # verify signed tokens locally — this org's identity, US's JWKS
+      # reachable over this internal network, and Platform's registration
+      # endpoint + shared secret (see Platform's own JWKS_PUSH_SECRET).
+      ORG_ID: ${ORG_ID:?set ORG_ID in .env}
+      US_JWKS_URL: http://auth-server:3000/.well-known/jwks.json
+      PLATFORM_JWKS_PUSH_URL: ${PLATFORM_JWKS_PUSH_URL:?set PLATFORM_JWKS_PUSH_URL in .env, e.g. https://platform.unotusk.com/internal/orgs/<org-id>/jwks}
+      JWKS_PUSH_SECRET: ${JWKS_PUSH_SECRET:?set JWKS_PUSH_SECRET in .env}
+      RUST_LOG: ${LOG_LEVEL:-info}
+    volumes:
+      - ups_data:/app/data
+      - ./UPS/certs:/app/certs:ro
+      - ./UPS/certs/platform:/app/certs/platform:ro
+      - logs:/app/logs
+    ports:
+      - "50051:50051"   # gRPC business mTLS
+    networks:
+      unotusk_internal:
+        aliases:
+          - company-server
+          - ups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      us:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  # ── AI PIE — intelligence engine (FastAPI). Internal only. ──────────
+  ai-pie:
+    build:
+      context: ./AI-PIE
+      dockerfile: Dockerfile
+    image: unotusk/ai-pie:local
+    restart: unless-stopped
+    env_file:
+      - ./AI-PIE/.env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      ONTOLOGY_DB_PATH: /app/data/ontology.db
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      # Checked before ingestion/spec-generation/report-generation (blocked
+      # while UPS reports Degraded Mode) — see aipie/license_client/.
+      UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
+      # AMEND-007: AI-PIE validates bearer tokens against US's auth gRPC
+      # directly. Was never overridden here — defaulted to
+      # settings.py's localhost:50052, which inside this container means
+      # itself, not the us service. auth-server is us's network alias.
+      AUTH_GRPC_ENDPOINT: auth-server:50052
+      AUTH_CLIENT_CA_CERT: /app/certs/auth-client/ca.pem
+      AUTH_CLIENT_TLS_CERT: /app/certs/auth-client/cert.pem
+      AUTH_CLIENT_TLS_KEY: /app/certs/auth-client/key.pem
+    volumes:
+      - ai_pie_data:/app/data
+      - ./AI-PIE/certs:/app/certs:ro
+      - logs:/app/logs
+    networks:
+      unotusk_internal:
+        aliases:
+          - ai-pie
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+      ups:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; ctx.load_cert_chain(certfile='/app/certs/dev/client.pem', keyfile='/app/certs/dev/client.key'); urllib.request.urlopen('https://localhost:8000/health', context=ctx)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true

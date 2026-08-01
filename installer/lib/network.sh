@@ -74,26 +74,32 @@ validate_ingress_ports() {
   log_to_file_info "Ingress ports 80/443 validation: Passed"
 }
 
-# Test outbound internet/dependency connectivity
+# Test outbound internet/dependency connectivity. Advisory only (no
+# log_fatal_err path) — must never return non-zero, since a bare non-zero
+# return from a top-level call under this script's `set -e` aborts the
+# entire install with no visible error.
 validate_outbound_connectivity() {
   local target_url="${1:-https://registry-1.docker.io}"
   log_to_file_info "Testing outbound connection to $target_url..."
 
-  if ! curl -sf --max-time 10 "$target_url" &>/dev/null; then
-    # Docker registry could block ping/root requests; test resolving it
+  # Deliberately no -f: registries like registry-1.docker.io return 401/404
+  # on an unauthenticated root request even when fully reachable — curl -f
+  # treats that as a failure. We only care that the TCP/TLS handshake and
+  # HTTP response happened at all, not the status code.
+  if ! curl -s --max-time 10 -o /dev/null "$target_url"; then
     local host
     host=$(echo "$target_url" | sed -E 's|https?://([^:/]+).*|\1|')
-    
+
     log_to_file_warn "Outbound connection to $target_url failed. Testing DNS resolution for $host..."
-    
+
     if ! nslookup "$host" &>/dev/null && ! host "$host" &>/dev/null; then
       log_warn "DNS lookup failed for '$host'. Verify internet access and DNS resolvers."
     else
       log_to_file_info "DNS resolution for $host: Success"
     fi
-    return 1
+    return 0
   fi
-  
+
   log_to_file_info "Outbound connectivity to $target_url: Passed"
   return 0
 }

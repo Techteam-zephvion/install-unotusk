@@ -1,0 +1,108 @@
+name: UP OCI Deploy Pipeline
+
+# Purpose: Complete production CI/CD pipeline for the UNOTUSK Platform (UP) Service.
+# Location: /home/devils/PRO/Unotusk/.github/workflows/up-deploy.yml
+# Permissions: 644 (Read-write for owner, read-only for others)
+#
+# How it works:
+#   1. Runs on push/merge to the main branch if files in the UP subfolder are changed.
+#   2. Installs Rust toolchain, compiles the platform-service, and runs all unit & integration tests.
+#   3. Initializes Docker Buildx and builds a multi-arch (AMD64 & ARM64) Docker image.
+#   4. Pushes the built image to GitHub Container Registry (GHCR).
+#   5. Establishes a secure SSH tunnel to the OCI VM using private keys stored in Github Secrets.
+#   6. Invokes the update.sh script on the production server to run migrations and perform rolling restarts.
+#   7. If update.sh returns exit code 1, the pipeline reports failure and alerts administrators.
+#
+# Recovery Procedure:
+#   If the pipeline fails at compile stage: Fix syntax/Rust code errors locally and push.
+#   If it fails at deployment stage: Log in to OCI VM via SSH and run: journalctl -u unotusk-platform -n 100
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'UP/**'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-rust:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Cache Cargo Registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('UP/Cargo.lock') }}
+
+      - name: Cache Cargo Build Targets
+        uses: actions/cache@v4
+        with:
+          path: UP/target
+          key: ${{ runner.os }}-cargo-build-prod-${{ hashFiles('UP/Cargo.lock') }}
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev build-essential
+
+      - name: Run Tests
+        working-directory: UP
+        run: cargo test --all
+
+  build-and-push-docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test-rust
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (For Multi-Arch builds)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Multi-Arch Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./UP
+          file: ./UP/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/platform-service:latest
+            ghcr.io/${{ github.repository_owner }}/platform-service:${{ github.sha }}
+
+  deploy-to-oci:
+    name: Deploy to Oracle Cloud VM
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker
+    steps:
+      - name: Execute Remote SSH Deploy Script
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ubuntu
+          key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # Pull latest code and invoke the update orchestrator
+            cd /opt/unotusk
+            echo "[*] Triggering rolling upgrade on OCI VM..."
+            sudo /opt/unotusk/scripts/update.sh
