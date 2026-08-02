@@ -122,7 +122,40 @@ dev CA (US↔UPS↔UAC) and a second Platform-issued CA/cert pair
 - Watch for divergence between local and `origin` on `main`/base branches
   (seen previously on `UPS`) — reconcile deliberately, don't force-push over it.
 
-## 6. What not to do
+## 6. Live infrastructure and known gaps (as of 2026-08-01)
+
+**UP is actually deployed and live** at
+`https://unotusk-platform-service.onrender.com` (Render free tier — expect
+~60s cold start after idle; upgrading to a paid plan is a pending decision).
+Real Neon Postgres backs it. A stale, unused `unotusk-auth-service` Render
+deployment also exists from before AMEND-014 — `AUTH_SERVICE_URL` is
+unreferenced anywhere in UP's code, safe to ignore/delete.
+
+**The full local install path (`curl | sudo bash` → wizard → running
+US/UPS/AI-PIE stack → UCA login → spec generation) was verified working
+end-to-end** on 2026-08-01, after fixing 11 real installer/app bugs (dead
+`set -e` traps, missing compose file placement, unpublished ports across
+US/UPS/AI-PIE, wrong `ADMIN_LISTEN_ADDR` bind, UCA's bundled dev certs
+silently beating a real `client.env`, and more). Full detail:
+`logs/2026-08-01-full-local-deployment-feasibility-test.md`.
+
+**Known port assignments** (none of these were published to the host before
+2026-08-01's fixes): US → 3000 (OIDC/GitHub HTTP), 8444 (UAC admin pairing),
+50052 (gRPC, mTLS); UPS → 8443 (UAC admin pairing), 50051 (gRPC business
+API, mTLS); AI-PIE → 8000 (UCA's "Ask" calls — confusingly configured via
+UCA's `UPS_BASE_URL`, not a UPS-specific setting).
+
+**Still-open gaps for a genuinely clean customer install** (see the log file
+above for full detail): no container registry hosts `unotusk/us`,
+`unotusk/ups`, or `unotusk/ai-pie` anywhere — every real customer hits
+`pull access denied` today; no self-service project/license registration
+API exists in UP (`/api/projects` is read-only, ops does inserts by hand);
+no real UCA client-cert distribution mechanism per customer (since built); GitHub OAuth
+login had an org-membership gap (since fixed);
+AI-PIE's spec generation can return a schema-invalid response ("missing
+kpi") on legitimate queries, not yet root-caused.
+
+## 7. What not to do
 
 - Don't add Redis, JWT issuance, or personal-OAuth-provider apps to `US` without
   checking §3 first — these were each evaluated and are either unimplemented by
