@@ -153,9 +153,10 @@ run_config_wizard() {
 
   # Invoke python to run the interactive wizard dynamically using settings.yaml schema
   python3 -c "
-import sys, os, uuid, subprocess, getpass
+import sys, os, uuid, subprocess, getpass, time
 
 GUM_BIN = '$gum_bin'
+GUM_WARNED = False
 
 def mask(val):
     if not val:
@@ -174,15 +175,32 @@ def show_header(text):
         print('\033[1m╚══════════════════════════════════════════╝\033[0m\n')
 
 def ask(header, default='', secret=False):
+    global GUM_BIN, GUM_WARNED
     if GUM_BIN:
         cmd = [GUM_BIN, 'input', '--header', header, '--placeholder', 'type here, or Enter to accept default']
         if default:
             cmd += ['--value', default]
         if secret:
             cmd += ['--password']
+        started = time.monotonic()
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
         except OSError:
+            return ask_plain(header, default, secret)
+        elapsed = time.monotonic() - started
+        # A real interactive session takes at least a few hundred ms (the
+        # time to read the prompt and press a key) — anything faster means
+        # gum returned without actually waiting for input at all (seen in
+        # some sudo + non-standard-terminal combinations where gum can
+        # write to /dev/tty but the read side silently no-ops instead of
+        # erroring). Disable gum for the rest of THIS wizard run rather
+        # than looping the required-field error forever with no visible prompt.
+        if elapsed < 0.3 and not result.stdout.strip():
+            if not GUM_WARNED:
+                print('  \033[33m⚠ gum isn\\'t receiving interactive input in this terminal — '
+                      'switching to plain-text prompts for the rest of setup.\033[0m')
+                GUM_WARNED = True
+            GUM_BIN = ''
             return ask_plain(header, default, secret)
         if result.returncode != 0:
             print('\nAborted.')
