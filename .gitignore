@@ -24,6 +24,13 @@
 # Logs
 *.log
 
+# Session/work logs (logs/*.md) — deliberately local-only, never committed.
+# This repo is public (since 2026-08-03); a full history scrub was needed
+# once after these accumulated too much internal detail (vulnerability
+# specifics, architecture internals) for a public repo. Keep them out of
+# git entirely going forward — local reference only.
+logs/
+
 # Temporary
 tmp/
 TMP_*/

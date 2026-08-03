@@ -2,14 +2,25 @@
 
 ## 0. What this is
 
-This directory is the top-level workspace containing all UNOTUSK repositories as
-sibling checkouts. It is **not itself a git repository** — each subdirectory below
-is its own independent git repo with its own remote. There is no monorepo/submodule
-tooling; treat each service as a separate project that happens to live under one
-parent folder for local development convenience.
+This directory **is itself a git repository** — `install-unotusk`, public
+since 2026-08-03. Each subdirectory below (`US`, `UPS`, `AI-PIE`, `UCA`,
+`UAC`, `UP`) is its own independent, separately-owned git repo, most of
+them private — they show up here as gitlinks (bare commit-SHA pointers,
+the same mechanism git submodules use), so this repo being public does not
+expose any of their source. There is no monorepo/submodule tooling beyond
+that; treat each service as a separate project that happens to live nested
+under this one for local development convenience.
 
-Root-level files (`docker-compose.yml`, `.env.example`, `scripts/`, `README.md`)
-exist to run the customer-local part of the stack together — see §3.
+**This file is public.** Anything written into it should read like
+appropriate public engineering documentation — architecture facts,
+deployment topology, ops conventions — not an internal incident writeup or
+a vulnerability play-by-play. Detailed session/work logs are kept locally
+only (`logs/`, gitignored here) and never committed to this repo.
+
+Root-level files (`docker-compose.yml`, `.env.example`, `scripts/`,
+`README.md`, `install.sh`, `installer/`, `dist/`) belong to
+`install-unotusk` itself and exist to run the customer-local part of the
+stack together, and to package the real customer-facing installer — see §3.
 
 ## 1. Architecture — Hybrid Deployment
 
@@ -114,46 +125,61 @@ dev CA (US↔UPS↔UAC) and a second Platform-issued CA/cert pair
 - Per-repo work branches follow `claude/local-work-YYYY-MM-DD` or a named
   milestone branch (e.g. `MVP_build`) — check `git branch --show-current` in
   each repo rather than assuming; branches are not synchronized across repos.
-  As of the current session: `US`, `UPS`, `AI-PIE`, `UCA` → `MVP_build`; `UAC`,
-  `UP` → `main`.
+  As of 2026-08-03: `US`, `UPS`, `AI-PIE` → `MVP_build`; `UCA`, `UAC`, `UP`,
+  and this workspace's own `install-unotusk` repo → `main`.
 - Before switching branches or discarding anything, check `git status` — several
   of these repos carry uncommitted work between sessions; stash (`-u`) rather
   than lose it.
 - Watch for divergence between local and `origin` on `main`/base branches
   (seen previously on `UPS`) — reconcile deliberately, don't force-push over it.
 
-## 6. Live infrastructure and known gaps (as of 2026-08-01)
+## 6. Live infrastructure and status (as of 2026-08-03)
 
-**UP is actually deployed and live** at
+**UP is deployed and live** at
 `https://unotusk-platform-service.onrender.com` (Render free tier — expect
-~60s cold start after idle; upgrading to a paid plan is a pending decision).
-Real Neon Postgres backs it. A stale, unused `unotusk-auth-service` Render
-deployment also exists from before AMEND-014 — `AUTH_SERVICE_URL` is
-unreferenced anywhere in UP's code, safe to ignore/delete.
+~60s cold start after idle; upgrading to a paid plan is a pending decision,
+not yet made). Real Neon Postgres backs it. A stale, unused
+`unotusk-auth-service` Render deployment also exists from before AMEND-014
+— unreferenced anywhere in UP's code, safe to ignore/delete.
 
-**The full local install path (`curl | sudo bash` → wizard → running
-US/UPS/AI-PIE stack → UCA login → spec generation) was verified working
-end-to-end** on 2026-08-01, after fixing 11 real installer/app bugs (dead
-`set -e` traps, missing compose file placement, unpublished ports across
-US/UPS/AI-PIE, wrong `ADMIN_LISTEN_ADDR` bind, UCA's bundled dev certs
-silently beating a real `client.env`, and more). Full detail:
-`logs/2026-08-01-full-local-deployment-feasibility-test.md`.
+**The full local install path** (`curl | sudo bash` → wizard → running
+US/UPS/AI-PIE stack → UCA login → spec generation) has been verified
+working end-to-end. Container images for all three services publish to
+GHCR via each repo's own `.github/workflows/publish.yml` and pull
+publicly (`ghcr.io/anikethanshetty/unotusk-auth-server`,
+`ghcr.io/anikethanshetty/unotusk-company-server`,
+`ghcr.io/techteam-zephvion/ai-pie`) — `installer/manifest.json` and
+`installer/templates/docker-compose.yml` reference these directly.
 
-**Known port assignments** (none of these were published to the host before
-2026-08-01's fixes): US → 3000 (OIDC/GitHub HTTP), 8444 (UAC admin pairing),
-50052 (gRPC, mTLS); UPS → 8443 (UAC admin pairing), 50051 (gRPC business
-API, mTLS); AI-PIE → 8000 (UCA's "Ask" calls — confusingly configured via
+**Auth**: GitHub OAuth login (still the live path — `US/src/legacy/`, not
+`/oidc/*`; AMEND-008's OIDC migration is not finished, and stale
+doc-comments in that directory claiming it's "deprecated/unmounted" are
+wrong — check `US/src/http/mod.rs`'s router before trusting those
+comments) enforces org membership as of 2026-08-03; `GITHUB_ORG` is a
+required config/wizard field whenever GitHub OAuth is configured.
+
+**Employee client certs**: `US` can issue per-employee mTLS client
+certificates on demand (`POST /client-cert/issue`, session-gated),
+signed by a CA dedicated to that purpose and kept separate from the
+shared US↔UPS↔AI-PIE mesh CA (see `US/src/employee_pki.rs`'s doc comment
+for the reasoning). `installer/lib/certificates.sh` provisions this CA at
+install time. UCA's own consumption of this endpoint (requesting and
+using a cert) is not built yet — server-side only so far.
+
+**Self-service project registration**: `UP`'s `POST /api/projects`
+finds-or-creates the organization/ups_instance and grants the creating
+employee membership in one call — no PM/admin UI for this yet, API only.
+
+**Known port assignments**: US → 3000 (OIDC/GitHub HTTP), 8444 (UAC admin
+pairing), 50052 (gRPC, mTLS); UPS → 8443 (UAC admin pairing), 50051 (gRPC
+business API, mTLS); AI-PIE → 8000 (UCA's "Ask" calls — configured via
 UCA's `UPS_BASE_URL`, not a UPS-specific setting).
 
-**Still-open gaps for a genuinely clean customer install** (see the log file
-above for full detail): no container registry hosts `unotusk/us`,
-`unotusk/ups`, or `unotusk/ai-pie` anywhere — every real customer hits
-`pull access denied` today; no self-service project/license registration
-API exists in UP (`/api/projects` is read-only, ops does inserts by hand);
-no real UCA client-cert distribution mechanism per customer (since built); GitHub OAuth
-login had an org-membership gap (since fixed);
-AI-PIE's spec generation can return a schema-invalid response ("missing
-kpi") on legitimate queries, not yet root-caused.
+**Still open**: no production GitHub App registered yet for AI-PIE
+ingestion auth (the code path for it is complete and prefers it over a raw
+token automatically once configured); Render free-tier cold starts vs.
+self-hosting on a VPS is an undecided cost/ops tradeoff; UCA/UAC currently
+have no public release/download mechanism a customer could use directly.
 
 ## 7. What not to do
 
