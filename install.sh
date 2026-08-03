@@ -199,7 +199,15 @@ else
   LOCAL_SRC="/home/devils/PRO/Unotusk"
   if [ -d "$LOCAL_SRC/.git" ] && [ "$INSTALL_DIR" != "$LOCAL_SRC" ]; then
     info "Copying from local development tree ($LOCAL_SRC)..."
-    rsync -a --exclude='.git' --exclude='backups' "$LOCAL_SRC/" "$INSTALL_DIR/" 2>/dev/null || \
+    # The installer only ever runs pre-built GHCR images (see
+    # installer/manifest.json) — it never builds US/UPS/UCA/UAC/UP from
+    # source. Excluding their build/dependency dirs (Rust target/, npm
+    # node_modules/, Tauri out/) turns this from a 70GB+ multi-minute copy
+    # into a few hundred MB — those dirs contributed nothing the installer
+    # reads, just made "sudo bash install.sh" look hung.
+    rsync -a --exclude='.git' --exclude='backups' \
+      --exclude='*/target' --exclude='*/node_modules' --exclude='*/out' \
+      "$LOCAL_SRC/" "$INSTALL_DIR/" 2>/dev/null || \
       cp -a "$LOCAL_SRC/." "$INSTALL_DIR/" 2>/dev/null
   elif curl -sf --max-time 5 https://github.com &>/dev/null; then
     info "Cloning UNOTUSK repository..."

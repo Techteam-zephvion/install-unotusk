@@ -19,9 +19,9 @@ header()  { echo -e "\n${BOLD}$*${RESET}"; }
 
 # ── Validators ─────────────────────────────────────────────────────────────────
 validate_nonempty() {
-  local label="$1" value="$2"
+  local value="$1"
   if [ -z "$value" ]; then
-    error "$label cannot be empty."
+    error "This field cannot be empty."
     return 1
   fi
   return 0
@@ -164,7 +164,7 @@ if [ -n "$OAUTH_PROVIDER" ]; then
   # Client ID must be non-empty when a provider is chosen
   while true; do
     read -r -p "$(echo -e "  ${CYAN}?${RESET} Client ID: ")" OAUTH_CLIENT_ID
-    if validate_nonempty "OAuth Client ID" "$OAUTH_CLIENT_ID"; then break; fi
+    if validate_nonempty "$OAUTH_CLIENT_ID"; then break; fi
   done
 
   prompt_secret OAUTH_CLIENT_SECRET "Client Secret"
