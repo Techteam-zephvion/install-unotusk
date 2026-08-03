@@ -54,6 +54,40 @@ generate_certificates() {
   cp "$INSTALL_DIR/US/certs/ca.crt" "$INSTALL_DIR/AI-PIE/certs/ca.crt"
   cp "$INSTALL_DIR/US/certs/ca.crt" "$INSTALL_DIR/caddy/certs/ca.crt"
 
+  # ── 1b. Create a SEPARATE employee CA (own keypair, own root) ──
+  # UCA's per-employee client certs are signed by this CA, never by the
+  # shared mesh CA above — deliberately separate blast radius (see
+  # US/src/employee_pki.rs's doc comment): US mints fresh employee leaves
+  # on live, authenticated HTTP requests (POST /client-cert/issue), so a
+  # compromise of that endpoint must not compromise the CA everything else
+  # (US<->UPS<->AI-PIE mTLS) trusts.
+  #
+  # Generated here (install time, pre-boot) rather than lazily by US at
+  # runtime — UPS's ca.crt trust bundle below is finalized before any
+  # container ever starts, so a CA that only came into existence after UPS
+  # already booted would never make it into UPS's trust store.
+  log_to_file_info "Generating employee CA (UCA per-employee client certs)..."
+  openssl req -x509 -newkey rsa:4096 -days 3650 -nodes \
+    -keyout "$INSTALL_DIR/US/certs/employee-ca.key" \
+    -out "$INSTALL_DIR/US/certs/employee-ca.crt" \
+    -subj "/C=US/O=Unotusk/CN=UnotuskEmployeeCA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
+    &>>"$INSTALL_LOG" || {
+      log_fatal_err \
+        "Failed to generate employee CA certificates." \
+        "Check openssl installation and permissions on US/certs directory." \
+        "https://docs.unotusk.com/ops/security#tls-generation-errors" \
+        "151"
+    }
+
+  # Append (not overwrite) — UPS must trust EITHER CA: the shared mesh CA
+  # (for whatever already relies on it) and the employee CA (for UCA client
+  # certs issued via US's /client-cert/issue). A single ca.crt file with
+  # both certs concatenated is a standard multi-root trust bundle; UPS's
+  # existing single-CA_CERT-path config needs no code change to accept it.
+  cat "$INSTALL_DIR/US/certs/employee-ca.crt" >> "$INSTALL_DIR/UPS/certs/ca.crt"
+
   # ── 2. Create Auth Service (US) server certs ──
   # -addext on the CSR + -copy_extensions=copy on the signing step: carries
   # basicConstraints/keyUsage/extendedKeyUsage/subjectAltName through to the

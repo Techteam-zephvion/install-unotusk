@@ -8,7 +8,7 @@ set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 INSTALL_DIR="${INSTALL_DIR:-/opt/unotusk}"
-REPO_URL="https://github.com/Unotusk/Unotusk.git"
+REPO_URL="https://github.com/Techteam-zephvion/install-unotusk.git"
 BRANCH="${BRANCH:-main}"
 MIN_DOCKER_VERSION=24
 MIN_RAM_MB=4096
