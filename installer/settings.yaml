@@ -80,9 +80,9 @@ settings:
     required: true
 
   - name: GITHUB_ORG
-    description: "GitHub Organization integration"
+    description: "GitHub Organization slug employees must belong to (org-membership check on every OAuth login — required, not just for ingestion scoping: US refuses to start without it whenever GitHub OAuth is configured)"
     type: "string"
-    required: false
+    required: true
 
   # AI-PIE ingestion/generation settings — previously collected by no wizard
   # field at all; AI-PIE/.env only ever got LOG_LEVEL/GITHUB_ORG/JIRA_URL,

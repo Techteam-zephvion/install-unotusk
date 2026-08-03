@@ -6,9 +6,9 @@
     "redis": "redis:7-alpine",
     "qdrant": "qdrant/qdrant:v1.15.1",
     "phoenix": "arizephoenix/phoenix:latest",
-    "us": "ghcr.io/unotusk/us:v2.0.0",
-    "ups": "ghcr.io/unotusk/ups:v2.0.0",
-    "ai-pie": "ghcr.io/unotusk/ai-pie:v2.0.0",
+    "us": "ghcr.io/anikethanshetty/unotusk-auth-server:latest",
+    "ups": "ghcr.io/anikethanshetty/unotusk-company-server:latest",
+    "ai-pie": "ghcr.io/techteam-zephvion/ai-pie:latest",
     "caddy": "caddy:2.7-alpine"
   },
   "templates": {

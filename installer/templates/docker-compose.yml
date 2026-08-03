@@ -94,7 +94,7 @@ services:
 
   # ── US — Auth Service (OIDC issuer, JWT pair verification) ──
   us:
-    image: unotusk/us:local
+    image: ghcr.io/anikethanshetty/unotusk-auth-server:latest
     hostname: auth-server
     restart: unless-stopped
     env_file:
@@ -150,7 +150,7 @@ services:
 
   # ── UPS — Company Server (outbound heartbeat, licensing) ──
   ups:
-    image: unotusk/ups:local
+    image: ghcr.io/anikethanshetty/unotusk-company-server:latest
     hostname: company-server
     restart: unless-stopped
     env_file:
@@ -204,7 +204,7 @@ services:
 
   # ── AI PIE — Core AI engineering reasoning backend ──
   ai-pie:
-    image: unotusk/ai-pie:local
+    image: ghcr.io/techteam-zephvion/ai-pie:latest
     restart: unless-stopped
     env_file:
       - ./AI-PIE/.env
