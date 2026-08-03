@@ -20,6 +20,7 @@ settings:
     type: "string"
     required: true
     format: "license"
+    secret: true
 
   - name: PLATFORM_URL
     description: "Platform API URL"
@@ -67,12 +68,14 @@ settings:
     description: "GitHub OAuth App Client Secret"
     type: "string"
     required: true
+    secret: true
 
   - name: GITHUB_CALLBACK_URL
-    description: "GitHub OAuth callback URL (must match the OAuth App's registered callback exactly)"
+    description: "GitHub OAuth callback URL (must match the OAuth App's registered callback exactly — US publishes its OAuth HTTP port on host port 3100 (not 443/3000); Caddy does not yet proxy /auth/* — see installer/templates/Caddyfile, so this must point directly at :3100)"
     type: "string"
     required: true
     format: "url"
+    auto_default: "github_callback"
 
   - name: ADMIN_USER_IDS
     description: "Comma-separated GitHub numeric user IDs to grant admin privileges on first login (e.g. the org's UAC operators) — find via https://api.github.com/users/<username>, the 'id' field. UPS refuses to start without this."
@@ -93,6 +96,7 @@ settings:
     description: "Cloudflare AI Gateway auth token (Zephvion-managed — mint one per customer at dash.cloudflare.com, AI Gateway > unotuskmvp > Create authentication token, scoped to AI Gateway:Run only). Never a partner-supplied value."
     type: "string"
     required: true
+    secret: true
 
   - name: CF_AIG_BASE_URL
     description: "Cloudflare AI Gateway base URL for this deployment"
@@ -105,6 +109,7 @@ settings:
     description: "Voyage AI API key (code/decision embeddings — required for ingestion)"
     type: "string"
     required: true
+    secret: true
 
   # GITHUB_APP_ID/PRIVATE_KEY are the same across every customer (one
   # Zephvion-owned production GitHub App) — NOT the AI-PIE-repo-only test
@@ -122,6 +127,7 @@ settings:
     description: "Zephvion's production GitHub App private key, PEM contents (same value for every customer)"
     type: "string"
     required: false
+    secret: true
 
   - name: GITHUB_APP_INSTALLATION_ID
     description: "GitHub App installation ID for this customer's org (install Zephvion's AI-PIE Ingestion App at github.com/organizations/<org>/settings/installations, then copy the installation ID from the URL)"
@@ -144,6 +150,7 @@ settings:
     description: "Jira API token"
     type: "string"
     required: false
+    secret: true
 
   - name: JIRA_PROJECT_KEY
     description: "Jira project key (e.g. KAN)"

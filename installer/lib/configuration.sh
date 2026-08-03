@@ -17,6 +17,69 @@ generate_uuid_v4() {
   fi
 }
 
+# Resolves a usable `gum` binary for the interactive wizard's prompts and
+# echoes its path (or "" if unavailable — callers fall back to plain
+# read/input prompts, never hard-fail the installer over a UX nicety).
+#
+# Prefers a system-installed gum already on PATH. Otherwise downloads the
+# static binary release directly from GitHub (same fallback pattern
+# bootstrap/install.sh already uses for the Docker Compose plugin) rather
+# than adding an apt repository — customer machines shouldn't need a new
+# trusted repo just to get a nicer prompt, and a single static Go binary
+# needs no package manager at all.
+GUM_VERSION="0.17.0"
+ensure_gum_available() {
+  if command -v gum &>/dev/null; then
+    command -v gum
+    return 0
+  fi
+
+  local bin_dir="$INSTALL_DIR/.bin"
+  local cached="$bin_dir/gum"
+  if [ -x "$cached" ]; then
+    echo "$cached"
+    return 0
+  fi
+
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch="x86_64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *)
+      log_to_file_warn "Unsupported architecture for gum ($(uname -m)) — falling back to plain prompts."
+      return 1
+      ;;
+  esac
+
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  local tarball="gum_${GUM_VERSION}_Linux_${arch}.tar.gz"
+  local url="https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/${tarball}"
+
+  log_to_file_info "Downloading gum ${GUM_VERSION} for the interactive wizard..."
+  if ! curl -fsSL "$url" -o "$tmp_dir/$tarball" 2>>"$INSTALL_LOG"; then
+    log_to_file_warn "gum download failed — falling back to plain prompts."
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  tar -xzf "$tmp_dir/$tarball" -C "$tmp_dir" 2>>"$INSTALL_LOG"
+  local extracted
+  extracted=$(find "$tmp_dir" -type f -name gum | head -1)
+  if [ -z "$extracted" ]; then
+    log_to_file_warn "gum archive didn't contain the expected binary — falling back to plain prompts."
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  mkdir -p "$bin_dir"
+  cp "$extracted" "$cached"
+  chmod +x "$cached"
+  rm -rf "$tmp_dir"
+
+  echo "$cached"
+}
+
 # Validator functions
 validate_nonempty_val() {
   [ -n "$1" ]
@@ -83,9 +146,71 @@ run_config_wizard() {
 
   log_to_file_info "Parsing settings registry: $settings_registry"
 
+  local gum_bin=""
+  if [ "${UNATTENDED:-}" != "true" ]; then
+    gum_bin="$(ensure_gum_available || true)"
+  fi
+
   # Invoke python to run the interactive wizard dynamically using settings.yaml schema
   python3 -c "
-import sys, os, uuid
+import sys, os, uuid, subprocess, getpass
+
+GUM_BIN = '$gum_bin'
+
+def mask(val):
+    if not val:
+        return ''
+    if len(val) <= 4:
+        return '*' * len(val)
+    return val[:4] + ('*' * max(len(val) - 4, 4))
+
+def show_header(text):
+    if GUM_BIN:
+        subprocess.run([GUM_BIN, 'style', '--border', 'rounded', '--padding', '0 2',
+                         '--margin', '1 0', '--bold', '--border-foreground', '212', text])
+    else:
+        print('\n\033[1m╔══════════════════════════════════════════╗\033[0m')
+        print(f'\033[1m║{text:^44}║\033[0m')
+        print('\033[1m╚══════════════════════════════════════════╝\033[0m\n')
+
+def ask(header, default='', secret=False):
+    if GUM_BIN:
+        cmd = [GUM_BIN, 'input', '--header', header, '--placeholder', 'type here, or Enter to accept default']
+        if default:
+            cmd += ['--value', default]
+        if secret:
+            cmd += ['--password']
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except OSError:
+            return ask_plain(header, default, secret)
+        if result.returncode != 0:
+            print('\nAborted.')
+            sys.exit(1)
+        return result.stdout.rstrip('\n')
+    return ask_plain(header, default, secret)
+
+def ask_plain(header, default, secret):
+    prompt = f'  ? {header}'
+    if default:
+        prompt += f' [{mask(default) if secret else default}]'
+    prompt += ': '
+    try:
+        return getpass.getpass(prompt) if secret else input(prompt)
+    except (KeyboardInterrupt, EOFError):
+        print('\nAborted.')
+        sys.exit(1)
+
+def ask_confirm(prompt_text):
+    if GUM_BIN:
+        result = subprocess.run([GUM_BIN, 'confirm', prompt_text, '--default'])
+        return result.returncode == 0
+    try:
+        c = input(f'  ? {prompt_text} [Y/n]: ').strip()
+    except (KeyboardInterrupt, EOFError):
+        print('\nAborted.')
+        sys.exit(1)
+    return c.lower() in ('', 'y', 'yes')
 
 def parse_yaml(filepath):
     settings = []
@@ -124,70 +249,101 @@ def run():
                     defaults[k] = v.strip('\"').strip(\"'\")
     
     unattended = os.environ.get('UNATTENDED', '') == 'true'
+    settings_list = reg.get('settings', [])
+    total = len(settings_list)
+
     answers = {}
-    print('\n\033[1m╔══════════════════════════════════════════╗\033[0m')
-    print('\033[1m║    UNOTUSK Registry Configuration        ║\033[0m')
-    print('\033[1m╚══════════════════════════════════════════╝\033[0m\n')
-    
-    for s in reg.get('settings', []):
-        name = s['name']
-        desc = s['description']
-        default = s.get('default', '')
-        if name in defaults:
-            default = defaults[name]
-            
-        if s.get('generator') == 'uuid' and not default:
-            default = str(uuid.uuid4())
-            
-        required = s.get('required', False)
-        env_val = os.environ.get(name, '')
-        if env_val:
-            default = env_val
-            
-        if unattended:
-            if required and not default:
-                print(f'Error: Unattended mode but {name} is missing.', file=sys.stderr)
-                sys.exit(1)
-            answers[name] = default
-            continue
-            
-        val = ''
-        while True:
-            prompt = f'  ? {desc}'
-            if default:
-                prompt += f' [{default}]'
-            prompt += ': '
-            try:
-                val = input(prompt).strip()
-            except (KeyboardInterrupt, EOFError):
-                print('\nAborted.')
-                sys.exit(1)
-            if not val:
-                val = default
-            if required and not val:
-                print('  \033[31m✘ Error: This field is required.\033[0m')
+
+    while True:
+        answers = {}
+        show_header('UNOTUSK Registry Configuration')
+
+        for idx, s in enumerate(settings_list, start=1):
+            name = s['name']
+            desc = s['description']
+            default = s.get('default', '')
+            if name in defaults:
+                default = defaults[name]
+
+            if s.get('generator') == 'uuid' and not default:
+                default = str(uuid.uuid4())
+
+            # GITHUB_CALLBACK_URL has no static safe default — it must
+            # point at US's directly-published OAuth port (host 3100, see
+            # installer/templates/docker-compose.yml), not the HOSTNAME's
+            # bare 443/3000, because Caddy doesn't proxy /auth/* yet
+            # (templates/Caddyfile only routes the dead /oidc/* path).
+            # Left blank here, a customer will plausibly type
+            # http://<hostname> and silently break login.
+            if s.get('auto_default') == 'github_callback' and not default:
+                callback_host = answers.get('HOSTNAME', 'localhost')
+                default = f'http://{callback_host}:3100/auth/callback'
+
+            required = s.get('required', False)
+            is_secret = s.get('secret') is True
+            env_val = os.environ.get(name, '')
+            if env_val:
+                default = env_val
+
+            if unattended:
+                if required and not default:
+                    print(f'Error: Unattended mode but {name} is missing.', file=sys.stderr)
+                    sys.exit(1)
+                answers[name] = default.strip() if isinstance(default, str) else default
                 continue
-            
-            fmt = s.get('format', '')
-            if val:
-                if fmt == 'email' and '@' not in val:
-                    print('  \033[31m✘ Error: Invalid email format.\033[0m')
+
+            val = ''
+            while True:
+                val = ask(f'[{idx}/{total}] {desc}', default, is_secret)
+                # Strip whitespace unconditionally — customers routinely
+                # paste secrets/keys with a leading/trailing space or
+                # newline picked up from wherever they copied it, and a
+                # stray space silently breaks auth (invalid_client, bad
+                # signature, etc.) with no useful error at the point of
+                # failure. Safe for every field type here, secret or not.
+                val = val.strip()
+                if not val:
+                    val = default
+                if required and not val:
+                    print('  \033[31m✘ Error: This field is required.\033[0m')
                     continue
-                if fmt == 'url' and not val.startswith(('http://', 'https://')):
-                    print('  \033[31m✘ Error: URL must start with http:// or https://\033[0m')
-                    continue
-            answers[name] = val
+
+                fmt = s.get('format', '')
+                if val:
+                    if fmt == 'email' and '@' not in val:
+                        print('  \033[31m✘ Error: Invalid email format.\033[0m')
+                        continue
+                    if fmt == 'url' and not val.startswith(('http://', 'https://')):
+                        print('  \033[31m✘ Error: URL must start with http:// or https://\033[0m')
+                        continue
+                answers[name] = val
+                break
+
+        if unattended:
             break
-            
+
+        review_lines = []
+        for s in settings_list:
+            name = s['name']
+            v = answers.get(name, '')
+            shown = mask(v) if s.get('secret') is True else v
+            review_lines.append(f'{name:<28} {shown}')
+        show_header('Configuration review')
+        print('\n'.join(f'  {line}' for line in review_lines))
+        print('')
+        if ask_confirm('Confirm and proceed with this configuration?'):
+            break
+        print('\n  → Restarting — your previous answers are pre-filled as defaults; press Enter to keep, or type a new value to change.\n')
+        defaults = dict(answers)
+
     with open('$wizard_conf_file', 'w') as f:
         f.write('# UNOTUSK Selections\n')
         for k, v in answers.items():
             f.write(f'{k}=\"{v}\"\n')
-            
+
     admin_pw = os.environ.get('ADMIN_PASSWORD', '')
     if not unattended:
-        import getpass
-        pw1 = getpass.getpass('  ? Administrator Password: ')
+        pw1 = ask('Administrator Password (leave blank to auto-generate)', '', True).strip()
         if pw1:
             admin_pw = pw1
         else:
@@ -370,6 +526,68 @@ EOF
 
   # Lock down config permissions immediately
   secure_configuration_files
-  
+
+  write_client_env
+
   log_to_file_info "Configuration wizard save sequence complete."
+}
+
+# UCA (and eventually UAC) resolve their auth/gRPC endpoints from
+# /etc/unotusk/client.env (see UCA/src-tauri/src/config.rs::
+# deployment_config_paths / apply_config_file) — only filling in vars not
+# already set in the process environment, so this is purely a deployment-
+# specific override layer, never a substitute for real per-user config.
+#
+# Without this file, UCA falls back to its compiled-in defaults
+# (http://localhost:3000/auth/login etc.), which don't match this
+# installer's actual port choices (US's OAuth HTTP port is published on
+# host 3100, not 3000 — see templates/docker-compose.yml) and silently
+# break login (ERR_CONNECTION_REFUSED) with no indication why.
+#
+# CLIENT_CRT/CLIENT_KEY are intentionally left unset: US can issue
+# per-employee mTLS client certs on demand (POST /client-cert/issue,
+# session-gated — see US/src/employee_pki.rs), but UCA doesn't consume
+# that endpoint yet (server-side only so far). Until that's built,
+# gRPC-dependent features (fetching UPS/US data) won't work even with
+# this file in place — only the HTTP-based OAuth login flow does.
+write_client_env() {
+  log_to_file_info "Writing /etc/unotusk/client.env for desktop client discovery..."
+
+  # AUTH_SAN/COMPANY_SAN are hardcoded to "localhost" because that's the
+  # only SAN entry certificates.sh actually bakes into US/UPS's directly-
+  # published server certs (see "subjectAltName=DNS:...,DNS:localhost") —
+  # it never includes the customer's real $HOSTNAME. Fine for this
+  # loopback test deployment; a real non-localhost HOSTNAME would need
+  # certificates.sh's SAN generation fixed too before this file would be
+  # correct for it. Not attempting that here — separate, larger change.
+
+  local client_env_dir="/etc/unotusk"
+  local client_ca_path="$client_env_dir/ca.crt"
+  mkdir -p "$client_env_dir"
+
+  # The CA is public (it only signs server certs employees' machines need
+  # to trust) — copy it somewhere every local user can read, since
+  # US/certs/ca.crt lives inside root-owned $INSTALL_DIR and UCA runs as
+  # the logged-in desktop user, not root.
+  if [ -f "$INSTALL_DIR/US/certs/ca.crt" ]; then
+    cp "$INSTALL_DIR/US/certs/ca.crt" "$client_ca_path"
+    chmod 644 "$client_ca_path"
+  fi
+
+  cat > "$client_env_dir/client.env" <<EOF
+# UNOTUSK Desktop Client Configuration — Generated on $(date -u)
+# Consumed by UCA (and eventually UAC) at startup. Do not edit by hand —
+# regenerated on every 'unotusk reconfigure' / reinstall.
+AUTH_LOGIN_URL=http://${HOSTNAME}:3100/auth/login
+AUTH_BASE_URL=http://${HOSTNAME}:3100
+AUTH_GRPC_URL=https://${HOSTNAME}:50052
+COMPANY_GRPC_URL=https://${HOSTNAME}:50051
+AUTH_SAN=localhost
+COMPANY_SAN=localhost
+UPS_BASE_URL=https://${HOSTNAME}:8443
+CA_CERT=$client_ca_path
+EOF
+  chmod 644 "$client_env_dir/client.env"
+
+  log_to_file_info "/etc/unotusk/client.env written."
 }
