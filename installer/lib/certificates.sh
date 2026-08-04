@@ -249,6 +249,37 @@ generate_certificates() {
     -days 365 &>>"$INSTALL_LOG"
   cp "$INSTALL_DIR/US/certs/ca.crt" "$INSTALL_DIR/AI-PIE/certs/auth-client/ca.pem"
 
+  # ── 5c. UCA bootstrap client cert — closes a real gap: UCA's initial
+  # login (ExchangeRef over US's mTLS gRPC listener, mandatory client
+  # auth per tls.rs) has no client identity to present, since a real
+  # per-employee cert (US/src/employee_pki.rs, POST /client-cert/issue)
+  # is only obtainable AFTER a session exists — which ExchangeRef is what
+  # creates. This breaks the circularity: one shared leaf, signed by the
+  # same mesh CA US already trusts unconditionally, proving "this is a
+  # UCA install of this deployment" (not per-employee identity — that
+  # still comes from the OIDC claims ExchangeRef/GetCurrentUser return).
+  # Swapping this for a real per-employee cert post-login is a separate,
+  # not-yet-built feature (UCA never calls /client-cert/issue yet).
+  log_to_file_info "Generating UCA bootstrap client certificate..."
+  mkdir -p "$INSTALL_DIR/US/certs/uca-client"
+  openssl req -newkey rsa:2048 -nodes \
+    -keyout "$INSTALL_DIR/US/certs/uca-client/key.pem" \
+    -out "$INSTALL_DIR/US/certs/uca-client/cert.csr" \
+    -subj "/C=US/O=Unotusk/CN=uca-client" \
+    -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+    -addext "extendedKeyUsage=clientAuth" \
+    &>>"$INSTALL_LOG"
+
+  openssl x509 -req -in "$INSTALL_DIR/US/certs/uca-client/cert.csr" \
+    -CA "$INSTALL_DIR/US/certs/ca.crt" \
+    -CAkey "$INSTALL_DIR/US/certs/ca.key" \
+    -CAcreateserial \
+    -copy_extensions=copy \
+    -out "$INSTALL_DIR/US/certs/uca-client/cert.pem" \
+    -days 365 &>>"$INSTALL_LOG"
+  rm -f "$INSTALL_DIR/US/certs/uca-client/cert.csr"
+
   # ── 6. Ingress Certificate Setup (Caddy) ──
   local caddyfile_target="$INSTALL_DIR/templates/Caddyfile"
   if [ -f "$caddyfile_target" ]; then

@@ -109,6 +109,11 @@ services:
       # already includes "localhost" unconditionally (admin_pki.rs), so
       # this bind-address change doesn't invalidate it.
       ADMIN_LISTEN_ADDR: 0.0.0.0:8444
+      # Same NAT reasoning as ADMIN_LISTEN_ADDR above — the pairing-code
+      # bootstrap listener (admin_pairing_bootstrap.rs) needs to bind the
+      # container's external interface, not its loopback, to be reachable
+      # via the published port below.
+      ADMIN_PAIRING_BOOTSTRAP_ADDR: 0.0.0.0:8446
       DATABASE_URL: postgres://${POSTGRES_USER:-unotusk}:${POSTGRES_PASSWORD}@postgres:5432/auth
       UPS_LICENSE_STATUS_URL: http://company-server:8080/license/status
       PLATFORM_TOKEN_AUDIENCE: ${PLATFORM_TOKEN_AUDIENCE:-platform.unotusk.com}
@@ -123,6 +128,10 @@ services:
                        # host mapping changed.
       - "8444:8444"   # UAC administrative pairing (US's own admin listener,
                        # distinct from UPS's on 8443)
+      - "8446:8446"   # UAC pairing-code redemption (admin_pairing_bootstrap.rs)
+                       # — server-auth-only TLS, no client cert required; this
+                       # is what "unotusk pairing-code" + UAC's code-entry
+                       # screen use instead of manual PEM copy-paste.
       - "50052:50052" # gRPC mTLS — UCA (a host app, unlike UPS/AI-PIE which
                        # reach this over the internal Docker network as
                        # "auth-server:50052") needs this reachable directly
@@ -157,6 +166,9 @@ services:
       - ./UPS/.env
     environment:
       HEALTH_LISTEN_ADDR: 0.0.0.0:8080
+      # Same NAT reasoning as US's ADMIN_PAIRING_BOOTSTRAP_ADDR — needs the
+      # container's external interface, not its loopback.
+      ADMIN_PAIRING_BOOTSTRAP_ADDR: 0.0.0.0:8447
       AUTH_GRPC_ENDPOINT: https://auth-server:50052
       CA_CERT: /app/certs/ca.crt
       SERVER_TLS_CERT: /app/certs/server.crt
@@ -175,6 +187,9 @@ services:
       - "8443:8443"   # UAC administrative pairing — never published before this;
                        # UAC runs on the host, outside unotusk_internal, and could
                        # never reach this listener without it.
+      - "8447:8447"   # UAC pairing-code redemption (admin_pairing_bootstrap.rs)
+                       # — server-auth-only TLS, no client cert required; what
+                       # "unotusk pairing-code ups" + UAC's code-entry screen use.
       - "50051:50051" # gRPC business API (ClientService) — UCA calls this
                        # directly after exchange_ref() to attach_to_client();
                        # same host-app-reachability gap as US's 50052.

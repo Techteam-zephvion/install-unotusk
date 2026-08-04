@@ -42,6 +42,10 @@ show_cli_usage() {
   echo "    rollback              Trigger rollback to previous state"
   echo "    uninstall             Remove UNOTUSK from this server"
   echo ""
+  echo "  Admin console pairing:"
+  echo "    pair us                Generate a short-lived Auth Service (US) pairing code"
+  echo "    pair ups               Generate a short-lived UPS pairing code"
+  echo ""
 }
 
 # CLI command dispatcher logic
@@ -110,6 +114,46 @@ dispatch_cli_command() {
       else
         log_error "uninstall.sh not found in $INSTALL_DIR."
       fi
+      ;;
+    pair)
+      local target="${1:-}"
+      local container_exec_cmd label screen
+      case "$target" in
+        us)
+          container_exec_cmd="docker exec unotusk-us-1 curl -sf -X POST http://127.0.0.1:3000/internal/pairing-code"
+          label="Auth Service (US)"
+          screen="UAC's Connect Auth Service screen"
+          ;;
+        ups)
+          container_exec_cmd="docker exec unotusk-ups-1 curl -sf -X POST http://127.0.0.1:8080/internal/pairing-code"
+          label="UPS"
+          screen="UAC's Pair with your UPS instance screen"
+          ;;
+        *)
+          log_error "Usage: unotusk pair <us|ups>"
+          exit 1
+          ;;
+      esac
+      # Loopback-only route (see US/src/http/pairing_code.rs and
+      # UPS/src/health.rs's pairing_code handler) — only reachable from
+      # inside the container itself, which is exactly the "operator at
+      # this machine's console" boundary the pairing-code flow relies on.
+      local resp
+      resp=$($container_exec_cmd 2>/dev/null) || {
+        log_error "Could not reach $label on this machine — is it running? Try 'unotusk status'."
+        exit 1
+      }
+      local code
+      code=$(echo "$resp" | grep -o '"code":"[^"]*"' | cut -d'"' -f4)
+      if [ -z "$code" ]; then
+        log_error "$label did not return a pairing code."
+        exit 1
+      fi
+      log_header "UAC Pairing Code — $label"
+      echo "  Code: $code"
+      echo "  Valid for 10 minutes, one-time use."
+      echo "  Enter this in $screen along with this machine's hostname or IP."
+      echo ""
       ;;
     help|--help|-h|"")
       show_cli_usage

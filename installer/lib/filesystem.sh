@@ -59,6 +59,15 @@ deploy_installer_resources() {
   cp "$INSTALLER_ROOT/manifest.json" "$INSTALL_DIR/manifest.json" 2>/dev/null || true
   cp "$INSTALLER_ROOT/settings.yaml" "$INSTALL_DIR/settings.yaml" 2>/dev/null || true
 
+  # Copy top-level operator scripts — lib/cli.sh's doctor/update/uninstall
+  # commands look for these directly at $INSTALL_DIR/*.sh (not inside lib/
+  # or scripts/), but nothing here ever put them there, so every one of
+  # those `unotusk` subcommands failed with "not found" after every install.
+  cp "$INSTALLER_ROOT/doctor.sh" "$INSTALL_DIR/doctor.sh" 2>/dev/null || true
+  cp "$INSTALLER_ROOT/uninstall.sh" "$INSTALL_DIR/uninstall.sh" 2>/dev/null || true
+  cp "$INSTALLER_ROOT/rollback.sh" "$INSTALL_DIR/rollback.sh" 2>/dev/null || true
+  cp "$INSTALLER_ROOT/upgrade.sh" "$INSTALL_DIR/upgrade.sh" 2>/dev/null || true
+
   # Copy libraries
   cp -r "$INSTALLER_ROOT/lib/"* "$INSTALL_DIR/lib/"
   
