@@ -1,5 +1,6 @@
 import uuid
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
+
 from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,7 +31,7 @@ class Integration(Base, UUIDMixin, TimestampMixin):
         default=IntegrationStatus.PENDING,
         nullable=False,
     )
-    external_id: Mapped[Optional[str]] = mapped_column(
+    external_id: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )

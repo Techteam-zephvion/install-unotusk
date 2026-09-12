@@ -1,8 +1,10 @@
 import uuid
+
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.api.exceptions import UnauthorizedException
 from apps.api.src.auth.security import decode_access_token
@@ -35,7 +37,7 @@ async def get_current_user(
         raise UnauthorizedException(
             code="INVALID_TOKEN",
             message="Malformed user identifier in token",
-        )
+        ) from None
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

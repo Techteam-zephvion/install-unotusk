@@ -1,9 +1,19 @@
 import uuid
-from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from apps.api.src.api.exceptions import ConflictException, ForbiddenException, NotFoundException
-from apps.api.src.models.enums import IntegrationProvider, IntegrationStatus, MembershipRole, ProjectStatus
+
+from apps.api.src.api.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
+from apps.api.src.models.enums import (
+    IntegrationProvider,
+    IntegrationStatus,
+    MembershipRole,
+    ProjectStatus,
+)
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.project import Project

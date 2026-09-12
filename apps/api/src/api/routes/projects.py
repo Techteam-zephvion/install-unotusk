@@ -1,10 +1,10 @@
 import uuid
-from typing import Optional
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from apps.api.src.api.dependencies.auth import get_current_user
 from apps.api.src.api.dependencies.database import get_db
-from apps.api.src.api.exceptions import BadRequestException
 from apps.api.src.models.user import User
 from apps.api.src.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from apps.api.src.services.org_service import OrgService
@@ -25,7 +25,7 @@ async def create_project(
 
 @router.get("", response_model=list[ProjectRead])
 async def list_projects(
-    organization_id: Optional[uuid.UUID] = Query(default=None),
+    organization_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectRead]:

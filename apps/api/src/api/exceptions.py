@@ -1,4 +1,5 @@
-from typing import Any, Optional
+from typing import Any
+
 from fastapi import HTTPException, status
 
 
@@ -8,7 +9,7 @@ class AppException(HTTPException):
         status_code: int,
         code: str,
         message: str,
-        details: Optional[Any] = None,
+        details: Any | None = None,
     ):
         super().__init__(status_code=status_code, detail=message)
         self.code = code
@@ -37,5 +38,5 @@ class ConflictException(AppException):
 
 
 class BadRequestException(AppException):
-    def __init__(self, message: str = "Bad request", code: str = "BAD_REQUEST", details: Optional[Any] = None):
+    def __init__(self, message: str = "Bad request", code: str = "BAD_REQUEST", details: Any | None = None):
         super().__init__(status_code=status.HTTP_400_BAD_REQUEST, code=code, message=message, details=details)

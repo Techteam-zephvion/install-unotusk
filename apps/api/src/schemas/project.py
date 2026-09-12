@@ -1,24 +1,25 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from apps.api.src.models.enums import ProjectStatus
 
 
 class ProjectBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class ProjectCreate(ProjectBase):
     organization_id: uuid.UUID
-    slug: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    slug: str | None = Field(default=None, min_length=2, max_length=100)
 
 
 class ProjectUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    status: Optional[ProjectStatus] = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    status: ProjectStatus | None = None
 
 
 class ProjectRead(ProjectBase):

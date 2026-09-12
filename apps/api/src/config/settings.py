@@ -1,4 +1,4 @@
-from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk"
     )
-    SYNC_DATABASE_URL: Optional[str] = Field(
+    SYNC_DATABASE_URL: str | None = Field(
         default="postgresql://postgres:postgres@localhost:5432/unotusk"
     )
 

@@ -1,6 +1,8 @@
 import json
+
 import pytest
 import redis.asyncio as aioredis
+
 from apps.api.src.config.settings import settings
 from apps.api.src.workers.dispatcher import TaskDispatcher
 from services.workers.worker import process_task

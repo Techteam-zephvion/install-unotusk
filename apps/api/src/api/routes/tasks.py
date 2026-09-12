@@ -1,6 +1,8 @@
 from typing import Any
+
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
+
 from apps.api.src.api.dependencies.auth import get_current_user
 from apps.api.src.api.exceptions import NotFoundException
 from apps.api.src.models.user import User

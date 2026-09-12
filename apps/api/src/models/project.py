@@ -1,5 +1,6 @@
 import uuid
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,6 +11,7 @@ from apps.api.src.models.enums import ProjectStatus
 if TYPE_CHECKING:
     from apps.api.src.models.integration import Integration
     from apps.api.src.models.organization import Organization
+    from apps.api.src.models.repository import Repository
 
 
 class Project(Base, UUIDMixin, TimestampMixin):
@@ -30,7 +32,7 @@ class Project(Base, UUIDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    description: Mapped[Optional[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -47,6 +49,11 @@ class Project(Base, UUIDMixin, TimestampMixin):
     )
     integrations: Mapped[list["Integration"]] = relationship(
         "Integration",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    repositories: Mapped[list["Repository"]] = relationship(
+        "Repository",
         back_populates="project",
         cascade="all, delete-orphan",
     )

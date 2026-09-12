@@ -1,5 +1,7 @@
 from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from apps.api.src.db.session import get_db_session
 
 

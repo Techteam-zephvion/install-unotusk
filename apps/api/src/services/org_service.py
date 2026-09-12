@@ -1,7 +1,13 @@
 import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from apps.api.src.api.exceptions import ConflictException, ForbiddenException, NotFoundException
+
+from apps.api.src.api.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 from apps.api.src.models.enums import MembershipRole
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.organization import Organization

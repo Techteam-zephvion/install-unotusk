@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +8,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from apps.api.src.api.exceptions import AppException
-from apps.api.src.api.routes import auth, health, organizations, projects, tasks
+from apps.api.src.api.routes import (
+    auth,
+    health,
+    organizations,
+    projects,
+    repository,
+    tasks,
+)
 from apps.api.src.config.settings import settings
 
 logging.basicConfig(
@@ -61,7 +69,7 @@ async def handle_app_exception(request: Request, exc: AppException):
 async def handle_validation_error(request: Request, exc: RequestValidationError):
     errors = []
     for err in exc.errors():
-        loc = ".".join([str(l) for l in err.get("loc", [])])
+        loc = ".".join([str(part) for part in err.get("loc", [])])
         errors.append({"field": loc, "issue": err.get("msg")})
 
     return JSONResponse(
@@ -118,4 +126,5 @@ app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(organizations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(projects.router, prefix=settings.API_V1_PREFIX)
+app.include_router(repository.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_V1_PREFIX)

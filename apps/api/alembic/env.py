@@ -1,21 +1,22 @@
 import asyncio
-from logging.config import fileConfig
 import sys
+from logging.config import fileConfig
 from pathlib import Path
+
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from alembic import context
 
 # Ensure workspace root is in sys.path
 root_dir = Path(__file__).resolve().parents[3]
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from apps.api.src.config.settings import settings
-from apps.api.src.db.base import Base
 # Import all models to register with Base.metadata
 import apps.api.src.models  # noqa: F401
+from apps.api.src.config.settings import settings
+from apps.api.src.db.base import Base
 
 config = context.config
 

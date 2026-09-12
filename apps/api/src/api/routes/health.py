@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, status
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-import redis.asyncio as aioredis
+
 from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.config.settings import settings
 from apps.api.src.schemas.health import HealthResponse, ReadyResponse

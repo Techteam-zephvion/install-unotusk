@@ -1,0 +1,22 @@
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # FastAPI Depends in function defaults
+    "UP045", # Optional vs | None (support both)
+    "UP042", # StrEnum vs (str, enum.Enum) for SQLAlchemy compatibility
+    "E402",  # module level import not at top (conftest env setup)
+]
+
+[lint.isort]
+known-first-party = ["apps", "services"]

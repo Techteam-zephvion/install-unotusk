@@ -5,13 +5,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/api/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY apps/api/ ./apps/api/
 COPY services/workers/ ./services/workers/
-COPY apps/api/src/config/ ./apps/api/src/config/
+COPY alembic.ini ./alembic.ini
 
 ENV PYTHONPATH=/app
 

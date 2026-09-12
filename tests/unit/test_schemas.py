@@ -1,6 +1,8 @@
 import uuid
+
 import pytest
 from pydantic import ValidationError
+
 from apps.api.src.schemas.project import ProjectCreate
 from apps.api.src.schemas.user import UserCreate
 from apps.api.src.services.slug import slugify

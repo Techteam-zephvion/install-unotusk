@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from apps.api.src.models.enums import MembershipRole
 
 
@@ -10,7 +11,7 @@ class OrganizationBase(BaseModel):
 
 
 class OrganizationCreate(OrganizationBase):
-    slug: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    slug: str | None = Field(default=None, min_length=2, max_length=100)
 
 
 class OrganizationRead(OrganizationBase):
@@ -18,7 +19,7 @@ class OrganizationRead(OrganizationBase):
     slug: str
     created_at: datetime
     updated_at: datetime
-    role: Optional[MembershipRole] = None
+    role: MembershipRole | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

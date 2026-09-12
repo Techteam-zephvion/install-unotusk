@@ -1,4 +1,16 @@
-import { ApiError, AuthResponse, Organization, Project } from '@unotusk/types';
+import {
+  ApiError,
+  AuthResponse,
+  CodeDependency,
+  CodeSymbol,
+  IngestTriggerResponse,
+  Organization,
+  Project,
+  ProjectRepositoryContext,
+  Repository,
+  RepositoryFile,
+  RepositorySnapshot,
+} from '@unotusk/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -115,6 +127,39 @@ export const api = {
     delete: (id: string) =>
       request<void>(`/api/v1/projects/${id}`, {
         method: 'DELETE',
+      }),
+  },
+
+  repository: {
+    connectGitHub: (projectId: string, githubToken?: string) =>
+      request<{ status: string; username?: string }>(`/api/v1/projects/${projectId}/github/connect`, {
+        method: 'POST',
+        body: JSON.stringify({ github_token: githubToken }),
+      }),
+    listRepositories: (projectId: string) =>
+      request<any[]>(`/api/v1/projects/${projectId}/repositories`),
+    selectRepository: (projectId: string, payload: any) =>
+      request<Repository>(`/api/v1/projects/${projectId}/repositories/select`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    triggerIngest: (projectId: string, repositoryId: string) =>
+      request<IngestTriggerResponse>(`/api/v1/projects/${projectId}/repositories/${repositoryId}/ingest`, {
+        method: 'POST',
+      }),
+    getIngestionStatus: (projectId: string, ingestionId: string) =>
+      request<RepositorySnapshot>(`/api/v1/projects/${projectId}/ingestions/${ingestionId}`),
+    getContext: (projectId: string) =>
+      request<ProjectRepositoryContext>(`/api/v1/projects/${projectId}/repository`),
+    listFiles: (projectId: string) =>
+      request<RepositoryFile[]>(`/api/v1/projects/${projectId}/files`),
+    listSymbols: (projectId: string) =>
+      request<CodeSymbol[]>(`/api/v1/projects/${projectId}/symbols`),
+    listDependencies: (projectId: string) =>
+      request<CodeDependency[]>(`/api/v1/projects/${projectId}/dependencies`),
+    reindex: (projectId: string) =>
+      request<IngestTriggerResponse>(`/api/v1/projects/${projectId}/repository/reindex`, {
+        method: 'POST',
       }),
   },
 };

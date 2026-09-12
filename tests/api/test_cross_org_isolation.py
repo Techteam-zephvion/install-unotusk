@@ -1,7 +1,5 @@
-import uuid
 import pytest
 from httpx import AsyncClient
-from apps.api.src.models.enums import MembershipRole
 
 
 @pytest.mark.asyncio

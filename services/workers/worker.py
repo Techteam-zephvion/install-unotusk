@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import uuid
 from typing import Any
 import redis.asyncio as aioredis
 
@@ -33,6 +34,19 @@ async def process_task(task_data: dict[str, Any], r: aioredis.Redis) -> None:
                 "pong": True,
                 "echo": payload.get("message", "hello"),
                 "worker_status": "healthy",
+            }
+        elif task_name == "ingest_repository":
+            snapshot_id_str = payload.get("snapshot_id")
+            override_dir = payload.get("override_local_dir")
+            if snapshot_id_str:
+                from apps.api.src.services.ingestion_service import IngestionService
+                await IngestionService.run_ingestion(
+                    uuid.UUID(snapshot_id_str),
+                    override_local_dir=override_dir,
+                )
+            result = {
+                "ingestion_triggered": True,
+                "snapshot_id": snapshot_id_str,
             }
         else:
             result = {"unknown_task": True}
@@ -69,7 +83,6 @@ async def run_worker() -> None:
 
     try:
         while running:
-            # Pop with 2 second timeout
             popped = await r.brpop(QUEUE_NAME, timeout=2)
             if popped:
                 _, raw_data = popped

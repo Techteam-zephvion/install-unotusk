@@ -1,14 +1,18 @@
 import uuid
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from apps.api.src.models.enums import IntegrationProvider, IntegrationStatus, MembershipRole, ProjectStatus
+
+from apps.api.src.models.enums import (
+    IntegrationProvider,
+    IntegrationStatus,
+    ProjectStatus,
+)
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership
-from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
-from apps.api.src.models.user import User
 
 
 @pytest.mark.asyncio
