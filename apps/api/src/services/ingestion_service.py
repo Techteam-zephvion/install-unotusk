@@ -296,20 +296,32 @@ class IngestionService:
                 snapshot.status = SnapshotStatus.INDEXING
                 await session.commit()
 
+                files_by_id_map = {rf.id: rf for rf in created_files_map.values()}
                 for source_file_id, dep in raw_deps_to_create:
                     target_file_id = None
-                    ext_pkg = None
+                    ext_pkg = dep.raw_target
 
                     if dep.is_relative:
-                        # Attempt to resolve relative import target file
-                        # Normalization heuristic
-                        cleaned_target = dep.raw_target.lstrip("./")
+                        source_rf = files_by_id_map.get(source_file_id)
+                        src_dir = os.path.dirname(source_rf.path) if source_rf else ""
+                        # Handle dot-notation or slash notation
+                        rel_path = dep.raw_target.lstrip(".")
+                        if not rel_path.startswith("/"):
+                            rel_path = "/" + rel_path
+                        norm_target = os.path.normpath(src_dir + rel_path)
+
                         for p, rf in created_files_map.items():
-                            if p.startswith(cleaned_target) or os.path.splitext(p)[0] == cleaned_target:
+                            p_no_ext = os.path.splitext(p)[0]
+                            if p == norm_target or p_no_ext == norm_target or p_no_ext.endswith(norm_target):
                                 target_file_id = rf.id
                                 break
                     else:
-                        ext_pkg = dep.raw_target
+                        for p, rf in created_files_map.items():
+                            p_no_ext = os.path.splitext(p)[0]
+                            target_as_path = dep.raw_target.replace(".", "/")
+                            if p_no_ext == target_as_path or p_no_ext.endswith(target_as_path):
+                                target_file_id = rf.id
+                                break
 
                     code_dep = CodeDependency(
                         id=uuid.uuid4(),

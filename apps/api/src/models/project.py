@@ -10,6 +10,8 @@ from apps.api.src.models.enums import ProjectStatus
 
 if TYPE_CHECKING:
     from apps.api.src.models.conversation import Conversation
+    from apps.api.src.models.discovery_run import DiscoveryRun
+    from apps.api.src.models.finding import Finding
     from apps.api.src.models.integration import Integration
     from apps.api.src.models.organization import Organization
     from apps.api.src.models.repository import Repository
@@ -60,6 +62,16 @@ class Project(Base, UUIDMixin, TimestampMixin):
     )
     conversations: Mapped[list["Conversation"]] = relationship(
         "Conversation",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    findings: Mapped[list["Finding"]] = relationship(
+        "Finding",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    discovery_runs: Mapped[list["DiscoveryRun"]] = relationship(
+        "DiscoveryRun",
         back_populates="project",
         cascade="all, delete-orphan",
     )

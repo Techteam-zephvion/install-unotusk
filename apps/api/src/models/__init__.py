@@ -1,8 +1,14 @@
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.conversation import Conversation
 from apps.api.src.models.dependency import CodeDependency
+from apps.api.src.models.discovery_run import DiscoveryRun
 from apps.api.src.models.enums import (
     DependencyType,
+    DiscoveryJobStatus,
+    FindingCategory,
+    FindingConfidence,
+    FindingSeverity,
+    FindingStatus,
     IntegrationProvider,
     IntegrationStatus,
     MembershipRole,
@@ -11,6 +17,7 @@ from apps.api.src.models.enums import (
     SymbolType,
 )
 from apps.api.src.models.file import RepositoryFile
+from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.message import Message
@@ -27,6 +34,13 @@ __all__ = [
     "CodeSymbol",
     "Conversation",
     "DependencyType",
+    "DiscoveryJobStatus",
+    "DiscoveryRun",
+    "Finding",
+    "FindingCategory",
+    "FindingConfidence",
+    "FindingSeverity",
+    "FindingStatus",
     "Integration",
     "IntegrationProvider",
     "IntegrationStatus",

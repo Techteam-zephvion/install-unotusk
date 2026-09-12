@@ -26,6 +26,15 @@ import {
   Search,
   Terminal,
   Plus,
+  Compass,
+  Lightbulb,
+  ShieldAlert,
+  SlidersHorizontal,
+  X,
+  Check,
+  Eye,
+  Filter,
+  ArrowRight,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
@@ -33,7 +42,12 @@ import {
   CodeDependency,
   CodeSymbol,
   Conversation,
+  DiscoverSummary,
   EvidenceItem,
+  Finding,
+  FindingCategory,
+  FindingSeverity,
+  FindingStatus,
   Message,
   Organization,
   Project,
@@ -62,11 +76,23 @@ export default function ProjectOverviewPage() {
   const [selectedRepoId, setSelectedRepoId] = useState<string>('');
 
   // Active tab in completed context
-  const [activeTab, setActiveTab] = useState<'overview' | 'ask' | 'files' | 'symbols' | 'dependencies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ask' | 'discoveries' | 'files' | 'symbols' | 'dependencies'>('overview');
   const [filesList, setFilesList] = useState<RepositoryFile[]>([]);
   const [symbolsList, setSymbolsList] = useState<CodeSymbol[]>([]);
   const [dependenciesList, setDependenciesList] = useState<CodeDependency[]>([]);
   const [loadingTab, setLoadingTab] = useState(false);
+
+  // Stage 3: Discoveries state
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [discoverSummary, setDiscoverSummary] = useState<DiscoverSummary | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [loadingFindings, setLoadingFindings] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const discoveryPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Intelligence / Ask state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -172,6 +198,101 @@ export default function ProjectOverviewPage() {
     }
   };
 
+  // Stage 3: Discoveries helper methods
+  const loadDiscoverSummary = async () => {
+    try {
+      const summary = await api.discovery.getStatus(projectId);
+      setDiscoverSummary(summary);
+      if (
+        summary.latest_run &&
+        ['QUEUED', 'ANALYZING', 'FINALIZING'].includes(summary.latest_run.status)
+      ) {
+        setAnalyzing(true);
+        startDiscoveryPolling();
+      } else {
+        setAnalyzing(false);
+      }
+    } catch (e) {
+      console.error('Failed to load discovery summary:', e);
+    }
+  };
+
+  const loadFindings = async () => {
+    setLoadingFindings(true);
+    try {
+      const list = await api.discovery.listFindings(projectId, {
+        status: statusFilter !== 'ALL' ? statusFilter : undefined,
+        severity: severityFilter !== 'ALL' ? severityFilter : undefined,
+        category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
+      });
+      setFindings(list);
+    } catch (e) {
+      console.error('Failed to load findings:', e);
+    } finally {
+      setLoadingFindings(false);
+    }
+  };
+
+  const startDiscoveryPolling = () => {
+    stopDiscoveryPolling();
+    discoveryPollingRef.current = setInterval(async () => {
+      try {
+        const summary = await api.discovery.getStatus(projectId);
+        setDiscoverSummary(summary);
+        if (
+          !summary.latest_run ||
+          summary.latest_run.status === 'COMPLETED' ||
+          summary.latest_run.status === 'FAILED'
+        ) {
+          stopDiscoveryPolling();
+          setAnalyzing(false);
+          loadFindings();
+        }
+      } catch (e) {
+        console.error('Discovery polling error:', e);
+      }
+    }, 2000);
+  };
+
+  const stopDiscoveryPolling = () => {
+    if (discoveryPollingRef.current) {
+      clearInterval(discoveryPollingRef.current);
+      discoveryPollingRef.current = null;
+    }
+  };
+
+  const handleTriggerDiscovery = async () => {
+    setAnalyzing(true);
+    setError(null);
+    try {
+      await api.discovery.trigger(projectId);
+      startDiscoveryPolling();
+    } catch (err: any) {
+      setError(err.message || 'Failed to trigger discovery analysis');
+      setAnalyzing(false);
+    }
+  };
+
+  const handleUpdateFindingStatus = async (findingId: string, newStatus: FindingStatus) => {
+    try {
+      const updated = await api.discovery.updateStatus(projectId, findingId, newStatus);
+      setFindings((prev) => prev.map((f) => (f.id === findingId ? updated : f)));
+      if (selectedFinding && selectedFinding.id === findingId) {
+        setSelectedFinding(updated);
+      }
+      loadDiscoverSummary();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update finding status');
+    }
+  };
+
+  const handleInvestigateFinding = (finding: Finding) => {
+    setActiveTab('ask');
+    setSelectedFinding(null);
+    const prompt = `Investigate discovery finding: "${finding.title}". ${finding.why_it_matters} What is the root cause and how should we address it?`;
+    handleAsk(prompt);
+  };
+
   const loadData = async () => {
     try {
       setError(null);
@@ -184,6 +305,9 @@ export default function ProjectOverviewPage() {
 
       const ctx = await api.repository.getContext(projectId);
       setContext(ctx);
+
+      // Load discoveries summary
+      loadDiscoverSummary();
 
       // If snapshot is active, poll for progress
       const snap = ctx.active_snapshot;
@@ -235,8 +359,18 @@ export default function ProjectOverviewPage() {
     if (projectId) {
       loadData();
     }
-    return () => stopPolling();
+    return () => {
+      stopPolling();
+      stopDiscoveryPolling();
+    };
   }, [projectId]);
+
+  // Lazy load tab data
+  useEffect(() => {
+    if (activeTab === 'discoveries') {
+      loadFindings();
+    }
+  }, [activeTab, statusFilter, severityFilter, categoryFilter]);
 
   // Lazy load tab data
   useEffect(() => {
@@ -346,6 +480,47 @@ export default function ProjectOverviewPage() {
     snapshot && snapshot.total_files > 0
       ? Math.min(100, Math.round((snapshot.processed_files / snapshot.total_files) * 100))
       : 0;
+
+  const getSeverityBadgeClass = (severity: FindingSeverity) => {
+    switch (severity) {
+      case 'CRITICAL':
+        return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30';
+      case 'HIGH':
+        return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30';
+      case 'MEDIUM':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+      case 'LOW':
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+      default:
+        return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/30';
+    }
+  };
+
+  const getStatusBadgeClass = (status: FindingStatus) => {
+    switch (status) {
+      case 'OPEN':
+        return 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      case 'ACKNOWLEDGED':
+        return 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+      case 'RESOLVED':
+        return 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+      case 'DISMISSED':
+        return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700';
+      default:
+        return 'bg-zinc-100 text-zinc-600 border-zinc-200';
+    }
+  };
+
+  const filteredFindings = findings.filter((f) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      f.title.toLowerCase().includes(q) ||
+      f.description.toLowerCase().includes(q) ||
+      f.category.toLowerCase().includes(q) ||
+      (f.related_entities && f.related_entities.some((e) => e.toLowerCase().includes(q)))
+    );
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -619,6 +794,26 @@ export default function ProjectOverviewPage() {
                     </button>
                     <button
                       onClick={() => {
+                        setActiveTab('discoveries');
+                        loadFindings();
+                        loadDiscoverSummary();
+                      }}
+                      className={`py-3 text-xs font-semibold border-b-2 flex items-center space-x-1.5 transition-colors ${
+                        activeTab === 'discoveries'
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Compass className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Discoveries</span>
+                      {discoverSummary && discoverSummary.total_findings > 0 && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                          {discoverSummary.total_findings}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
                         setActiveTab('ask');
                         loadConversations();
                       }}
@@ -669,16 +864,155 @@ export default function ProjectOverviewPage() {
                         Loading explorer details...
                       </div>
                     ) : activeTab === 'overview' ? (
-                      <div className="space-y-4 text-xs text-muted-foreground">
-                        <p>
-                          Deterministic project context has been stored in PostgreSQL. AST analysis extracted symbols
-                          and dependency trees via Tree-sitter.
-                        </p>
-                        <div className="p-4 bg-muted/20 border border-border rounded-lg text-xs space-y-1">
-                          <div><strong>Repository:</strong> {repo.full_name}</div>
-                          <div><strong>URL:</strong> <a href={repo.url} target="_blank" rel="noreferrer" className="text-blue-600 underline">{repo.url}</a></div>
-                          <div><strong>Commit SHA:</strong> {snapshot.commit_sha}</div>
-                          <div><strong>Parser Status:</strong> Completed with zero unhandled language crashes</div>
+                      <div className="space-y-6">
+                        {/* Repository context metadata */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Indexed Repository State
+                          </h4>
+                          <div className="p-4 bg-muted/20 border border-border rounded-lg text-xs space-y-1.5">
+                            <div><strong>Repository:</strong> {repo.full_name}</div>
+                            <div><strong>URL:</strong> <a href={repo.url} target="_blank" rel="noreferrer" className="text-blue-600 underline">{repo.url}</a></div>
+                            <div><strong>Commit SHA:</strong> {snapshot.commit_sha || 'Latest HEAD'}</div>
+                            <div><strong>Parser Status:</strong> Completed AST indexing with zero unhandled crashes</div>
+                          </div>
+                        </div>
+
+                        {/* Proactive Discoveries Summary Panel */}
+                        <div className="border border-border rounded-xl bg-card p-5 shadow-xs space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 flex items-center justify-center text-blue-600">
+                                <Compass className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                                  <span>Proactive Project Discoveries</span>
+                                  <span className="text-[10px] font-mono font-normal px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                    "I found something you should know"
+                                  </span>
+                                </h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Deterministic structural, dependency, and code quality analysis.
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={handleTriggerDiscovery}
+                              disabled={analyzing}
+                              className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-xs disabled:opacity-50"
+                            >
+                              <RotateCw className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : ''}`} />
+                              <span>{analyzing ? 'Analyzing Project...' : 'Analyze Project'}</span>
+                            </button>
+                          </div>
+
+                          {/* Severity breakdown counters */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                              <div className="flex items-center justify-between text-xs text-red-600 dark:text-red-400 font-semibold mb-1">
+                                <span>Critical</span>
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-xl font-bold text-foreground">
+                                {discoverSummary?.critical_count ?? 0}
+                              </span>
+                            </div>
+
+                            <div className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                              <div className="flex items-center justify-between text-xs text-orange-600 dark:text-orange-400 font-semibold mb-1">
+                                <span>High</span>
+                                <AlertCircle className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-xl font-bold text-foreground">
+                                {discoverSummary?.high_count ?? 0}
+                              </span>
+                            </div>
+
+                            <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                              <div className="flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 font-semibold mb-1">
+                                <span>Medium</span>
+                                <Lightbulb className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-xl font-bold text-foreground">
+                                {discoverSummary?.medium_count ?? 0}
+                              </span>
+                            </div>
+
+                            <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                              <div className="flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">
+                                <span>Low</span>
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </div>
+                              <span className="text-xl font-bold text-foreground">
+                                {discoverSummary?.low_count ?? 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Top findings list preview */}
+                          {findings.length > 0 ? (
+                            <div className="space-y-2 pt-2">
+                              <span className="text-xs font-semibold text-foreground">
+                                Top Discoveries:
+                              </span>
+                              <div className="space-y-2">
+                                {findings.slice(0, 3).map((f) => (
+                                  <div
+                                    key={f.id}
+                                    className="p-3 border border-border rounded-lg bg-card hover:bg-muted/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                                  >
+                                    <div className="space-y-1 max-w-2xl">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityBadgeClass(f.severity)}`}>
+                                          {f.severity}
+                                        </span>
+                                        <span className="font-semibold text-foreground">{f.title}</span>
+                                      </div>
+                                      <p className="text-muted-foreground line-clamp-1">
+                                        {f.why_it_matters || f.description}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        onClick={() => handleInvestigateFinding(f)}
+                                        className="inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:hover:bg-blue-900 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800 text-[11px] font-semibold transition-colors shadow-2xs"
+                                      >
+                                        <Sparkles className="w-3 h-3" />
+                                        <span>Investigate</span>
+                                      </button>
+                                      <button
+                                        onClick={() => setSelectedFinding(f)}
+                                        className="inline-flex items-center space-x-1 px-2.5 py-1 bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded border border-border text-[11px] font-medium transition-colors"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                        <span>Details</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="pt-2 flex justify-end">
+                                <button
+                                  onClick={() => {
+                                    setActiveTab('discoveries');
+                                    loadFindings();
+                                  }}
+                                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1"
+                                >
+                                  <span>View all {discoverSummary?.total_findings || findings.length} discoveries</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-6 text-center text-xs text-muted-foreground space-y-2">
+                              <p>No project discoveries recorded yet.</p>
+                              <p>Click "Analyze Project" to run automated deterministic AST and dependency discovery.</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : activeTab === 'ask' ? (
@@ -955,6 +1289,254 @@ export default function ProjectOverviewPage() {
                           </div>
                         )}
                       </div>
+                    ) : activeTab === 'discoveries' ? (
+                      <div className="space-y-6">
+                        {/* Discoveries Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+                          <div>
+                            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                              <Compass className="w-4 h-4 text-blue-600" />
+                              <span>Project Discovery Engine</span>
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                {discoverSummary?.total_findings ?? findings.length} findings
+                              </span>
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Proactive structural risks, high-coupling hotspots, circular dependencies, documentation gaps, and legacy code.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleTriggerDiscovery}
+                              disabled={analyzing}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+                            >
+                              <RotateCw className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : ''}`} />
+                              <span>{analyzing ? 'Analyzing Repository...' : 'Run Discovery Analysis'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Analyzing banner */}
+                        {analyzing && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2.5 text-xs text-blue-700 dark:text-blue-300">
+                            <RotateCw className="w-4 h-4 animate-spin text-blue-600" />
+                            <span>
+                              Discovery engine is running multi-analyzer pipeline (circular dependencies, coupling, doc gaps, duplication, architecture, test gaps)...
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Filters & Search Toolbar */}
+                        <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/20 border border-border rounded-xl">
+                          <div className="flex-1 min-w-[200px] relative">
+                            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-2.5" />
+                            <input
+                              type="text"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              placeholder="Search findings by title, description, entity..."
+                              className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap text-xs">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Filter className="w-3.5 h-3.5" />
+                              <span>Status:</span>
+                            </div>
+                            <select
+                              value={statusFilter}
+                              onChange={(e) => setStatusFilter(e.target.value)}
+                              className="px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none"
+                            >
+                              <option value="ALL">All Statuses</option>
+                              <option value="OPEN">Open</option>
+                              <option value="ACKNOWLEDGED">Acknowledged</option>
+                              <option value="RESOLVED">Resolved</option>
+                              <option value="DISMISSED">Dismissed</option>
+                            </select>
+
+                            <div className="flex items-center gap-1 text-muted-foreground ml-1">
+                              <span>Severity:</span>
+                            </div>
+                            <select
+                              value={severityFilter}
+                              onChange={(e) => setSeverityFilter(e.target.value)}
+                              className="px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none"
+                            >
+                              <option value="ALL">All Severities</option>
+                              <option value="CRITICAL">Critical</option>
+                              <option value="HIGH">High</option>
+                              <option value="MEDIUM">Medium</option>
+                              <option value="LOW">Low</option>
+                            </select>
+
+                            <div className="flex items-center gap-1 text-muted-foreground ml-1">
+                              <span>Category:</span>
+                            </div>
+                            <select
+                              value={categoryFilter}
+                              onChange={(e) => setCategoryFilter(e.target.value)}
+                              className="px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none"
+                            >
+                              <option value="ALL">All Categories</option>
+                              <option value="CIRCULAR_DEPENDENCY">Circular Dependency</option>
+                              <option value="COUPLING">High Coupling</option>
+                              <option value="CHANGE_RISK">Change Risk</option>
+                              <option value="UNUSED_CODE">Unused Code</option>
+                              <option value="DOCUMENTATION_GAP">Documentation Gap</option>
+                              <option value="DUPLICATION">Duplication</option>
+                              <option value="ARCHITECTURE">Architecture</option>
+                              <option value="LEGACY">Legacy Code</option>
+                              <option value="TEST_GAP">Test Gap</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Findings Grid / List */}
+                        {loadingFindings ? (
+                          <div className="py-16 text-center text-xs text-muted-foreground">
+                            Loading project findings...
+                          </div>
+                        ) : filteredFindings.length === 0 ? (
+                          <div className="py-16 text-center border border-border border-dashed rounded-xl bg-muted/10 space-y-2">
+                            <Compass className="w-8 h-8 text-muted-foreground mx-auto stroke-1" />
+                            <h4 className="text-sm font-semibold text-foreground">No matching findings found</h4>
+                            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                              {searchQuery || statusFilter !== 'ALL' || severityFilter !== 'ALL' || categoryFilter !== 'ALL'
+                                ? 'Try adjusting your search or filters.'
+                                : 'Run discovery analysis to inspect this codebase for architectural risks.'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-3">
+                            {filteredFindings.map((f) => (
+                              <div
+                                key={f.id}
+                                className="border border-border rounded-xl bg-card p-4 hover:border-blue-500/40 transition-colors shadow-2xs space-y-3"
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                  <div className="space-y-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityBadgeClass(f.severity)}`}>
+                                        {f.severity}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
+                                        {f.category.replace(/_/g, ' ')}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-medium text-muted-foreground">
+                                        Confidence: {f.confidence}
+                                      </span>
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${getStatusBadgeClass(f.status)}`}>
+                                        {f.status}
+                                      </span>
+                                    </div>
+                                    <h4 className="text-sm font-bold text-foreground">{f.title}</h4>
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="flex items-center gap-1.5 shrink-0 self-start">
+                                    <button
+                                      onClick={() => handleInvestigateFinding(f)}
+                                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs"
+                                    >
+                                      <Sparkles className="w-3.5 h-3.5" />
+                                      <span>Investigate</span>
+                                    </button>
+                                    <button
+                                      onClick={() => setSelectedFinding(f)}
+                                      className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-muted/60 hover:bg-muted text-foreground rounded-lg border border-border text-xs font-medium transition-colors"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Details</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                  {f.why_it_matters || f.description}
+                                </p>
+
+                                {/* Bottom Metadata & Quick Status Actions */}
+                                <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-muted-foreground">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {f.evidence && f.evidence.length > 0 && (
+                                      <span className="font-mono text-[11px] text-foreground font-semibold">
+                                        {f.evidence.length} evidence {f.evidence.length === 1 ? 'item' : 'items'}
+                                      </span>
+                                    )}
+                                    {f.related_entities && f.related_entities.slice(0, 3).map((e) => (
+                                      <span
+                                        key={e}
+                                        className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-muted/80 text-foreground border border-border"
+                                      >
+                                        {e}
+                                      </span>
+                                    ))}
+                                    {f.related_entities && f.related_entities.length > 3 && (
+                                      <span className="text-[10px] text-muted-foreground font-mono">
+                                        +{f.related_entities.length - 3} more
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] mr-1 text-muted-foreground">Status:</span>
+                                    {f.status === 'OPEN' && (
+                                      <>
+                                        <button
+                                          onClick={() => handleUpdateFindingStatus(f.id, 'ACKNOWLEDGED')}
+                                          className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted hover:bg-muted/80 text-foreground border border-border"
+                                        >
+                                          Acknowledge
+                                        </button>
+                                        <button
+                                          onClick={() => handleUpdateFindingStatus(f.id, 'RESOLVED')}
+                                          className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                        >
+                                          Resolve
+                                        </button>
+                                        <button
+                                          onClick={() => handleUpdateFindingStatus(f.id, 'DISMISSED')}
+                                          className="px-2 py-0.5 rounded text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                                        >
+                                          Dismiss
+                                        </button>
+                                      </>
+                                    )}
+                                    {f.status === 'ACKNOWLEDGED' && (
+                                      <>
+                                        <button
+                                          onClick={() => handleUpdateFindingStatus(f.id, 'RESOLVED')}
+                                          className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                        >
+                                          Resolve
+                                        </button>
+                                        <button
+                                          onClick={() => handleUpdateFindingStatus(f.id, 'DISMISSED')}
+                                          className="px-2 py-0.5 rounded text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                                        >
+                                          Dismiss
+                                        </button>
+                                      </>
+                                    )}
+                                    {(f.status === 'RESOLVED' || f.status === 'DISMISSED') && (
+                                      <button
+                                        onClick={() => handleUpdateFindingStatus(f.id, 'OPEN')}
+                                        className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted hover:bg-muted/80 text-foreground border border-border"
+                                      >
+                                        Reopen
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : activeTab === 'files' ? (
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
@@ -1180,6 +1762,177 @@ export default function ProjectOverviewPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Slide-over Finding Detail Modal */}
+      {selectedFinding && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-border flex items-start justify-between gap-4 bg-muted/20">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityBadgeClass(selectedFinding.severity)}`}>
+                    {selectedFinding.severity}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
+                    {selectedFinding.category.replace(/_/g, ' ')}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${getStatusBadgeClass(selectedFinding.status)}`}>
+                    {selectedFinding.status}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Confidence: {selectedFinding.confidence}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-foreground">
+                  {selectedFinding.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedFinding(null)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs">
+              {/* WHAT WE FOUND */}
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
+                  What We Found
+                </h4>
+                <p className="text-foreground leading-relaxed">
+                  {selectedFinding.description}
+                </p>
+              </div>
+
+              {/* WHY IT MATTERS */}
+              <div className="space-y-1.5 p-3.5 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                <h4 className="font-bold text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Why It Matters
+                </h4>
+                <p className="text-foreground leading-relaxed">
+                  {selectedFinding.why_it_matters}
+                </p>
+              </div>
+
+              {/* RECOMMENDATION */}
+              <div className="space-y-1.5 p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                <h4 className="font-bold text-[11px] uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                  Recommendation
+                </h4>
+                <p className="text-foreground leading-relaxed">
+                  {selectedFinding.recommendation}
+                </p>
+              </div>
+
+              {/* EVIDENCE */}
+              {selectedFinding.evidence && selectedFinding.evidence.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Evidence ({selectedFinding.evidence.length})
+                  </h4>
+                  <div className="space-y-2.5">
+                    {selectedFinding.evidence.map((ev, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-muted/20 border border-border rounded-lg space-y-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                          <span className="font-mono font-semibold text-foreground">
+                            {ev.file || 'File'} {ev.lines ? `:${ev.lines}` : ''}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                            Type: {ev.type}
+                          </span>
+                        </div>
+                        {ev.consumers_count !== undefined && (
+                          <div className="text-[11px] text-muted-foreground font-mono">
+                            Dependents / Consumers: {ev.consumers_count}
+                          </div>
+                        )}
+                        {ev.snippet && (
+                          <pre className="p-2.5 bg-zinc-950 text-zinc-200 rounded text-[11px] font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                            {ev.snippet}
+                          </pre>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* RELATED ENTITIES */}
+              {selectedFinding.related_entities && selectedFinding.related_entities.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Related Entities
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedFinding.related_entities.map((ent) => (
+                      <span
+                        key={ent}
+                        className="px-2 py-0.5 bg-muted rounded text-[11px] font-mono text-foreground border border-border"
+                      >
+                        {ent}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5">
+                {selectedFinding.status !== 'ACKNOWLEDGED' && selectedFinding.status !== 'RESOLVED' && (
+                  <button
+                    onClick={() => handleUpdateFindingStatus(selectedFinding.id, 'ACKNOWLEDGED')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-card hover:bg-muted text-foreground border border-border transition-colors"
+                  >
+                    Acknowledge
+                  </button>
+                )}
+                {selectedFinding.status !== 'RESOLVED' && (
+                  <button
+                    onClick={() => handleUpdateFindingStatus(selectedFinding.id, 'RESOLVED')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors"
+                  >
+                    Mark Resolved
+                  </button>
+                )}
+                {selectedFinding.status !== 'DISMISSED' && (
+                  <button
+                    onClick={() => handleUpdateFindingStatus(selectedFinding.id, 'DISMISSED')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                )}
+                {(selectedFinding.status === 'RESOLVED' || selectedFinding.status === 'DISMISSED') && (
+                  <button
+                    onClick={() => handleUpdateFindingStatus(selectedFinding.id, 'OPEN')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-card hover:bg-muted text-foreground border border-border transition-colors"
+                  >
+                    Reopen
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => handleInvestigateFinding(selectedFinding)}
+                className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Investigate with Grounded Ask</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </button>
+            </div>
           </div>
         </div>
       )}

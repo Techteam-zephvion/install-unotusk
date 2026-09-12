@@ -192,4 +192,53 @@ export const api = {
         body: JSON.stringify({ query }),
       }),
   },
+
+  discovery: {
+    listFindings: (
+      projectId: string,
+      filters?: {
+        category?: string;
+        severity?: string;
+        status?: string;
+        confidence?: string;
+      }
+    ) => {
+      const params = new URLSearchParams();
+      if (filters?.category) params.set('category', filters.category);
+      if (filters?.severity) params.set('severity', filters.severity);
+      if (filters?.status) params.set('status', filters.status);
+      if (filters?.confidence) params.set('confidence', filters.confidence);
+      const qs = params.toString();
+      return request<import('@unotusk/types').Finding[]>(
+        `/api/v1/projects/${projectId}/findings${qs ? `?${qs}` : ''}`
+      );
+    },
+    getFinding: (projectId: string, findingId: string) =>
+      request<import('@unotusk/types').Finding>(
+        `/api/v1/projects/${projectId}/findings/${findingId}`
+      ),
+    updateStatus: (
+      projectId: string,
+      findingId: string,
+      status: import('@unotusk/types').FindingStatus
+    ) =>
+      request<import('@unotusk/types').Finding>(
+        `/api/v1/projects/${projectId}/findings/${findingId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        }
+      ),
+    trigger: (projectId: string) =>
+      request<import('@unotusk/types').DiscoveryTriggerResponse>(
+        `/api/v1/projects/${projectId}/discover`,
+        {
+          method: 'POST',
+        }
+      ),
+    getStatus: (projectId: string) =>
+      request<import('@unotusk/types').DiscoverSummary>(
+        `/api/v1/projects/${projectId}/discover/status`
+      ),
+  },
 };

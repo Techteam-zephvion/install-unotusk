@@ -247,3 +247,85 @@ export interface ContextSearchResponse {
   candidates_count: number;
   ranked_candidates: ContextCandidateDebug[];
 }
+
+// Stage 3: Proactive Project Discovery Engine Types
+export type FindingCategory =
+  | 'UNUSED_CODE'
+  | 'COUPLING'
+  | 'DOCUMENTATION_GAP'
+  | 'DUPLICATION'
+  | 'ARCHITECTURE'
+  | 'CIRCULAR_DEPENDENCY'
+  | 'CHANGE_RISK'
+  | 'LEGACY'
+  | 'TEST_GAP';
+
+export type FindingSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+
+export type FindingConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type FindingStatus = 'OPEN' | 'ACKNOWLEDGED' | 'DISMISSED' | 'RESOLVED';
+
+export type DiscoveryJobStatus =
+  | 'QUEUED'
+  | 'ANALYZING'
+  | 'FINALIZING'
+  | 'COMPLETED'
+  | 'FAILED';
+
+export interface Finding {
+  id: string;
+  project_id: string;
+  snapshot_id: string;
+  discovery_run_id?: string | null;
+  category: FindingCategory;
+  title: string;
+  description: string;
+  why_it_matters: string;
+  severity: FindingSeverity;
+  confidence: FindingConfidence;
+  status: FindingStatus;
+  score: number;
+  recommendation: string;
+  evidence: Array<{
+    type: string;
+    file?: string;
+    target?: string;
+    symbol?: string;
+    lines?: string;
+    snippet?: string;
+    consumers_count?: number;
+    [key: string]: unknown;
+  }>;
+  related_entities: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryRun {
+  id: string;
+  project_id: string;
+  snapshot_id: string;
+  status: DiscoveryJobStatus;
+  progress: number;
+  findings_count: number;
+  error_message?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+}
+
+export interface DiscoverSummary {
+  total_findings: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  latest_run?: DiscoveryRun | null;
+}
+
+export interface DiscoveryTriggerResponse {
+  task_id: string;
+  discovery_run_id: string;
+  status: DiscoveryJobStatus;
+  message: string;
+}

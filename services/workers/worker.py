@@ -3,9 +3,9 @@ import json
 import logging
 import os
 import signal
-import sys
 import uuid
 from typing import Any
+
 import redis.asyncio as aioredis
 
 logging.basicConfig(
@@ -48,6 +48,25 @@ async def process_task(task_data: dict[str, Any], r: aioredis.Redis) -> None:
                 "ingestion_triggered": True,
                 "snapshot_id": snapshot_id_str,
             }
+        elif task_name == "discover_project":
+            project_id_str = payload.get("project_id")
+            snapshot_id_str = payload.get("snapshot_id")
+            discovery_run_id_str = payload.get("discovery_run_id")
+            if project_id_str and snapshot_id_str:
+                from apps.api.src.services.discovery_engine.engine import ProjectDiscoveryEngine
+                findings = await ProjectDiscoveryEngine.run_discovery(
+                    project_id=uuid.UUID(project_id_str),
+                    snapshot_id=uuid.UUID(snapshot_id_str),
+                    discovery_run_id=uuid.UUID(discovery_run_id_str) if discovery_run_id_str else None,
+                )
+                result = {
+                    "discovery_completed": True,
+                    "findings_count": len(findings),
+                    "project_id": project_id_str,
+                    "snapshot_id": snapshot_id_str,
+                }
+            else:
+                result = {"error": "Missing project_id or snapshot_id"}
         else:
             result = {"unknown_task": True}
 

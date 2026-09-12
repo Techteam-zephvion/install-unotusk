@@ -49,3 +49,45 @@ class DependencyType(str, enum.Enum):
     IMPORT = "IMPORT"
     REQUIRE = "REQUIRE"
     FROM_IMPORT = "FROM_IMPORT"
+
+
+class FindingCategory(str, enum.Enum):
+    UNUSED_CODE = "UNUSED_CODE"
+    COUPLING = "COUPLING"
+    DOCUMENTATION_GAP = "DOCUMENTATION_GAP"
+    DUPLICATION = "DUPLICATION"
+    ARCHITECTURE = "ARCHITECTURE"
+    CIRCULAR_DEPENDENCY = "CIRCULAR_DEPENDENCY"
+    CHANGE_RISK = "CHANGE_RISK"
+    LEGACY = "LEGACY"
+    TEST_GAP = "TEST_GAP"
+
+
+class FindingSeverity(str, enum.Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
+
+
+class FindingConfidence(str, enum.Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class FindingStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    DISMISSED = "DISMISSED"
+    RESOLVED = "RESOLVED"
+
+
+class DiscoveryJobStatus(str, enum.Enum):
+    QUEUED = "QUEUED"
+    ANALYZING = "ANALYZING"
+    FINALIZING = "FINALIZING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
