@@ -9,6 +9,7 @@ from apps.api.src.db.base import Base, TimestampMixin, UUIDMixin
 from apps.api.src.models.enums import ProjectStatus
 
 if TYPE_CHECKING:
+    from apps.api.src.models.conversation import Conversation
     from apps.api.src.models.integration import Integration
     from apps.api.src.models.organization import Organization
     from apps.api.src.models.repository import Repository
@@ -54,6 +55,11 @@ class Project(Base, UUIDMixin, TimestampMixin):
     )
     repositories: Mapped[list["Repository"]] = relationship(
         "Repository",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    conversations: Mapped[list["Conversation"]] = relationship(
+        "Conversation",
         back_populates="project",
         cascade="all, delete-orphan",
     )

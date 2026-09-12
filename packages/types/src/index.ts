@@ -179,3 +179,71 @@ export interface ApiError {
     details?: unknown;
   };
 }
+
+// Stage 2: Grounded Project Intelligence Types
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface EvidenceItem {
+  type: string;
+  file: string;
+  symbol: string | null;
+  lines: string | null;
+  relevance: number;
+  snippet: string | null;
+}
+
+export interface GroundedAskRequest {
+  question: string;
+  conversation_id?: string;
+}
+
+export interface GroundedAnswerResponse {
+  conversation_id: string;
+  message_id: string;
+  role: 'assistant';
+  content: string;
+  evidence: EvidenceItem[];
+  related_entities: string[];
+  confidence: ConfidenceLevel;
+  debug_signals: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  project_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count?: number;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  evidence: EvidenceItem[];
+  related_entities: string[];
+  confidence?: ConfidenceLevel;
+  debug_signals: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ContextCandidateDebug {
+  name: string;
+  entity_type: string;
+  path: string;
+  lines: string;
+  score: number;
+  reasons: string[];
+  snippet: string;
+}
+
+export interface ContextSearchResponse {
+  query: string;
+  keywords: string[];
+  symbol_candidates: string[];
+  candidates_count: number;
+  ranked_candidates: ContextCandidateDebug[];
+}

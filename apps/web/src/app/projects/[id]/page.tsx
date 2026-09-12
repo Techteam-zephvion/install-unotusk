@@ -18,12 +18,23 @@ import {
   Play,
   KeyRound,
   ExternalLink,
+  Sparkles,
+  MessageSquare,
+  Send,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Terminal,
+  Plus,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
 import {
   CodeDependency,
   CodeSymbol,
+  Conversation,
+  EvidenceItem,
+  Message,
   Organization,
   Project,
   ProjectRepositoryContext,
@@ -51,14 +62,115 @@ export default function ProjectOverviewPage() {
   const [selectedRepoId, setSelectedRepoId] = useState<string>('');
 
   // Active tab in completed context
-  const [activeTab, setActiveTab] = useState<'overview' | 'files' | 'symbols' | 'dependencies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ask' | 'files' | 'symbols' | 'dependencies'>('overview');
   const [filesList, setFilesList] = useState<RepositoryFile[]>([]);
   const [symbolsList, setSymbolsList] = useState<CodeSymbol[]>([]);
   const [dependenciesList, setDependenciesList] = useState<CodeDependency[]>([]);
   const [loadingTab, setLoadingTab] = useState(false);
 
+  // Intelligence / Ask state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [questionInput, setQuestionInput] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [expandedEvidenceKey, setExpandedEvidenceKey] = useState<string | null>(null);
+  const [showDebugSignals, setShowDebugSignals] = useState(false);
+  const [debugQuery, setDebugQuery] = useState('');
+  const [debugResults, setDebugResults] = useState<any | null>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
+
   // Ingestion polling ref
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadConversations = async () => {
+    try {
+      const list = await api.intelligence.listConversations(projectId);
+      setConversations(list);
+      if (list.length > 0 && !activeConversationId) {
+        setActiveConversationId(list[0].id);
+        loadConversationMessages(list[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+    }
+  };
+
+  const loadConversationMessages = async (convId: string) => {
+    try {
+      const msgs = await api.intelligence.getMessages(projectId, convId);
+      setMessages(msgs);
+    } catch (err) {
+      console.error('Failed to load messages:', err);
+    }
+  };
+
+  const handleAsk = async (queryText?: string) => {
+    const q = (queryText || questionInput).trim();
+    if (!q || asking) return;
+    setAsking(true);
+    setError(null);
+
+    const tempUserMsg: Message = {
+      id: 'temp-' + Date.now(),
+      conversation_id: activeConversationId || '',
+      role: 'user',
+      content: q,
+      evidence: [],
+      related_entities: [],
+      debug_signals: {},
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempUserMsg]);
+    setQuestionInput('');
+
+    try {
+      const res = await api.intelligence.ask(projectId, q, activeConversationId || undefined);
+      setActiveConversationId(res.conversation_id);
+      const assistantMsg: Message = {
+        id: res.message_id,
+        conversation_id: res.conversation_id,
+        role: 'assistant',
+        content: res.content,
+        evidence: res.evidence,
+        related_entities: res.related_entities,
+        confidence: res.confidence,
+        debug_signals: res.debug_signals,
+        created_at: res.created_at,
+      };
+      setMessages((prev) => [...prev.filter((m) => m.id !== tempUserMsg.id), tempUserMsg, assistantMsg]);
+      loadConversations();
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate grounded answer');
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const handleNewConversation = async () => {
+    try {
+      const newConv = await api.intelligence.createConversation(projectId, 'New Conversation');
+      setConversations((prev) => [newConv, ...prev]);
+      setActiveConversationId(newConv.id);
+      setMessages([]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create conversation');
+    }
+  };
+
+  const handleDebugSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!debugQuery.trim() || debugLoading) return;
+    setDebugLoading(true);
+    try {
+      const res = await api.intelligence.debugSearch(projectId, debugQuery);
+      setDebugResults(res);
+    } catch (err: any) {
+      setError(err.message || 'Debug search failed');
+    } finally {
+      setDebugLoading(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -506,6 +618,20 @@ export default function ProjectOverviewPage() {
                       Context Summary
                     </button>
                     <button
+                      onClick={() => {
+                        setActiveTab('ask');
+                        loadConversations();
+                      }}
+                      className={`py-3 text-xs font-semibold border-b-2 flex items-center space-x-1.5 transition-colors ${
+                        activeTab === 'ask'
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Ask Unotusk</span>
+                    </button>
+                    <button
                       onClick={() => setActiveTab('files')}
                       className={`py-3 text-xs font-semibold border-b-2 transition-colors ${
                         activeTab === 'files'
@@ -554,6 +680,280 @@ export default function ProjectOverviewPage() {
                           <div><strong>Commit SHA:</strong> {snapshot.commit_sha}</div>
                           <div><strong>Parser Status:</strong> Completed with zero unhandled language crashes</div>
                         </div>
+                      </div>
+                    ) : activeTab === 'ask' ? (
+                      <div className="space-y-6">
+                        {/* Ask Unotusk Header & Mode Controls */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+                          <div>
+                            <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4 text-blue-600" />
+                              <span>Grounded Project Intelligence</span>
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Evidence-backed answers synthesized from deterministic repository files, symbols, and dependencies.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setShowDebugSignals(!showDebugSignals)}
+                              className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors ${
+                                showDebugSignals
+                                  ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-300'
+                                  : 'bg-muted/40 border-border text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <Terminal className="w-3.5 h-3.5" />
+                              <span>Retrieval Signals</span>
+                            </button>
+                            <button
+                              onClick={handleNewConversation}
+                              className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium flex items-center gap-1.5 transition-colors shadow-xs"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>New Thread</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Starter Prompt Chips */}
+                        {messages.length === 0 && (
+                          <div className="p-4 bg-muted/20 border border-border rounded-xl">
+                            <span className="text-xs font-semibold text-foreground block mb-2">
+                              Suggested Project Inquiries:
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                'How does authentication work?',
+                                'Where is payment processing implemented?',
+                                'What depends on the UserService?',
+                                'Which files define API routes?',
+                                'How is the database connected and migrated?',
+                              ].map((starter) => (
+                                <button
+                                  key={starter}
+                                  onClick={() => handleAsk(starter)}
+                                  disabled={asking}
+                                  className="text-xs text-left px-3 py-1.5 rounded-lg bg-card hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/40 dark:hover:text-blue-300 border border-border transition-colors text-muted-foreground shadow-xs"
+                                >
+                                  {starter}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Conversation Messages Stream */}
+                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                          {messages.map((m, idx) => (
+                            <div
+                              key={m.id || idx}
+                              className={`p-4 rounded-xl border ${
+                                m.role === 'user'
+                                  ? 'bg-muted/40 border-border ml-6 sm:ml-12'
+                                  : 'bg-card border-border mr-6 sm:mr-12 shadow-xs'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                      m.role === 'user'
+                                        ? 'bg-secondary text-foreground'
+                                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                    }`}
+                                  >
+                                    {m.role === 'user' ? 'Question' : 'Unotusk Intelligence'}
+                                  </span>
+                                  {m.confidence && (
+                                    <span
+                                      className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                                        m.confidence === 'HIGH'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                                          : m.confidence === 'MEDIUM'
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                                          : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
+                                      }`}
+                                    >
+                                      Confidence: {m.confidence}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {new Date(m.created_at).toLocaleTimeString()}
+                                </span>
+                              </div>
+
+                              {/* Answer Markdown Body */}
+                              <div className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                {m.content}
+                              </div>
+
+                              {/* Collapsible Evidence Section */}
+                              {m.evidence && m.evidence.length > 0 && (
+                                <div className="mt-4 pt-3 border-t border-border">
+                                  <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                                    <span>Grounded Repository Evidence ({m.evidence.length} sources)</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {m.evidence.map((ev, evIdx) => {
+                                      const key = `${m.id}-${evIdx}`;
+                                      const isExpanded = expandedEvidenceKey === key;
+                                      return (
+                                        <div
+                                          key={key}
+                                          className="text-xs border border-border rounded-lg bg-muted/20 overflow-hidden"
+                                        >
+                                          <button
+                                            onClick={() => setExpandedEvidenceKey(isExpanded ? null : key)}
+                                            className="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-muted/40 transition-colors"
+                                          >
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                              {isExpanded ? (
+                                                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                              ) : (
+                                                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                              )}
+                                              <span className="font-mono text-foreground font-semibold truncate">
+                                                {ev.file}
+                                              </span>
+                                              {ev.symbol && (
+                                                <span className="text-blue-600 dark:text-blue-400 font-mono text-[11px]">
+                                                  {ev.symbol}()
+                                                </span>
+                                              )}
+                                              {ev.lines && (
+                                                <span className="text-muted-foreground text-[10px]">
+                                                  lines {ev.lines}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className="text-[10px] font-mono text-muted-foreground ml-2 shrink-0">
+                                              relevance: {Math.round(ev.relevance * 100)}%
+                                            </span>
+                                          </button>
+
+                                          {isExpanded && ev.snippet && (
+                                            <div className="p-3 bg-card border-t border-border font-mono text-[11px] overflow-x-auto text-muted-foreground">
+                                              <pre>{ev.snippet}</pre>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Related Entities Pills */}
+                              {m.related_entities && m.related_entities.length > 0 && (
+                                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[11px] text-muted-foreground mr-1">Related:</span>
+                                  {m.related_entities.map((ent) => (
+                                    <span
+                                      key={ent}
+                                      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-foreground border border-border"
+                                    >
+                                      {ent}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Debug Signals Panel */}
+                              {showDebugSignals && m.debug_signals && Object.keys(m.debug_signals).length > 0 && (
+                                <div className="mt-3 p-2.5 bg-muted/40 rounded-lg border border-border text-[11px] font-mono text-muted-foreground space-y-1">
+                                  <div className="font-bold text-foreground mb-1">Retrieval Debug Diagnostics:</div>
+                                  <div>Model/Provider: {String(m.debug_signals.model || 'claude')}</div>
+                                  <div>Candidates Retrieved: {String(m.debug_signals.candidates_retrieved ?? 'N/A')}</div>
+                                  <div>Candidates Expanded: {String(m.debug_signals.candidates_expanded ?? 'N/A')}</div>
+                                  <div>Keywords: {JSON.stringify(m.debug_signals.keywords || [])}</div>
+                                  <div>Symbols Detected: {JSON.stringify(m.debug_signals.symbols_detected || [])}</div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {asking && (
+                            <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 text-xs text-blue-700 dark:text-blue-300 flex items-center space-x-2">
+                              <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Investigating repository context and synthesizing grounded answer...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Question Input Box */}
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleAsk();
+                          }}
+                          className="pt-2 flex items-center space-x-2"
+                        >
+                          <input
+                            type="text"
+                            value={questionInput}
+                            onChange={(e) => setQuestionInput(e.target.value)}
+                            placeholder="Ask a technical or architectural question about this codebase..."
+                            disabled={asking}
+                            className="flex-1 bg-background border border-border rounded-lg px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-blue-600"
+                          />
+                          <button
+                            type="submit"
+                            disabled={asking || !questionInput.trim()}
+                            className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-xs"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Ask</span>
+                          </button>
+                        </form>
+
+                        {/* Developer Debug Context Search Panel */}
+                        {showDebugSignals && (
+                          <div className="mt-6 p-4 border border-border rounded-xl bg-card">
+                            <h4 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                              <Search className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Live Context Engine Search & Ranking Inspector</span>
+                            </h4>
+                            <form onSubmit={handleDebugSearch} className="flex gap-2 mb-3">
+                              <input
+                                type="text"
+                                value={debugQuery}
+                                onChange={(e) => setDebugQuery(e.target.value)}
+                                placeholder="Test query retrieval (e.g., auth, users, payment)..."
+                                className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-xs"
+                              />
+                              <button
+                                type="submit"
+                                disabled={debugLoading || !debugQuery.trim()}
+                                className="bg-secondary text-foreground text-xs px-3 py-1.5 rounded-lg border border-border font-medium"
+                              >
+                                {debugLoading ? 'Searching...' : 'Inspect Signals'}
+                              </button>
+                            </form>
+
+                            {debugResults && (
+                              <div className="space-y-2 text-xs">
+                                <div className="text-muted-foreground">
+                                  Keywords: <code>{debugResults.keywords.join(', ')}</code> | Candidates: {debugResults.candidates_count}
+                                </div>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                  {debugResults.ranked_candidates.map((c: any, i: number) => (
+                                    <div key={i} className="p-2 bg-muted/30 border border-border rounded text-[11px] font-mono">
+                                      <div className="flex justify-between font-bold text-foreground">
+                                        <span>[{c.entity_type}] {c.name} ({c.path})</span>
+                                        <span className="text-blue-600">score: {c.score}</span>
+                                      </div>
+                                      <div className="text-muted-foreground text-[10px] mt-0.5">
+                                        Reasons: {c.reasons.join(' | ')}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : activeTab === 'files' ? (
                       <div className="overflow-x-auto">

@@ -1,3 +1,5 @@
+from apps.api.src.models.chunk import CodeChunk
+from apps.api.src.models.conversation import Conversation
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
     DependencyType,
@@ -11,6 +13,7 @@ from apps.api.src.models.enums import (
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership
+from apps.api.src.models.message import Message
 from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
 from apps.api.src.models.repository import Repository
@@ -19,13 +22,16 @@ from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.models.user import User
 
 __all__ = [
+    "CodeChunk",
     "CodeDependency",
     "CodeSymbol",
+    "Conversation",
     "DependencyType",
     "Integration",
     "IntegrationProvider",
     "IntegrationStatus",
     "MembershipRole",
+    "Message",
     "Organization",
     "OrganizationMembership",
     "Project",

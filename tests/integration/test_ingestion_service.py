@@ -148,6 +148,17 @@ async def test_end_to_end_repository_ingestion(
         assert "os" in dep_targets
         assert "react" in dep_targets
 
+        # Check code chunks created
+        from apps.api.src.models.chunk import CodeChunk
+        chunks_res = await session.execute(
+            select(CodeChunk).where(CodeChunk.snapshot_id == snapshot.id)
+        )
+        chunks = chunks_res.scalars().all()
+        assert len(chunks) >= 4  # CoreEngine, compute, Config, setup, README
+        chunk_names = [c.name for c in chunks]
+        assert "CoreEngine" in chunk_names
+        assert "README.md" in chunk_names
+
         # Check Project status transitioned to READY
         p_check = await session.execute(select(Project).where(Project.id == project.id))
         ready_proj = p_check.scalar_one()

@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from apps.api.src.db.session import AsyncSessionLocal
+from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import ProjectStatus, SnapshotStatus
 from apps.api.src.models.file import RepositoryFile
@@ -188,17 +189,20 @@ class IngestionService:
 
                 await session.flush()
 
-                # Second pass: Parse AST for symbols and dependencies
+                # Second pass: Parse AST for symbols, chunks, and dependencies
                 processed_count = 0
                 for f_info in discovered_files:
                     repo_file = created_files_map[f_info["path"]]
                     content = f_info["content_bytes"]
+                    extracted_symbols_count = 0
 
                     if f_info["parser_supported"] and content:
                         tree = parse_code(content, f_info["language"])
                         if tree is not None:
+                            content_lines = content.decode("utf-8", errors="replace").splitlines()
                             # Extract symbols
                             extracted_symbols = extract_symbols_from_tree(tree, content, f_info["language"])
+                            extracted_symbols_count = len(extracted_symbols)
                             for sym in extracted_symbols:
                                 code_sym = CodeSymbol(
                                     id=uuid.uuid4(),
@@ -211,6 +215,23 @@ class IngestionService:
                                     symbol_metadata=sym.metadata,
                                 )
                                 session.add(code_sym)
+
+                                # Create code chunk for top-level symbol
+                                if 1 <= sym.start_line <= len(content_lines):
+                                    sym_lines = content_lines[sym.start_line - 1 : min(sym.end_line, len(content_lines))]
+                                    sym_chunk = CodeChunk(
+                                        id=uuid.uuid4(),
+                                        snapshot_id=snapshot.id,
+                                        file_id=repo_file.id,
+                                        symbol_id=code_sym.id,
+                                        chunk_type=sym.symbol_type.value,
+                                        name=sym.name,
+                                        path=repo_file.path,
+                                        content="\n".join(sym_lines),
+                                        start_line=sym.start_line,
+                                        end_line=sym.end_line,
+                                    )
+                                    session.add(sym_chunk)
 
                                 # Children (e.g. methods within class)
                                 for child_sym in sym.children:
@@ -227,10 +248,44 @@ class IngestionService:
                                     )
                                     session.add(child_code_sym)
 
+                                    if 1 <= child_sym.start_line <= len(content_lines):
+                                        child_lines = content_lines[child_sym.start_line - 1 : min(child_sym.end_line, len(content_lines))]
+                                        child_chunk = CodeChunk(
+                                            id=uuid.uuid4(),
+                                            snapshot_id=snapshot.id,
+                                            file_id=repo_file.id,
+                                            symbol_id=child_code_sym.id,
+                                            chunk_type=child_sym.symbol_type.value,
+                                            name=child_sym.name,
+                                            path=repo_file.path,
+                                            content="\n".join(child_lines),
+                                            start_line=child_sym.start_line,
+                                            end_line=child_sym.end_line,
+                                        )
+                                        session.add(child_chunk)
+
                             # Extract dependencies / imports
                             extracted_deps = extract_dependencies_from_tree(tree, content, f_info["language"])
                             for dep in extracted_deps:
                                 raw_deps_to_create.append((repo_file.id, dep))
+
+                    # For config files, documentation, or files with no symbols, store file header chunk
+                    if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
+                        lines = content.decode("utf-8", errors="replace").splitlines()[:100]
+                        if lines:
+                            file_chunk = CodeChunk(
+                                id=uuid.uuid4(),
+                                snapshot_id=snapshot.id,
+                                file_id=repo_file.id,
+                                symbol_id=None,
+                                chunk_type="CONFIG" if f_info["filename"].endswith((".json", ".yml", ".yaml", ".toml", ".txt", ".md")) else "MODULE",
+                                name=f_info["filename"],
+                                path=repo_file.path,
+                                content="\n".join(lines),
+                                start_line=1,
+                                end_line=len(lines),
+                            )
+                            session.add(file_chunk)
 
                     processed_count += 1
                     if processed_count % 50 == 0:

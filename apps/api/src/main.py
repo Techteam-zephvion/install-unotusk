@@ -11,6 +11,7 @@ from apps.api.src.api.exceptions import AppException
 from apps.api.src.api.routes import (
     auth,
     health,
+    intelligence,
     organizations,
     projects,
     repository,
@@ -127,4 +128,5 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(organizations.router, prefix=settings.API_V1_PREFIX)
 app.include_router(projects.router, prefix=settings.API_V1_PREFIX)
 app.include_router(repository.router, prefix=settings.API_V1_PREFIX)
+app.include_router(intelligence.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_V1_PREFIX)

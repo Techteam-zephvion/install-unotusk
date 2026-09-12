@@ -162,4 +162,34 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  intelligence: {
+    ask: (projectId: string, question: string, conversationId?: string) =>
+      request<import('@unotusk/types').GroundedAnswerResponse>(`/api/v1/projects/${projectId}/ask`, {
+        method: 'POST',
+        body: JSON.stringify({ question, conversation_id: conversationId }),
+      }),
+    createConversation: (projectId: string, title?: string, initialQuestion?: string) =>
+      request<import('@unotusk/types').Conversation>(`/api/v1/projects/${projectId}/conversations`, {
+        method: 'POST',
+        body: JSON.stringify({ title, initial_question: initialQuestion }),
+      }),
+    listConversations: (projectId: string) =>
+      request<import('@unotusk/types').Conversation[]>(`/api/v1/projects/${projectId}/conversations`),
+    getMessages: (projectId: string, conversationId: string) =>
+      request<import('@unotusk/types').Message[]>(`/api/v1/projects/${projectId}/conversations/${conversationId}`),
+    postMessage: (projectId: string, conversationId: string, question: string) =>
+      request<import('@unotusk/types').GroundedAnswerResponse>(
+        `/api/v1/projects/${projectId}/conversations/${conversationId}/messages`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ question }),
+        }
+      ),
+    debugSearch: (projectId: string, query: string) =>
+      request<import('@unotusk/types').ContextSearchResponse>(`/api/v1/projects/${projectId}/context/search`, {
+        method: 'POST',
+        body: JSON.stringify({ query }),
+      }),
+  },
 };
