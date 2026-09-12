@@ -1,0 +1,32 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy root types and web app
+COPY packages/types/ ./packages/types/
+COPY apps/web/package.json apps/web/package-lock.json* ./apps/web/
+
+WORKDIR /app/apps/web
+RUN npm ci
+
+COPY apps/web/ ./
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+
+RUN npm run build
+
+# Production runner
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+COPY --from=builder /app/apps/web/package.json ./
+COPY --from=builder /app/apps/web/node_modules ./node_modules
+COPY --from=builder /app/apps/web/.next ./.next
+COPY --from=builder /app/apps/web/public ./public 2>/dev/null || true
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]

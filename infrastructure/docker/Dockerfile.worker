@@ -1,0 +1,18 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY apps/api/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY services/workers/ ./services/workers/
+COPY apps/api/src/config/ ./apps/api/src/config/
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "services/workers/worker.py"]
