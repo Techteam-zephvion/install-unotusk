@@ -241,4 +241,27 @@ export const api = {
         `/api/v1/projects/${projectId}/discover/status`
       ),
   },
+
+  reports: {
+    trigger: (projectId: string) =>
+      request<import('@unotusk/types').ReportTriggerResponse>(
+        `/api/v1/projects/${projectId}/reports`,
+        {
+          method: 'POST',
+        }
+      ),
+    list: (projectId: string) =>
+      request<import('@unotusk/types').ReportListItem[]>(
+        `/api/v1/projects/${projectId}/reports`
+      ),
+    getLatest: (projectId: string) =>
+      request<import('@unotusk/types').ProjectIntelligenceReport>(
+        `/api/v1/projects/${projectId}/reports/latest`
+      ),
+    get: (projectId: string, reportId: string) =>
+      request<import('@unotusk/types').ProjectIntelligenceReport>(
+        `/api/v1/projects/${projectId}/reports/${reportId}`
+      ),
+  },
 };
+

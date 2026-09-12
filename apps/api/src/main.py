@@ -15,6 +15,7 @@ from apps.api.src.api.routes import (
     intelligence,
     organizations,
     projects,
+    reports,
     repository,
     tasks,
 )
@@ -131,4 +132,5 @@ app.include_router(projects.router, prefix=settings.API_V1_PREFIX)
 app.include_router(repository.router, prefix=settings.API_V1_PREFIX)
 app.include_router(intelligence.router, prefix=settings.API_V1_PREFIX)
 app.include_router(discovery.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_V1_PREFIX)

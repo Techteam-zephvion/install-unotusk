@@ -67,6 +67,27 @@ async def process_task(task_data: dict[str, Any], r: aioredis.Redis) -> None:
                 }
             else:
                 result = {"error": "Missing project_id or snapshot_id"}
+        elif task_name == "generate_report":
+            project_id_str = payload.get("project_id")
+            snapshot_id_str = payload.get("snapshot_id")
+            discovery_run_id_str = payload.get("discovery_run_id")
+            report_id_str = payload.get("report_id")
+            if project_id_str and snapshot_id_str:
+                from apps.api.src.services.report_engine.engine import ProjectReportEngine
+                report = await ProjectReportEngine.generate_report(
+                    project_id=uuid.UUID(project_id_str),
+                    snapshot_id=uuid.UUID(snapshot_id_str),
+                    discovery_run_id=uuid.UUID(discovery_run_id_str) if discovery_run_id_str else None,
+                    report_id=uuid.UUID(report_id_str) if report_id_str else None,
+                )
+                result = {
+                    "report_completed": True,
+                    "report_id": str(report.id),
+                    "project_id": project_id_str,
+                    "snapshot_id": snapshot_id_str,
+                }
+            else:
+                result = {"error": "Missing project_id or snapshot_id"}
         else:
             result = {"unknown_task": True}
 

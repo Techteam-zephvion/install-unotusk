@@ -91,3 +91,17 @@ class DiscoveryJobStatus(str, enum.Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
+
+class ReportStatus(str, enum.Enum):
+    QUEUED = "QUEUED"
+    GENERATING = "GENERATING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class KnowledgeClass(str, enum.Enum):
+    OBSERVED = "OBSERVED"
+    DERIVED = "DERIVED"
+    RECOMMENDED = "RECOMMENDED"
+
+

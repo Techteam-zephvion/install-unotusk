@@ -329,3 +329,163 @@ export interface DiscoveryTriggerResponse {
   status: DiscoveryJobStatus;
   message: string;
 }
+
+// Stage 4: Project Intelligence Report Types
+export type ReportStatus = 'QUEUED' | 'GENERATING' | 'COMPLETED' | 'FAILED';
+
+export type KnowledgeClass = 'OBSERVED' | 'DERIVED' | 'RECOMMENDED';
+
+export interface ReportEvidenceRef {
+  type: string;
+  file?: string | null;
+  symbol?: string | null;
+  lines?: string | null;
+  snippet?: string | null;
+  reference_type?: string | null;
+  consumers_count?: number | null;
+}
+
+export interface ClaimItem {
+  claim_type: KnowledgeClass;
+  title: string;
+  statement: string;
+  evidence: ReportEvidenceRef[];
+}
+
+export interface VitalMetrics {
+  total_files: number;
+  total_symbols: number;
+  total_dependencies: number;
+  total_discoveries: number;
+  critical_findings: number;
+  high_findings: number;
+}
+
+export interface ExecutiveSummary {
+  project_summary: string;
+  state_assessment: string;
+  vital_metrics: VitalMetrics;
+  top_things_to_know: ClaimItem[];
+  top_next_actions: ClaimItem[];
+}
+
+export interface ProjectUnderstanding {
+  primary_languages: Record<string, number>;
+  repository_size: {
+    total_lines: number;
+    total_bytes: number;
+    size_formatted: string;
+  };
+  major_areas: Array<{
+    area: string;
+    files_count: number;
+    sample_files: string[];
+  }>;
+  key_symbols: Array<{
+    name: string;
+    symbol_type: string;
+    file_path: string;
+    consumer_count: number;
+  }>;
+  architectural_boundaries: string[];
+  business_purpose_note: string;
+}
+
+export interface TopDiscoveryItem {
+  finding_id: string;
+  title: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  what_we_found: string;
+  why_it_matters: string;
+  recommendation: string;
+  evidence: Array<Record<string, unknown>>;
+}
+
+export interface RiskArea {
+  area: string;
+  observed: ClaimItem[];
+  derived: string;
+  recommended: string;
+}
+
+export interface TechnicalDebtItem {
+  signal: string;
+  evidence: Array<Record<string, unknown>>;
+  impact: string;
+  priority: string;
+}
+
+export interface ImportantDependency {
+  source: string;
+  target: string;
+  dependency_type: string;
+  consumer_count: number;
+  why_it_matters: string;
+}
+
+export interface TestingAndDocs {
+  testing_observed: ClaimItem[];
+  testing_derived: string;
+  testing_recommended: string;
+  testing_coverage_note: string;
+  docs_observed: ClaimItem[];
+  docs_recommended: string;
+}
+
+export interface NextAction {
+  id: string;
+  priority: string;
+  title: string;
+  description: string;
+  claim_type: KnowledgeClass;
+  related_finding_ids: string[];
+  evidence: Array<Record<string, unknown>>;
+}
+
+export interface ReportDocument {
+  metadata: Record<string, unknown>;
+  executive_summary: ExecutiveSummary;
+  project_understanding: ProjectUnderstanding;
+  observed: ClaimItem[];
+  discoveries: TopDiscoveryItem[];
+  risk_areas: RiskArea[];
+  technical_debt: TechnicalDebtItem[];
+  dependencies: ImportantDependency[];
+  testing_and_documentation: TestingAndDocs;
+  next_actions: NextAction[];
+}
+
+export interface ProjectIntelligenceReport {
+  id: string;
+  project_id: string;
+  snapshot_id: string;
+  discovery_run_id?: string | null;
+  status: ReportStatus;
+  report_version: string;
+  summary: string;
+  report_data: ReportDocument;
+  error_message?: string | null;
+  generated_at: string;
+  created_at: string;
+}
+
+export interface ReportListItem {
+  id: string;
+  project_id: string;
+  snapshot_id: string;
+  status: ReportStatus;
+  report_version: string;
+  summary: string;
+  generated_at: string;
+  created_at: string;
+}
+
+export interface ReportTriggerResponse {
+  task_id: string;
+  report_id: string;
+  status: ReportStatus;
+  message: string;
+}
+

@@ -35,10 +35,14 @@ import {
   Eye,
   Filter,
   ArrowRight,
+  FileText,
+  Activity,
+  CheckCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
 import {
+  ClaimItem,
   CodeDependency,
   CodeSymbol,
   Conversation,
@@ -48,10 +52,14 @@ import {
   FindingCategory,
   FindingSeverity,
   FindingStatus,
+  KnowledgeClass,
   Message,
+  NextAction,
   Organization,
   Project,
+  ProjectIntelligenceReport,
   ProjectRepositoryContext,
+  ReportDocument,
   RepositoryFile,
   User,
 } from '@unotusk/types';
@@ -76,11 +84,19 @@ export default function ProjectOverviewPage() {
   const [selectedRepoId, setSelectedRepoId] = useState<string>('');
 
   // Active tab in completed context
-  const [activeTab, setActiveTab] = useState<'overview' | 'ask' | 'discoveries' | 'files' | 'symbols' | 'dependencies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'discoveries' | 'ask' | 'files' | 'symbols' | 'dependencies'>('overview');
   const [filesList, setFilesList] = useState<RepositoryFile[]>([]);
   const [symbolsList, setSymbolsList] = useState<CodeSymbol[]>([]);
   const [dependenciesList, setDependenciesList] = useState<CodeDependency[]>([]);
   const [loadingTab, setLoadingTab] = useState(false);
+
+  // Stage 4: Intelligence Report state
+  const [report, setReport] = useState<ProjectIntelligenceReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportSection, setReportSection] = useState<'summary' | 'understanding' | 'discoveries' | 'risks' | 'debt' | 'dependencies' | 'tests_docs' | 'actions'>('summary');
+  const [inspectedEvidence, setInspectedEvidence] = useState<{ title: string; statement?: string; evidence: any[] } | null>(null);
+  const reportPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Stage 3: Discoveries state
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -293,6 +309,111 @@ export default function ProjectOverviewPage() {
     handleAsk(prompt);
   };
 
+  const loadLatestReport = async () => {
+    setLoadingReport(true);
+    try {
+      const res = await api.reports.getLatest(projectId);
+      setReport(res);
+      if (res && (res.status === 'QUEUED' || res.status === 'GENERATING')) {
+        setGeneratingReport(true);
+        startReportPolling();
+      } else {
+        setGeneratingReport(false);
+      }
+    } catch (err: any) {
+      if (err.status !== 404) {
+        console.error('Failed to load latest report:', err);
+      }
+      setReport(null);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const startReportPolling = () => {
+    stopReportPolling();
+    reportPollingRef.current = setInterval(async () => {
+      try {
+        const res = await api.reports.getLatest(projectId);
+        setReport(res);
+        if (res && res.status === 'COMPLETED') {
+          setGeneratingReport(false);
+          stopReportPolling();
+        } else if (res && res.status === 'FAILED') {
+          setGeneratingReport(false);
+          stopReportPolling();
+          setError('Report generation failed');
+        }
+      } catch (e) {
+        console.error('Report polling error:', e);
+      }
+    }, 2000);
+  };
+
+  const stopReportPolling = () => {
+    if (reportPollingRef.current) {
+      clearInterval(reportPollingRef.current);
+      reportPollingRef.current = null;
+    }
+  };
+
+  const handleTriggerReport = async () => {
+    setGeneratingReport(true);
+    setError(null);
+    try {
+      const res = await api.reports.trigger(projectId);
+      if (res.status === 'COMPLETED') {
+        const full = await api.reports.get(projectId, res.report_id);
+        setReport(full);
+        setGeneratingReport(false);
+      } else {
+        startReportPolling();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to trigger report generation');
+      setGeneratingReport(false);
+    }
+  };
+
+  const handleInvestigateAction = (actionTitle: string, actionDetail?: string, evidence?: any[]) => {
+    setActiveTab('ask');
+    let prompt = `Investigate recommendation: "${actionTitle}".`;
+    if (actionDetail) {
+      prompt += ` ${actionDetail}`;
+    }
+    if (evidence && evidence.length > 0) {
+      prompt += ` Referenced evidence: ${evidence.map((e) => e.file || e.symbol || e.target || '').filter(Boolean).join(', ')}.`;
+    }
+    prompt += ` Explain which components depend on it and what risks changes to it could create.`;
+    handleAsk(prompt);
+  };
+
+  const getKnowledgeBadgeClass = (type?: string) => {
+    switch (type) {
+      case 'OBSERVED':
+        return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+      case 'DERIVED':
+        return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30';
+      case 'RECOMMENDED':
+        return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30';
+      default:
+        return 'bg-zinc-500/10 text-zinc-600 border-zinc-500/30';
+    }
+  };
+
+  const getKnowledgeBadgeLabel = (type?: string) => {
+    switch (type) {
+      case 'OBSERVED':
+        return 'FACT';
+      case 'DERIVED':
+        return 'INTERPRETATION';
+      case 'RECOMMENDED':
+        return 'SUGGESTION';
+      default:
+        return type || 'INFO';
+    }
+  };
+
   const loadData = async () => {
     try {
       setError(null);
@@ -308,6 +429,9 @@ export default function ProjectOverviewPage() {
 
       // Load discoveries summary
       loadDiscoverSummary();
+
+      // Load latest intelligence report
+      loadLatestReport();
 
       // If snapshot is active, poll for progress
       const snap = ctx.active_snapshot;
@@ -362,6 +486,7 @@ export default function ProjectOverviewPage() {
     return () => {
       stopPolling();
       stopDiscoveryPolling();
+      stopReportPolling();
     };
   }, [projectId]);
 
@@ -369,6 +494,8 @@ export default function ProjectOverviewPage() {
   useEffect(() => {
     if (activeTab === 'discoveries') {
       loadFindings();
+    } else if (activeTab === 'reports') {
+      loadLatestReport();
     }
   }, [activeTab, statusFilter, severityFilter, categoryFilter]);
 
@@ -781,7 +908,26 @@ export default function ProjectOverviewPage() {
 
                 {/* Structure Explorer Tabs */}
                 <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-                  <div className="border-b border-border bg-muted/30 px-4 flex items-center space-x-4">
+                  <div className="border-b border-border bg-muted/30 px-4 flex items-center space-x-4 overflow-x-auto">
+                    <button
+                      onClick={() => {
+                        setActiveTab('reports');
+                        loadLatestReport();
+                      }}
+                      className={`py-3 text-xs font-semibold border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
+                        activeTab === 'reports'
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Intelligence Report</span>
+                      {report?.status === 'COMPLETED' && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          Ready
+                        </span>
+                      )}
+                    </button>
                     <button
                       onClick={() => setActiveTab('overview')}
                       className={`py-3 text-xs font-semibold border-b-2 transition-colors ${
@@ -862,6 +1008,799 @@ export default function ProjectOverviewPage() {
                     {loadingTab ? (
                       <div className="py-12 text-center text-xs text-muted-foreground">
                         Loading explorer details...
+                      </div>
+                    ) : activeTab === 'reports' ? (
+                      <div className="space-y-6">
+                        {loadingReport ? (
+                          <div className="py-16 text-center space-y-3">
+                            <RotateCw className="w-6 h-6 text-blue-600 animate-spin mx-auto" />
+                            <p className="text-xs text-muted-foreground">Loading Project Intelligence Report...</p>
+                          </div>
+                        ) : generatingReport || (report && (report.status === 'QUEUED' || report.status === 'GENERATING')) ? (
+                          <div className="py-16 text-center space-y-4 border border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-950/20 rounded-xl p-8">
+                            <RotateCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+                            <div>
+                              <h3 className="text-sm font-bold text-foreground">
+                                Generating Complete Project Intelligence Report...
+                              </h3>
+                              <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
+                                Assembling deterministic AST and dependency facts, ranking discoveries, and generating grounded recommendations. Status: <span className="font-mono font-semibold text-blue-600">{report?.status || 'GENERATING'}</span>
+                              </p>
+                            </div>
+                          </div>
+                        ) : !report || !report.report_data ? (
+                          <div className="py-16 text-center space-y-4 border border-dashed border-border rounded-xl p-8 bg-muted/10">
+                            <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950 flex items-center justify-center text-blue-600 mx-auto">
+                              <FileText className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h3 className="text-base font-bold text-foreground">
+                                Project Intelligence Report
+                              </h3>
+                              <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
+                                Synthesize repository structure, AST symbols, dependencies, and Stage 3 discoveries into a concise, evidence-backed 5–10 minute briefing.
+                              </p>
+                            </div>
+                            <button
+                              onClick={handleTriggerReport}
+                              disabled={generatingReport}
+                              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              <span>Generate Intelligence Report</span>
+                            </button>
+                          </div>
+                        ) : (
+                          /* Full Flagship Intelligence Report Display */
+                          <div className="space-y-6">
+                            {/* Report Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold uppercase tracking-wider text-blue-600">PROJECT INTELLIGENCE</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="text-xs font-semibold text-foreground">{project?.name}</span>
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                    {report.report_data.executive_summary?.state_assessment || 'Moderate Risk'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-2">
+                                  <span>Last generated: <strong>{report.generated_at ? new Date(report.generated_at).toLocaleString() : 'Just now'}</strong></span>
+                                  {snapshot?.commit_sha && (
+                                    <>
+                                      <span>•</span>
+                                      <span>Snapshot: <code className="text-xs font-mono">{snapshot.commit_sha.slice(0, 7)}</code></span>
+                                    </>
+                                  )}
+                                  <span>•</span>
+                                  <span>Report: v{report.report_version || '1.0.0'}</span>
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={handleTriggerReport}
+                                  disabled={generatingReport}
+                                  className="inline-flex items-center space-x-1.5 bg-secondary hover:bg-muted text-foreground text-xs font-semibold px-3 py-2 rounded-lg border border-border transition-colors shadow-xs disabled:opacity-50"
+                                >
+                                  <RotateCw className={`w-3.5 h-3.5 ${generatingReport ? 'animate-spin' : ''}`} />
+                                  <span>Regenerate Report</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Section Navigation Tabs */}
+                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-border text-xs">
+                              {[
+                                { id: 'summary', label: 'Summary' },
+                                { id: 'understanding', label: 'Understanding' },
+                                { id: 'discoveries', label: 'Discoveries' },
+                                { id: 'risks', label: 'Risks' },
+                                { id: 'debt', label: 'Technical Debt' },
+                                { id: 'dependencies', label: 'Dependencies' },
+                                { id: 'tests_docs', label: 'Tests & Docs' },
+                                { id: 'actions', label: 'Next Actions' },
+                              ].map((sec) => (
+                                <button
+                                  key={sec.id}
+                                  onClick={() => setReportSection(sec.id as any)}
+                                  className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                                    reportSection === sec.id
+                                      ? 'bg-blue-600 text-white shadow-xs'
+                                      : 'bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground'
+                                  }`}
+                                >
+                                  {sec.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Section 1: Executive Summary */}
+                            {reportSection === 'summary' && (
+                              <div className="space-y-6">
+                                <div className="p-4 bg-muted/20 border border-border rounded-xl">
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                                    Executive Summary
+                                  </h4>
+                                  <p className="text-xs text-foreground leading-relaxed">
+                                    {report.report_data.executive_summary?.project_summary}
+                                  </p>
+                                </div>
+
+                                {/* Vital Metrics */}
+                                <div>
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                                    Vital Metrics Analyzed
+                                  </h4>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    <div className="p-4 bg-card border border-border rounded-xl">
+                                      <div className="text-xs text-muted-foreground">Files Analyzed</div>
+                                      <div className="text-2xl font-bold text-foreground mt-1">
+                                        {report.report_data.executive_summary?.vital_metrics?.total_files?.toLocaleString() || 0}
+                                      </div>
+                                    </div>
+                                    <div className="p-4 bg-card border border-border rounded-xl">
+                                      <div className="text-xs text-muted-foreground">Symbols Extracted</div>
+                                      <div className="text-2xl font-bold text-foreground mt-1">
+                                        {report.report_data.executive_summary?.vital_metrics?.total_symbols?.toLocaleString() || 0}
+                                      </div>
+                                    </div>
+                                    <div className="p-4 bg-card border border-border rounded-xl">
+                                      <div className="text-xs text-muted-foreground">Dependencies Mapped</div>
+                                      <div className="text-2xl font-bold text-foreground mt-1">
+                                        {report.report_data.executive_summary?.vital_metrics?.total_dependencies?.toLocaleString() || 0}
+                                      </div>
+                                    </div>
+                                    <div className="p-4 bg-card border border-border rounded-xl">
+                                      <div className="text-xs text-muted-foreground">Discoveries Found</div>
+                                      <div className="text-2xl font-bold text-foreground mt-1">
+                                        {report.report_data.executive_summary?.vital_metrics?.total_discoveries?.toLocaleString() || 0}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Top Things To Know */}
+                                <div>
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                                    Top Things To Know
+                                  </h4>
+                                  <div className="space-y-3">
+                                    {report.report_data.executive_summary?.top_things_to_know?.map((item, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-4 bg-card border border-border rounded-xl flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                                      >
+                                        <div className="space-y-1.5 flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-mono font-bold text-blue-600">
+                                              {String(idx + 1).padStart(2, '0')}
+                                            </span>
+                                            <span className="text-xs font-bold text-foreground">
+                                              {item.statement}
+                                            </span>
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass(item.claim_type)}`}>
+                                              {getKnowledgeBadgeLabel(item.claim_type)}
+                                            </span>
+                                          </div>
+                                          {item.title && item.title !== item.statement && (
+                                            <p className="text-xs text-muted-foreground">
+                                              {item.title}
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                                          {item.evidence && item.evidence.length > 0 && (
+                                            <button
+                                              onClick={() =>
+                                                setInspectedEvidence({
+                                                  title: `Observation #${idx + 1}`,
+                                                  statement: item.statement,
+                                                  evidence: item.evidence || [],
+                                                })
+                                              }
+                                              className="text-[11px] px-2.5 py-1 rounded bg-muted hover:bg-muted/80 text-foreground border border-border font-medium flex items-center gap-1"
+                                            >
+                                              <Eye className="w-3 h-3" />
+                                              <span>Evidence ({item.evidence.length})</span>
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() =>
+                                              handleInvestigateAction(item.statement, item.title, item.evidence)
+                                            }
+                                            className="text-[11px] px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-900 font-semibold flex items-center gap-1"
+                                          >
+                                            <Sparkles className="w-3 h-3" />
+                                            <span>Investigate</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Next Actions Preview */}
+                                {report.report_data.next_actions &&
+                                  report.report_data.next_actions.length > 0 && (
+                                    <div>
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                          Immediate Next Actions
+                                        </h4>
+                                        <button
+                                          onClick={() => setReportSection('actions')}
+                                          className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                        >
+                                          <span>View all actions</span>
+                                          <ArrowRight className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {report.report_data.next_actions.slice(0, 3).map((act, idx) => (
+                                          <div
+                                            key={act.id || idx}
+                                            className="p-3 bg-muted/20 border border-border rounded-lg flex items-center justify-between gap-3 text-xs"
+                                          >
+                                            <div className="flex items-center gap-2.5">
+                                              <span className="font-mono font-bold text-blue-600">
+                                                {String(idx + 1).padStart(2, '0')}
+                                              </span>
+                                              <span className="font-medium text-foreground">{act.title}</span>
+                                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-red-500/10 text-red-600 border-red-500/30">
+                                                {act.priority}
+                                              </span>
+                                            </div>
+                                            <button
+                                              onClick={() => handleInvestigateAction(act.title, act.description)}
+                                              className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                            >
+                                              <Sparkles className="w-3 h-3" />
+                                              <span>Investigate</span>
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+
+                            {/* Section 2: Project Understanding */}
+                            {reportSection === 'understanding' && (
+                              <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="p-4 bg-card border border-border rounded-xl space-y-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                      Repository Structure & Languages
+                                    </h4>
+                                    <p className="text-xs text-foreground">
+                                      {report.report_data.project_understanding?.repository_size?.size_formatted || '—'} total volume ({report.report_data.project_understanding?.repository_size?.total_lines?.toLocaleString() || 0} lines).
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5 pt-2">
+                                      {Object.entries(report.report_data.project_understanding?.primary_languages || {}).map(([lang, count]) => (
+                                        <span
+                                          key={lang}
+                                          className="px-2 py-0.5 rounded text-[11px] font-medium bg-muted border border-border"
+                                        >
+                                          {lang}: {count} files
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="p-4 bg-card border border-border rounded-xl space-y-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                      Major Application Areas
+                                    </h4>
+                                    <div className="space-y-1.5">
+                                      {report.report_data.project_understanding?.major_areas?.map((area, idx) => (
+                                        <div key={idx} className="text-xs text-foreground flex items-center justify-between">
+                                          <span className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                            <span className="font-semibold">{area.area}</span>
+                                          </span>
+                                          <span className="text-muted-foreground font-mono text-[11px]">{area.files_count} files</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 bg-card border border-border rounded-xl space-y-3">
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                    Architectural Boundaries & Business Purpose
+                                  </h4>
+                                  {report.report_data.project_understanding?.architectural_boundaries &&
+                                    report.report_data.project_understanding.architectural_boundaries.length > 0 && (
+                                      <div className="space-y-1">
+                                        <div className="text-[11px] font-semibold text-muted-foreground">Boundary Observations:</div>
+                                        {report.report_data.project_understanding.architectural_boundaries.map((b, i) => (
+                                          <p key={i} className="text-xs text-foreground">• {b}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  {report.report_data.project_understanding?.business_purpose_note && (
+                                    <div className="p-3 bg-muted/20 border border-border rounded-lg text-xs text-muted-foreground italic">
+                                      <strong>Purpose Observation:</strong> {report.report_data.project_understanding.business_purpose_note}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Key Symbols */}
+                                {report.report_data.project_understanding?.key_symbols &&
+                                  report.report_data.project_understanding.key_symbols.length > 0 && (
+                                    <div className="p-4 bg-card border border-border rounded-xl space-y-3">
+                                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        High-Centrality Key Symbols
+                                      </h4>
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                          <thead>
+                                            <tr className="border-b border-border text-muted-foreground">
+                                              <th className="pb-2 font-medium">Symbol</th>
+                                              <th className="pb-2 font-medium">Type</th>
+                                              <th className="pb-2 font-medium">File Path</th>
+                                              <th className="pb-2 font-medium">References</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-border">
+                                            {report.report_data.project_understanding.key_symbols.map((sym, idx) => (
+                                              <tr key={idx} className="hover:bg-muted/30">
+                                                <td className="py-2 font-mono font-bold text-foreground">{sym.name}</td>
+                                                <td className="py-2">
+                                                  <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900">
+                                                    {sym.symbol_type}
+                                                  </span>
+                                                </td>
+                                                <td className="py-2 font-mono text-muted-foreground">{sym.file_path || '—'}</td>
+                                                <td className="py-2 font-mono text-foreground font-semibold">
+                                                  {sym.consumer_count} incoming
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+
+                            {/* Section 3: Discoveries */}
+                            {reportSection === 'discoveries' && (
+                              <div className="space-y-6">
+                                <div className="flex items-center justify-between pb-2 border-b border-border">
+                                  <div>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                      Top Discoveries
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Ranked by severity, architectural risk, and evidence density.
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setActiveTab('discoveries');
+                                      loadFindings();
+                                    }}
+                                    className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                  >
+                                    <span>View all discoveries in Discovery tab</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                  {report.report_data.discoveries?.map((disc, idx) => (
+                                    <div
+                                      key={disc.finding_id || idx}
+                                      className="p-5 bg-card border border-border rounded-xl space-y-3 shadow-xs"
+                                    >
+                                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                        <div className="space-y-1">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-mono font-bold text-xs text-blue-600">
+                                              #{idx + 1}
+                                            </span>
+                                            <h5 className="text-sm font-bold text-foreground">
+                                              {disc.title}
+                                            </h5>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${getSeverityBadgeClass(disc.severity as FindingSeverity)}`}>
+                                              {disc.severity}
+                                            </span>
+                                            <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-muted text-muted-foreground border border-border">
+                                              {disc.category}
+                                            </span>
+                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                              Confidence: <strong>{disc.confidence}</strong>
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                                          {disc.evidence && disc.evidence.length > 0 && (
+                                            <button
+                                              onClick={() =>
+                                                setInspectedEvidence({
+                                                  title: disc.title,
+                                                  statement: disc.what_we_found,
+                                                  evidence: disc.evidence || [],
+                                                })
+                                              }
+                                              className="text-[11px] px-2.5 py-1 rounded bg-muted hover:bg-muted/80 text-foreground border border-border font-medium flex items-center gap-1"
+                                            >
+                                              <Eye className="w-3 h-3" />
+                                              <span>Evidence ({disc.evidence.length})</span>
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() =>
+                                              handleInvestigateAction(disc.title, disc.why_it_matters, disc.evidence)
+                                            }
+                                            className="text-[11px] px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-900 font-semibold flex items-center gap-1"
+                                          >
+                                            <Sparkles className="w-3 h-3" />
+                                            <span>Investigate</span>
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-2 text-xs">
+                                        <div>
+                                          <span className="font-semibold text-muted-foreground">WHAT WE FOUND: </span>
+                                          <span className="text-foreground">{disc.what_we_found}</span>
+                                        </div>
+                                        <div>
+                                          <span className="font-semibold text-muted-foreground">WHY IT MATTERS: </span>
+                                          <span className="text-foreground">{disc.why_it_matters}</span>
+                                        </div>
+                                        {disc.recommendation && (
+                                          <div className="p-2.5 bg-muted/30 border border-border rounded-lg text-foreground">
+                                            <span className="font-semibold text-purple-700 dark:text-purple-400">RECOMMENDATION: </span>
+                                            <span>{disc.recommendation}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Section 4: Risk Areas */}
+                            {reportSection === 'risks' && (
+                              <div className="space-y-6">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                  Risk Areas & Structural Hotspots
+                                </h4>
+
+                                <div className="grid grid-cols-1 gap-4">
+                                  {report.report_data.risk_areas?.map((area, idx) => (
+                                    <div key={idx} className="p-5 bg-card border border-border rounded-xl space-y-4 shadow-xs">
+                                      <div className="border-b border-border pb-2.5">
+                                        <h5 className="text-sm font-bold text-foreground flex items-center justify-between">
+                                          <span>{area.area}</span>
+                                        </h5>
+                                      </div>
+
+                                      <div className="space-y-2.5 text-xs">
+                                        {/* Observed facts */}
+                                        {area.observed?.map((obs, i) => (
+                                          <div key={i} className="flex items-start justify-between gap-2 p-2 rounded bg-muted/20">
+                                            <div className="space-y-0.5">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('OBSERVED')}`}>
+                                                  FACT
+                                                </span>
+                                                <span className="font-medium text-foreground">{obs.statement}</span>
+                                              </div>
+                                            </div>
+                                            {obs.evidence && obs.evidence.length > 0 && (
+                                              <button
+                                                onClick={() =>
+                                                  setInspectedEvidence({
+                                                    title: `${area.area} - Observed Fact`,
+                                                    statement: obs.statement,
+                                                    evidence: obs.evidence || [],
+                                                  })
+                                                }
+                                                className="text-[10px] text-blue-600 hover:underline font-mono"
+                                              >
+                                                Evidence ({obs.evidence.length})
+                                              </button>
+                                            )}
+                                          </div>
+                                        ))}
+
+                                        {/* Derived interpretation */}
+                                        {area.derived && (
+                                          <div className="flex items-start justify-between gap-2 p-2 rounded bg-blue-50/20 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('DERIVED')}`}>
+                                                INTERPRETATION
+                                              </span>
+                                              <span className="text-foreground">{area.derived}</span>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Recommended suggestion */}
+                                        {area.recommended && (
+                                          <div className="flex items-center justify-between gap-2 p-2 rounded bg-purple-50/20 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('RECOMMENDED')}`}>
+                                                SUGGESTION
+                                              </span>
+                                              <span className="font-medium text-foreground">{area.recommended}</span>
+                                            </div>
+                                            <button
+                                              onClick={() => handleInvestigateAction(area.recommended)}
+                                              className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold hover:underline"
+                                            >
+                                              Investigate
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Section 5: Technical Debt */}
+                            {reportSection === 'debt' && (
+                              <div className="space-y-6">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                  Technical Debt Signals
+                                </h4>
+
+                                <div className="overflow-x-auto border border-border rounded-xl bg-card">
+                                  <table className="w-full text-left text-xs">
+                                    <thead>
+                                      <tr className="border-b border-border text-muted-foreground bg-muted/30">
+                                        <th className="p-3 font-medium">Signal</th>
+                                        <th className="p-3 font-medium">Priority</th>
+                                        <th className="p-3 font-medium">Likely Impact</th>
+                                        <th className="p-3 font-medium">Evidence</th>
+                                        <th className="p-3 font-medium">Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                      {report.report_data.technical_debt?.map((td, idx) => (
+                                        <tr key={idx} className="hover:bg-muted/30">
+                                          <td className="p-3 font-semibold text-foreground">{td.signal}</td>
+                                          <td className="p-3">
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                                              td.priority === 'HIGH'
+                                                ? 'bg-red-500/10 text-red-600 border-red-500/30'
+                                                : td.priority === 'MEDIUM'
+                                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                                                : 'bg-blue-500/10 text-blue-600 border-blue-500/30'
+                                            }`}>
+                                              {td.priority}
+                                            </span>
+                                          </td>
+                                          <td className="p-3 text-muted-foreground">{td.impact}</td>
+                                          <td className="p-3 font-mono text-[11px]">
+                                            {td.evidence && td.evidence.length > 0 ? (
+                                              <button
+                                                onClick={() =>
+                                                  setInspectedEvidence({
+                                                    title: td.signal,
+                                                    statement: td.impact,
+                                                    evidence: td.evidence || [],
+                                                  })
+                                                }
+                                                className="text-blue-600 hover:underline"
+                                              >
+                                                {td.evidence.length} reference(s)
+                                              </button>
+                                            ) : (
+                                              '—'
+                                            )}
+                                          </td>
+                                          <td className="p-3">
+                                            <button
+                                              onClick={() => handleInvestigateAction(td.signal, td.impact, td.evidence)}
+                                              className="text-blue-600 hover:underline font-medium text-[11px]"
+                                            >
+                                              Investigate
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Section 6: Dependencies */}
+                            {reportSection === 'dependencies' && (
+                              <div className="space-y-6">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                  Important Dependency Hotspots & Relationships
+                                </h4>
+
+                                <div className="space-y-3">
+                                  {report.report_data.dependencies?.map((dep, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-4 bg-card border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                                    >
+                                      <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-muted text-muted-foreground border border-border uppercase">
+                                            {dep.dependency_type}
+                                          </span>
+                                          <span className="font-mono font-bold text-foreground">
+                                            {dep.source} {dep.target ? `→ ${dep.target}` : ''}
+                                          </span>
+                                          {dep.consumer_count > 0 && (
+                                            <span className="text-[10px] text-blue-600 font-semibold">
+                                              ({dep.consumer_count} consumers)
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-muted-foreground">{dep.why_it_matters}</p>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() =>
+                                            handleInvestigateAction(
+                                              `Investigate dependency relationship: ${dep.source} ${dep.target ? '-> ' + dep.target : ''}`,
+                                              dep.why_it_matters
+                                            )
+                                          }
+                                          className="text-[11px] px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-900 font-semibold"
+                                        >
+                                          Investigate
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Section 7: Tests & Docs */}
+                            {reportSection === 'tests_docs' && (
+                              <div className="space-y-6">
+                                <div className="p-5 bg-card border border-border rounded-xl space-y-4">
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                    Testing State & Coverage Gaps
+                                  </h4>
+                                  <div className="space-y-2 text-xs">
+                                    {report.report_data.testing_and_documentation?.testing_observed?.map((item, i) => (
+                                      <div key={i} className="flex items-center gap-2">
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('OBSERVED')}`}>
+                                          FACT
+                                        </span>
+                                        <span className="text-foreground">{item.statement}</span>
+                                      </div>
+                                    ))}
+                                    {report.report_data.testing_and_documentation?.testing_derived && (
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('DERIVED')}`}>
+                                          INTERPRETATION
+                                        </span>
+                                        <span className="text-foreground">{report.report_data.testing_and_documentation.testing_derived}</span>
+                                      </div>
+                                    )}
+                                    {report.report_data.testing_and_documentation?.testing_recommended && (
+                                      <div className="flex items-center justify-between gap-2 p-2 rounded bg-purple-50/20 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('RECOMMENDED')}`}>
+                                            SUGGESTION
+                                          </span>
+                                          <span className="font-medium text-foreground">{report.report_data.testing_and_documentation.testing_recommended}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => handleInvestigateAction(report.report_data.testing_and_documentation.testing_recommended)}
+                                          className="text-[10px] font-semibold text-purple-700 dark:text-purple-400 hover:underline"
+                                        >
+                                          Investigate
+                                        </button>
+                                      </div>
+                                    )}
+                                    {report.report_data.testing_and_documentation?.testing_coverage_note && (
+                                      <p className="text-[11px] text-muted-foreground italic pt-1">
+                                        {report.report_data.testing_and_documentation.testing_coverage_note}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="p-5 bg-card border border-border rounded-xl space-y-4">
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                    Documentation State & Interface Gaps
+                                  </h4>
+                                  <div className="space-y-2 text-xs">
+                                    {report.report_data.testing_and_documentation?.docs_observed?.map((item, i) => (
+                                      <div key={i} className="flex items-center gap-2">
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('OBSERVED')}`}>
+                                          FACT
+                                        </span>
+                                        <span className="text-foreground">{item.statement}</span>
+                                      </div>
+                                    ))}
+                                    {report.report_data.testing_and_documentation?.docs_recommended && (
+                                      <div className="flex items-center justify-between gap-2 p-2 rounded bg-purple-50/20 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getKnowledgeBadgeClass('RECOMMENDED')}`}>
+                                            SUGGESTION
+                                          </span>
+                                          <span className="font-medium text-foreground">{report.report_data.testing_and_documentation.docs_recommended}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => handleInvestigateAction(report.report_data.testing_and_documentation.docs_recommended)}
+                                          className="text-[10px] font-semibold text-purple-700 dark:text-purple-400 hover:underline"
+                                        >
+                                          Investigate
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Section 8: Next Actions */}
+                            {reportSection === 'actions' && (
+                              <div className="space-y-6">
+                                <div>
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                                    Prioritized Next Actions
+                                  </h4>
+                                  <p className="text-xs text-muted-foreground mb-4">
+                                    Recommendations derived from repository evidence. Ready to investigate with Grounded Ask.
+                                  </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                  {report.report_data.next_actions?.map((act, idx) => (
+                                    <div
+                                      key={act.id || idx}
+                                      className="p-4 bg-card border border-border rounded-xl flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs shadow-xs"
+                                    >
+                                      <div className="space-y-1.5 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-mono font-bold text-blue-600">
+                                            {String(idx + 1).padStart(2, '0')}
+                                          </span>
+                                          <h5 className="font-bold text-foreground text-sm">{act.title}</h5>
+                                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                                            act.priority === 'HIGH'
+                                              ? 'bg-red-500/10 text-red-600 border-red-500/30'
+                                              : act.priority === 'MEDIUM'
+                                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                                              : 'bg-blue-500/10 text-blue-600 border-blue-500/30'
+                                          }`}>
+                                            {act.priority}
+                                          </span>
+                                        </div>
+                                        <p className="text-muted-foreground">{act.description}</p>
+                                      </div>
+
+                                      <button
+                                        onClick={() => handleInvestigateAction(act.title, act.description)}
+                                        className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors shadow-xs self-end sm:self-auto"
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        <span>Investigate with Grounded Ask</span>
+                                        <ArrowRight className="w-3 h-3 ml-0.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : activeTab === 'overview' ? (
                       <div className="space-y-6">
@@ -1931,6 +2870,80 @@ export default function ProjectOverviewPage() {
                 <Sparkles className="w-4 h-4" />
                 <span>Investigate with Grounded Ask</span>
                 <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence Inspection Modal */}
+      {inspectedEvidence && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-blue-600" />
+                  <span>{inspectedEvidence.title}</span>
+                </h3>
+                {inspectedEvidence.statement && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {inspectedEvidence.statement}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setInspectedEvidence(null)}
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+              {inspectedEvidence.evidence && inspectedEvidence.evidence.length > 0 ? (
+                inspectedEvidence.evidence.map((ev: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-muted/20 border border-border rounded-lg text-xs space-y-1.5">
+                    <div className="flex items-center justify-between font-mono text-[11px]">
+                      <span className="text-foreground font-semibold">
+                        {ev.file_path || ev.file || ev.target || 'Repository Entity'}
+                      </span>
+                      {ev.reference_type && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-sans uppercase">
+                          {ev.reference_type}
+                        </span>
+                      )}
+                    </div>
+                    {(ev.symbol || ev.source_symbol) && (
+                      <div className="text-muted-foreground">
+                        Symbol: <code className="text-[11px] font-mono font-bold text-foreground">{ev.symbol || ev.source_symbol}</code>
+                      </div>
+                    )}
+                    {(ev.line_number || (ev.start_line && ev.end_line)) && (
+                      <div className="text-muted-foreground font-mono text-[10px]">
+                        Line: {ev.line_number ? `L${ev.line_number}` : `L${ev.start_line} - L${ev.end_line}`}
+                      </div>
+                    )}
+                    {ev.snippet && (
+                      <pre className="p-2.5 bg-background border border-border rounded text-[11px] font-mono text-foreground overflow-x-auto whitespace-pre-wrap">
+                        {ev.snippet}
+                      </pre>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  No detailed line snippets available for this evidence item.
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 border-t border-border bg-muted/20 flex justify-end">
+              <button
+                onClick={() => setInspectedEvidence(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-muted hover:bg-muted/80 text-foreground border border-border"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from apps.api.src.models.finding import Finding
     from apps.api.src.models.integration import Integration
     from apps.api.src.models.organization import Organization
+    from apps.api.src.models.report import ProjectIntelligenceReport
     from apps.api.src.models.repository import Repository
 
 
@@ -72,6 +73,11 @@ class Project(Base, UUIDMixin, TimestampMixin):
     )
     discovery_runs: Mapped[list["DiscoveryRun"]] = relationship(
         "DiscoveryRun",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    reports: Mapped[list["ProjectIntelligenceReport"]] = relationship(
+        "ProjectIntelligenceReport",
         back_populates="project",
         cascade="all, delete-orphan",
     )
