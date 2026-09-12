@@ -169,6 +169,7 @@ class IntelligenceService:
             snapshot_id=snapshot.id,
             question=question,
             conversation_history=history_turns,
+            project_id=project.id,
         )
 
         # 5. Persist Assistant Message

@@ -333,7 +333,75 @@ export interface DiscoveryTriggerResponse {
 // Stage 4: Project Intelligence Report Types
 export type ReportStatus = 'QUEUED' | 'GENERATING' | 'COMPLETED' | 'FAILED';
 
-export type KnowledgeClass = 'OBSERVED' | 'DERIVED' | 'RECOMMENDED';
+export type KnowledgeClass = 'OBSERVED' | 'DERIVED' | 'CUSTOMER' | 'RECOMMENDED';
+
+// Stage 5: Persistent Project Knowledge Types
+export type KnowledgeCategory =
+  | 'INTENT'
+  | 'BUSINESS_RULE'
+  | 'ARCHITECTURE_DECISION'
+  | 'EXCEPTION'
+  | 'CONSTRAINT'
+  | 'LEGACY_CONTEXT'
+  | 'CRITICAL_COMPONENT'
+  | 'TEMPORARY_STATE'
+  | 'OTHER';
+
+export type KnowledgeStatus = 'ACTIVE' | 'ARCHIVED';
+
+export interface ProjectKnowledge {
+  id: string;
+  project_id: string;
+  created_by?: string | null;
+  creator_email?: string | null;
+  category: KnowledgeCategory;
+  title: string;
+  content: string;
+  status: KnowledgeStatus;
+  source_type: string;
+  source_reference_type?: string | null;
+  source_reference_id?: string | null;
+  related_file_path?: string | null;
+  related_symbol?: string | null;
+  related_finding_id?: string | null;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  knowledge_metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeCreateRequest {
+  category: KnowledgeCategory;
+  title: string;
+  content: string;
+  source_reference_type?: string | null;
+  source_reference_id?: string | null;
+  related_file_path?: string | null;
+  related_symbol?: string | null;
+  related_finding_id?: string | null;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  knowledge_metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeUpdateRequest {
+  category?: KnowledgeCategory;
+  title?: string;
+  content?: string;
+  status?: KnowledgeStatus;
+  related_file_path?: string | null;
+  related_symbol?: string | null;
+  related_finding_id?: string | null;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  knowledge_metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeListResponse {
+  items: ProjectKnowledge[];
+  total: number;
+}
 
 export interface ReportEvidenceRef {
   type: string;
@@ -455,6 +523,7 @@ export interface ReportDocument {
   dependencies: ImportantDependency[];
   testing_and_documentation: TestingAndDocs;
   next_actions: NextAction[];
+  project_knowledge?: Array<Record<string, unknown>>;
 }
 
 export interface ProjectIntelligenceReport {

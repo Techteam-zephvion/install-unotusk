@@ -38,6 +38,10 @@ import {
   FileText,
   Activity,
   CheckCircle,
+  BookOpen,
+  Archive,
+  Edit3,
+  Brain,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/Navbar';
@@ -52,12 +56,15 @@ import {
   FindingCategory,
   FindingSeverity,
   FindingStatus,
+  KnowledgeCategory,
   KnowledgeClass,
+  KnowledgeStatus,
   Message,
   NextAction,
   Organization,
   Project,
   ProjectIntelligenceReport,
+  ProjectKnowledge,
   ProjectRepositoryContext,
   ReportDocument,
   RepositoryFile,
@@ -84,17 +91,37 @@ export default function ProjectOverviewPage() {
   const [selectedRepoId, setSelectedRepoId] = useState<string>('');
 
   // Active tab in completed context
-  const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'discoveries' | 'ask' | 'files' | 'symbols' | 'dependencies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'discoveries' | 'knowledge' | 'ask' | 'files' | 'symbols' | 'dependencies'>('overview');
   const [filesList, setFilesList] = useState<RepositoryFile[]>([]);
   const [symbolsList, setSymbolsList] = useState<CodeSymbol[]>([]);
   const [dependenciesList, setDependenciesList] = useState<CodeDependency[]>([]);
   const [loadingTab, setLoadingTab] = useState(false);
 
+  // Stage 5: Project Knowledge state
+  const [knowledgeList, setKnowledgeList] = useState<ProjectKnowledge[]>([]);
+  const [loadingKnowledge, setLoadingKnowledge] = useState(false);
+  const [knowledgeCategoryFilter, setKnowledgeCategoryFilter] = useState<string>('ALL');
+  const [knowledgeStatusFilter, setKnowledgeStatusFilter] = useState<string>('ACTIVE');
+  const [knowledgeSearchQuery, setKnowledgeSearchQuery] = useState<string>('');
+  const [selectedKnowledge, setSelectedKnowledge] = useState<ProjectKnowledge | null>(null);
+
+  // Add/Edit Knowledge Modal state
+  const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
+  const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(null);
+  const [knowledgeFormCategory, setKnowledgeFormCategory] = useState<KnowledgeCategory>('ARCHITECTURE_DECISION');
+  const [knowledgeFormTitle, setKnowledgeFormTitle] = useState('');
+  const [knowledgeFormContent, setKnowledgeFormContent] = useState('');
+  const [knowledgeFormFilePath, setKnowledgeFormFilePath] = useState('');
+  const [knowledgeFormSymbol, setKnowledgeFormSymbol] = useState('');
+  const [knowledgeFormFindingId, setKnowledgeFormFindingId] = useState<string | null>(null);
+  const [savingKnowledge, setSavingKnowledge] = useState(false);
+  const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
+
   // Stage 4: Intelligence Report state
   const [report, setReport] = useState<ProjectIntelligenceReport | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [reportSection, setReportSection] = useState<'summary' | 'understanding' | 'discoveries' | 'risks' | 'debt' | 'dependencies' | 'tests_docs' | 'actions'>('summary');
+  const [reportSection, setReportSection] = useState<'summary' | 'understanding' | 'discoveries' | 'risks' | 'debt' | 'dependencies' | 'tests_docs' | 'actions' | 'knowledge'>('summary');
   const [inspectedEvidence, setInspectedEvidence] = useState<{ title: string; statement?: string; evidence: any[] } | null>(null);
   const reportPollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -309,6 +336,108 @@ export default function ProjectOverviewPage() {
     handleAsk(prompt);
   };
 
+  // Stage 5: Project Knowledge Handlers
+  const loadKnowledge = async () => {
+    setLoadingKnowledge(true);
+    try {
+      const res = await api.knowledge.list(projectId, {
+        status: knowledgeStatusFilter !== 'ALL' ? knowledgeStatusFilter : undefined,
+        category: knowledgeCategoryFilter !== 'ALL' ? knowledgeCategoryFilter : undefined,
+        search: knowledgeSearchQuery.trim() || undefined,
+      });
+      setKnowledgeList(res.items || []);
+    } catch (e) {
+      console.error('Failed to load project knowledge:', e);
+    } finally {
+      setLoadingKnowledge(false);
+    }
+  };
+
+  const openAddKnowledgeModal = (opts?: {
+    findingId?: string;
+    filePath?: string;
+    symbol?: string;
+    category?: KnowledgeCategory;
+    title?: string;
+    content?: string;
+  }) => {
+    setEditingKnowledgeId(null);
+    setKnowledgeFormCategory(opts?.category || 'ARCHITECTURE_DECISION');
+    setKnowledgeFormTitle(opts?.title || '');
+    setKnowledgeFormContent(opts?.content || '');
+    setKnowledgeFormFilePath(opts?.filePath || '');
+    setKnowledgeFormSymbol(opts?.symbol || '');
+    setKnowledgeFormFindingId(opts?.findingId || null);
+    setKnowledgeError(null);
+    setShowKnowledgeModal(true);
+  };
+
+  const openEditKnowledgeModal = (item: ProjectKnowledge) => {
+    setEditingKnowledgeId(item.id);
+    setKnowledgeFormCategory(item.category);
+    setKnowledgeFormTitle(item.title);
+    setKnowledgeFormContent(item.content);
+    setKnowledgeFormFilePath(item.related_file_path || '');
+    setKnowledgeFormSymbol(item.related_symbol || '');
+    setKnowledgeFormFindingId(item.related_finding_id || null);
+    setKnowledgeError(null);
+    setShowKnowledgeModal(true);
+  };
+
+  const handleSaveKnowledge = async () => {
+    if (!knowledgeFormTitle.trim() || !knowledgeFormContent.trim()) {
+      setKnowledgeError('Title and content are required.');
+      return;
+    }
+    setSavingKnowledge(true);
+    setKnowledgeError(null);
+    try {
+      if (editingKnowledgeId) {
+        await api.knowledge.update(projectId, editingKnowledgeId, {
+          title: knowledgeFormTitle.trim(),
+          content: knowledgeFormContent.trim(),
+          category: knowledgeFormCategory,
+          related_file_path: knowledgeFormFilePath.trim() || null,
+          related_symbol: knowledgeFormSymbol.trim() || null,
+          related_finding_id: knowledgeFormFindingId || null,
+        });
+      } else {
+        await api.knowledge.create(projectId, {
+          title: knowledgeFormTitle.trim(),
+          content: knowledgeFormContent.trim(),
+          category: knowledgeFormCategory,
+          related_file_path: knowledgeFormFilePath.trim() || null,
+          related_symbol: knowledgeFormSymbol.trim() || null,
+          related_finding_id: knowledgeFormFindingId || null,
+        });
+      }
+      setShowKnowledgeModal(false);
+      loadKnowledge();
+    } catch (err: any) {
+      setKnowledgeError(err.message || 'Failed to save knowledge.');
+    } finally {
+      setSavingKnowledge(false);
+    }
+  };
+
+  const handleArchiveKnowledge = async (id: string) => {
+    try {
+      await api.knowledge.archive(projectId, id);
+      loadKnowledge();
+    } catch (err: any) {
+      alert(err.message || 'Failed to archive knowledge');
+    }
+  };
+
+  const handleRestoreKnowledge = async (id: string) => {
+    try {
+      await api.knowledge.restore(projectId, id);
+      loadKnowledge();
+    } catch (err: any) {
+      alert(err.message || 'Failed to restore knowledge');
+    }
+  };
+
   const loadLatestReport = async () => {
     setLoadingReport(true);
     try {
@@ -496,8 +625,10 @@ export default function ProjectOverviewPage() {
       loadFindings();
     } else if (activeTab === 'reports') {
       loadLatestReport();
+    } else if (activeTab === 'knowledge') {
+      loadKnowledge();
     }
-  }, [activeTab, statusFilter, severityFilter, categoryFilter]);
+  }, [activeTab, statusFilter, severityFilter, categoryFilter, knowledgeStatusFilter, knowledgeCategoryFilter, knowledgeSearchQuery]);
 
   // Lazy load tab data
   useEffect(() => {
@@ -960,6 +1091,25 @@ export default function ProjectOverviewPage() {
                     </button>
                     <button
                       onClick={() => {
+                        setActiveTab('knowledge');
+                        loadKnowledge();
+                      }}
+                      className={`py-3 text-xs font-semibold border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
+                        activeTab === 'knowledge'
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Project Knowledge</span>
+                      {knowledgeList.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                          {knowledgeList.length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
                         setActiveTab('ask');
                         loadConversations();
                       }}
@@ -1100,6 +1250,7 @@ export default function ProjectOverviewPage() {
                                 { id: 'dependencies', label: 'Dependencies' },
                                 { id: 'tests_docs', label: 'Tests & Docs' },
                                 { id: 'actions', label: 'Next Actions' },
+                                { id: 'knowledge', label: `Project Knowledge (${report.report_data.project_knowledge?.length || 0})` },
                               ].map((sec) => (
                                 <button
                                   key={sec.id}
@@ -1214,6 +1365,20 @@ export default function ProjectOverviewPage() {
                                           >
                                             <Sparkles className="w-3 h-3" />
                                             <span>Investigate</span>
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              openAddKnowledgeModal({
+                                                title: `${item.title} context`,
+                                                filePath: item.evidence?.[0]?.file || undefined,
+                                                symbol: item.evidence?.[0]?.symbol || undefined,
+                                              })
+                                            }
+                                            className="text-[11px] px-2.5 py-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 border border-amber-200 dark:border-amber-900 font-semibold flex items-center gap-1"
+                                            title="Add Project Knowledge"
+                                          >
+                                            <Brain className="w-3 h-3" />
+                                            <span>Add Knowledge</span>
                                           </button>
                                         </div>
                                       </div>
@@ -1443,6 +1608,21 @@ export default function ProjectOverviewPage() {
                                           >
                                             <Sparkles className="w-3 h-3" />
                                             <span>Investigate</span>
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              openAddKnowledgeModal({
+                                                findingId: disc.finding_id,
+                                                title: `${disc.title} context`,
+                                                filePath: (disc.evidence?.[0] as any)?.file_path || (disc.evidence?.[0] as any)?.file,
+                                                symbol: (disc.evidence?.[0] as any)?.symbol,
+                                              })
+                                            }
+                                            className="text-[11px] px-2.5 py-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 border border-amber-200 dark:border-amber-900 font-semibold flex items-center gap-1"
+                                            title="Add Project Knowledge"
+                                          >
+                                            <Brain className="w-3 h-3" />
+                                            <span>Add Knowledge</span>
                                           </button>
                                         </div>
                                       </div>
@@ -1797,6 +1977,76 @@ export default function ProjectOverviewPage() {
                                     </div>
                                   ))}
                                 </div>
+                              </div>
+                            )}
+
+                            {/* Section 9: Project Knowledge */}
+                            {reportSection === 'knowledge' && (
+                              <div className="space-y-6">
+                                <div className="flex items-center justify-between pb-2 border-b border-border">
+                                  <div>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                      Project Knowledge (Contextualized into this Report)
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Explicit customer context, intent, decisions, and constraints supplied to guide interpretation.
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setActiveTab('knowledge');
+                                      loadKnowledge();
+                                    }}
+                                    className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                  >
+                                    <span>Manage Knowledge in Tab</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                {(!report.report_data.project_knowledge || report.report_data.project_knowledge.length === 0) ? (
+                                  <div className="py-12 text-center border border-border border-dashed rounded-xl bg-muted/10 space-y-3">
+                                    <Brain className="w-8 h-8 text-muted-foreground mx-auto stroke-1" />
+                                    <div className="space-y-1">
+                                      <h5 className="text-xs font-bold text-foreground">No customer knowledge recorded at generation time</h5>
+                                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                                        Teach Unotusk about intentional architecture choices, business rules, or legacy context to enrich future reports.
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => openAddKnowledgeModal()}
+                                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Add Project Knowledge</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {report.report_data.project_knowledge.map((k: any, idx: number) => (
+                                      <div key={idx} className="p-4 bg-card border border-amber-500/20 rounded-xl space-y-2 shadow-xs">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/30">
+                                              {k.category}
+                                            </span>
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 border border-blue-500/30">
+                                              CUSTOMER
+                                            </span>
+                                            <h5 className="text-xs font-bold text-foreground">{k.title}</h5>
+                                          </div>
+                                        </div>
+                                        <p className="text-xs text-foreground/90 whitespace-pre-wrap">{k.content}</p>
+                                        {(k.related_file_path || k.related_symbol) && (
+                                          <div className="text-[11px] font-mono text-muted-foreground pt-1 border-t border-border flex items-center gap-3">
+                                            {k.related_file_path && <span>File: {k.related_file_path}</span>}
+                                            {k.related_symbol && <span>Symbol: {k.related_symbol}</span>}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2391,6 +2641,19 @@ export default function ProjectOverviewPage() {
                                       <Eye className="w-3.5 h-3.5" />
                                       <span>Details</span>
                                     </button>
+                                    <button
+                                      onClick={() => openAddKnowledgeModal({
+                                        findingId: f.id,
+                                        filePath: f.evidence?.[0]?.file || (f.related_entities?.[0]?.includes('/') ? f.related_entities[0] : undefined),
+                                        symbol: f.related_entities?.find((e: string) => !e.includes('/')),
+                                        title: `${f.title} context`,
+                                      })}
+                                      className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-500/30 text-xs font-medium transition-colors"
+                                      title="Add Project Knowledge"
+                                    >
+                                      <Brain className="w-3.5 h-3.5" />
+                                      <span>Add Knowledge</span>
+                                    </button>
                                   </div>
                                 </div>
 
@@ -2471,6 +2734,199 @@ export default function ProjectOverviewPage() {
                                     )}
                                   </div>
                                 </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : activeTab === 'knowledge' ? (
+                      <div className="space-y-6">
+                        {/* Header Banner */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base font-bold text-foreground">PROJECT KNOWLEDGE</h3>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                CUSTOMER-PROVIDED
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
+                              Teach Unotusk domain facts, architectural decisions, business rules, exceptions, and legacy constraints.
+                              Customer knowledge is prioritized as context in Grounded Ask, Discovery, and Reports without altering observed code facts.
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => openAddKnowledgeModal()}
+                            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs shrink-0 self-start sm:self-auto"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Project Knowledge</span>
+                          </button>
+                        </div>
+
+                        {/* Search & Filters */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                          <div className="relative flex-1 max-w-sm">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
+                            <input
+                              type="text"
+                              placeholder="Search project knowledge..."
+                              value={knowledgeSearchQuery}
+                              onChange={(e) => setKnowledgeSearchQuery(e.target.value)}
+                              className="w-full pl-9 pr-3 py-1.5 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <span>Status:</span>
+                            </div>
+                            <select
+                              value={knowledgeStatusFilter}
+                              onChange={(e) => setKnowledgeStatusFilter(e.target.value)}
+                              className="px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none"
+                            >
+                              <option value="ACTIVE">Active Only</option>
+                              <option value="ARCHIVED">Archived</option>
+                              <option value="ALL">All Statuses</option>
+                            </select>
+
+                            <div className="flex items-center gap-1 text-muted-foreground ml-1">
+                              <span>Category:</span>
+                            </div>
+                            <select
+                              value={knowledgeCategoryFilter}
+                              onChange={(e) => setKnowledgeCategoryFilter(e.target.value)}
+                              className="px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none"
+                            >
+                              <option value="ALL">All Categories</option>
+                              <option value="INTENT">Intent</option>
+                              <option value="BUSINESS_RULE">Business Rule</option>
+                              <option value="ARCHITECTURE_DECISION">Architecture Decision</option>
+                              <option value="EXCEPTION">Exception</option>
+                              <option value="CONSTRAINT">Constraint</option>
+                              <option value="LEGACY_CONTEXT">Legacy Context</option>
+                              <option value="CRITICAL_COMPONENT">Critical Component</option>
+                              <option value="TEMPORARY_STATE">Temporary State</option>
+                              <option value="OTHER">Other</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Knowledge List */}
+                        {loadingKnowledge ? (
+                          <div className="py-16 text-center text-xs text-muted-foreground">
+                            Loading project knowledge...
+                          </div>
+                        ) : knowledgeList.length === 0 ? (
+                          <div className="py-16 text-center border border-border border-dashed rounded-xl bg-muted/10 space-y-3">
+                            <Brain className="w-10 h-10 text-muted-foreground mx-auto stroke-1" />
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-semibold text-foreground">No project knowledge found</h4>
+                              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                                {knowledgeSearchQuery || knowledgeStatusFilter !== 'ACTIVE' || knowledgeCategoryFilter !== 'ALL'
+                                  ? 'No knowledge items match your search and filter criteria.'
+                                  : 'Explicitly teach Unotusk about architecture decisions, business rules, or legacy context so future Ask and Reports incorporate your team\'s intent.'}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => openAddKnowledgeModal()}
+                              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add First Knowledge</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-3.5">
+                            {knowledgeList.map((item) => (
+                              <div
+                                key={item.id}
+                                className={`border rounded-xl p-4 transition-colors shadow-2xs space-y-3 ${
+                                  item.status === 'ARCHIVED'
+                                    ? 'bg-muted/10 border-border/60 opacity-75'
+                                    : 'bg-card border-border hover:border-amber-500/40'
+                                }`}
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                  <div className="space-y-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                        CUSTOMER
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground border border-border">
+                                        {item.category.replace(/_/g, ' ')}
+                                      </span>
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                                          item.status === 'ACTIVE'
+                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                                            : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/30'
+                                        }`}
+                                      >
+                                        {item.status}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        Added {new Date(item.created_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                    <h4 className="text-sm font-bold text-foreground">{item.title}</h4>
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="flex items-center gap-1.5 shrink-0 self-start">
+                                    <button
+                                      onClick={() => openEditKnowledgeModal(item)}
+                                      className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-muted/60 hover:bg-muted text-foreground rounded-lg border border-border text-xs font-medium transition-colors"
+                                    >
+                                      <span>Edit</span>
+                                    </button>
+                                    {item.status === 'ACTIVE' ? (
+                                      <button
+                                        onClick={() => handleArchiveKnowledge(item.id)}
+                                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg border border-border text-xs font-medium transition-colors"
+                                      >
+                                        <span>Archive</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleRestoreKnowledge(item.id)}
+                                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800 text-xs font-medium transition-colors"
+                                      >
+                                        <span>Restore</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <p className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                  {item.content}
+                                </p>
+
+                                {/* Related entity references */}
+                                {(item.related_file_path || item.related_symbol || item.related_finding_id) && (
+                                  <div className="pt-2 border-t border-border flex flex-wrap items-center gap-2 text-xs">
+                                    <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                                      Related:
+                                    </span>
+                                    {item.related_file_path && (
+                                      <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-muted/60 text-foreground border border-border">
+                                        file: {item.related_file_path}
+                                      </span>
+                                    )}
+                                    {item.related_symbol && (
+                                      <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 font-bold">
+                                        symbol: {item.related_symbol}
+                                      </span>
+                                    )}
+                                    {item.related_finding_id && (
+                                      <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
+                                        finding: {item.related_finding_id.slice(0, 8)}...
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -2861,6 +3317,21 @@ export default function ProjectOverviewPage() {
                     Reopen
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    const f = selectedFinding;
+                    openAddKnowledgeModal({
+                      findingId: f.id,
+                      filePath: f.evidence?.[0]?.file || (f.related_entities?.[0]?.includes('/') ? f.related_entities[0] : undefined),
+                      symbol: f.related_entities?.find((e: string) => !e.includes('/')),
+                      title: `${f.title} context`,
+                    });
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 transition-colors flex items-center gap-1.5"
+                >
+                  <Brain className="w-3.5 h-3.5" />
+                  <span>Add Project Knowledge</span>
+                </button>
               </div>
 
               <button
@@ -2944,6 +3415,126 @@ export default function ProjectOverviewPage() {
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-muted hover:bg-muted/80 text-foreground border border-border"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Project Knowledge Modal */}
+      {showKnowledgeModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-foreground">
+                  {editingKnowledgeId ? 'Edit Project Knowledge' : 'Add Project Knowledge'}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Teach Unotusk explicit domain decisions, intent, constraints, or exceptions.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowKnowledgeModal(false)}
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {knowledgeError && (
+              <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 rounded-lg text-xs text-red-600 dark:text-red-400">
+                {knowledgeError}
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold mb-1 text-foreground">Category</label>
+                <select
+                  value={knowledgeFormCategory}
+                  onChange={(e) => setKnowledgeFormCategory(e.target.value as KnowledgeCategory)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="ARCHITECTURE_DECISION">Architecture Decision</option>
+                  <option value="INTENT">Intent</option>
+                  <option value="BUSINESS_RULE">Business Rule</option>
+                  <option value="EXCEPTION">Exception</option>
+                  <option value="CONSTRAINT">Constraint</option>
+                  <option value="LEGACY_CONTEXT">Legacy Context</option>
+                  <option value="CRITICAL_COMPONENT">Critical Component</option>
+                  <option value="TEMPORARY_STATE">Temporary State</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-foreground">Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g., AuthService centralization is intentional"
+                  value={knowledgeFormTitle}
+                  onChange={(e) => setKnowledgeFormTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-foreground">
+                  What should Unotusk remember about this project?
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="e.g., AuthService is the intentional boundary for authentication and session management. It should not be split even though it has high coupling."
+                  value={knowledgeFormContent}
+                  onChange={(e) => setKnowledgeFormContent(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary leading-relaxed"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-semibold mb-1 text-muted-foreground text-[11px]">
+                    Related File (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="src/auth/service.py"
+                    value={knowledgeFormFilePath}
+                    onChange={(e) => setKnowledgeFormFilePath(e.target.value)}
+                    className="w-full px-2.5 py-1.5 font-mono text-[11px] bg-background border border-border rounded-lg focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-muted-foreground text-[11px]">
+                    Related Symbol (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="AuthService"
+                    value={knowledgeFormSymbol}
+                    onChange={(e) => setKnowledgeFormSymbol(e.target.value)}
+                    className="w-full px-2.5 py-1.5 font-mono text-[11px] bg-background border border-border rounded-lg focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowKnowledgeModal(false)}
+                className="px-3.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveKnowledge}
+                disabled={savingKnowledge}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm disabled:opacity-50"
+              >
+                {savingKnowledge ? 'Saving...' : 'Save Knowledge'}
               </button>
             </div>
           </div>

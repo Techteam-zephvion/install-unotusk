@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.discovery_run import DiscoveryRun
-from apps.api.src.models.enums import FindingCategory, FindingStatus
+from apps.api.src.models.enums import FindingCategory, FindingStatus, KnowledgeStatus
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.finding import Finding
+from apps.api.src.models.knowledge import ProjectKnowledge
 from apps.api.src.models.project import Project
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
@@ -159,6 +160,14 @@ class FactBuilder:
                     elif "target" in ev and "file" in ev:
                         cycles.append([ev["file"], ev["target"]])
 
+        # 10. Load Active Customer Knowledge
+        knowledge_stmt = select(ProjectKnowledge).where(
+            ProjectKnowledge.project_id == project_id,
+            ProjectKnowledge.status == KnowledgeStatus.ACTIVE,
+        )
+        knowledge_res = await session.execute(knowledge_stmt)
+        knowledge_items = list(knowledge_res.scalars().all())
+
         return FactData(
             project=project,
             snapshot=snapshot,
@@ -176,4 +185,5 @@ class FactBuilder:
             symbol_consumers=dict(symbol_consumers),
             external_packages=external_packages,
             cycles=cycles,
+            knowledge_items=knowledge_items,
         )

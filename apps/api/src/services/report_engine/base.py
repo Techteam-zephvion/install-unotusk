@@ -28,3 +28,4 @@ class FactData:
     symbol_consumers: dict[str, int] = field(default_factory=dict)
     external_packages: set[str] = field(default_factory=set)
     cycles: list[list[str]] = field(default_factory=list)
+    knowledge_items: list[Any] = field(default_factory=list)

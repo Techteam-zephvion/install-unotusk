@@ -11,7 +11,9 @@ from apps.api.src.models.enums import (
     FindingStatus,
     IntegrationProvider,
     IntegrationStatus,
+    KnowledgeCategory,
     KnowledgeClass,
+    KnowledgeStatus,
     MembershipRole,
     ProjectStatus,
     ReportStatus,
@@ -21,6 +23,7 @@ from apps.api.src.models.enums import (
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
+from apps.api.src.models.knowledge import ProjectKnowledge
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.message import Message
 from apps.api.src.models.organization import Organization
@@ -47,13 +50,16 @@ __all__ = [
     "Integration",
     "IntegrationProvider",
     "IntegrationStatus",
+    "KnowledgeCategory",
     "KnowledgeClass",
+    "KnowledgeStatus",
     "MembershipRole",
     "Message",
     "Organization",
     "OrganizationMembership",
     "Project",
     "ProjectIntelligenceReport",
+    "ProjectKnowledge",
     "ProjectStatus",
     "ReportStatus",
     "Repository",

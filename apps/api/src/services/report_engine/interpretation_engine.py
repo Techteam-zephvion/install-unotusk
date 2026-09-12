@@ -444,6 +444,57 @@ class InterpretationEngine:
                 evidence=[],
             ))
 
+        # Build Project Knowledge representation & contextualize interpretations
+        project_knowledge_items: list[dict[str, Any]] = []
+        if facts.knowledge_items:
+            for k in facts.knowledge_items:
+                cat_val = k.category.value if hasattr(k.category, "value") else str(k.category)
+                project_knowledge_items.append({
+                    "id": str(k.id),
+                    "category": cat_val,
+                    "title": k.title,
+                    "content": k.content,
+                    "related_file_path": k.related_file_path,
+                    "related_symbol": k.related_symbol,
+                    "claim_type": "CUSTOMER",
+                })
+
+                # Include Customer Knowledge in observed claims
+                observed_items.append(ClaimItem(
+                    claim_type=KnowledgeClass.CUSTOMER,
+                    title=f"Customer Intent: {k.title}",
+                    statement=k.content,
+                    evidence=[{
+                        "file": k.related_file_path,
+                        "symbol": k.related_symbol,
+                        "reference_type": "CUSTOMER_KNOWLEDGE",
+                    }] if (k.related_file_path or k.related_symbol) else [],
+                ))
+
+                # Surface Customer Knowledge in executive summary top things to know
+                top_things.append(ClaimItem(
+                    claim_type=KnowledgeClass.CUSTOMER,
+                    title=f"Customer Context: {k.title}",
+                    statement=k.content,
+                    evidence=[{
+                        "file": k.related_file_path,
+                        "symbol": k.related_symbol,
+                        "reference_type": "CUSTOMER_KNOWLEDGE",
+                    }] if (k.related_file_path or k.related_symbol) else [],
+                ))
+
+                # Contextualize top things to know if symbol or keywords match
+                k_sym = getattr(k, "related_symbol", "") or ""
+                for thing in top_things:
+                    if k_sym and k_sym.lower() in thing.statement.lower():
+                        thing.statement += f" (Customer Knowledge: {k.content})."
+
+                # Contextualize risk areas
+                for ra in risk_areas:
+                    obs_text = " ".join(c.statement or "" for c in ra.observed)
+                    if k_sym and k_sym.lower() in obs_text.lower():
+                        ra.derived += f" (Customer Knowledge: Team indicates '{k.content}')."
+
         top_actions: list[ClaimItem] = []
         for act in next_actions[:3]:
             top_actions.append(ClaimItem(
@@ -475,11 +526,12 @@ class InterpretationEngine:
             metadata=metadata,
             executive_summary=executive_summary,
             project_understanding=understanding,
-            observed=observed_items[:10],
+            observed=observed_items[:12],
             discoveries=top_discoveries,
             risk_areas=risk_areas,
             technical_debt=tech_debt[:8],
             dependencies=important_deps[:8],
             testing_and_documentation=testing_and_docs,
             next_actions=next_actions[:6],
+            project_knowledge=project_knowledge_items,
         )

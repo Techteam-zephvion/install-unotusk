@@ -13,6 +13,7 @@ from apps.api.src.api.routes import (
     discovery,
     health,
     intelligence,
+    knowledge,
     organizations,
     projects,
     reports,
@@ -133,4 +134,5 @@ app.include_router(repository.router, prefix=settings.API_V1_PREFIX)
 app.include_router(intelligence.router, prefix=settings.API_V1_PREFIX)
 app.include_router(discovery.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(knowledge.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_V1_PREFIX)

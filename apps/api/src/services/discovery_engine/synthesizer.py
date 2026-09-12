@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from apps.api.src.config.settings import settings
 from apps.api.src.services.discovery_engine.base import CandidateFinding
@@ -21,8 +22,37 @@ class FindingSynthesizer:
     async def enhance_recommendations(
         self,
         findings: list[CandidateFinding],
+        active_knowledge: list[Any] | None = None,
     ) -> list[CandidateFinding]:
-        """Optionally uses Claude to polish recommendations for top-priority findings."""
+        """Optionally incorporates customer knowledge context and uses Claude to polish recommendations."""
+        # 1. Apply deterministic customer knowledge context
+        if active_knowledge:
+            for finding in findings:
+                ev_paths = {str(e.get("file", "")).lower() for e in finding.evidence if isinstance(e, dict)}
+                ev_syms = {str(e.get("symbol", "")).lower() for e in finding.evidence if isinstance(e, dict)}
+                finding_text = f"{finding.title} {finding.description}".lower()
+
+                matching_knowledge = []
+                for k in active_knowledge:
+                    k_sym = getattr(k, "related_symbol", None)
+                    k_path = getattr(k, "related_file_path", None)
+                    k_title = getattr(k, "title", "").lower()
+
+                    if k_sym and k_sym.lower() in ev_syms:
+                        matching_knowledge.append(k)
+                    elif k_path and any(k_path.lower() in p for p in ev_paths):
+                        matching_knowledge.append(k)
+                    elif k_sym and k_sym.lower() in finding_text:
+                        matching_knowledge.append(k)
+                    elif any(word in finding_text for word in k_title.split() if len(word) > 4):
+                        matching_knowledge.append(k)
+
+                if matching_knowledge:
+                    top_k = matching_knowledge[0]
+                    finding.why_it_matters += (
+                        f" (Project Knowledge: Team states '{top_k.content}')."
+                    )
+
         if not self._client or not findings:
             return findings
 

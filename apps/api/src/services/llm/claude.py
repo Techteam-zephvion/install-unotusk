@@ -106,7 +106,32 @@ class ClaudeProvider(LLMProvider):
         project_context: str,
         confidence: str,
     ) -> str:
-        if not evidence_items:
+        # Extract any active customer knowledge from context
+        customer_notes: list[str] = []
+        if "<customer_project_knowledge>" in project_context:
+            try:
+                start_tag = "<customer_project_knowledge>"
+                end_tag = "</customer_project_knowledge>"
+                start_idx = project_context.find(start_tag) + len(start_tag)
+                end_idx = project_context.find(end_tag)
+                if start_idx != -1 and end_idx != -1:
+                    raw_knowledge = project_context[start_idx:end_idx].strip()
+                    for block in raw_knowledge.split("### [CUSTOMER:"):
+                        block = block.strip()
+                        if block and not block.startswith("This is user-provided"):
+                            lines_b = block.splitlines()
+                            header = lines_b[0].strip()
+                            content_lines = [
+                                line_text
+                                for line_text in lines_b[1:]
+                                if line_text.strip().startswith("Content:")
+                            ]
+                            content_txt = content_lines[0].replace("Content:", "").strip() if content_lines else ""
+                            customer_notes.append(f"- **[CUSTOMER: {header}]**: {content_txt}")
+            except Exception:
+                pass
+
+        if not evidence_items and not customer_notes:
             return (
                 f"### Analysis\n\n"
                 f"I searched the project context for references to **'{question}'**, "
@@ -123,8 +148,15 @@ class ClaudeProvider(LLMProvider):
             "Based on the indexed project context, the relevant architecture and implementation details are identified below:\n",
         ]
 
+        if customer_notes:
+            lines.append("**Customer Project Knowledge (User-Provided Context):**")
+            for note in customer_notes:
+                lines.append(note)
+            lines.append("\n*Note: Customer knowledge represents team-provided intent and architectural decisions, interpreted alongside repository code.*")
+            lines.append("")
+
         if symbols:
-            lines.append("**Key Symbols & Entities Identified:**")
+            lines.append("**Key Symbols & Entities Identified in Code:**")
             for sym in symbols[:6]:
                 lines.append(f"- `{sym}`")
             lines.append("")
@@ -135,13 +167,14 @@ class ClaudeProvider(LLMProvider):
                 lines.append(f"- `{f}`")
             lines.append("")
 
-        lines.append("**Implementation Details:**")
-        for i, ev in enumerate(top_evidence, start=1):
-            sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
-            lines.append(
-                f"{i}. **{ev['file']}**{sym_name} (Lines {ev.get('lines', 'N/A')}):\n"
-                f"   Contains relevant definitions and logic associated with this query."
-            )
+        if top_evidence:
+            lines.append("**Observed Implementation Details:**")
+            for i, ev in enumerate(top_evidence, start=1):
+                sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
+                lines.append(
+                    f"{i}. **{ev['file']}**{sym_name} (Lines {ev.get('lines', 'N/A')}):\n"
+                    f"   Contains relevant definitions and logic associated with this query."
+                )
 
         if related_entities:
             lines.append("\n**Connected Components:**")

@@ -114,6 +114,7 @@ class ReportDocument(BaseModel):
     dependencies: list[ImportantDependency] = Field(default_factory=list)
     testing_and_documentation: TestingAndDocs
     next_actions: list[NextAction] = Field(default_factory=list)
+    project_knowledge: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ReportResponse(BaseModel):

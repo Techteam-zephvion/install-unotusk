@@ -10,9 +10,10 @@ from apps.api.src.db.session import AsyncSessionLocal
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.discovery_run import DiscoveryRun
-from apps.api.src.models.enums import DiscoveryJobStatus, FindingStatus
+from apps.api.src.models.enums import DiscoveryJobStatus, FindingStatus, KnowledgeStatus
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.finding import Finding
+from apps.api.src.models.knowledge import ProjectKnowledge
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.services.discovery_engine.architecture_analyzer import ArchitectureAnalyzer
 from apps.api.src.services.discovery_engine.base import CandidateFinding, DiscoveryContext
@@ -164,9 +165,16 @@ class ProjectDiscoveryEngine:
             discovery_run.progress = 80
             await session.commit()
 
-            # 7. Synthesize Explanations & Recommendations
+            # 7. Synthesize Explanations & Recommendations (incorporating Customer Knowledge)
+            knowledge_q = select(ProjectKnowledge).where(
+                ProjectKnowledge.project_id == project_id,
+                ProjectKnowledge.status == KnowledgeStatus.ACTIVE,
+            )
+            knowledge_res = await session.execute(knowledge_q)
+            active_knowledge = list(knowledge_res.scalars().all())
+
             synthesizer = FindingSynthesizer()
-            final_candidates = await synthesizer.enhance_recommendations(ranked)
+            final_candidates = await synthesizer.enhance_recommendations(ranked, active_knowledge=active_knowledge)
 
             # 8. Persist Findings
             # Clean up older OPEN findings for this snapshot so rerunning replaces them

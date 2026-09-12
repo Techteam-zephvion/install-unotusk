@@ -263,5 +263,63 @@ export const api = {
         `/api/v1/projects/${projectId}/reports/${reportId}`
       ),
   },
+
+  knowledge: {
+    create: (projectId: string, data: import('@unotusk/types').KnowledgeCreateRequest) =>
+      request<import('@unotusk/types').ProjectKnowledge>(
+        `/api/v1/projects/${projectId}/knowledge`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }
+      ),
+    list: (
+      projectId: string,
+      filters?: {
+        status?: string;
+        category?: string;
+        search?: string;
+      }
+    ) => {
+      const params = new URLSearchParams();
+      if (filters?.status) params.set('status', filters.status);
+      if (filters?.category) params.set('category', filters.category);
+      if (filters?.search) params.set('search', filters.search);
+      const qs = params.toString();
+      return request<import('@unotusk/types').KnowledgeListResponse>(
+        `/api/v1/projects/${projectId}/knowledge${qs ? `?${qs}` : ''}`
+      );
+    },
+    get: (projectId: string, knowledgeId: string) =>
+      request<import('@unotusk/types').ProjectKnowledge>(
+        `/api/v1/projects/${projectId}/knowledge/${knowledgeId}`
+      ),
+    update: (
+      projectId: string,
+      knowledgeId: string,
+      data: import('@unotusk/types').KnowledgeUpdateRequest
+    ) =>
+      request<import('@unotusk/types').ProjectKnowledge>(
+        `/api/v1/projects/${projectId}/knowledge/${knowledgeId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }
+      ),
+    archive: (projectId: string, knowledgeId: string) =>
+      request<import('@unotusk/types').ProjectKnowledge>(
+        `/api/v1/projects/${projectId}/knowledge/${knowledgeId}/archive`,
+        {
+          method: 'POST',
+        }
+      ),
+    restore: (projectId: string, knowledgeId: string) =>
+      request<import('@unotusk/types').ProjectKnowledge>(
+        `/api/v1/projects/${projectId}/knowledge/${knowledgeId}/restore`,
+        {
+          method: 'POST',
+        }
+      ),
+  },
 };
 

@@ -102,6 +102,24 @@ class ReportStatus(str, enum.Enum):
 class KnowledgeClass(str, enum.Enum):
     OBSERVED = "OBSERVED"
     DERIVED = "DERIVED"
+    CUSTOMER = "CUSTOMER"
     RECOMMENDED = "RECOMMENDED"
+
+
+class KnowledgeCategory(str, enum.Enum):
+    INTENT = "INTENT"
+    BUSINESS_RULE = "BUSINESS_RULE"
+    ARCHITECTURE_DECISION = "ARCHITECTURE_DECISION"
+    EXCEPTION = "EXCEPTION"
+    CONSTRAINT = "CONSTRAINT"
+    LEGACY_CONTEXT = "LEGACY_CONTEXT"
+    CRITICAL_COMPONENT = "CRITICAL_COMPONENT"
+    TEMPORARY_STATE = "TEMPORARY_STATE"
+    OTHER = "OTHER"
+
+
+class KnowledgeStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
 
 
