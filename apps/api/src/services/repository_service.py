@@ -8,6 +8,7 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
     IntegrationProvider,
@@ -23,7 +24,9 @@ from apps.api.src.models.repository import Repository
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.schemas.context import (
+    CodeChunkRead,
     DependencyRead,
+    FileDetailRead,
     FileRead,
     ProjectContextMetrics,
     ProjectRepositoryContext,
@@ -417,3 +420,95 @@ class RepositoryService:
             read_obj.source_path = source_path
             deps.append(read_obj)
         return deps
+
+    @staticmethod
+    async def get_file_detail(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        file_id: uuid.UUID,
+    ) -> FileDetailRead:
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+
+        f_query = (
+            select(RepositoryFile)
+            .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
+            .join(Repository, Repository.id == RepositorySnapshot.repository_id)
+            .where(
+                RepositoryFile.id == file_id,
+                Repository.project_id == project.id,
+            )
+        )
+        f_res = await session.execute(f_query)
+        file = f_res.scalar_one_or_none()
+        if file is None:
+            raise NotFoundException(code="FILE_NOT_FOUND", message="File not found in project")
+
+        # Get symbols in this file
+        sym_query = (
+            select(CodeSymbol)
+            .where(CodeSymbol.file_id == file.id)
+            .order_by(CodeSymbol.start_line.asc())
+        )
+        sym_res = await session.execute(sym_query)
+        symbols = []
+        for s in sym_res.scalars().all():
+            read_sym = SymbolRead.model_validate(s)
+            read_sym.file_path = file.path
+            symbols.append(read_sym)
+
+        # Get outgoing dependencies
+        out_dep_query = (
+            select(CodeDependency, RepositoryFile.path)
+            .outerjoin(RepositoryFile, RepositoryFile.id == CodeDependency.target_file_id)
+            .where(CodeDependency.source_file_id == file.id)
+            .order_by(CodeDependency.line_number.asc())
+        )
+        out_res = await session.execute(out_dep_query)
+        outgoing_deps = []
+        for dep, target_path in out_res.all():
+            d = DependencyRead.model_validate(dep)
+            d.source_path = file.path
+            d.target_path = target_path
+            outgoing_deps.append(d)
+
+        # Get incoming references (files that depend on this file)
+        in_dep_query = (
+            select(CodeDependency, RepositoryFile.path)
+            .join(RepositoryFile, RepositoryFile.id == CodeDependency.source_file_id)
+            .where(CodeDependency.target_file_id == file.id)
+            .order_by(CodeDependency.line_number.asc())
+        )
+        in_res = await session.execute(in_dep_query)
+        incoming_refs = []
+        for dep, source_path in in_res.all():
+            d = DependencyRead.model_validate(dep)
+            d.source_path = source_path
+            d.target_path = file.path
+            incoming_refs.append(d)
+
+        # Get code chunks
+        chunk_query = (
+            select(CodeChunk)
+            .where(CodeChunk.file_id == file.id)
+            .order_by(CodeChunk.start_line.asc())
+        )
+        chunk_res = await session.execute(chunk_query)
+        chunks = [CodeChunkRead.model_validate(c) for c in chunk_res.scalars().all()]
+
+        full_content = None
+        if chunks:
+            file_chunks = [c for c in chunks if c.chunk_type == "file"]
+            if file_chunks:
+                full_content = file_chunks[0].content
+            else:
+                full_content = "\n\n".join([c.content for c in chunks])
+
+        return FileDetailRead(
+            file=FileRead.model_validate(file),
+            symbols=symbols,
+            outgoing_dependencies=outgoing_deps,
+            incoming_references=incoming_refs,
+            chunks=chunks,
+            full_content=full_content,
+        )

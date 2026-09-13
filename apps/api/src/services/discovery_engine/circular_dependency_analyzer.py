@@ -65,10 +65,13 @@ class CircularDependencyAnalyzer(DiscoveryAnalyzer):
 
             severity = FindingSeverity.HIGH if len(affected_files) >= 3 else FindingSeverity.MEDIUM
 
+            raw_title = f"Circular dependency: {cycle_str}"
+            title = raw_title if len(raw_title) <= 200 else f"Circular dependency ({len(affected_files)} files): {cycle_str[:170]}..."
+
             findings.append(
                 CandidateFinding(
                     category=FindingCategory.CIRCULAR_DEPENDENCY,
-                    title=f"Circular dependency: {cycle_str}",
+                    title=title,
                     description=(
                         f"A circular dependency loop was detected between {len(affected_files)} components: "
                         f"{cycle_str}."

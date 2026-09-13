@@ -58,7 +58,7 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                                 category=FindingCategory.ARCHITECTURE,
                                 title="Architectural violation: production file imports test code",
                                 description=(
-                                    f"Production file `{src_file.path}` imports from test package `{dep.target}`. "
+                                    f"Production file `{src_file.path}` imports from test package `{raw_target}`. "
                                     f"Production code should never depend on test harnesses or test fixtures."
                                 ),
                                 why_it_matters=(
@@ -68,12 +68,12 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                                 severity=FindingSeverity.HIGH,
                                 confidence=FindingConfidence.HIGH,
                                 recommendation=(
-                                    f"Move shared helpers out of `{dep.target}` into a shared production utility, "
+                                    f"Move shared helpers out of `{raw_target}` into a shared production utility, "
                                     f"or refactor `{src_file.path}` to decouple it from test code."
                                 ),
                                 evidence=evidence,
-                                related_entities=[src_file.path, dep.target],
-                                metadata={"source": src_file.path, "target": dep.target},
+                                related_entities=[src_file.path, raw_target],
+                                metadata={"source": src_file.path, "target": raw_target},
                                 score=80.0,
                             )
                         )
@@ -90,9 +90,9 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                             {
                                 "type": "boundary_violation",
                                 "file": src_file.path,
-                                "target": dep.target,
+                                "target": raw_target,
                                 "lines": f"{dep.line_number}" if dep.line_number else "N/A",
-                                "snippet": f"Client code in {src_file.path} imports {dep.target}",
+                                "snippet": f"Client code in {src_file.path} imports {raw_target}",
                             }
                         ]
 
@@ -102,7 +102,7 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                                 title="Layer boundary breach: client code imports database layer",
                                 description=(
                                     f"Frontend/client component `{src_file.path}` imports backend database "
-                                    f"dependency `{dep.target}` directly."
+                                    f"dependency `{raw_target}` directly."
                                 ),
                                 why_it_matters=(
                                     "Direct database access from presentation tiers violates separation of concerns, "
@@ -114,8 +114,8 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                                     "Access database resources exclusively through authenticated backend API endpoints."
                                 ),
                                 evidence=evidence_web,
-                                related_entities=[src_file.path, dep.target],
-                                metadata={"source": src_file.path, "target": dep.target},
+                                related_entities=[src_file.path, raw_target],
+                                metadata={"source": src_file.path, "target": raw_target},
                                 score=85.0,
                             )
                         )

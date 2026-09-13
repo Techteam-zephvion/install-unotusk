@@ -8,6 +8,7 @@ from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.models.user import User
 from apps.api.src.schemas.context import (
     DependencyRead,
+    FileDetailRead,
     FileRead,
     ProjectRepositoryContext,
     SymbolRead,
@@ -89,6 +90,16 @@ async def list_files(
     db: AsyncSession = Depends(get_db),
 ) -> list[FileRead]:
     return await RepositoryService.list_files(db, current_user.id, project_id, limit=limit)
+
+
+@router.get("/files/{file_id}", response_model=FileDetailRead)
+async def get_file_detail(
+    project_id: uuid.UUID,
+    file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> FileDetailRead:
+    return await RepositoryService.get_file_detail(db, current_user.id, project_id, file_id)
 
 
 @router.get("/symbols", response_model=list[SymbolRead])

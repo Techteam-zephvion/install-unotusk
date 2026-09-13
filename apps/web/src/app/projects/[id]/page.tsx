@@ -14,6 +14,7 @@ import {
   Link2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Clock,
   Play,
   KeyRound,
@@ -116,6 +117,7 @@ export default function ProjectOverviewPage() {
   const [knowledgeFormFindingId, setKnowledgeFormFindingId] = useState<string | null>(null);
   const [savingKnowledge, setSavingKnowledge] = useState(false);
   const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
+  const [knowledgeTabError, setKnowledgeTabError] = useState<string | null>(null);
 
   // Stage 4: Intelligence Report state
   const [report, setReport] = useState<ProjectIntelligenceReport | null>(null);
@@ -422,19 +424,21 @@ export default function ProjectOverviewPage() {
 
   const handleArchiveKnowledge = async (id: string) => {
     try {
+      setKnowledgeTabError(null);
       await api.knowledge.archive(projectId, id);
       loadKnowledge();
     } catch (err: any) {
-      alert(err.message || 'Failed to archive knowledge');
+      setKnowledgeTabError(err.message || 'Failed to archive knowledge');
     }
   };
 
   const handleRestoreKnowledge = async (id: string) => {
     try {
+      setKnowledgeTabError(null);
       await api.knowledge.restore(projectId, id);
       loadKnowledge();
     } catch (err: any) {
-      alert(err.message || 'Failed to restore knowledge');
+      setKnowledgeTabError(err.message || 'Failed to restore knowledge');
     }
   };
 
@@ -525,6 +529,8 @@ export default function ProjectOverviewPage() {
         return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30';
       case 'RECOMMENDED':
         return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30';
+      case 'CUSTOMER':
+        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
       default:
         return 'bg-zinc-500/10 text-zinc-600 border-zinc-500/30';
     }
@@ -538,6 +544,8 @@ export default function ProjectOverviewPage() {
         return 'INTERPRETATION';
       case 'RECOMMENDED':
         return 'SUGGESTION';
+      case 'CUSTOMER':
+        return 'CUSTOMER';
       default:
         return type || 'INFO';
     }
@@ -827,8 +835,8 @@ export default function ProjectOverviewPage() {
                     >
                       {project.status}
                     </span>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      slug: {project.slug}
+                    <span className="text-xs text-muted-foreground font-mono opacity-60" title={`slug: ${project.slug}`}>
+                      {project.slug}
                     </span>
                   </div>
                   <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -873,7 +881,7 @@ export default function ProjectOverviewPage() {
                 <div className="p-6 bg-muted/20 border border-dashed border-border rounded-xl text-center">
                   <GitBranch className="w-10 h-10 mx-auto text-muted-foreground stroke-1 mb-2" />
                   <p className="text-xs text-muted-foreground max-w-md mx-auto mb-4">
-                    Connect your GitHub account or provide a repository access token to ingest files, AST symbols, and dependency relationships.
+                    Connect your GitHub account to let Unotusk analyze your code, extract symbols, and map dependency relationships for project intelligence.
                   </p>
                   <button
                     onClick={() => setShowConnectModal(true)}
@@ -892,43 +900,62 @@ export default function ProjectOverviewPage() {
                     <RotateCw className="w-5 h-5 text-blue-600 animate-spin" />
                     <div>
                       <h2 className="text-base font-bold text-foreground">
-                        Analyzing project... ({snapshot?.status})
+                        Analyzing {repo.full_name}...
                       </h2>
                       <p className="text-xs text-muted-foreground">
-                        Ingesting {repo.full_name} on branch {repo.default_branch}
+                        Branch: {repo.default_branch} &mdash;
+                        {snapshot?.status === 'QUEUED' ? ' Queued for processing' :
+                         snapshot?.status === 'CLONING' ? ' Cloning repository' :
+                         snapshot?.status === 'SCANNING' ? ' Discovering files' :
+                         snapshot?.status === 'PARSING' ? ' Parsing code structure' :
+                         snapshot?.status === 'INDEXING' ? ' Building intelligence index' :
+                         ` ${snapshot?.status}`}
                       </p>
                     </div>
                   </div>
-                  <span className="text-sm font-mono font-bold text-blue-600">
-                    {progressPercent}%
-                  </span>
+                  {snapshot && snapshot.total_files > 0 && (
+                    <span className="text-sm font-mono font-bold text-blue-600">
+                      {progressPercent}%
+                    </span>
+                  )}
                 </div>
 
-                {/* Progress bar */}
-                <div className="w-full bg-border h-2.5 rounded-full overflow-hidden mb-4">
-                  <div
-                    className="bg-blue-600 h-full transition-all duration-300 rounded-full"
-                    style={{ width: `${Math.max(5, progressPercent)}%` }}
-                  />
-                </div>
+                {/* Progress bar — only shown when file count is known */}
+                {snapshot && snapshot.total_files > 0 ? (
+                  <div className="w-full bg-border h-2.5 rounded-full overflow-hidden mb-4">
+                    <div
+                      className="bg-blue-600 h-full transition-all duration-300 rounded-full"
+                      style={{ width: `${Math.max(5, progressPercent)}%` }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full bg-border h-2.5 rounded-full overflow-hidden mb-4">
+                    <div className="bg-blue-600/40 h-full rounded-full animate-pulse" style={{ width: '100%' }} />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
                   <div className="p-3 bg-card border border-border rounded-lg">
-                    <span className="text-muted-foreground block">Files discovered</span>
+                    <span className="text-muted-foreground block">Files found</span>
                     <span className="text-base font-bold text-foreground mt-0.5 block">
-                      {snapshot?.total_files || 0}
+                      {snapshot?.total_files || '—'}
                     </span>
                   </div>
                   <div className="p-3 bg-card border border-border rounded-lg">
-                    <span className="text-muted-foreground block">Files processed</span>
+                    <span className="text-muted-foreground block">Files analyzed</span>
                     <span className="text-base font-bold text-foreground mt-0.5 block">
-                      {snapshot?.processed_files || 0}
+                      {snapshot?.processed_files || '—'}
                     </span>
                   </div>
                   <div className="p-3 bg-card border border-border rounded-lg col-span-2 sm:col-span-1">
                     <span className="text-muted-foreground block">Current phase</span>
-                    <span className="text-base font-mono font-bold text-blue-600 mt-0.5 block">
-                      {snapshot?.status}
+                    <span className="text-base font-bold text-blue-600 mt-0.5 block">
+                      {snapshot?.status === 'QUEUED' ? 'Queued' :
+                       snapshot?.status === 'CLONING' ? 'Cloning' :
+                       snapshot?.status === 'SCANNING' ? 'Scanning' :
+                       snapshot?.status === 'PARSING' ? 'Parsing' :
+                       snapshot?.status === 'INDEXING' ? 'Indexing' :
+                       snapshot?.status || '—'}
                     </span>
                   </div>
                 </div>
@@ -1067,7 +1094,7 @@ export default function ProjectOverviewPage() {
                           : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      Context Summary
+                      Overview
                     </button>
                     <button
                       onClick={() => {
@@ -1091,6 +1118,20 @@ export default function ProjectOverviewPage() {
                     </button>
                     <button
                       onClick={() => {
+                        setActiveTab('ask');
+                        loadConversations();
+                      }}
+                      className={`py-3 text-xs font-semibold border-b-2 flex items-center space-x-1.5 transition-colors ${
+                        activeTab === 'ask'
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Ask Unotusk</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         setActiveTab('knowledge');
                         loadKnowledge();
                       }}
@@ -1107,20 +1148,6 @@ export default function ProjectOverviewPage() {
                           {knowledgeList.length}
                         </span>
                       )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab('ask');
-                        loadConversations();
-                      }}
-                      className={`py-3 text-xs font-semibold border-b-2 flex items-center space-x-1.5 transition-colors ${
-                        activeTab === 'ask'
-                          ? 'border-blue-600 text-blue-600'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Ask Unotusk</span>
                     </button>
                     <button
                       onClick={() => setActiveTab('files')}
@@ -1174,9 +1201,31 @@ export default function ProjectOverviewPage() {
                                 Generating Complete Project Intelligence Report...
                               </h3>
                               <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
-                                Assembling deterministic AST and dependency facts, ranking discoveries, and generating grounded recommendations. Status: <span className="font-mono font-semibold text-blue-600">{report?.status || 'GENERATING'}</span>
+                                Synthesizing code architecture, ranking discoveries, and generating actionable recommendations. Status: <span className="font-mono font-semibold text-blue-600">{report?.status || 'GENERATING'}</span>
                               </p>
                             </div>
+                          </div>
+                        ) : report && report.status === 'FAILED' ? (
+                          <div className="py-16 text-center space-y-4 border border-red-200 dark:border-red-900/50 bg-red-50/20 dark:bg-red-950/20 rounded-xl p-8">
+                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
+                              <AlertTriangle className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h3 className="text-base font-bold text-foreground">
+                                Report Generation Failed
+                              </h3>
+                              <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
+                                {report?.error_message || 'Could not assemble project intelligence report. Please try again.'}
+                              </p>
+                            </div>
+                            <button
+                              onClick={handleTriggerReport}
+                              disabled={generatingReport}
+                              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              <RotateCw className="w-4 h-4" />
+                              <span>Retry Report Generation</span>
+                            </button>
                           </div>
                         ) : !report || !report.report_data ? (
                           <div className="py-16 text-center space-y-4 border border-dashed border-border rounded-xl p-8 bg-muted/10">
@@ -1188,7 +1237,7 @@ export default function ProjectOverviewPage() {
                                 Project Intelligence Report
                               </h3>
                               <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
-                                Synthesize repository structure, AST symbols, dependencies, and Stage 3 discoveries into a concise, evidence-backed 5–10 minute briefing.
+                                Synthesize repository structure, code architecture, dependencies, and discoveries into a concise, evidence-backed briefing.
                               </p>
                             </div>
                             <button
@@ -2063,7 +2112,7 @@ export default function ProjectOverviewPage() {
                             <div><strong>Repository:</strong> {repo.full_name}</div>
                             <div><strong>URL:</strong> <a href={repo.url} target="_blank" rel="noreferrer" className="text-blue-600 underline">{repo.url}</a></div>
                             <div><strong>Commit SHA:</strong> {snapshot.commit_sha || 'Latest HEAD'}</div>
-                            <div><strong>Parser Status:</strong> Completed AST indexing with zero unhandled crashes</div>
+                            <div><strong>Indexing Status:</strong> Completed code parsing and structural analysis</div>
                           </div>
                         </div>
 
@@ -2183,7 +2232,7 @@ export default function ProjectOverviewPage() {
                                 ))}
                               </div>
 
-                              <div className="pt-2 flex justify-end">
+                              <div className="pt-2 text-right">
                                 <button
                                   onClick={() => {
                                     setActiveTab('discoveries');
@@ -2199,7 +2248,7 @@ export default function ProjectOverviewPage() {
                           ) : (
                             <div className="py-6 text-center text-xs text-muted-foreground space-y-2">
                               <p>No project discoveries recorded yet.</p>
-                              <p>Click "Analyze Project" to run automated deterministic AST and dependency discovery.</p>
+                              <p>Click "Analyze Discoveries" to run automated risk and architecture discovery.</p>
                             </div>
                           )}
                         </div>
@@ -2214,7 +2263,7 @@ export default function ProjectOverviewPage() {
                               <span>Grounded Project Intelligence</span>
                             </h3>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Evidence-backed answers synthesized from deterministic repository files, symbols, and dependencies.
+                              Evidence-backed answers synthesized from code symbols, architecture, and dependencies.
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -2227,7 +2276,7 @@ export default function ProjectOverviewPage() {
                               }`}
                             >
                               <Terminal className="w-3.5 h-3.5" />
-                              <span>Retrieval Signals</span>
+                              <span>Debug Info</span>
                             </button>
                             <button
                               onClick={handleNewConversation}
@@ -2512,7 +2561,7 @@ export default function ProjectOverviewPage() {
                           <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2.5 text-xs text-blue-700 dark:text-blue-300">
                             <RotateCw className="w-4 h-4 animate-spin text-blue-600" />
                             <span>
-                              Discovery engine is running multi-analyzer pipeline (circular dependencies, coupling, doc gaps, duplication, architecture, test gaps)...
+                              Analyzing repository for circular dependencies, architectural hotspots, coupling risks, and test gaps...
                             </span>
                           </div>
                         )}
@@ -2764,6 +2813,22 @@ export default function ProjectOverviewPage() {
                             <span>Add Project Knowledge</span>
                           </button>
                         </div>
+
+                        {/* Error Banner */}
+                        {knowledgeTabError && (
+                          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg flex items-center justify-between text-xs text-red-700 dark:text-red-300">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                              <span>{knowledgeTabError}</span>
+                            </div>
+                            <button
+                              onClick={() => setKnowledgeTabError(null)}
+                              className="text-muted-foreground hover:text-foreground text-xs font-medium"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        )}
 
                         {/* Search & Filters */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -3038,6 +3103,35 @@ export default function ProjectOverviewPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+            ) : snapshot && snapshot.status === 'FAILED' ? (
+              /* State: Ingestion Failed */
+              <div className="border border-red-200 dark:border-red-900/60 bg-red-50/20 dark:bg-red-950/20 rounded-xl p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-foreground">Repository Analysis Failed</h2>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-semibold border border-red-200 dark:border-red-800">
+                          Failed
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-lg">
+                        {snapshot.error_message || 'An error occurred during repository analysis. Please verify repository access and try again.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleTriggerIngest}
+                    className="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm self-start sm:self-auto"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>Retry Analysis</span>
+                  </button>
                 </div>
               </div>
             ) : (

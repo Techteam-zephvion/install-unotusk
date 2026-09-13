@@ -125,8 +125,8 @@ class FactBuilder:
             target_path = None
             if dep.target_file_id and dep.target_file_id in file_by_id:
                 target_path = file_by_id[dep.target_file_id].path
-            elif dep.raw_target:
-                candidate = dep.raw_target.replace(".", "/")
+            elif dep.external_package:
+                candidate = dep.external_package.replace(".", "/")
                 for path in file_by_path:
                     if candidate in path:
                         target_path = path

@@ -47,7 +47,7 @@ class Finding(Base, UUIDMixin, TimestampMixin):
         index=True,
     )
     title: Mapped[str] = mapped_column(
-        String(255),
+        String(1000),
         nullable=False,
     )
     description: Mapped[str] = mapped_column(

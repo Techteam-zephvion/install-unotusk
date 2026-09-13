@@ -46,9 +46,18 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3005",
     ]
 
+    # LLM Settings (Explicit Provider: 'claude', 'groq', 'offline')
+    LLM_PROVIDER: str = Field(default="groq")
+
     # Anthropic / Claude LLM Settings
     ANTHROPIC_API_KEY: str | None = Field(default=None)
     ANTHROPIC_MODEL: str = Field(default="claude-3-5-sonnet-20241022")
+
+    # Groq LLM Settings
+    GROQ_API_KEY: str | None = Field(default=None)
+    GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile")
+
+    # Context Budget
     CONTEXT_BUDGET_TOKENS: int = Field(default=16000)
 
 

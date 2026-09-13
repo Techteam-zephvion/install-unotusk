@@ -33,6 +33,7 @@ htmlcov/
 *.sqlite3
 postgres_data/
 redis_data/
+validation_repos/
 
 # IDE & OS
 .DS_Store

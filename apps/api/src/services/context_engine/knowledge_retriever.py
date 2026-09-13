@@ -73,7 +73,7 @@ class KnowledgeRetriever:
         raw_records: list[dict[str, Any]] = [
             {
                 "id": str(item.id),
-                "category": item.category.value,
+                "category": item.category.value if hasattr(item.category, "value") else str(item.category),
                 "title": item.title,
                 "content": item.content,
                 "related_file_path": item.related_file_path,
@@ -101,7 +101,8 @@ class KnowledgeRetriever:
         ]
 
         for item in items:
-            knowledge_lines.append(f"### [CUSTOMER: {item.category.value}] {item.title}")
+            cat_val = item.category.value if hasattr(item.category, "value") else str(item.category)
+            knowledge_lines.append(f"### [CUSTOMER: {cat_val}] {item.title}")
             knowledge_lines.append(f"Content: {item.content}")
             if item.related_file_path:
                 knowledge_lines.append(f"Related File: {item.related_file_path}")

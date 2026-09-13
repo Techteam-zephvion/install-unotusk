@@ -12,12 +12,12 @@ from apps.api.src.services.context_engine.query_analyzer import analyze_query
 from apps.api.src.services.context_engine.ranker import MultiSignalRanker
 from apps.api.src.services.context_engine.retriever import MultiSignalRetriever
 from apps.api.src.services.llm.base import GroundedAnswer, LLMProvider
-from apps.api.src.services.llm.claude import ClaudeProvider
+from apps.api.src.services.llm.factory import get_llm_provider
 
 
 class ProjectContextEngine:
     def __init__(self, llm_provider: LLMProvider | None = None):
-        self.llm_provider = llm_provider or ClaudeProvider()
+        self.llm_provider = llm_provider or get_llm_provider()
 
     async def investigate(
         self,

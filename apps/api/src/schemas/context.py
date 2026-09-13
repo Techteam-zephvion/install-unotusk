@@ -66,3 +66,24 @@ class ProjectRepositoryContext(BaseModel):
     repository: RepositoryRead | None = None
     active_snapshot: SnapshotRead | None = None
     metrics: ProjectContextMetrics = Field(default_factory=ProjectContextMetrics)
+
+
+class CodeChunkRead(BaseModel):
+    id: uuid.UUID
+    chunk_type: str
+    name: str
+    path: str
+    content: str
+    start_line: int
+    end_line: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FileDetailRead(BaseModel):
+    file: FileRead
+    symbols: list[SymbolRead] = Field(default_factory=list)
+    outgoing_dependencies: list[DependencyRead] = Field(default_factory=list)
+    incoming_references: list[DependencyRead] = Field(default_factory=list)
+    chunks: list[CodeChunkRead] = Field(default_factory=list)
+    full_content: str | None = None

@@ -40,7 +40,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-xl font-bold tracking-tight">Sign in to Unotusk</h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Project Intelligence Platform (Stage 0 Baseline)
+            Project Intelligence for Engineering Teams
           </p>
         </div>
 

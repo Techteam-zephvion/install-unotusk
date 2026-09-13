@@ -75,5 +75,4 @@ class ProjectIntelligenceReport(Base, UUIDMixin, TimestampMixin):
 
     __table_args__ = (
         Index("ix_project_intelligence_reports_project_created", "project_id", "created_at"),
-        Index("ix_project_intelligence_reports_status", "status"),
     )

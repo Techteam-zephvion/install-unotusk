@@ -114,7 +114,7 @@ export default function ProjectsPage() {
             <FolderKanban className="w-12 h-12 mx-auto text-muted-foreground stroke-1 mb-3" />
             <h2 className="text-base font-semibold">No projects yet</h2>
             <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-6">
-              Create your first project to establish the project boundary and prepare for repository connection in Stage 1.
+              Create a project, connect a repository, and let Unotusk analyze your codebase for structural risks, architectural patterns, and actionable improvements.
             </p>
             <Link
               href="/projects/new"
