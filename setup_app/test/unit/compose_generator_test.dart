@@ -20,8 +20,8 @@ void main() {
       expect(compose, contains('container_name: unotusk-api'));
       expect(compose, contains('container_name: unotusk-worker'));
       expect(compose, contains('"8085:8000"'));
-      expect(compose, contains('"5439:5432"'));
-      expect(compose, contains('"6389:6379"'));
+      expect(compose, contains('"127.0.0.1:5439:5432"'));
+      expect(compose, contains('"127.0.0.1:6389:6379"'));
       expect(compose, contains('GROQ_API_KEY=gsk_mock_123'));
     });
   });
