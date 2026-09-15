@@ -1,4 +1,3 @@
-
 import tree_sitter
 import tree_sitter_go
 import tree_sitter_javascript

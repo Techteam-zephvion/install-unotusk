@@ -15,6 +15,7 @@ class FindingSynthesizer:
         if self.api_key:
             try:
                 import anthropic
+
                 self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
             except Exception as e:
                 logger.warning(f"Could not initialize Anthropic client for synthesizer: {e}")
@@ -28,8 +29,14 @@ class FindingSynthesizer:
         # 1. Apply deterministic customer knowledge context
         if active_knowledge:
             for finding in findings:
-                ev_paths = {str(e.get("file", "")).lower() for e in finding.evidence if isinstance(e, dict)}
-                ev_syms = {str(e.get("symbol", "")).lower() for e in finding.evidence if isinstance(e, dict)}
+                ev_paths = {
+                    str(e.get("file", "")).lower() for e in finding.evidence if isinstance(e, dict)
+                }
+                ev_syms = {
+                    str(e.get("symbol", "")).lower()
+                    for e in finding.evidence
+                    if isinstance(e, dict)
+                }
                 finding_text = f"{finding.title} {finding.description}".lower()
 
                 matching_knowledge = []

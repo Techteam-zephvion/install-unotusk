@@ -17,7 +17,9 @@ class ReportSynthesizer:
         self.provider = (provider or settings.LLM_PROVIDER or "offline").lower()
         self.groq_api_key = api_key if self.provider == "groq" else settings.GROQ_API_KEY
         self.groq_model = model if self.provider == "groq" else settings.GROQ_MODEL
-        self.anthropic_api_key = api_key if self.provider == "claude" else settings.ANTHROPIC_API_KEY
+        self.anthropic_api_key = (
+            api_key if self.provider == "claude" else settings.ANTHROPIC_API_KEY
+        )
         self.anthropic_model = model if self.provider == "claude" else settings.ANTHROPIC_MODEL
 
         self._groq_client = None
@@ -27,6 +29,7 @@ class ReportSynthesizer:
         if self.provider == "groq" and self.groq_api_key:
             try:
                 import groq
+
                 self._groq_client = groq.AsyncGroq(api_key=self.groq_api_key)
                 self._client = self._groq_client
             except Exception as e:
@@ -35,6 +38,7 @@ class ReportSynthesizer:
         elif self.provider == "claude" and self.anthropic_api_key:
             try:
                 import anthropic
+
                 self._anthropic_client = anthropic.AsyncAnthropic(api_key=self.anthropic_api_key)
                 self._client = self._anthropic_client
             except Exception as e:
@@ -47,7 +51,9 @@ class ReportSynthesizer:
         """
         if self.provider == "groq" and self._groq_client:
             return await self._synthesize_with_groq(doc)
-        elif self.provider == "claude" and (self._anthropic_client or (self._client and hasattr(self._client, "messages"))):
+        elif self.provider == "claude" and (
+            self._anthropic_client or (self._client and hasattr(self._client, "messages"))
+        ):
             return await self._synthesize_with_claude(doc)
 
         logger.info("Remote LLM client unavailable; using deterministic report document directly.")
@@ -70,8 +76,7 @@ class ReportSynthesizer:
                 for d in doc.discoveries[:4]
             ],
             "observed_facts": [
-                {"title": obs.title, "statement": obs.statement}
-                for obs in doc.observed[:5]
+                {"title": obs.title, "statement": obs.statement} for obs in doc.observed[:5]
             ],
         }
 
@@ -161,14 +166,18 @@ class ReportSynthesizer:
         return doc
 
     def _apply_parsed_synthesis(self, doc: ReportDocument, parsed: dict) -> None:
-        if isinstance(parsed, dict) and ("executive_summary_text" in parsed or "project_summary" in parsed):
+        if isinstance(parsed, dict) and (
+            "executive_summary_text" in parsed or "project_summary" in parsed
+        ):
             summary_text = parsed.get("executive_summary_text") or parsed.get("project_summary")
             if summary_text:
                 doc.executive_summary.project_summary = str(summary_text).strip()
             if "state_assessment" in parsed and parsed["state_assessment"]:
                 doc.executive_summary.state_assessment = str(parsed["state_assessment"]).strip()
             if "business_purpose_note" in parsed and parsed["business_purpose_note"]:
-                doc.project_understanding.business_purpose_note = str(parsed["business_purpose_note"]).strip()
+                doc.project_understanding.business_purpose_note = str(
+                    parsed["business_purpose_note"]
+                ).strip()
 
 
 class ClaudeReportSynthesizer(ReportSynthesizer):

@@ -51,11 +51,12 @@ jobs:
           pip install -r apps/api/requirements.txt
 
       - name: Run Ruff Linting
-        run: ruff check apps/api/
+        run: ruff check apps/api/ tests/
 
       - name: Run Alembic Migrations
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test
+          SYNC_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/unotusk_test
         run: alembic upgrade head
 
       - name: Run Pytest Suite
@@ -63,28 +64,57 @@ jobs:
           APP_ENV: test
           DEBUG: "true"
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test
+          SYNC_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/unotusk_test
           REDIS_URL: redis://localhost:6379/0
           AUTH_SECRET: ci-test-secret-minimum-32-chars-long-1234
         run: pytest -v --cov=apps/api/src
 
-  frontend-checks:
-    name: Frontend Build & Typecheck
+  flutter-employee-app:
+    name: Flutter Employee App — Analyze & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: apps/web/package.json
+          flutter-version: "3.x"
+          channel: stable
 
       - name: Install Dependencies
-        working-directory: apps/web
-        run: npm ci
+        working-directory: app
+        run: flutter pub get
 
-      - name: Build Next.js Application
-        working-directory: apps/web
-        run: npm run build
+      - name: Flutter Analyze (Employee App)
+        working-directory: app
+        run: flutter analyze --fatal-infos
+
+      - name: Flutter Test (Employee App)
+        working-directory: app
+        run: flutter test
+
+  flutter-setup-app:
+    name: Flutter Setup App — Analyze & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: stable
+
+      - name: Install Dependencies
+        working-directory: setup_app
+        run: flutter pub get
+
+      - name: Flutter Analyze (Setup App)
+        working-directory: setup_app
+        run: flutter analyze --fatal-infos
+
+      - name: Flutter Test (Setup App)
+        working-directory: setup_app
+        run: flutter test

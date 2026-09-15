@@ -26,7 +26,9 @@ async def trigger_ping_task(
     payload: PingTaskRequest,
     current_user: User = Depends(get_current_user),
 ) -> TaskResponse:
-    task_id = await TaskDispatcher.enqueue("ping", {"message": payload.message, "user_id": str(current_user.id)})
+    task_id = await TaskDispatcher.enqueue(
+        "ping", {"message": payload.message, "user_id": str(current_user.id)}
+    )
     return TaskResponse(
         task_id=task_id,
         status="QUEUED",

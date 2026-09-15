@@ -41,7 +41,11 @@ async def clean_database():
     async with test_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE TABLE integrations, projects, organization_memberships, organizations, users CASCADE;"
+                "TRUNCATE TABLE findings, discovery_runs, "
+                "project_intelligence_reports, project_knowledge, messages, conversations, "
+                "code_dependencies, code_chunks, code_symbols, repository_files, "
+                "repository_snapshots, repositories, integrations, projects, "
+                "organization_memberships, organizations, users CASCADE;"
             )
         )
     yield
@@ -89,7 +93,6 @@ async def create_test_user(db_session: AsyncSession):
         )
         db_session.add(user)
         await db_session.commit()
-        await db_session.refresh(user)
         return user
 
     return _create
@@ -120,8 +123,6 @@ async def create_test_org(db_session: AsyncSession):
         )
         db_session.add(membership)
         await db_session.commit()
-        await db_session.refresh(org)
-        await db_session.refresh(membership)
         return org, membership
 
     return _create
@@ -146,7 +147,6 @@ async def create_test_project(db_session: AsyncSession):
         )
         db_session.add(proj)
         await db_session.commit()
-        await db_session.refresh(proj)
         return proj
 
     return _create

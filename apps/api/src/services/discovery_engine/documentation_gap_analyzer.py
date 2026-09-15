@@ -71,14 +71,17 @@ class DocumentationGapAnalyzer(DiscoveryAnalyzer):
                 has_docstring = False
                 if sym_chunk and sym_chunk.content:
                     # Check for docstrings (""" or /**)
-                    if '"""' in sym_chunk.content or "/**" in sym_chunk.content or "'''" in sym_chunk.content:
+                    if (
+                        '"""' in sym_chunk.content
+                        or "/**" in sym_chunk.content
+                        or "'''" in sym_chunk.content
+                    ):
                         has_docstring = True
 
                 # Check if mentioned in README/docs
                 sym_name_lower = sym.name.lower()
                 mentioned_in_docs = any(
-                    re.search(r"\b" + re.escape(sym_name_lower) + r"\b", dt)
-                    for dt in doc_texts
+                    re.search(r"\b" + re.escape(sym_name_lower) + r"\b", dt) for dt in doc_texts
                 )
 
                 if not has_docstring and not mentioned_in_docs:
@@ -109,7 +112,9 @@ class DocumentationGapAnalyzer(DiscoveryAnalyzer):
                                 "Key architectural abstractions without documentation increase onboarding friction, "
                                 "misunderstandings of behavioral contracts, and bug rates."
                             ),
-                            severity=FindingSeverity.MEDIUM if len(consumers) >= 5 else FindingSeverity.LOW,
+                            severity=FindingSeverity.MEDIUM
+                            if len(consumers) >= 5
+                            else FindingSeverity.LOW,
                             confidence=FindingConfidence.HIGH,
                             recommendation=(
                                 f"Add clear docstrings and interface documentation describing `{sym.name}`'s "

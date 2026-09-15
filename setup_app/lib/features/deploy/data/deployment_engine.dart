@@ -61,7 +61,15 @@ class DeploymentEngine {
       // 1. Preparing
       onStageChanged(DeployStage.preparing);
       final envContent = config.generateEnvFileContent();
-      final composeContent = ComposeGenerator.generateDockerCompose(config);
+      // Resolve the source root: the directory containing the setup_app executable
+      // (or the current working directory when run from source).
+      final sourceRoot = customDeploymentDir != null
+          ? null // Use relative '.' if deploying from a custom dir that contains the source
+          : _resolveSourceRoot();
+      final composeContent = ComposeGenerator.generateDockerCompose(
+        config,
+        projectRoot: sourceRoot,
+      );
 
       // 2. Configuring (create directory and write files)
       onStageChanged(DeployStage.configuring);
@@ -101,21 +109,11 @@ class DeploymentEngine {
         }
 
         // 4. Migrating DB
+        // Migration is handled by the declarative 'migration' service container
+        // (condition: service_completed_successfully), so no manual exec needed.
+        // We wait for the API health check (in HealthVerifier) to confirm readiness.
         onStageChanged(DeployStage.migratingDb);
-        // Small delay for postgres readiness if needed, then run alembic
-        await Future.delayed(const Duration(seconds: 2));
-        final migrateRes = await _processExecutor(
-          'docker',
-          ['compose', '-f', composeFile.path, 'exec', '-T', 'api', 'alembic', 'upgrade', 'head'],
-          workingDirectory: deployDir,
-        );
-
-        // If alembic exec succeeds or is already current
-        if (migrateRes.exitCode != 0 &&
-            !migrateRes.stdout.toString().contains('alembic') &&
-            !migrateRes.stderr.toString().contains('alembic')) {
-          // Non-fatal if alembic already ran at container bootstrap
-        }
+        await Future.delayed(const Duration(seconds: 3));
 
         onStageChanged(DeployStage.completed);
         return const DeployResult(isSuccess: true);
@@ -171,5 +169,21 @@ class DeploymentEngine {
   String _resolveDeploymentDir() {
     final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
     return '$home/.unotusk/server';
+  }
+
+  /// Resolves the Unotusk source root directory for Docker build context.
+  /// When running from source, this is the current working directory.
+  /// When packaged, this is the directory containing the executable.
+  String? _resolveSourceRoot() {
+    // Use the current working directory — when deployed via setup_app running
+    // from within the Unotusk-MVP source tree, this gives a valid build context.
+    // When running as a standalone packaged binary (not beside source), the caller
+    // should use generateProductionCompose() with a prebuilt image tag instead.
+    final cwd = Directory.current.path;
+    final dockerfileCheck = File('$cwd/infrastructure/docker/Dockerfile.api');
+    if (dockerfileCheck.existsSync()) {
+      return cwd;
+    }
+    return null; // Falls back to '.' in ComposeGenerator (relative to deployDir)
   }
 }

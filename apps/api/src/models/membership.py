@@ -54,6 +54,4 @@ class OrganizationMembership(Base, UUIDMixin):
         back_populates="memberships",
     )
 
-    __table_args__ = (
-        UniqueConstraint("organization_id", "user_id", name="uq_org_user"),
-    )
+    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_org_user"),)

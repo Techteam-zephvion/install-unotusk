@@ -62,9 +62,7 @@ class FactBuilder:
 
         if file_ids:
             symbols_stmt = (
-                select(CodeSymbol)
-                .where(CodeSymbol.file_id.in_(file_ids))
-                .order_by(CodeSymbol.name)
+                select(CodeSymbol).where(CodeSymbol.file_id.in_(file_ids)).order_by(CodeSymbol.name)
             )
             symbols_res = await session.execute(symbols_stmt)
             symbols = list(symbols_res.scalars().all())
@@ -104,7 +102,9 @@ class FactBuilder:
         else:
             latest_run_stmt = (
                 select(DiscoveryRun)
-                .where(DiscoveryRun.project_id == project_id, DiscoveryRun.snapshot_id == snapshot_id)
+                .where(
+                    DiscoveryRun.project_id == project_id, DiscoveryRun.snapshot_id == snapshot_id
+                )
                 .order_by(desc(DiscoveryRun.created_at))
                 .limit(1)
             )

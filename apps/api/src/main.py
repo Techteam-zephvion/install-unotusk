@@ -112,7 +112,25 @@ async def handle_http_exception(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(Exception)
 async def handle_generic_exception(request: Request, exc: Exception):
-    logger.error(f"Unhandled server error: {exc}", exc_info=True)
+    import re
+
+    exc_str = str(exc)
+    # Sanitize sensitive patterns from exception messages before logging.
+    # This prevents passwords, API keys, and connection strings from appearing in logs.
+    _SENSITIVE_PATTERNS = [
+        (r"(postgresql(?:\+asyncpg)?://[^\s:]+:)([^\s@]+)(@\S+)", r"\1[REDACTED]\3"),
+        (r"(redis://[^\s:]+:)([^\s@]+)(@\S+)", r"\1[REDACTED]\3"),
+        (r"gsk_[A-Za-z0-9_]{10,}", "[REDACTED]"),
+        (r"sk-ant-[A-Za-z0-9_.\-]{10,}", "[REDACTED]"),
+        (r"((?:api[_-]?key|auth[_-]?secret|password|token)\s*=\s*)\S{6,}", r"\1[REDACTED]"),
+    ]
+    sanitized = exc_str
+    for pattern, replacement in _SENSITIVE_PATTERNS:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+
+    # In production, suppress detailed tracebacks (exc_info) to avoid leaking internals.
+    include_traceback = settings.APP_ENV != "production" or settings.DEBUG
+    logger.error(f"Unhandled server error: {sanitized}", exc_info=include_traceback)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={

@@ -16,6 +16,7 @@ class ClaudeProvider(LLMProvider):
         if self.api_key:
             try:
                 import anthropic
+
                 self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
             except Exception as e:
                 logger.warning(f"Could not initialize Anthropic client: {e}")
@@ -75,7 +76,10 @@ class ClaudeProvider(LLMProvider):
                     },
                 )
             except Exception as e:
-                logger.error(f"Claude API call failed: {e}. Falling back to deterministic synthesis.", exc_info=True)
+                logger.error(
+                    f"Claude API call failed: {e}. Falling back to deterministic synthesis.",
+                    exc_info=True,
+                )
 
         # Deterministic offline synthesis fallback (for tests, CI, or when API key is not configured)
         fallback_content = self._generate_offline_grounded_answer(
@@ -126,7 +130,11 @@ class ClaudeProvider(LLMProvider):
                                 for line_text in lines_b[1:]
                                 if line_text.strip().startswith("Content:")
                             ]
-                            content_txt = content_lines[0].replace("Content:", "").strip() if content_lines else ""
+                            content_txt = (
+                                content_lines[0].replace("Content:", "").strip()
+                                if content_lines
+                                else ""
+                            )
                             customer_notes.append(f"- **[CUSTOMER: {header}]**: {content_txt}")
             except Exception:
                 pass
@@ -152,7 +160,9 @@ class ClaudeProvider(LLMProvider):
             lines.append("**Customer Project Knowledge (User-Provided Context):**")
             for note in customer_notes:
                 lines.append(note)
-            lines.append("\n*Note: Customer knowledge represents team-provided intent and architectural decisions, interpreted alongside repository code.*")
+            lines.append(
+                "\n*Note: Customer knowledge represents team-provided intent and architectural decisions, interpreted alongside repository code.*"
+            )
             lines.append("")
 
         if symbols:

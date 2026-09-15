@@ -24,11 +24,7 @@ class TestGapAnalyzer(DiscoveryAnalyzer):
         all_paths = set(ctx.file_by_path.keys())
 
         # Collect all test paths
-        test_paths = {
-            p.lower()
-            for p in all_paths
-            if "test" in p.lower() or "spec" in p.lower()
-        }
+        test_paths = {p.lower() for p in all_paths if "test" in p.lower() or "spec" in p.lower()}
 
         # Inspect core source files that define major classes or services
         for file_obj in ctx.files:
@@ -62,10 +58,7 @@ class TestGapAnalyzer(DiscoveryAnalyzer):
                 f"{base_name}.spec",
             ]
 
-            has_test = any(
-                any(pat in tp for pat in expected_test_patterns)
-                for tp in test_paths
-            )
+            has_test = any(any(pat in tp for pat in expected_test_patterns) for tp in test_paths)
 
             if not has_test:
                 evidence: list[dict[str, Any]] = [
@@ -89,7 +82,9 @@ class TestGapAnalyzer(DiscoveryAnalyzer):
                             "Unchecked source modules risk regressions when modified. "
                             "Automated tests provide safety rails and document intended behavior."
                         ),
-                        severity=FindingSeverity.MEDIUM if len(symbols) >= 3 else FindingSeverity.LOW,
+                        severity=FindingSeverity.MEDIUM
+                        if len(symbols) >= 3
+                        else FindingSeverity.LOW,
                         confidence=FindingConfidence.HIGH,
                         recommendation=(
                             f"Create a test suite (e.g. `test_{base_name}.py` or `{base_name}.test.ts`) "

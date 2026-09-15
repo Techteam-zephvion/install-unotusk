@@ -61,7 +61,9 @@ class ProjectReportEngine:
         # 1. Fetch or create report record
         report: ProjectIntelligenceReport
         if report_id:
-            stmt = select(ProjectIntelligenceReport).where(ProjectIntelligenceReport.id == report_id)
+            stmt = select(ProjectIntelligenceReport).where(
+                ProjectIntelligenceReport.id == report_id
+            )
             res = await session.execute(stmt)
             report = res.scalar_one()
             report.status = ReportStatus.GENERATING

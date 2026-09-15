@@ -65,7 +65,10 @@ class ProjectContextEngine:
         knowledge_context = ""
         knowledge_records = []
         if project_id is not None:
-            knowledge_context, knowledge_records = await KnowledgeRetriever.retrieve_project_knowledge(
+            (
+                knowledge_context,
+                knowledge_records,
+            ) = await KnowledgeRetriever.retrieve_project_knowledge(
                 session=session,
                 project_id=project_id,
                 analyzed_query=analyzed,
@@ -73,7 +76,9 @@ class ProjectContextEngine:
 
         full_prompt_context = assembled.prompt_context
         if knowledge_context:
-            full_prompt_context = f"{knowledge_context}\n\n## REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}"
+            full_prompt_context = (
+                f"{knowledge_context}\n\n## REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}"
+            )
 
         # 6. LLM Grounded Synthesis (Claude or deterministic offline)
         answer = await self.llm_provider.generate_grounded_answer(

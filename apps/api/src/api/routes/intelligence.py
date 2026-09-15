@@ -124,6 +124,7 @@ async def post_conversation_message(
     "/projects/{project_id}/context/search",
     response_model=ContextSearchResponse,
     summary="Developer debug endpoint for Context Engine retrieval & ranking signals",
+    description="Available in development/test environments only. Returns 403 in production.",
 )
 async def debug_search_context(
     project_id: uuid.UUID,
@@ -131,6 +132,15 @@ async def debug_search_context(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ContextSearchResponse:
+    from fastapi import HTTPException
+
+    from apps.api.src.config.settings import settings
+
+    if settings.APP_ENV == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Debug endpoints are not available in production deployments.",
+        )
     return await IntelligenceService.debug_search_context(
         session=db,
         user_id=current_user.id,

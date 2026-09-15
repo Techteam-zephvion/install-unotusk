@@ -93,9 +93,9 @@ async def test_complete_e2e_product_loop(
         # Payment processor with high coupling
         with open(os.path.join(src_dir, "payment_gateway.py"), "w") as f:
             f.write(
-                'class PaymentGateway:\n'
+                "class PaymentGateway:\n"
                 '    """Main entrypoint for Stripe and PayPal integrations."""\n'
-                '    def process_charge(self, customer_id: str, amount_cents: int):\n'
+                "    def process_charge(self, customer_id: str, amount_cents: int):\n"
                 '        return {"status": "success", "charge_id": "ch_123"}\n'
             )
 
@@ -103,11 +103,11 @@ async def test_complete_e2e_product_loop(
         for idx in range(1, 5):
             with open(os.path.join(src_dir, f"invoice_module_{idx}.py"), "w") as f:
                 f.write(
-                    'from src.payment_gateway import PaymentGateway\n\n'
-                    f'class InvoiceModule{idx}:\n'
-                    '    def bill(self, user_id, amount):\n'
-                    '        gw = PaymentGateway()\n'
-                    '        return gw.process_charge(user_id, amount)\n'
+                    "from src.payment_gateway import PaymentGateway\n\n"
+                    f"class InvoiceModule{idx}:\n"
+                    "    def bill(self, user_id, amount):\n"
+                    "        gw = PaymentGateway()\n"
+                    "        return gw.process_charge(user_id, amount)\n"
                 )
 
         snapshot_id = snapshot.id
@@ -129,7 +129,14 @@ async def test_complete_e2e_product_loop(
     )
 
     assert len(findings) > 0
-    high_coupling_finding = next((f for f in findings if "PaymentGateway" in f.title or "payment_gateway" in str(f.evidence)), None)
+    high_coupling_finding = next(
+        (
+            f
+            for f in findings
+            if "PaymentGateway" in f.title or "payment_gateway" in str(f.evidence)
+        ),
+        None,
+    )
     assert high_coupling_finding is not None
     assert high_coupling_finding.status == FindingStatus.OPEN
 
@@ -153,7 +160,10 @@ async def test_complete_e2e_product_loop(
         question="Where is payment processing handled?",
     )
     assert ask_response_baseline.content is not None
-    assert "PaymentGateway" in ask_response_baseline.content or "payment" in ask_response_baseline.content.lower()
+    assert (
+        "PaymentGateway" in ask_response_baseline.content
+        or "payment" in ask_response_baseline.content.lower()
+    )
 
     # ---------------------------------------------------------
     # 4. Generate Intelligence Report v1 (Baseline)

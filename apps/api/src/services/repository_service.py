@@ -244,6 +244,7 @@ class RepositoryService:
         except Exception:
             # If Redis connection fails in testing environment, run synchronously as fallback
             from apps.api.src.services.ingestion_service import IngestionService
+
             await IngestionService.run_ingestion(snapshot.id, override_local_dir=override_local_dir)
 
         return IngestTriggerResponse(
@@ -272,7 +273,9 @@ class RepositoryService:
         res = await session.execute(query)
         snapshot = res.scalar_one_or_none()
         if snapshot is None:
-            raise NotFoundException(code="INGESTION_NOT_FOUND", message="Ingestion snapshot not found")
+            raise NotFoundException(
+                code="INGESTION_NOT_FOUND", message="Ingestion snapshot not found"
+            )
 
         return SnapshotRead.model_validate(snapshot)
 
@@ -311,7 +314,9 @@ class RepositoryService:
             # Deterministic metrics
             # Total files
             f_count = await session.execute(
-                select(func.count(RepositoryFile.id)).where(RepositoryFile.snapshot_id == snapshot.id)
+                select(func.count(RepositoryFile.id)).where(
+                    RepositoryFile.snapshot_id == snapshot.id
+                )
             )
             metrics.total_files = f_count.scalar() or 0
 

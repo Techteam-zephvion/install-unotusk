@@ -70,6 +70,7 @@ async def test_knowledge_retriever_ranking_and_prioritization():
     db_mock.execute.return_value = MagicMock(scalars=MagicMock(return_value=scalars_mock))
 
     from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
+
     analyzed_query = AnalyzedQuery(
         raw_query="Why is AuthService centralized?",
         symbol_candidates=["AuthService"],

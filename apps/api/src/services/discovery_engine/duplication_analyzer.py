@@ -100,7 +100,9 @@ class DuplicationAnalyzer(DiscoveryAnalyzer):
                                 "system behavior when one implementation is updated and the other forgotten."
                             ),
                             severity=FindingSeverity.MEDIUM,
-                            confidence=FindingConfidence.HIGH if ratio >= 0.88 else FindingConfidence.MEDIUM,
+                            confidence=FindingConfidence.HIGH
+                            if ratio >= 0.88
+                            else FindingConfidence.MEDIUM,
                             recommendation=(
                                 "Consolidate common logic into a shared utility or base class to guarantee "
                                 "consistent behavior across both usages."

@@ -58,9 +58,7 @@ async def test_database_model_creation_and_cascade(
     )
     assert m_check.scalar_one_or_none() is None
 
-    i_check = await db_session.execute(
-        select(Integration).where(Integration.id == integration.id)
-    )
+    i_check = await db_session.execute(select(Integration).where(Integration.id == integration.id))
     assert i_check.scalar_one_or_none() is None
 
 

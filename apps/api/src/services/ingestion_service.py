@@ -66,6 +66,7 @@ class IngestionService:
 
             # Fetch integration token if present
             from apps.api.src.models.integration import Integration
+
             int_query = select(Integration).where(Integration.id == repository.integration_id)
             int_res = await session.execute(int_query)
             integration = int_res.scalar_one_or_none()
@@ -134,7 +135,9 @@ class IngestionService:
                                 with open(full_path, "rb") as f:
                                     content_bytes = f.read()
                                 content_hash = hashlib.sha256(content_bytes).hexdigest()
-                                line_count = content_bytes.count(b"\n") + (1 if content_bytes else 0)
+                                line_count = content_bytes.count(b"\n") + (
+                                    1 if content_bytes else 0
+                                )
                             except Exception:
                                 binary = True
                         else:
@@ -201,7 +204,9 @@ class IngestionService:
                         if tree is not None:
                             content_lines = content.decode("utf-8", errors="replace").splitlines()
                             # Extract symbols
-                            extracted_symbols = extract_symbols_from_tree(tree, content, f_info["language"])
+                            extracted_symbols = extract_symbols_from_tree(
+                                tree, content, f_info["language"]
+                            )
                             extracted_symbols_count = len(extracted_symbols)
                             for sym in extracted_symbols:
                                 code_sym = CodeSymbol(
@@ -218,7 +223,9 @@ class IngestionService:
 
                                 # Create code chunk for top-level symbol
                                 if 1 <= sym.start_line <= len(content_lines):
-                                    sym_lines = content_lines[sym.start_line - 1 : min(sym.end_line, len(content_lines))]
+                                    sym_lines = content_lines[
+                                        sym.start_line - 1 : min(sym.end_line, len(content_lines))
+                                    ]
                                     sym_chunk = CodeChunk(
                                         id=uuid.uuid4(),
                                         snapshot_id=snapshot.id,
@@ -249,7 +256,11 @@ class IngestionService:
                                     session.add(child_code_sym)
 
                                     if 1 <= child_sym.start_line <= len(content_lines):
-                                        child_lines = content_lines[child_sym.start_line - 1 : min(child_sym.end_line, len(content_lines))]
+                                        child_lines = content_lines[
+                                            child_sym.start_line - 1 : min(
+                                                child_sym.end_line, len(content_lines)
+                                            )
+                                        ]
                                         child_chunk = CodeChunk(
                                             id=uuid.uuid4(),
                                             snapshot_id=snapshot.id,
@@ -265,7 +276,9 @@ class IngestionService:
                                         session.add(child_chunk)
 
                             # Extract dependencies / imports
-                            extracted_deps = extract_dependencies_from_tree(tree, content, f_info["language"])
+                            extracted_deps = extract_dependencies_from_tree(
+                                tree, content, f_info["language"]
+                            )
                             for dep in extracted_deps:
                                 raw_deps_to_create.append((repo_file.id, dep))
 
@@ -278,7 +291,11 @@ class IngestionService:
                                 snapshot_id=snapshot.id,
                                 file_id=repo_file.id,
                                 symbol_id=None,
-                                chunk_type="CONFIG" if f_info["filename"].endswith((".json", ".yml", ".yaml", ".toml", ".txt", ".md")) else "MODULE",
+                                chunk_type="CONFIG"
+                                if f_info["filename"].endswith(
+                                    (".json", ".yml", ".yaml", ".toml", ".txt", ".md")
+                                )
+                                else "MODULE",
                                 name=f_info["filename"],
                                 path=repo_file.path,
                                 content="\n".join(lines),
@@ -312,7 +329,11 @@ class IngestionService:
 
                         for p, rf in created_files_map.items():
                             p_no_ext = os.path.splitext(p)[0]
-                            if p == norm_target or p_no_ext == norm_target or p_no_ext.endswith(norm_target):
+                            if (
+                                p == norm_target
+                                or p_no_ext == norm_target
+                                or p_no_ext.endswith(norm_target)
+                            ):
                                 target_file_id = rf.id
                                 break
                     else:
@@ -346,7 +367,9 @@ class IngestionService:
                     proj.status = ProjectStatus.READY
 
                 await session.commit()
-                logger.info(f"Ingestion completed for repository {repository.full_name}, snapshot {snapshot.id}")
+                logger.info(
+                    f"Ingestion completed for repository {repository.full_name}, snapshot {snapshot.id}"
+                )
 
             except Exception as e:
                 logger.error(f"Ingestion failed for snapshot {snapshot_id}: {e}", exc_info=True)

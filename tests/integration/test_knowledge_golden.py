@@ -80,12 +80,12 @@ async def test_golden_persistent_project_knowledge(
         # Central AuthService
         with open(os.path.join(src_dir, "auth_service.py"), "w") as f:
             f.write(
-                'class AuthService:\n'
-                '    def __init__(self):\n'
-                '        self.tokens = {}\n'
-                '    def authenticate(self, user, token):\n'
-                '        return True\n'
-                '    def issue_token(self, user_id):\n'
+                "class AuthService:\n"
+                "    def __init__(self):\n"
+                "        self.tokens = {}\n"
+                "    def authenticate(self, user, token):\n"
+                "        return True\n"
+                "    def issue_token(self, user_id):\n"
                 '        return "jwt-token"\n'
             )
 
@@ -93,20 +93,20 @@ async def test_golden_persistent_project_knowledge(
         for i in range(1, 6):
             with open(os.path.join(src_dir, f"consumer_{i}.py"), "w") as f:
                 f.write(
-                    f'from src.auth_service import AuthService\n\n'
-                    f'class Consumer{i}:\n'
-                    f'    def run(self):\n'
-                    f'        auth = AuthService()\n'
+                    f"from src.auth_service import AuthService\n\n"
+                    f"class Consumer{i}:\n"
+                    f"    def run(self):\n"
+                    f"        auth = AuthService()\n"
                     f'        return auth.issue_token("{i}")\n'
                 )
 
         # Legacy API
         with open(os.path.join(src_dir, "legacy_api.py"), "w") as f:
             f.write(
-                '# DEPRECATED legacy API for backward compatibility\n'
-                '# legacy endpoint\n'
-                'class LegacyAPI:\n'
-                '    def handle_old_request(self):\n'
+                "# DEPRECATED legacy API for backward compatibility\n"
+                "# legacy endpoint\n"
+                "class LegacyAPI:\n"
+                "    def handle_old_request(self):\n"
                 '        return "legacy payload"\n'
             )
 

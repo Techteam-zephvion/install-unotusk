@@ -77,7 +77,9 @@ class RepositoryFile(Base, UUIDMixin):
     )
 
     # Relationships
-    snapshot: Mapped["RepositorySnapshot"] = relationship("RepositorySnapshot", back_populates="files")
+    snapshot: Mapped["RepositorySnapshot"] = relationship(
+        "RepositorySnapshot", back_populates="files"
+    )
     symbols: Mapped[list["CodeSymbol"]] = relationship(
         "CodeSymbol",
         back_populates="file",

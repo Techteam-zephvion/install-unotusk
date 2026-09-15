@@ -105,7 +105,9 @@ class Finding(Base, UUIDMixin, TimestampMixin):
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="findings")
     snapshot: Mapped["RepositorySnapshot"] = relationship("RepositorySnapshot")
-    discovery_run: Mapped["DiscoveryRun | None"] = relationship("DiscoveryRun", back_populates="findings")
+    discovery_run: Mapped["DiscoveryRun | None"] = relationship(
+        "DiscoveryRun", back_populates="findings"
+    )
 
     __table_args__ = (
         Index("ix_findings_project_status", "project_id", "status"),

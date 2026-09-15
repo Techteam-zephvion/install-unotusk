@@ -132,7 +132,11 @@ class UnusedCodeAnalyzer(DiscoveryAnalyzer):
                         ),
                         evidence=evidence,
                         related_entities=[sym.name, file_obj.path],
-                        metadata={"symbol": sym.name, "file": file_obj.path, "kind": sym.symbol_type.value},
+                        metadata={
+                            "symbol": sym.name,
+                            "file": file_obj.path,
+                            "kind": sym.symbol_type.value,
+                        },
                         score=30.0,
                     )
                 )

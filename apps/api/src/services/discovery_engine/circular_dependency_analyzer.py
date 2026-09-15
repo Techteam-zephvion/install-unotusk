@@ -55,18 +55,26 @@ class CircularDependencyAnalyzer(DiscoveryAnalyzer):
                 dst = affected_files[(i + 1) % len(affected_files)]
                 # Find matching dependency edge
                 edge_dep = next((d for target, d in graph.get(src, []) if target == dst), None)
-                evidence_items.append({
-                    "type": "dependency_edge",
-                    "file": src,
-                    "target": dst,
-                    "lines": f"{edge_dep.line_number}" if edge_dep and edge_dep.line_number else "N/A",
-                    "snippet": f"{src} imports {dst}",
-                })
+                evidence_items.append(
+                    {
+                        "type": "dependency_edge",
+                        "file": src,
+                        "target": dst,
+                        "lines": f"{edge_dep.line_number}"
+                        if edge_dep and edge_dep.line_number
+                        else "N/A",
+                        "snippet": f"{src} imports {dst}",
+                    }
+                )
 
             severity = FindingSeverity.HIGH if len(affected_files) >= 3 else FindingSeverity.MEDIUM
 
             raw_title = f"Circular dependency: {cycle_str}"
-            title = raw_title if len(raw_title) <= 200 else f"Circular dependency ({len(affected_files)} files): {cycle_str[:170]}..."
+            title = (
+                raw_title
+                if len(raw_title) <= 200
+                else f"Circular dependency ({len(affected_files)} files): {cycle_str[:170]}..."
+            )
 
             findings.append(
                 CandidateFinding(

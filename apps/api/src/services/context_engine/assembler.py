@@ -71,7 +71,11 @@ class ContextAssembler:
             if cand.name and cand.name not in ("dependency", "import"):
                 related_entities.add(cand.name)
 
-        final_prompt_context = "\n".join(sections) if sections else "No specific code evidence retrieved for this query."
+        final_prompt_context = (
+            "\n".join(sections)
+            if sections
+            else "No specific code evidence retrieved for this query."
+        )
 
         return AssembledContext(
             prompt_context=final_prompt_context,

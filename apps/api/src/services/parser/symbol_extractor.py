@@ -27,7 +27,7 @@ class ExtractedSymbol:
 
 
 def _get_node_text(node: tree_sitter.Node, code_bytes: bytes) -> str:
-    return code_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+    return code_bytes[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
 
 
 JS_CONTAINERS = {

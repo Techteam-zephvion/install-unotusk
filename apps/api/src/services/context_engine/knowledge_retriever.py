@@ -24,12 +24,9 @@ class KnowledgeRetriever:
         2. Keyword matches in title or content
         3. General active project knowledge
         """
-        stmt = (
-            select(ProjectKnowledge)
-            .where(
-                ProjectKnowledge.project_id == project_id,
-                ProjectKnowledge.status == KnowledgeStatus.ACTIVE,
-            )
+        stmt = select(ProjectKnowledge).where(
+            ProjectKnowledge.project_id == project_id,
+            ProjectKnowledge.status == KnowledgeStatus.ACTIVE,
         )
         res = await session.execute(stmt)
         all_active = list(res.scalars().all())
@@ -73,7 +70,9 @@ class KnowledgeRetriever:
         raw_records: list[dict[str, Any]] = [
             {
                 "id": str(item.id),
-                "category": item.category.value if hasattr(item.category, "value") else str(item.category),
+                "category": item.category.value
+                if hasattr(item.category, "value")
+                else str(item.category),
                 "title": item.title,
                 "content": item.content,
                 "related_file_path": item.related_file_path,

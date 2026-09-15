@@ -92,7 +92,9 @@ class MultiSignalRetriever:
             sym_res = await session.execute(sym_stmt)
             for sym, f in sym_res.all():
                 cid = f"sym:{sym.id}"
-                exact_sym = any(s.lower() == sym.name.lower() for s in analyzed_query.symbol_candidates)
+                exact_sym = any(
+                    s.lower() == sym.name.lower() for s in analyzed_query.symbol_candidates
+                )
                 score = 1.2 if exact_sym else 0.8
                 candidates[cid] = RetrievedCandidate(
                     candidate_id=cid,

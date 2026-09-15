@@ -16,6 +16,7 @@ class GroqProvider(LLMProvider):
         if self.api_key:
             try:
                 import groq
+
                 self._client = groq.AsyncGroq(api_key=self.api_key)
             except Exception as e:
                 logger.warning(f"Could not initialize Groq client: {e}")
@@ -68,8 +69,12 @@ class GroqProvider(LLMProvider):
                     if response.choices and response.choices[0].message.content
                     else "No response generated."
                 )
-                prompt_tokens = response.usage.prompt_tokens if response.usage else len(project_context) // 4
-                completion_tokens = response.usage.completion_tokens if response.usage else len(content) // 4
+                prompt_tokens = (
+                    response.usage.prompt_tokens if response.usage else len(project_context) // 4
+                )
+                completion_tokens = (
+                    response.usage.completion_tokens if response.usage else len(content) // 4
+                )
 
                 return GroundedAnswer(
                     content=content,
@@ -85,7 +90,10 @@ class GroqProvider(LLMProvider):
                     },
                 )
             except Exception as e:
-                logger.error(f"Groq API call failed: {e}. Falling back to deterministic synthesis.", exc_info=True)
+                logger.error(
+                    f"Groq API call failed: {e}. Falling back to deterministic synthesis.",
+                    exc_info=True,
+                )
 
         # Deterministic offline synthesis fallback (for tests, CI, or when API key is not configured)
         fallback_content = self._generate_offline_grounded_answer(
@@ -136,17 +144,21 @@ class GroqProvider(LLMProvider):
                                 for line_text in lines_b[1:]
                                 if line_text.strip().startswith("Content:")
                             ]
-                            content_txt = content_lines[0].replace("Content:", "").strip() if content_lines else ""
+                            content_txt = (
+                                content_lines[0].replace("Content:", "").strip()
+                                if content_lines
+                                else ""
+                            )
                             customer_notes.append(f"- **[CUSTOMER: {header}]**: {content_txt}")
             except Exception:
                 pass
 
         if not evidence_items and not customer_notes:
             return (
-                f"### Analysis\n\n"
-                f"I searched the project context for references to **'{question}'**, "
-                f"but no matching files, symbols, or dependencies were found in the current repository snapshot.\n\n"
-                f"**Note**: If this component was recently added, try re-indexing the repository."
+                "### Analysis\n\n"
+                "I searched the project context, but no matching files, symbols, or dependencies "
+                "were found in the current repository snapshot.\n\n"
+                "**Note**: If this component was recently added, try re-indexing the repository."
             )
 
         top_evidence = evidence_items[:5]
@@ -162,7 +174,9 @@ class GroqProvider(LLMProvider):
             lines.append("**Customer Project Knowledge (User-Provided Context):**")
             for note in customer_notes:
                 lines.append(note)
-            lines.append("\n*Note: Customer knowledge represents team-provided intent and architectural decisions, interpreted alongside repository code.*")
+            lines.append(
+                "\n*Note: Customer knowledge represents team-provided intent and architectural decisions, interpreted alongside repository code.*"
+            )
             lines.append("")
 
         if symbols:

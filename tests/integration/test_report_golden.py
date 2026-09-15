@@ -161,8 +161,13 @@ async def test_golden_project_intelligence_report(
     all_findings_titles = [d["title"] for d in data["discoveries"]]
 
     # Check for coupling and circular dependency findings
-    has_coupling = any("AuthService" in s or "coupling" in s.lower() for s in all_statements + all_findings_titles)
-    has_cycle = any("cycle" in s.lower() or "circular" in s.lower() for s in all_statements + all_findings_titles)
+    has_coupling = any(
+        "AuthService" in s or "coupling" in s.lower() for s in all_statements + all_findings_titles
+    )
+    has_cycle = any(
+        "cycle" in s.lower() or "circular" in s.lower()
+        for s in all_statements + all_findings_titles
+    )
 
     assert has_coupling, "Expected AuthService or high coupling to be captured in report"
     assert has_cycle, "Expected circular dependency to be captured in report"

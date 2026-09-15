@@ -88,6 +88,4 @@ class Project(Base, UUIDMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
 
-    __table_args__ = (
-        UniqueConstraint("organization_id", "slug", name="uq_org_project_slug"),
-    )
+    __table_args__ = (UniqueConstraint("organization_id", "slug", name="uq_org_project_slug"),)

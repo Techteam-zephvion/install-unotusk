@@ -207,7 +207,10 @@ class ProjectService:
         )
         mem_res = await session.execute(mem_query)
         membership = mem_res.scalar_one_or_none()
-        if membership is None or membership.role not in (MembershipRole.OWNER, MembershipRole.ADMIN):
+        if membership is None or membership.role not in (
+            MembershipRole.OWNER,
+            MembershipRole.ADMIN,
+        ):
             raise ForbiddenException(
                 code="INSUFFICIENT_PERMISSIONS",
                 message="Only organization owners or admins can delete projects",

@@ -124,8 +124,16 @@ def _extract_js_ts_dependencies(
         if child.type == "import_statement":
             source_node = child.child_by_field_name("source")
             if source_node:
-                raw_path = _clean_str(code_bytes[source_node.start_byte:source_node.end_byte].decode("utf-8", errors="replace"))
-                is_rel = raw_path.startswith("./") or raw_path.startswith("../") or raw_path.startswith("@/")
+                raw_path = _clean_str(
+                    code_bytes[source_node.start_byte : source_node.end_byte].decode(
+                        "utf-8", errors="replace"
+                    )
+                )
+                is_rel = (
+                    raw_path.startswith("./")
+                    or raw_path.startswith("../")
+                    or raw_path.startswith("@/")
+                )
                 result.append(
                     ExtractedDependency(
                         raw_target=raw_path,
@@ -138,14 +146,24 @@ def _extract_js_ts_dependencies(
         elif child.type == "call_expression":
             fn_node = child.child_by_field_name("function")
             if fn_node:
-                fn_text = code_bytes[fn_node.start_byte:fn_node.end_byte].decode("utf-8", errors="replace")
+                fn_text = code_bytes[fn_node.start_byte : fn_node.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
                 if fn_text == "require":
                     args_node = child.child_by_field_name("arguments")
                     if args_node:
                         for arg in args_node.children:
                             if arg.type in ("string", "string_fragment", "template_string"):
-                                raw_arg = _clean_str(code_bytes[arg.start_byte:arg.end_byte].decode("utf-8", errors="replace"))
-                                is_rel = raw_arg.startswith("./") or raw_arg.startswith("../") or raw_arg.startswith("@/")
+                                raw_arg = _clean_str(
+                                    code_bytes[arg.start_byte : arg.end_byte].decode(
+                                        "utf-8", errors="replace"
+                                    )
+                                )
+                                is_rel = (
+                                    raw_arg.startswith("./")
+                                    or raw_arg.startswith("../")
+                                    or raw_arg.startswith("@/")
+                                )
                                 result.append(
                                     ExtractedDependency(
                                         raw_target=raw_arg,
@@ -169,7 +187,11 @@ def _extract_go_dependencies(
                 if spec.type == "import_spec":
                     path_node = spec.child_by_field_name("path")
                     if path_node:
-                        raw_path = _clean_str(code_bytes[path_node.start_byte:path_node.end_byte].decode("utf-8", errors="replace"))
+                        raw_path = _clean_str(
+                            code_bytes[path_node.start_byte : path_node.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                        )
                         result.append(
                             ExtractedDependency(
                                 raw_target=raw_path,

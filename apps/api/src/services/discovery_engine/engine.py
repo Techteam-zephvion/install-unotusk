@@ -150,7 +150,9 @@ class ProjectDiscoveryEngine:
             all_candidates: list[CandidateFinding] = []
             for i, res in enumerate(candidate_lists):
                 if isinstance(res, Exception):
-                    logger.error(f"Analyzer {analyzers[i].__class__.__name__} failed: {res}", exc_info=True)
+                    logger.error(
+                        f"Analyzer {analyzers[i].__class__.__name__} failed: {res}", exc_info=True
+                    )
                 elif isinstance(res, list):
                     all_candidates.extend(res)
 
@@ -174,7 +176,9 @@ class ProjectDiscoveryEngine:
             active_knowledge = list(knowledge_res.scalars().all())
 
             synthesizer = FindingSynthesizer()
-            final_candidates = await synthesizer.enhance_recommendations(ranked, active_knowledge=active_knowledge)
+            final_candidates = await synthesizer.enhance_recommendations(
+                ranked, active_knowledge=active_knowledge
+            )
 
             # 8. Persist Findings
             # Clean up older OPEN findings for this snapshot so rerunning replaces them

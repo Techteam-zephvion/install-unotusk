@@ -58,16 +58,25 @@ async def test_groq_report_synthesizer_with_mock():
     from apps.api.src.services.report_engine.synthesizer import GroqReportSynthesizer
 
     doc = ReportDocument(
-        metadata={"project_name": "Test Project", "project_slug": "test-project", "snapshot_id": "123"},
+        metadata={
+            "project_name": "Test Project",
+            "project_slug": "test-project",
+            "snapshot_id": "123",
+        },
         executive_summary=ExecutiveSummary(
             project_summary="Original deterministic summary",
             state_assessment="STABLE",
-            vital_metrics=VitalMetrics(total_files=5, total_symbols=10, total_dependencies=4, total_findings=1),
+            vital_metrics=VitalMetrics(
+                total_files=5, total_symbols=10, total_dependencies=4, total_findings=1
+            ),
         ),
         project_understanding=ProjectUnderstanding(
             primary_languages={"Python": 5},
             major_areas=[{"path": "api", "files_count": 2}, {"path": "core", "files_count": 3}],
-            key_symbols=[{"name": "Session", "file": "sessions.py"}, {"name": "Request", "file": "models.py"}],
+            key_symbols=[
+                {"name": "Session", "file": "sessions.py"},
+                {"name": "Request", "file": "models.py"},
+            ],
             business_purpose_note="Inferred HTTP library",
         ),
         observed=[],
@@ -97,6 +106,8 @@ async def test_groq_report_synthesizer_with_mock():
 
     with patch.object(synthesizer, "_client", mock_client):
         res = await synthesizer.synthesize(doc)
-        assert res.executive_summary.project_summary == "Enhanced Groq narrative on HTTP architecture."
+        assert (
+            res.executive_summary.project_summary == "Enhanced Groq narrative on HTTP architecture."
+        )
         assert res.executive_summary.state_assessment == "HEALTHY"
         assert res.project_understanding.business_purpose_note == "Production HTTP client library."

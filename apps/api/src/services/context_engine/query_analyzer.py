@@ -13,17 +13,88 @@ class AnalyzedQuery:
 
 # Stop words that don't help in code retrieval
 STOP_WORDS = {
-    "a", "an", "the", "in", "on", "of", "for", "to", "from", "with", "by", "at",
-    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
-    "do", "does", "did", "how", "what", "where", "why", "when", "who", "which",
-    "can", "could", "should", "would", "will", "this", "that", "these", "those",
-    "there", "here", "work", "works", "working", "implemented", "used", "happen", "happens", "involved", "depend", "depends", "connected", "show", "me",
+    "a",
+    "an",
+    "the",
+    "in",
+    "on",
+    "of",
+    "for",
+    "to",
+    "from",
+    "with",
+    "by",
+    "at",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "how",
+    "what",
+    "where",
+    "why",
+    "when",
+    "who",
+    "which",
+    "can",
+    "could",
+    "should",
+    "would",
+    "will",
+    "this",
+    "that",
+    "these",
+    "those",
+    "there",
+    "here",
+    "work",
+    "works",
+    "working",
+    "implemented",
+    "used",
+    "happen",
+    "happens",
+    "involved",
+    "depend",
+    "depends",
+    "connected",
+    "show",
+    "me",
 }
 
 # Key architectural domain synonyms
 CONCEPT_SYNONYMS: dict[str, list[str]] = {
-    "auth": ["auth", "authentication", "login", "signup", "jwt", "token", "password", "session", "user"],
-    "database": ["db", "database", "postgres", "sql", "model", "session", "alembic", "migration", "schema"],
+    "auth": [
+        "auth",
+        "authentication",
+        "login",
+        "signup",
+        "jwt",
+        "token",
+        "password",
+        "session",
+        "user",
+    ],
+    "database": [
+        "db",
+        "database",
+        "postgres",
+        "sql",
+        "model",
+        "session",
+        "alembic",
+        "migration",
+        "schema",
+    ],
     "payment": ["payment", "checkout", "stripe", "billing", "invoice", "charge"],
     "api": ["api", "route", "router", "endpoint", "controller", "request", "response", "handler"],
     "worker": ["worker", "task", "job", "queue", "redis", "background", "dispatch", "process"],
@@ -41,7 +112,9 @@ def analyze_query(query: str) -> AnalyzedQuery:
 
     for word in words:
         # Detect paths (containing '/' or file extensions)
-        if "/" in word or re.search(r"\.(ts|tsx|js|jsx|py|go|java|rs|sql|json|md|ya?ml)$", word, re.I):
+        if "/" in word or re.search(
+            r"\.(ts|tsx|js|jsx|py|go|java|rs|sql|json|md|ya?ml)$", word, re.I
+        ):
             path_candidates.append(word.lower())
 
         # Detect potential symbols:

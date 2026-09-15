@@ -107,7 +107,9 @@ async def test_end_to_end_repository_ingestion(
         )
         completed_snap = snap_check.scalar_one()
         assert completed_snap.status == SnapshotStatus.COMPLETED
-        assert completed_snap.total_files == 3  # main.py, service.ts, README.md (node_modules excluded)
+        assert (
+            completed_snap.total_files == 3
+        )  # main.py, service.ts, README.md (node_modules excluded)
         assert completed_snap.processed_files == 3
         assert completed_snap.error_message is None
 
@@ -150,6 +152,7 @@ async def test_end_to_end_repository_ingestion(
 
         # Check code chunks created
         from apps.api.src.models.chunk import CodeChunk
+
         chunks_res = await session.execute(
             select(CodeChunk).where(CodeChunk.snapshot_id == snapshot.id)
         )

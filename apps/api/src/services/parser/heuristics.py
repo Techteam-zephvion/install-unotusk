@@ -27,12 +27,40 @@ EXCLUDED_DIRECTORIES = {
 
 # Binary extensions
 BINARY_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
-    ".pdf", ".exe", ".bin", ".tar", ".gz", ".zip", ".7z",
-    ".pyc", ".pyo", ".pyd", ".so", ".dylib", ".dll", ".whl",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".mp4", ".mov", ".avi", ".mp3", ".wav",
-    ".jar", ".war", ".class",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".webp",
+    ".pdf",
+    ".exe",
+    ".bin",
+    ".tar",
+    ".gz",
+    ".zip",
+    ".7z",
+    ".pyc",
+    ".pyo",
+    ".pyd",
+    ".so",
+    ".dylib",
+    ".dll",
+    ".whl",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".otf",
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mp3",
+    ".wav",
+    ".jar",
+    ".war",
+    ".class",
 }
 
 # Lock / Generated files
@@ -135,6 +163,11 @@ def is_file_test(relative_path: str) -> bool:
     if "test" in path_lower or "spec" in path_lower:
         return True
     base = os.path.basename(path_lower)
-    if base.startswith("test_") or base.endswith("_test.py") or base.endswith(".test.ts") or base.endswith(".spec.ts"):
+    if (
+        base.startswith("test_")
+        or base.endswith("_test.py")
+        or base.endswith(".test.ts")
+        or base.endswith(".spec.ts")
+    ):
         return True
     return False

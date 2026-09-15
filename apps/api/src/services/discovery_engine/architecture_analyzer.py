@@ -23,9 +23,7 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
         for src_file in ctx.files:
             src_path_lower = src_file.path.lower()
             is_test_file = (
-                "test" in src_path_lower
-                or "spec" in src_path_lower
-                or "conftest" in src_path_lower
+                "test" in src_path_lower or "spec" in src_path_lower or "conftest" in src_path_lower
             )
 
             deps = ctx.dependencies_by_file_id.get(src_file.id, [])
@@ -79,7 +77,11 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                         )
 
                 # Rule 2: Web frontend directly importing backend database/ORM modules
-                if "web/" in src_path_lower or "app/" in src_path_lower or "frontend/" in src_path_lower:
+                if (
+                    "web/" in src_path_lower
+                    or "app/" in src_path_lower
+                    or "frontend/" in src_path_lower
+                ):
                     if (
                         "sqlalchemy" in target_clean
                         or "asyncpg" in target_clean

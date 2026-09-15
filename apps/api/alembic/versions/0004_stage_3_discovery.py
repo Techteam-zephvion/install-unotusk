@@ -5,6 +5,7 @@ Revises: 0003_stage_2_intelligence
 Create Date: 2026-09-12 14:00:00.000000
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

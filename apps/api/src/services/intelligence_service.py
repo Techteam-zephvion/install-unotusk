@@ -158,8 +158,7 @@ class IntelligenceService:
         )
         history_res = await session.execute(history_stmt)
         history_turns = [
-            {"role": m.role, "content": m.content}
-            for m in history_res.scalars().all()
+            {"role": m.role, "content": m.content} for m in history_res.scalars().all()
         ]
 
         # 4. Run Grounded Investigation via ProjectContextEngine

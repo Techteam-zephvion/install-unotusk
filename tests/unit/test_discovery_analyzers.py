@@ -26,14 +26,38 @@ async def test_circular_dependency_analyzer_detects_cycles():
     project_id = uuid.uuid4()
     snapshot_id = uuid.uuid4()
 
-    file_a = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/auth.py", size_bytes=100)
-    file_b = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/session.py", size_bytes=100)
-    file_c = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/user.py", size_bytes=100)
+    file_a = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/auth.py", size_bytes=100
+    )
+    file_b = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/session.py", size_bytes=100
+    )
+    file_c = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/user.py", size_bytes=100
+    )
 
     # Cycle: auth -> session -> user -> auth
-    dep1 = CodeDependency(id=uuid.uuid4(), source_file_id=file_a.id, external_package="src.session", dependency_type=DependencyType.IMPORT, line_number=1)
-    dep2 = CodeDependency(id=uuid.uuid4(), source_file_id=file_b.id, external_package="src.user", dependency_type=DependencyType.IMPORT, line_number=2)
-    dep3 = CodeDependency(id=uuid.uuid4(), source_file_id=file_c.id, external_package="src.auth", dependency_type=DependencyType.IMPORT, line_number=3)
+    dep1 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=file_a.id,
+        external_package="src.session",
+        dependency_type=DependencyType.IMPORT,
+        line_number=1,
+    )
+    dep2 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=file_b.id,
+        external_package="src.user",
+        dependency_type=DependencyType.IMPORT,
+        line_number=2,
+    )
+    dep3 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=file_c.id,
+        external_package="src.auth",
+        dependency_type=DependencyType.IMPORT,
+        line_number=3,
+    )
 
     ctx = DiscoveryContext(
         project_id=project_id,
@@ -60,9 +84,13 @@ async def test_coupling_analyzer_identifies_central_components():
     project_id = uuid.uuid4()
     snapshot_id = uuid.uuid4()
 
-    target_file = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/core/bus.py", size_bytes=200)
+    target_file = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/core/bus.py", size_bytes=200
+    )
     consumers = [
-        RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path=f"src/service_{i}.py", size_bytes=100)
+        RepositoryFile(
+            id=uuid.uuid4(), snapshot_id=snapshot_id, path=f"src/service_{i}.py", size_bytes=100
+        )
         for i in range(8)
     ]
 
@@ -102,12 +130,34 @@ async def test_test_gap_analyzer():
     project_id = uuid.uuid4()
     snapshot_id = uuid.uuid4()
 
-    src_file_no_test = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/billing/engine.py", size_bytes=200)
-    src_file_with_test = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/auth/service.py", size_bytes=200)
-    test_file = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="tests/test_service.py", size_bytes=100)
+    src_file_no_test = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/billing/engine.py", size_bytes=200
+    )
+    src_file_with_test = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/auth/service.py", size_bytes=200
+    )
+    test_file = RepositoryFile(
+        id=uuid.uuid4(), snapshot_id=snapshot_id, path="tests/test_service.py", size_bytes=100
+    )
 
-    sym1 = CodeSymbol(id=uuid.uuid4(), file_id=src_file_no_test.id, name="BillingEngine", symbol_type=SymbolType.CLASS, qualified_name="src.billing.BillingEngine", start_line=1, end_line=50)
-    sym2 = CodeSymbol(id=uuid.uuid4(), file_id=src_file_with_test.id, name="AuthService", symbol_type=SymbolType.CLASS, qualified_name="src.auth.AuthService", start_line=1, end_line=50)
+    sym1 = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=src_file_no_test.id,
+        name="BillingEngine",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="src.billing.BillingEngine",
+        start_line=1,
+        end_line=50,
+    )
+    sym2 = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=src_file_with_test.id,
+        name="AuthService",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="src.auth.AuthService",
+        start_line=1,
+        end_line=50,
+    )
 
     ctx = DiscoveryContext(
         project_id=project_id,

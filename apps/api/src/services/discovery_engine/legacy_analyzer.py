@@ -32,7 +32,9 @@ class LegacyAnalyzer(DiscoveryAnalyzer):
             signals: list[str] = []
 
             # Signal 1: Name indicates legacy / deprecated
-            matching_indicator = next((ind for ind in LEGACY_NAME_INDICATORS if ind in path_lower), None)
+            matching_indicator = next(
+                (ind for ind in LEGACY_NAME_INDICATORS if ind in path_lower), None
+            )
             if matching_indicator:
                 signals.append(f"Filename contains legacy indicator '{matching_indicator}'")
 

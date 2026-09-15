@@ -24,9 +24,7 @@ class AuthService:
         normalized_email = data.email.strip().lower()
 
         # Check existing user
-        result = await session.execute(
-            select(User).where(User.email == normalized_email)
-        )
+        result = await session.execute(select(User).where(User.email == normalized_email))
         if result.scalar_one_or_none() is not None:
             raise ConflictException(
                 code="EMAIL_ALREADY_EXISTS",
@@ -80,9 +78,7 @@ class AuthService:
     @staticmethod
     async def login(session: AsyncSession, data: UserLogin) -> TokenResponse:
         normalized_email = data.email.strip().lower()
-        result = await session.execute(
-            select(User).where(User.email == normalized_email)
-        )
+        result = await session.execute(select(User).where(User.email == normalized_email))
         user = result.scalar_one_or_none()
 
         if user is None or not verify_password(data.password, user.password_hash):

@@ -30,23 +30,93 @@ def sample_fact_data():
     snapshot = RepositorySnapshot(id=snapshot_id, commit_sha="abcdef123456")
 
     # Files
-    f_auth = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/auth/service.py", language="python", line_count=120, size_bytes=2400)
-    f_api = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/api/routes.py", language="python", line_count=80, size_bytes=1600)
-    f_pay = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/core/payment_service.py", language="python", line_count=90, size_bytes=1800)
-    f_a = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/a.py", language="python", line_count=40, size_bytes=800)
-    f_b = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/b.py", language="python", line_count=40, size_bytes=800)
-    f_c = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/c.py", language="python", line_count=40, size_bytes=800)
+    f_auth = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        path="src/auth/service.py",
+        language="python",
+        line_count=120,
+        size_bytes=2400,
+    )
+    f_api = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        path="src/api/routes.py",
+        language="python",
+        line_count=80,
+        size_bytes=1600,
+    )
+    f_pay = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        path="src/core/payment_service.py",
+        language="python",
+        line_count=90,
+        size_bytes=1800,
+    )
+    f_a = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        path="src/a.py",
+        language="python",
+        line_count=40,
+        size_bytes=800,
+    )
+    f_b = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        path="src/b.py",
+        language="python",
+        line_count=40,
+        size_bytes=800,
+    )
+    f_c = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        path="src/c.py",
+        language="python",
+        line_count=40,
+        size_bytes=800,
+    )
 
     files = [f_auth, f_api, f_pay, f_a, f_b, f_c]
 
     # Symbols
-    sym_auth = CodeSymbol(id=uuid.uuid4(), file_id=f_auth.id, name="AuthService", qualified_name="AuthService", symbol_type=SymbolType.CLASS, start_line=5, end_line=50)
-    sym_pay = CodeSymbol(id=uuid.uuid4(), file_id=f_pay.id, name="PaymentService", qualified_name="PaymentService", symbol_type=SymbolType.CLASS, start_line=5, end_line=60)
+    sym_auth = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=f_auth.id,
+        name="AuthService",
+        qualified_name="AuthService",
+        symbol_type=SymbolType.CLASS,
+        start_line=5,
+        end_line=50,
+    )
+    sym_pay = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=f_pay.id,
+        name="PaymentService",
+        qualified_name="PaymentService",
+        symbol_type=SymbolType.CLASS,
+        start_line=5,
+        end_line=60,
+    )
     symbols = [sym_auth, sym_pay]
 
     # Dependencies
-    dep1 = CodeDependency(id=uuid.uuid4(), source_file_id=f_api.id, target_file_id=f_auth.id, dependency_type=DependencyType.IMPORT, line_number=1)
-    dep2 = CodeDependency(id=uuid.uuid4(), source_file_id=f_pay.id, target_file_id=f_auth.id, dependency_type=DependencyType.IMPORT, line_number=2)
+    dep1 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=f_api.id,
+        target_file_id=f_auth.id,
+        dependency_type=DependencyType.IMPORT,
+        line_number=1,
+    )
+    dep2 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=f_pay.id,
+        target_file_id=f_auth.id,
+        dependency_type=DependencyType.IMPORT,
+        line_number=2,
+    )
     dependencies = [dep1, dep2]
 
     # Findings
@@ -101,7 +171,9 @@ def sample_fact_data():
         total_bytes=8200,
         file_by_id={f.id: f for f in files},
         file_by_path={f.path: f for f in files},
-        file_consumers={"src/auth/service.py": {"src/api/routes.py", "src/core/payment_service.py"}},
+        file_consumers={
+            "src/auth/service.py": {"src/api/routes.py", "src/core/payment_service.py"}
+        },
         symbol_consumers={"AuthService": 17},
         external_packages={"fastapi", "sqlalchemy"},
         cycles=[["src/a.py", "src/b.py", "src/c.py", "src/a.py"]],
@@ -155,7 +227,10 @@ async def test_synthesizer_offline_fallback(sample_fact_data):
     synthesizer = ClaudeReportSynthesizer(api_key="")
     final_doc = await synthesizer.synthesize(deterministic_doc)
 
-    assert final_doc.executive_summary.project_summary == deterministic_doc.executive_summary.project_summary
+    assert (
+        final_doc.executive_summary.project_summary
+        == deterministic_doc.executive_summary.project_summary
+    )
     assert final_doc.executive_summary.vital_metrics.total_files == 6
     assert len(final_doc.discoveries) == 3
 
@@ -185,7 +260,9 @@ async def test_synthesizer_valid_ai_response(sample_fact_data):
 
     mock_response = MagicMock()
     mock_response.content = [
-        MagicMock(text='{"project_summary": "Engineered Python backend with high coupling around AuthService and architectural circular imports.", "state_assessment": "CRITICAL_RISK", "business_purpose_note": "Repository evidence indicates an enterprise service."}')
+        MagicMock(
+            text='{"project_summary": "Engineered Python backend with high coupling around AuthService and architectural circular imports.", "state_assessment": "CRITICAL_RISK", "business_purpose_note": "Repository evidence indicates an enterprise service."}'
+        )
     ]
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_response)

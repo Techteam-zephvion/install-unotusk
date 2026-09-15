@@ -38,5 +38,9 @@ class ConflictException(AppException):
 
 
 class BadRequestException(AppException):
-    def __init__(self, message: str = "Bad request", code: str = "BAD_REQUEST", details: Any | None = None):
-        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, code=code, message=message, details=details)
+    def __init__(
+        self, message: str = "Bad request", code: str = "BAD_REQUEST", details: Any | None = None
+    ):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST, code=code, message=message, details=details
+        )

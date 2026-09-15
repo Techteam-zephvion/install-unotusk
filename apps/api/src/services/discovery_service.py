@@ -207,6 +207,7 @@ class DiscoveryService:
         except Exception:
             # If redis is unreachable or in direct synchronous mode, run immediately
             from apps.api.src.services.discovery_engine.engine import ProjectDiscoveryEngine
+
             await ProjectDiscoveryEngine.run_discovery(
                 project_id=project_id,
                 snapshot_id=snapshot.id,

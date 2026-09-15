@@ -84,12 +84,9 @@ class RelationshipExpander:
                 c.symbol_id for c in expanded.values() if c.symbol_id and c.entity_type == "SYMBOL"
             ]
             if missing_chunk_sym_ids:
-                chunk_stmt = (
-                    select(CodeChunk)
-                    .where(
-                        CodeChunk.snapshot_id == snapshot_id,
-                        CodeChunk.symbol_id.in_(missing_chunk_sym_ids[:10]),
-                    )
+                chunk_stmt = select(CodeChunk).where(
+                    CodeChunk.snapshot_id == snapshot_id,
+                    CodeChunk.symbol_id.in_(missing_chunk_sym_ids[:10]),
                 )
                 chunk_res = await session.execute(chunk_stmt)
                 for chunk in chunk_res.scalars().all():

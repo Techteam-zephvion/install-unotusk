@@ -99,7 +99,11 @@ async def test_reports_api_full_lifecycle_and_tenant_isolation(
             },
             "project_understanding": {
                 "primary_languages": {"Python": 10},
-                "repository_size": {"total_lines": 500, "total_bytes": 1024, "size_formatted": "1 KB"},
+                "repository_size": {
+                    "total_lines": 500,
+                    "total_bytes": 1024,
+                    "size_formatted": "1 KB",
+                },
                 "major_areas": [],
                 "key_symbols": [],
                 "architectural_boundaries": [],
@@ -140,7 +144,9 @@ async def test_reports_api_full_lifecycle_and_tenant_isolation(
     assert latest_data["report_data"]["executive_summary"]["state_assessment"] == "MODERATE_RISK"
 
     # 3. User A gets specific report for Project A
-    resp = await client.get(f"/api/v1/projects/{project_a.id}/reports/{report_a.id}", headers=headers_a)
+    resp = await client.get(
+        f"/api/v1/projects/{project_a.id}/reports/{report_a.id}", headers=headers_a
+    )
     assert resp.status_code == 200
     specific_data = resp.json()
     assert specific_data["id"] == str(report_a.id)
@@ -153,20 +159,36 @@ async def test_reports_api_full_lifecycle_and_tenant_isolation(
     assert trigger_data["status"] in ["QUEUED", "GENERATING", "COMPLETED"]
 
     # 5. Cross-Organization Tenant Isolation: User B attempts to access Project A's reports
-    resp_cross_list = await client.get(f"/api/v1/projects/{project_a.id}/reports", headers=headers_b)
+    resp_cross_list = await client.get(
+        f"/api/v1/projects/{project_a.id}/reports", headers=headers_b
+    )
     assert resp_cross_list.status_code == 403, "Cross-tenant list reports must return 403 Forbidden"
 
-    resp_cross_latest = await client.get(f"/api/v1/projects/{project_a.id}/reports/latest", headers=headers_b)
-    assert resp_cross_latest.status_code == 403, "Cross-tenant get latest report must return 403 Forbidden"
+    resp_cross_latest = await client.get(
+        f"/api/v1/projects/{project_a.id}/reports/latest", headers=headers_b
+    )
+    assert resp_cross_latest.status_code == 403, (
+        "Cross-tenant get latest report must return 403 Forbidden"
+    )
 
-    resp_cross_get = await client.get(f"/api/v1/projects/{project_a.id}/reports/{report_a.id}", headers=headers_b)
+    resp_cross_get = await client.get(
+        f"/api/v1/projects/{project_a.id}/reports/{report_a.id}", headers=headers_b
+    )
     assert resp_cross_get.status_code == 403, "Cross-tenant get report must return 403 Forbidden"
 
-    resp_cross_post = await client.post(f"/api/v1/projects/{project_a.id}/reports", headers=headers_b)
-    assert resp_cross_post.status_code == 403, "Cross-tenant trigger report must return 403 Forbidden"
+    resp_cross_post = await client.post(
+        f"/api/v1/projects/{project_a.id}/reports", headers=headers_b
+    )
+    assert resp_cross_post.status_code == 403, (
+        "Cross-tenant trigger report must return 403 Forbidden"
+    )
 
-    resp_cross_reverse = await client.get(f"/api/v1/projects/{project_b.id}/reports", headers=headers_a)
-    assert resp_cross_reverse.status_code == 403, "User A accessing Project B must return 403 Forbidden"
+    resp_cross_reverse = await client.get(
+        f"/api/v1/projects/{project_b.id}/reports", headers=headers_a
+    )
+    assert resp_cross_reverse.status_code == 403, (
+        "User A accessing Project B must return 403 Forbidden"
+    )
 
     # 6. Unauthenticated requests must return 401 Unauthorized
     resp_unauth = await client.get(f"/api/v1/projects/{project_a.id}/reports")
@@ -174,5 +196,7 @@ async def test_reports_api_full_lifecycle_and_tenant_isolation(
 
     # 7. Non-existent report returns 404
     random_id = uuid.uuid4()
-    resp_404 = await client.get(f"/api/v1/projects/{project_a.id}/reports/{random_id}", headers=headers_a)
+    resp_404 = await client.get(
+        f"/api/v1/projects/{project_a.id}/reports/{random_id}", headers=headers_a
+    )
     assert resp_404.status_code == 404

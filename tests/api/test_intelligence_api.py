@@ -72,7 +72,9 @@ async def test_intelligence_api_lifecycle_and_isolation(
     with tempfile.TemporaryDirectory() as tmpdir:
         api_file = os.path.join(tmpdir, "routes.py")
         with open(api_file, "w") as f:
-            f.write("class PaymentGateway:\n    def process_charge(self, amt):\n        return True\n")
+            f.write(
+                "class PaymentGateway:\n    def process_charge(self, amt):\n        return True\n"
+            )
         await IngestionService.run_ingestion(snapshot.id, override_local_dir=tmpdir)
 
     # 1. Ask question on Project A

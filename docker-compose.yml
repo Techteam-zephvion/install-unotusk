@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-unotusk}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Bind to localhost only — prevents external network exposure in production.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +25,8 @@ services:
     container_name: unotusk-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Bind to localhost only — prevents external network exposure in production.
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -35,6 +37,21 @@ services:
     networks:
       - unotusk-network
 
+  migration:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: unotusk-migration
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
+      - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
+    command: ["alembic", "upgrade", "head"]
+    networks:
+      - unotusk-network
+
   api:
     build:
       context: .
@@ -42,6 +59,8 @@ services:
     container_name: unotusk-api
     restart: unless-stopped
     depends_on:
+      migration:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -70,6 +89,8 @@ services:
     container_name: unotusk-worker
     restart: unless-stopped
     depends_on:
+      migration:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     environment:

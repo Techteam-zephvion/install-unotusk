@@ -31,7 +31,9 @@ async def connect_github(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    return await RepositoryService.connect_github(db, current_user.id, project_id, data.github_token)
+    return await RepositoryService.connect_github(
+        db, current_user.id, project_id, data.github_token
+    )
 
 
 @router.get("/repositories")
@@ -43,7 +45,9 @@ async def list_available_repositories(
     return await RepositoryService.list_available_repositories(db, current_user.id, project_id)
 
 
-@router.post("/repositories/select", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/repositories/select", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED
+)
 async def select_repository(
     project_id: uuid.UUID,
     data: RepositorySelectRequest,
@@ -53,7 +57,11 @@ async def select_repository(
     return await RepositoryService.select_repository(db, current_user.id, project_id, data)
 
 
-@router.post("/repositories/{repository_id}/ingest", response_model=IngestTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/repositories/{repository_id}/ingest",
+    response_model=IngestTriggerResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def trigger_ingest(
     project_id: uuid.UUID,
     repository_id: uuid.UUID,
@@ -70,7 +78,9 @@ async def get_ingestion_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SnapshotRead:
-    return await RepositoryService.get_ingestion_status(db, current_user.id, project_id, ingestion_id)
+    return await RepositoryService.get_ingestion_status(
+        db, current_user.id, project_id, ingestion_id
+    )
 
 
 @router.get("/repository", response_model=ProjectRepositoryContext)
@@ -122,7 +132,11 @@ async def list_dependencies(
     return await RepositoryService.list_dependencies(db, current_user.id, project_id, limit=limit)
 
 
-@router.post("/repository/reindex", response_model=IngestTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/repository/reindex",
+    response_model=IngestTriggerResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def reindex_repository(
     project_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -131,5 +145,10 @@ async def reindex_repository(
     ctx = await RepositoryService.get_repository_context(db, current_user.id, project_id)
     if not ctx.repository:
         from apps.api.src.api.exceptions import NotFoundException
-        raise NotFoundException(code="NO_CONNECTED_REPOSITORY", message="No repository connected to re-index")
-    return await RepositoryService.trigger_ingestion(db, current_user.id, project_id, ctx.repository.id)
+
+        raise NotFoundException(
+            code="NO_CONNECTED_REPOSITORY", message="No repository connected to re-index"
+        )
+    return await RepositoryService.trigger_ingestion(
+        db, current_user.id, project_id, ctx.repository.id
+    )

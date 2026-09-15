@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-09-12 06:30:00.000000
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -106,7 +107,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("organization_id", "slug", name="uq_org_project_slug"),
     )
-    op.create_index(op.f("ix_projects_organization_id"), "projects", ["organization_id"], unique=False)
+    op.create_index(
+        op.f("ix_projects_organization_id"), "projects", ["organization_id"], unique=False
+    )
     op.create_index(op.f("ix_projects_slug"), "projects", ["slug"], unique=False)
 
     # 6. Create integrations table
@@ -136,7 +139,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_integrations_project_id"), "integrations", ["project_id"], unique=False)
+    op.create_index(
+        op.f("ix_integrations_project_id"), "integrations", ["project_id"], unique=False
+    )
 
 
 def downgrade() -> None:

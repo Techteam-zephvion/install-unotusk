@@ -121,5 +121,3 @@ class KnowledgeCategory(str, enum.Enum):
 class KnowledgeStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     ARCHIVED = "ARCHIVED"
-
-

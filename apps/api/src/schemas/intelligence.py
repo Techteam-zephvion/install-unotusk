@@ -15,8 +15,12 @@ class EvidenceItem(BaseModel):
 
 
 class GroundedAskRequest(BaseModel):
-    question: str = Field(min_length=2, max_length=2000, description="Natural language question about the project")
-    conversation_id: uuid.UUID | None = Field(default=None, description="Optional conversation ID to continue a thread")
+    question: str = Field(
+        min_length=2, max_length=2000, description="Natural language question about the project"
+    )
+    conversation_id: uuid.UUID | None = Field(
+        default=None, description="Optional conversation ID to continue a thread"
+    )
 
 
 class GroundedAnswerResponse(BaseModel):

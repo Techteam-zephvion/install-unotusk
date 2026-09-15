@@ -5,6 +5,7 @@ Revises: 0001_initial_schema
 Create Date: 2026-09-12 12:30:00.000000
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -50,9 +51,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("project_id", "external_id", name="uq_project_repo_external"),
     )
-    op.create_index(op.f("ix_repositories_project_id"), "repositories", ["project_id"], unique=False)
-    op.create_index(op.f("ix_repositories_external_id"), "repositories", ["external_id"], unique=False)
-    op.create_index(op.f("ix_repositories_integration_id"), "repositories", ["integration_id"], unique=False)
+    op.create_index(
+        op.f("ix_repositories_project_id"), "repositories", ["project_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_repositories_external_id"), "repositories", ["external_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_repositories_integration_id"), "repositories", ["integration_id"], unique=False
+    )
 
     # 2. Create repository_snapshots table
     op.create_table(
@@ -85,7 +92,12 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["repository_id"], ["repositories.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_repository_snapshots_repository_id"), "repository_snapshots", ["repository_id"], unique=False)
+    op.create_index(
+        op.f("ix_repository_snapshots_repository_id"),
+        "repository_snapshots",
+        ["repository_id"],
+        unique=False,
+    )
 
     # 3. Create repository_files table
     op.create_table(
@@ -106,7 +118,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["snapshot_id"], ["repository_snapshots.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_repository_files_snapshot_id"), "repository_files", ["snapshot_id"], unique=False)
+    op.create_index(
+        op.f("ix_repository_files_snapshot_id"), "repository_files", ["snapshot_id"], unique=False
+    )
     op.create_index(op.f("ix_repository_files_path"), "repository_files", ["path"], unique=False)
 
     # 4. Create code_symbols table
@@ -163,9 +177,24 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["target_file_id"], ["repository_files.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_code_dependencies_source_file_id"), "code_dependencies", ["source_file_id"], unique=False)
-    op.create_index(op.f("ix_code_dependencies_target_file_id"), "code_dependencies", ["target_file_id"], unique=False)
-    op.create_index(op.f("ix_code_dependencies_external_package"), "code_dependencies", ["external_package"], unique=False)
+    op.create_index(
+        op.f("ix_code_dependencies_source_file_id"),
+        "code_dependencies",
+        ["source_file_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_code_dependencies_target_file_id"),
+        "code_dependencies",
+        ["target_file_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_code_dependencies_external_package"),
+        "code_dependencies",
+        ["external_package"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:

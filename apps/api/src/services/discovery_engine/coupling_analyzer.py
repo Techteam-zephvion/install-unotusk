@@ -62,12 +62,14 @@ class CouplingAnalyzer(DiscoveryAnalyzer):
                     }
                 ]
                 for c in sorted_consumers[:10]:
-                    evidence.append({
-                        "type": "consumer_reference",
-                        "file": c,
-                        "target": target_path,
-                        "snippet": f"{c} depends on {target_path}",
-                    })
+                    evidence.append(
+                        {
+                            "type": "consumer_reference",
+                            "file": c,
+                            "target": target_path,
+                            "snippet": f"{c} depends on {target_path}",
+                        }
+                    )
 
                 findings.append(
                     CandidateFinding(

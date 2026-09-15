@@ -26,9 +26,7 @@ class OrgService:
         slug = base_slug
 
         # Ensure slug uniqueness
-        existing = await session.execute(
-            select(Organization).where(Organization.slug == slug)
-        )
+        existing = await session.execute(select(Organization).where(Organization.slug == slug))
         if existing.scalar_one_or_none() is not None:
             if data.slug:
                 raise ConflictException(
@@ -110,9 +108,7 @@ class OrgService:
 
         if row is None:
             # Check if org exists at all to return 403 vs 404
-            exists = await session.execute(
-                select(Organization.id).where(Organization.id == org_id)
-            )
+            exists = await session.execute(select(Organization.id).where(Organization.id == org_id))
             if exists.scalar_one_or_none() is None:
                 raise NotFoundException(
                     code="ORGANIZATION_NOT_FOUND",

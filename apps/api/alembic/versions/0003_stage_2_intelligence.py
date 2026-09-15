@@ -5,6 +5,7 @@ Revises: 0002_stage_1_repository_context
 Create Date: 2026-09-12 13:00:00.000000
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -26,7 +27,9 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("project_id", sa.UUID(), nullable=False),
         sa.Column("user_id", sa.UUID(), nullable=False),
-        sa.Column("title", sa.String(length=255), nullable=False, server_default="New Conversation"),
+        sa.Column(
+            "title", sa.String(length=255), nullable=False, server_default="New Conversation"
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -115,9 +118,9 @@ def upgrade() -> None:
 
     # Check if vector extension type exists
     bind = op.get_bind()
-    has_vector = bind.execute(
-        sa.text("SELECT 1 FROM pg_type WHERE typname = 'vector'")
-    ).scalar() is not None
+    has_vector = (
+        bind.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'vector'")).scalar() is not None
+    )
 
     embedding_type = Vector(1536) if has_vector else postgresql.JSONB()
 
