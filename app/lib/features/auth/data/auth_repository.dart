@@ -49,9 +49,51 @@ class AuthRepository {
 
     User user;
     if (data['user'] is Map) {
-      user = User.fromJson(Map<String, dynamic>.from(data['user']));
+      final userMap = Map<String, dynamic>.from(data['user'] as Map);
+      if (data['default_organization_id'] != null) {
+        userMap['organization_id'] = data['default_organization_id'].toString();
+      }
+      user = User.fromJson(userMap);
     } else {
       // Fallback: fetch current user via /auth/me with the token
+      await _storage.setAuthToken(token);
+      user = await fetchCurrentUser();
+    }
+
+    await _storage.setAuthToken(token);
+    await _storage.setUserData(jsonEncode(user.toJson()));
+
+    return (token: token, user: user);
+  }
+
+  Future<({String token, User user})> signup({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.signup,
+      data: {
+        'name': name.trim(),
+        'email': email.trim(),
+        'password': password,
+      },
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    final token = data['access_token']?.toString() ?? data['token']?.toString() ?? '';
+    if (token.isEmpty) {
+      throw Exception('Server did not provide an access token');
+    }
+
+    User user;
+    if (data['user'] is Map) {
+      final userMap = Map<String, dynamic>.from(data['user'] as Map);
+      if (data['default_organization_id'] != null) {
+        userMap['organization_id'] = data['default_organization_id'].toString();
+      }
+      user = User.fromJson(userMap);
+    } else {
       await _storage.setAuthToken(token);
       user = await fetchCurrentUser();
     }

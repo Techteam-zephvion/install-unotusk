@@ -88,4 +88,17 @@ void main() {
     expect(controller.state.status, AuthStatus.unauthenticated);
     expect(controller.state.token, isNull);
   });
+
+  test('handleUnauthorized clears session and sets session expired message', () async {
+    await controller.login(
+      email: 'test@example.com',
+      password: 'password123',
+    );
+    expect(controller.state.isAuthenticated, isTrue);
+
+    controller.handleUnauthorized();
+    expect(controller.state.status, AuthStatus.unauthenticated);
+    expect(controller.state.isAuthenticated, isFalse);
+    expect(controller.state.errorMessage, 'Session expired. Please sign in again.');
+  });
 }

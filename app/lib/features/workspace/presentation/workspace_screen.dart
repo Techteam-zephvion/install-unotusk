@@ -15,6 +15,7 @@ import 'tabs/discoveries_tab.dart';
 import 'tabs/files_tab.dart';
 import 'tabs/knowledge_tab.dart';
 import 'tabs/overview_tab.dart';
+import 'widgets/ingestion_progress_view.dart';
 import 'workspace_controller.dart';
 
 class WorkspaceScreen extends ConsumerStatefulWidget {
@@ -243,11 +244,20 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
                 ),
               ),
 
-              // Tab Content Area
+              // Tab Content Area or Ingestion Progress
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(32),
-                  child: _buildActiveTab(project.name),
+                  child: (project.status != 'READY' ||
+                          (snapshot != null &&
+                              snapshot.status != 'COMPLETED' &&
+                              snapshot.status != 'READY'))
+                      ? IngestionProgressView(
+                          project: project,
+                          snapshot: snapshot,
+                          repository: repoInfo,
+                        )
+                      : _buildActiveTab(project.name),
                 ),
               ),
             ],

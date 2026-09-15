@@ -25,13 +25,16 @@ class ErrorStateView extends StatelessWidget {
     if (lower.contains('401') || lower.contains('unauthorized')) {
       return 'Your session has expired. Please sign in again to continue.';
     }
+    if (lower.contains('403') || lower.contains('forbidden') || lower.contains('access denied')) {
+      return 'Access denied. You do not have permission to view this project or resource.';
+    }
     if (lower.contains('404') || lower.contains('not found')) {
       return 'The requested project or resource was not found.';
     }
     if (lower.contains('500') || lower.contains('internal server error')) {
-      return 'The server encountered an issue processing the request.';
+      return 'The server encountered an issue processing the request. Check server logs in Setup App for details.';
     }
-    return message;
+    return message.replaceAll('Exception:', '').replaceAll('DioException [bad response]:', '').trim();
   }
 
   @override

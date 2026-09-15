@@ -12,6 +12,7 @@ import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state_view.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../domain/project.dart';
+import 'create_project_dialog.dart';
 import 'projects_controller.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,13 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _openCreateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const CreateProjectDialog(),
+    );
   }
 
   @override
@@ -64,6 +72,13 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       icon: Icons.refresh,
                       variant: AppButtonVariant.secondary,
                       onPressed: () => ref.refresh(projectsProvider),
+                    ),
+                    const SizedBox(width: 10),
+                    AppButton(
+                      text: 'Connect Codebase',
+                      icon: Icons.add,
+                      variant: AppButtonVariant.primary,
+                      onPressed: () => _openCreateDialog(context),
                     ),
                   ],
                 ),
@@ -108,8 +123,10 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       icon: Icons.folder_open_outlined,
                       title: _searchQuery.isEmpty ? 'No projects yet' : 'No matching projects',
                       description: _searchQuery.isEmpty
-                          ? 'No software repositories have been connected to this workspace yet.'
+                          ? 'No software repositories have been connected to this workspace yet. Link a codebase to begin exploring architecture and discoveries.'
                           : 'Try changing your filter query.',
+                      actionLabel: _searchQuery.isEmpty ? 'Connect First Codebase' : null,
+                      onAction: _searchQuery.isEmpty ? () => _openCreateDialog(context) : null,
                     );
                   }
 

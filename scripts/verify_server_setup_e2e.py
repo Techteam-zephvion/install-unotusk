@@ -10,12 +10,12 @@ Validates:
 4. Project Workspace querying.
 """
 
-import os
-import sys
 import json
+import os
 import stat
-import urllib.request
+import sys
 import urllib.error
+import urllib.request
 
 API_URL = os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:8000")
 

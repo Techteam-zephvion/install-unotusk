@@ -10,6 +10,9 @@ class ApiEndpoints {
   // Projects & Workspace Context
   static const String projects = '/projects';
   static String projectById(String id) => '/projects/$id';
+  static String projectSelectRepository(String projectId) => '/projects/$projectId/repositories/select';
+  static String projectTriggerIngest(String projectId, String repositoryId) => '/projects/$projectId/repositories/$repositoryId/ingest';
+  static String projectIngestionStatus(String projectId, String ingestionId) => '/projects/$projectId/ingestions/$ingestionId';
   static String projectSnapshots(String projectId) => '/projects/$projectId/snapshots';
   static String projectRepositoryContext(String projectId) => '/projects/$projectId/repository';
   static String projectFiles(String projectId, {int limit = 500}) => '/projects/$projectId/files?limit=$limit';

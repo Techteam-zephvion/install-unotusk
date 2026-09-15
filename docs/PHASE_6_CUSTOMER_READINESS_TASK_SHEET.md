@@ -14,22 +14,22 @@
 
 | Task ID | Task Name | Status | Dependencies | Target Area |
 |---|---|---|---|---|
-| **TASK-601** | Phase 5 Findings Triage & Customer Impact Audit | PENDING | - | Triage & Baseline |
-| **TASK-602** | Employee App First-Run Experience | PENDING | TASK-601 | Employee App UX |
-| **TASK-603** | Project Creation & Repository Connection Flow | PENDING | TASK-602 | Workflow Hardening |
-| **TASK-604** | Ingestion Status & Progress Experience | PENDING | TASK-603 | Reliability & Clarity |
-| **TASK-605** | Intelligence Views & Evidentiary Clarity | PENDING | TASK-604 | Core Product Value |
-| **TASK-606** | Plain-Language Error, Empty & Offline States | PENDING | TASK-605 | Resilience UX |
-| **TASK-607** | Authentication, Session Restoration & 401 Recovery | PENDING | TASK-606 | Auth UX |
-| **TASK-608** | Server Setup App Customer Polish | PENDING | TASK-607 | Setup Wizard UX |
-| **TASK-609** | Platform Build Evaluation (Linux / macOS / Windows) | PENDING | TASK-608 | Build Engineering |
-| **TASK-610** | Packaging, Naming & Distribution Artifacts | PENDING | TASK-609 | Release Engineering |
-| **TASK-611** | Customer-Facing Performance & Latency Audit | PENDING | TASK-610 | Performance |
-| **TASK-612** | Security, Secret Exposure & Isolation Verification | PENDING | TASK-611 | Security & Privacy |
-| **TASK-613** | Customer Quick-Start & Operations Documentation | PENDING | TASK-612 | Documentation |
-| **TASK-614** | Repeatable Design Partner Demo Environment | PENDING | TASK-613 | Demo Enablement |
-| **TASK-615** | Clean-Room Final Customer Journey Test | PENDING | TASK-614 | E2E Customer Journey |
-| **TASK-616** | MVP Release Gate & Final Disposition Report | PENDING | TASK-615 | Release Sign-Off |
+| **TASK-601** | Phase 5 Findings Triage & Customer Impact Audit | COMPLETED | - | Triage & Baseline |
+| **TASK-602** | Employee App First-Run Experience | COMPLETED | TASK-601 | Employee App UX |
+| **TASK-603** | Project Creation & Repository Connection Flow | COMPLETED | TASK-602 | Workflow Hardening |
+| **TASK-604** | Ingestion Status & Progress Experience | COMPLETED | TASK-603 | Reliability & Clarity |
+| **TASK-605** | Intelligence Views & Evidentiary Clarity | COMPLETED | TASK-604 | Core Product Value |
+| **TASK-606** | Plain-Language Error, Empty & Offline States | COMPLETED | TASK-605 | Resilience UX |
+| **TASK-607** | Authentication, Session Restoration & 401 Recovery | COMPLETED | TASK-606 | Auth UX |
+| **TASK-608** | Server Setup App Customer Polish | COMPLETED | TASK-607 | Setup Wizard UX |
+| **TASK-609** | Platform Build Evaluation (Linux / macOS / Windows) | COMPLETED | TASK-608 | Build Engineering |
+| **TASK-610** | Packaging, Naming & Distribution Artifacts | COMPLETED | TASK-609 | Release Engineering |
+| **TASK-611** | Customer-Facing Performance & Latency Audit | COMPLETED | TASK-610 | Performance |
+| **TASK-612** | Security, Secret Exposure & Isolation Verification | COMPLETED | TASK-611 | Security & Privacy |
+| **TASK-613** | Customer Quick-Start & Operations Documentation | COMPLETED | TASK-612 | Documentation |
+| **TASK-614** | Repeatable Design Partner Demo Environment | COMPLETED | TASK-613 | Demo Enablement |
+| **TASK-615** | Clean-Room Final Customer Journey Test | COMPLETED | TASK-614 | E2E Customer Journey |
+| **TASK-616** | MVP Release Gate & Final Disposition Report | COMPLETED | TASK-615 | Release Sign-Off |
 
 ---
 
@@ -37,11 +37,18 @@
 
 ### TASK-601: Phase 5 Findings Triage & Customer Impact Audit
 - **Objective**: Review all findings, limitations, and defect resolutions from Phase 5 (DEF-501 to DEF-505) and audit how they directly affect customer perception and workflow.
-- **Scope**:
-  - Classify issues into P0 (blocking), P1 (serious customer UX defect), P2 (customer polish), P3 (future).
-  - Confirm all P0/P1 items remain resolved; prioritize P2 polish items impacting design partners.
-- **Acceptance Criteria**:
-  - Triage matrix completed with explicit rationale for customer-facing items.
+- **Status**: COMPLETED
+- **Triage Matrix & Audit Results**:
+
+| Issue ID | Severity | Category | Customer Impact | Resolution & Verification |
+|---|---|---|---|---|
+| **DEF-501** | P1 | Deployment | Without automated migrations, first-time server start crashed on missing tables. | Resolved via migration init-container in `ComposeGenerator` & verified in integration tests. |
+| **DEF-502** | P2 | Security | Database and cache ports exposed to local LAN on customer machines. | Hardened to `127.0.0.1` binding; unit test verified and passing. |
+| **DEF-503** | P2 | Security | Raw retrieval internals exposed to unauthorized network observers. | Guarded with `APP_ENV == "production"` 403 Forbidden check. |
+| **DEF-504** | P2 | Evidentiary | Offline synthesis template previously echoed query strings as if they were facts. | Refined template to strictly state absence of evidence without fabrication. |
+| **DEF-505** | P3 | Quality | Regressions in desktop UI could pass unnoticed in PR builds. | Added automated Flutter analysis and test suites to `.github/workflows/ci.yml`. |
+
+- **Conclusion**: All P0/P1 issues are resolved. System baseline is verified green across 85 backend tests and 70 frontend tests. Customer readiness focus shifts to UI/UX first-run flow and plain-language resilience.
 
 ---
 

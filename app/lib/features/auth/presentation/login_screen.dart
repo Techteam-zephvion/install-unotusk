@@ -19,21 +19,33 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController(text: 'test@example.com');
   final _passwordController = TextEditingController(text: 'password123');
+  final _nameController = TextEditingController();
+  bool _isSignUp = false;
   final _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleSubmit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final success = await ref.read(authControllerProvider.notifier).login(
-            email: _emailController.text,
-            password: _passwordController.text,
-          );
+      final bool success;
+      if (_isSignUp) {
+        success = await ref.read(authControllerProvider.notifier).signup(
+              name: _nameController.text,
+              email: _emailController.text,
+              password: _passwordController.text,
+            );
+      } else {
+        success = await ref.read(authControllerProvider.notifier).login(
+              email: _emailController.text,
+              password: _passwordController.text,
+            );
+      }
       if (success && mounted) {
         context.go('/projects');
       }
@@ -87,11 +99,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Sign in to your account',
+                    _isSignUp ? 'Create your Unotusk account' : 'Sign in to your account',
                     style: AppTextStyles.bodySmall,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 28),
+
+                  // Name Field (Sign Up only)
+                  if (_isSignUp) ...[
+                    AppTextField(
+                      controller: _nameController,
+                      label: 'Full name',
+                      hint: 'Alex Morgan',
+                      prefixIcon: const Icon(Icons.person_outline, size: 16),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Full name is required';
+                        return null;
+                      },
+                      onEditingComplete: _handleSubmit,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Email Field
                   AppTextField(
@@ -105,7 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       if (!val.contains('@')) return 'Enter a valid email';
                       return null;
                     },
-                    onEditingComplete: _handleLogin,
+                    onEditingComplete: _handleSubmit,
                   ),
                   const SizedBox(height: 16),
 
@@ -118,9 +146,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     prefixIcon: const Icon(Icons.lock_outline, size: 16),
                     validator: (val) {
                       if (val == null || val.isEmpty) return 'Password is required';
+                      if (_isSignUp && val.length < 8) return 'Password must be at least 8 characters';
                       return null;
                     },
-                    onEditingComplete: _handleLogin,
+                    onEditingComplete: _handleSubmit,
                   ),
                   const SizedBox(height: 20),
 
@@ -143,12 +172,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   // Submit Button
                   AppButton(
-                    text: 'Sign in',
+                    text: _isSignUp ? 'Create Account' : 'Sign in',
                     isLoading: authState.isLoading,
-                    onPressed: _handleLogin,
+                    onPressed: _handleSubmit,
                     isFullWidth: true,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+
+                  // Toggle Sign In / Sign Up
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _isSignUp = !_isSignUp;
+                        });
+                      },
+                      child: Text(
+                        _isSignUp
+                            ? 'Already have an account? Sign in'
+                            : "Don't have an account? Create one",
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Server Connection Footer
                   const Divider(),

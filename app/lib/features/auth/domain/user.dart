@@ -19,7 +19,7 @@ class User {
       email: json['email']?.toString() ?? '',
       fullName: json['full_name']?.toString() ?? json['name']?.toString() ?? '',
       role: json['role']?.toString() ?? 'member',
-      organizationId: json['organization_id']?.toString(),
+      organizationId: json['organization_id']?.toString() ?? json['default_organization_id']?.toString(),
     );
   }
 

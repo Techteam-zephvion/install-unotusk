@@ -61,5 +61,13 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
     expect(find.textContaining('http://localhost:8000'), findsOneWidget);
+
+    // Tap toggle to create account
+    await tester.tap(find.text("Don't have an account? Create one"));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create your Unotusk account'), findsOneWidget);
+    expect(find.text('Create Account'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(3)); // Name, Email, Password
   });
 }

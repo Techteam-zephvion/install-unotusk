@@ -37,6 +37,48 @@ class KnowledgeCard extends StatelessWidget {
           // Header Row: Category Badge, Status, and Actions
           Row(
             children: [
+              // Team Curated vs Observed Fact Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: item.sourceType == 'CUSTOMER'
+                      ? AppColors.primaryMuted
+                      : AppColors.slate100,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: item.sourceType == 'CUSTOMER'
+                        ? AppColors.primary.withOpacity(0.3)
+                        : AppColors.slate200,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item.sourceType == 'CUSTOMER'
+                          ? Icons.verified_outlined
+                          : Icons.code,
+                      size: 11,
+                      color: item.sourceType == 'CUSTOMER'
+                          ? AppColors.primary
+                          : AppColors.slate600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      item.sourceType == 'CUSTOMER' ? 'TEAM CURATED' : 'OBSERVED FACT',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                        color: item.sourceType == 'CUSTOMER'
+                            ? AppColors.primary
+                            : AppColors.slate600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
