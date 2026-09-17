@@ -47,7 +47,7 @@ class KnowledgeCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(
                     color: item.sourceType == 'CUSTOMER'
-                        ? AppColors.primary.withOpacity(0.3)
+                        ? AppColors.primary.withValues(alpha: 0.3)
                         : AppColors.slate200,
                   ),
                 ),

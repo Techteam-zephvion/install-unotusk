@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import '../../target/domain/target_config.dart';
 import '../domain/check_item.dart';
@@ -10,16 +11,59 @@ typedef ProcessExecutor = Future<ProcessResult> Function(
 });
 
 typedef SocketTester = Future<bool> Function(String host, int port);
+typedef HttpHealthChecker = Future<bool> Function(String host, int port);
+
+enum PortConflictSource {
+  free,
+  existingUnotusk,
+  dockerContainer,
+  localProcess,
+  unknownProcess;
+
+  bool get isFree => this == PortConflictSource.free;
+}
+
+class PortConflictInspection {
+  final int port;
+  final PortConflictSource source;
+  final String? details;
+
+  const PortConflictInspection({
+    required this.port,
+    required this.source,
+    this.details,
+  });
+
+  bool get isOccupied => source != PortConflictSource.free;
+
+  String get description {
+    switch (source) {
+      case PortConflictSource.free:
+        return 'Port $port is open and available.';
+      case PortConflictSource.existingUnotusk:
+        return 'Port $port is already in use by an existing Unotusk deployment${details != null ? " ($details)" : ""}.';
+      case PortConflictSource.dockerContainer:
+        return 'Port $port is already in use by Docker container${details != null ? " ($details)" : ""}.';
+      case PortConflictSource.localProcess:
+        return 'Port $port is already in use by local process${details != null ? " ($details)" : ""}.';
+      case PortConflictSource.unknownProcess:
+        return 'Port $port is already in use by an unknown process.';
+    }
+  }
+}
 
 class EnvironmentValidator {
   final ProcessExecutor _processExecutor;
   final SocketTester _socketTester;
+  final HttpHealthChecker _httpHealthChecker;
 
   EnvironmentValidator({
     ProcessExecutor? processExecutor,
     SocketTester? socketTester,
+    HttpHealthChecker? httpHealthChecker,
   })  : _processExecutor = processExecutor ?? Process.run,
-        _socketTester = socketTester ?? _defaultSocketTester;
+        _socketTester = socketTester ?? _defaultSocketTester,
+        _httpHealthChecker = httpHealthChecker ?? _defaultHttpHealthChecker;
 
   static Future<bool> _defaultSocketTester(String host, int port) async {
     try {
@@ -28,6 +72,23 @@ class EnvironmentValidator {
       return true; // Port was successfully bound, meaning it is free
     } catch (_) {
       return false; // Port is in use or forbidden
+    }
+  }
+
+  static Future<bool> _defaultHttpHealthChecker(String host, int port) async {
+    try {
+      final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 1500);
+      final request = await client.getUrl(Uri.parse('http://$host:$port/health'));
+      final response = await request.close().timeout(const Duration(milliseconds: 1500));
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        client.close();
+        return body.contains('unotusk') || body.contains('status');
+      }
+      client.close();
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -192,6 +253,92 @@ class EnvironmentValidator {
     );
   }
 
+  Future<PortConflictInspection> inspectPort(String host, int port) async {
+    final isFree = await _socketTester(host, port);
+    if (isFree) {
+      return PortConflictInspection(
+        port: port,
+        source: PortConflictSource.free,
+      );
+    }
+
+    // 1. Check if it is an existing Unotusk deployment
+    try {
+      final isUnotusk = await _httpHealthChecker(host, port);
+      if (isUnotusk) {
+        return PortConflictInspection(
+          port: port,
+          source: PortConflictSource.existingUnotusk,
+          details: 'Running Unotusk API instance detected on http://$host:$port',
+        );
+      }
+    } catch (_) {}
+
+    // 2. Check if it is a Docker container
+    try {
+      final dockerRes = await _processExecutor('docker', ['ps', '--format', '{{.Names}}\t{{.Ports}}']);
+      if (dockerRes.exitCode == 0) {
+        final lines = dockerRes.stdout.toString().split('\n');
+        for (final line in lines) {
+          if (line.contains(':$port->') ||
+              line.contains(':$port/') ||
+              line.contains('0.0.0.0:$port') ||
+              line.contains(':::$port')) {
+            final parts = line.split('\t');
+            final containerName = parts.isNotEmpty ? parts[0].trim() : line.trim();
+            return PortConflictInspection(
+              port: port,
+              source: PortConflictSource.dockerContainer,
+              details: containerName,
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Check if it is a local host process
+    try {
+      final lsofRes = await _processExecutor('lsof', ['-i', ':$port', '-sTCP:LISTEN', '-P', '-n']);
+      if (lsofRes.exitCode == 0) {
+        final lines = lsofRes.stdout.toString().trim().split('\n');
+        if (lines.length > 1) {
+          final processLine = lines[1].trim();
+          final columns = processLine.split(RegExp(r'\s+'));
+          final command = columns.isNotEmpty ? columns[0] : 'process';
+          final pid = columns.length > 1 ? columns[1] : '';
+          return PortConflictInspection(
+            port: port,
+            source: PortConflictSource.localProcess,
+            details: '$command (PID $pid)',
+          );
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final ssRes = await _processExecutor('ss', ['-tulpn']);
+      if (ssRes.exitCode == 0) {
+        final lines = ssRes.stdout.toString().trim().split('\n');
+        for (final line in lines) {
+          if (line.contains(':$port')) {
+            return PortConflictInspection(
+              port: port,
+              source: PortConflictSource.localProcess,
+              details: line.trim(),
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 4. Unknown process
+    return PortConflictInspection(
+      port: port,
+      source: PortConflictSource.unknownProcess,
+      details: 'Unidentified process or service',
+    );
+  }
+
   Future<CheckItem> checkPortsAvailable(TargetConfig config, {int apiPort = 8000}) async {
     if (!config.isLocal) {
       return const CheckItem(
@@ -202,22 +349,27 @@ class EnvironmentValidator {
       );
     }
 
-    final isApiFree = await _socketTester('localhost', apiPort);
-    if (!isApiFree) {
+    final inspection = await inspectPort('localhost', apiPort);
+    if (inspection.isOccupied) {
+      final remediation = inspection.source == PortConflictSource.existingUnotusk
+          ? 'An existing Unotusk deployment is active on port $apiPort. You can use this server or choose a different port in configuration.'
+          : 'Port $apiPort is already in use by ${inspection.details ?? "another application"}. Please select a different port during configuration.';
+
       return CheckItem(
         id: 'ports_available',
         title: 'Required ports available',
-        description: 'Port $apiPort is already in use by another application.',
-        status: CheckStatus.warning,
-        failureMessage: 'Port $apiPort is currently occupied.',
-        remediationHint: 'You can change the server port during the configuration step.',
+        description: inspection.description,
+        status: CheckStatus.failed,
+        failureMessage: 'Port $apiPort is already in use.',
+        remediationHint: remediation,
+        technicalDetails: inspection.details,
       );
     }
 
-    return const CheckItem(
+    return CheckItem(
       id: 'ports_available',
       title: 'Required ports available',
-      description: 'Port 8000 and internal service ports are open and available.',
+      description: 'Port $apiPort is open and available for Unotusk API.',
       status: CheckStatus.passed,
     );
   }

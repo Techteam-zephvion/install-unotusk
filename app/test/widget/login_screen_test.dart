@@ -20,7 +20,7 @@ class MockConnectionRepository extends ConnectionRepository {
 }
 
 void main() {
-  testWidgets('LoginScreen renders fields and actions properly', (WidgetTester tester) async {
+  testWidgets('LoginScreen renders OIDC discovery entry and SSO options', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -48,7 +48,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
-          theme: AppTheme.lightTheme,
+          theme: AppTheme.darkTheme,
           home: const LoginScreen(),
         ),
       ),
@@ -57,17 +57,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unotusk'), findsWidgets);
-    expect(find.text('Sign in to your account'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(2));
-    expect(find.textContaining('http://localhost:8000'), findsOneWidget);
-
-    // Tap toggle to create account
-    await tester.tap(find.text("Don't have an account? Create one"));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Create your Unotusk account'), findsOneWidget);
-    expect(find.text('Create Account'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(3)); // Name, Email, Password
+    expect(find.text('Sign in to Unotusk'), findsOneWidget);
+    expect(find.text('Continue with OIDC Discovery'), findsOneWidget);
+    expect(find.text('Sign in with Google OIDC'), findsOneWidget);
+    expect(find.text('Sign in with Microsoft Entra OIDC'), findsOneWidget);
   });
 }

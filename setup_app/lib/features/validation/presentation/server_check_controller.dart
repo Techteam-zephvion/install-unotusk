@@ -24,6 +24,18 @@ class ServerCheckState {
       !isRunning &&
       items.every((item) => item.status == CheckStatus.passed || item.status == CheckStatus.warning);
 
+  bool get hasPrerequisiteFailure =>
+      items.any((i) => i.status.isFailed && i.id != 'ports_available');
+
+  bool get hasOnlyPortConflict =>
+      items.any((i) => i.status.isFailed && i.id == 'ports_available') &&
+      !hasPrerequisiteFailure;
+
+  bool get isExistingUnotuskActive => items.any((i) =>
+      i.id == 'ports_available' &&
+      (i.description.contains('existing Unotusk') ||
+       (i.remediationHint?.contains('existing Unotusk') ?? false)));
+
   ServerCheckState copyWith({
     List<CheckItem>? items,
     bool? isRunning,

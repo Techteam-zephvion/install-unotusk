@@ -60,16 +60,6 @@ class DeploymentEngine {
     try {
       // 1. Preparing
       onStageChanged(DeployStage.preparing);
-      final envContent = config.generateEnvFileContent();
-      // Resolve the source root: the directory containing the setup_app executable
-      // (or the current working directory when run from source).
-      final sourceRoot = customDeploymentDir != null
-          ? null // Use relative '.' if deploying from a custom dir that contains the source
-          : _resolveSourceRoot();
-      final composeContent = ComposeGenerator.generateDockerCompose(
-        config,
-        projectRoot: sourceRoot,
-      );
 
       // 2. Configuring (create directory and write files)
       onStageChanged(DeployStage.configuring);
@@ -79,7 +69,45 @@ class DeploymentEngine {
         dir.createSync(recursive: true);
       }
 
+      // Preserve existing DB and auth secrets if re-deploying or updating config
+      ServerConfig effectiveConfig = config;
       final envFile = File('$deployDir/.env');
+      if (envFile.existsSync()) {
+        try {
+          final existingLines = envFile.readAsLinesSync();
+          final existingMap = <String, String>{};
+          for (final line in existingLines) {
+            final trimmed = line.trim();
+            if (trimmed.isEmpty || trimmed.startsWith('#') || !trimmed.contains('=')) continue;
+            final idx = trimmed.indexOf('=');
+            final key = trimmed.substring(0, idx).trim();
+            final value = trimmed.substring(idx + 1).trim();
+            existingMap[key] = value;
+          }
+          final existingPgPass = existingMap['POSTGRES_PASSWORD'];
+          final existingAuthSec = existingMap['AUTH_SECRET'];
+          if (existingPgPass != null && existingPgPass.isNotEmpty) {
+            effectiveConfig = effectiveConfig.copyWith(
+              postgresPassword: existingPgPass,
+              authSecret: (existingAuthSec != null && existingAuthSec.isNotEmpty)
+                  ? existingAuthSec
+                  : null,
+            );
+          }
+        } catch (_) {}
+      }
+
+      final envContent = effectiveConfig.generateEnvFileContent();
+      // Resolve the source root: the directory containing the setup_app executable
+      // (or the current working directory when run from source).
+      final sourceRoot = customDeploymentDir != null
+          ? null // Use relative '.' if deploying from a custom dir that contains the source
+          : _resolveSourceRoot();
+      final composeContent = ComposeGenerator.generateDockerCompose(
+        effectiveConfig,
+        projectRoot: sourceRoot,
+      );
+
       envFile.writeAsStringSync(envContent);
       // Restrict permissions on .env
       try {
@@ -101,9 +129,15 @@ class DeploymentEngine {
         );
 
         if (startRes.exitCode != 0) {
+          final stderr = startRes.stderr.toString();
+          String errorMessage = 'Failed to start Docker containers.';
+          if (stderr.contains('port is already allocated') || stderr.contains('address already in use')) {
+            errorMessage = 'Port ${config.serverPort} is already in use.';
+          }
+          onStageChanged(DeployStage.failed);
           return DeployResult(
             isSuccess: false,
-            errorMessage: 'Failed to start Docker containers.',
+            errorMessage: errorMessage,
             technicalLogs: 'Exit Code: ${startRes.exitCode}\nError: ${startRes.stderr}',
           );
         }
@@ -175,15 +209,14 @@ class DeploymentEngine {
   /// When running from source, this is the current working directory.
   /// When packaged, this is the directory containing the executable.
   String? _resolveSourceRoot() {
-    // Use the current working directory — when deployed via setup_app running
-    // from within the Unotusk-MVP source tree, this gives a valid build context.
-    // When running as a standalone packaged binary (not beside source), the caller
-    // should use generateProductionCompose() with a prebuilt image tag instead.
     final cwd = Directory.current.path;
-    final dockerfileCheck = File('$cwd/infrastructure/docker/Dockerfile.api');
-    if (dockerfileCheck.existsSync()) {
+    if (File('$cwd/infrastructure/docker/Dockerfile.api').existsSync()) {
       return cwd;
     }
-    return null; // Falls back to '.' in ComposeGenerator (relative to deployDir)
+    const devPath = '/home/devils/PRO/Unotusk-MVP';
+    if (File('$devPath/infrastructure/docker/Dockerfile.api').existsSync()) {
+      return devPath;
+    }
+    return null;
   }
 }

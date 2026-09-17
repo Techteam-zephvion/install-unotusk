@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../wizard/presentation/wizard_controller.dart';
+import '../../wizard/domain/wizard_step.dart';
 import '../domain/check_item.dart';
 import 'server_check_controller.dart';
 
@@ -45,22 +46,32 @@ class ServerCheckScreen extends ConsumerWidget {
                 _buildFailureBanner(context, checkState.items.firstWhere((i) => i.status.isFailed)),
               ],
               const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 10,
                 children: [
-                  if (checkState.hasCriticalFailure) ...[
+                  if (checkState.hasCriticalFailure)
                     AppButton(
                       label: 'Retry',
                       variant: AppButtonVariant.secondary,
                       icon: Icons.refresh,
                       onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
                     ),
-                    const SizedBox(width: 12),
-                  ],
+                  if (checkState.hasOnlyPortConflict && checkState.isExistingUnotuskActive)
+                    AppButton(
+                      label: 'Use Existing Server',
+                      variant: AppButtonVariant.secondary,
+                      icon: Icons.check_circle_outline,
+                      onPressed: checkState.isRunning
+                          ? null
+                          : () => wizardNotifier.setStep(WizardStep.verify),
+                    ),
                   AppButton(
-                    label: 'Continue',
+                    label: checkState.hasOnlyPortConflict ? 'Configure Alternate Port' : 'Continue',
                     isLoading: checkState.isRunning,
-                    onPressed: checkState.isAllPassed
+                    onPressed: (checkState.isAllPassed || checkState.hasOnlyPortConflict)
                         ? () => wizardNotifier.nextStep()
                         : null,
                   ),

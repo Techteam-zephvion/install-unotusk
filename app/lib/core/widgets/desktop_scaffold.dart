@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../app/config/app_config.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text_styles.dart';
+import '../../app/theme/theme_controller.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/connection/presentation/connection_controller.dart';
 import 'status_badge.dart';
+import 'unotusk_mark.dart';
 
 class DesktopScaffold extends ConsumerWidget {
   final Widget body;
@@ -22,119 +24,149 @@ class DesktopScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
     final connectionState = ref.watch(connectionControllerProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark;
     final user = authState.user;
 
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final dividerColor = isDark ? AppColors.divider : AppColors.dividerLight;
+
     return Scaffold(
-      backgroundColor: AppColors.slate50,
+      backgroundColor: bgColor,
       body: Column(
         children: [
-          // Top Application Bar
+          // Top Application Bar (52px matching Figma specification)
           Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: surfaceColor,
               border: Border(
-                bottom: BorderSide(color: AppColors.slate200),
+                bottom: BorderSide(color: dividerColor),
               ),
             ),
             child: Row(
               children: [
                 // App Logo & Name
-                Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: AppColors.slate900,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'U',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      AppConfig.appName,
-                      style: AppTextStyles.h2.copyWith(fontSize: 14),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 32),
-
-                // Primary Navigation Items
-                _NavItem(
-                  label: 'Projects',
-                  icon: Icons.folder_outlined,
-                  isSelected: currentRoute.startsWith('/projects'),
-                  onTap: () => context.go('/projects'),
-                ),
-                const SizedBox(width: 8),
-                _NavItem(
-                  label: 'Settings',
-                  icon: Icons.settings_outlined,
-                  isSelected: currentRoute.startsWith('/settings'),
-                  onTap: () => context.go('/settings'),
-                ),
-
-                const Spacer(),
-
-                // Server Connection Status
                 InkWell(
-                  onTap: () => context.go('/settings'),
-                  borderRadius: BorderRadius.circular(4),
+                  onTap: () => context.go('/projects'),
+                  borderRadius: BorderRadius.circular(6),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                     child: Row(
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: connectionState.isConnected
-                                ? AppColors.success
-                                : AppColors.warning,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
+                        UnotuskMark(size: 26, isDark: isDark),
+                        const SizedBox(width: 10),
                         Text(
-                          connectionState.isConnected ? 'Connected' : 'Offline / Checking',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                          AppConfig.appName,
+                          style: AppTextStyles.h2.copyWith(
+                            fontSize: 14,
+                            letterSpacing: -0.2,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 28),
+
+                // Primary Navigation Items (Pill Styled)
+                _NavItem(
+                  label: 'Projects',
+                  icon: Icons.folder_outlined,
+                  isSelected: currentRoute.startsWith('/projects'),
+                  onTap: () => context.go('/projects'),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _NavItem(
+                  label: 'Settings',
+                  icon: Icons.settings_outlined,
+                  isSelected: currentRoute.startsWith('/settings'),
+                  onTap: () => context.go('/settings'),
+                  isDark: isDark,
+                ),
+
+                const Spacer(),
+
+                // Live Server Connection Status Pill
+                InkWell(
+                  onTap: () => context.go('/settings'),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: connectionState.isConnected
+                          ? AppColors.liveBg
+                          : AppColors.warningBg,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: connectionState.isConnected
+                            ? AppColors.successBorder
+                            : AppColors.warningBorder,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: connectionState.isConnected
+                                ? AppColors.live
+                                : AppColors.warning,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          connectionState.isConnected ? 'Connected' : 'Offline / Checking',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: connectionState.isConnected
+                                ? AppColors.live
+                                : AppColors.warning,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Theme Toggle (Sun / Moon)
+                IconButton(
+                  tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+                  icon: Icon(
+                    isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                    size: 17,
+                    color: isDark ? AppColors.textSecondary : AppColors.textSecondaryLight,
+                  ),
+                  onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(),
+                  splashRadius: 18,
+                ),
+                const SizedBox(width: 4),
 
                 // User / Account Area
                 if (user != null) ...[
                   Container(
-                    height: 24,
+                    height: 20,
                     width: 1,
-                    color: AppColors.slate200,
+                    color: dividerColor,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   PopupMenuButton<String>(
-                    offset: const Offset(0, 36),
+                    offset: const Offset(0, 42),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      side: const BorderSide(color: AppColors.slate200),
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: dividerColor),
                     ),
-                    color: Colors.white,
-                    elevation: 2,
+                    color: isDark ? AppColors.bgElevated : AppColors.bgElevatedLight,
+                    elevation: 8,
                     tooltip: 'Account Menu',
                     itemBuilder: (context) => [
                       PopupMenuItem(
@@ -146,14 +178,16 @@ class DesktopScaffold extends ConsumerWidget {
                               user.fullName,
                               style: AppTextStyles.bodyMedium.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.slate900,
+                                color: isDark ? AppColors.textPrimary : AppColors.textPrimaryLight,
                               ),
                             ),
                             Text(
                               user.email,
-                              style: AppTextStyles.bodySmall,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: isDark ? AppColors.textSecondary : AppColors.textSecondaryLight,
+                              ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             StatusBadge(
                               label: user.role.toUpperCase(),
                               variant: BadgeVariant.neutral,
@@ -166,9 +200,18 @@ class DesktopScaffold extends ConsumerWidget {
                         value: 'settings',
                         child: Row(
                           children: [
-                            const Icon(Icons.settings_outlined, size: 16, color: AppColors.slate700),
+                            Icon(
+                              Icons.settings_outlined,
+                              size: 15,
+                              color: isDark ? AppColors.textSecondary : AppColors.textSecondaryLight,
+                            ),
                             const SizedBox(width: 8),
-                            Text('Settings', style: AppTextStyles.bodyMedium),
+                            Text(
+                              'Settings',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: isDark ? AppColors.textPrimary : AppColors.textPrimaryLight,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -176,9 +219,12 @@ class DesktopScaffold extends ConsumerWidget {
                         value: 'logout',
                         child: Row(
                           children: [
-                            const Icon(Icons.logout, size: 16, color: AppColors.error),
+                            const Icon(Icons.logout, size: 15, color: AppColors.error),
                             const SizedBox(width: 8),
-                            Text('Sign Out', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                            Text(
+                              'Sign Out',
+                              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                            ),
                           ],
                         ),
                       ),
@@ -190,34 +236,46 @@ class DesktopScaffold extends ConsumerWidget {
                         ref.read(authControllerProvider.notifier).logout();
                       }
                     },
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundColor: AppColors.slate200,
-                          child: Text(
-                            user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : 'U',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.slate800,
-                              fontSize: 11,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.transparent),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 13,
+                            backgroundColor: isDark ? AppColors.bgElevated : const Color(0xFFE6E5DF),
+                            child: Text(
+                              user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : 'U',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.accent,
+                                fontSize: 11,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 120),
-                          child: Text(
-                            user.fullName.isNotEmpty ? user.fullName : user.email,
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w500,
+                          const SizedBox(width: 8),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 130),
+                            child: Text(
+                              user.fullName.isNotEmpty ? user.fullName : user.email,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.slate500),
-                      ],
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 15,
+                            color: isDark ? AppColors.textSecondary : AppColors.textSecondaryLight,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -238,38 +296,51 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isDark;
 
   const _NavItem({
     required this.label,
     required this.icon,
     required this.isSelected,
     required this.onTap,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.slate100 : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
+          color: isSelected
+              ? (isDark ? AppColors.accentMuted : const Color(0x1ADA7756))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.accent.withOpacity(0.35)
+                : Colors.transparent,
+          ),
         ),
         child: Row(
           children: [
             Icon(
               icon,
-              size: 16,
-              color: isSelected ? AppColors.primary : AppColors.slate600,
+              size: 15,
+              color: isSelected
+                  ? AppColors.accent
+                  : (isDark ? AppColors.textSecondary : AppColors.textSecondaryLight),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 7),
             Text(
               label,
               style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.slate900 : AppColors.slate700,
+                color: isSelected
+                    ? (isDark ? AppColors.textPrimary : AppColors.accent)
+                    : (isDark ? AppColors.textSecondary : AppColors.textSecondaryLight),
                 fontSize: 13,
               ),
             ),

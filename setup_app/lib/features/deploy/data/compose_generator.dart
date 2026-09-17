@@ -6,7 +6,6 @@ class ComposeGenerator {
   /// The caller must supply [projectRoot] (the Unotusk source directory)
   /// for the build context.
   static String generateDockerCompose(ServerConfig config, {String? projectRoot}) {
-    final rootContext = projectRoot ?? '.';
     return '''
 services:
   postgres:
@@ -17,8 +16,6 @@ services:
       POSTGRES_USER: ${config.postgresUser}
       POSTGRES_PASSWORD: ${config.postgresPassword}
       POSTGRES_DB: ${config.postgresDb}
-    ports:
-      - "127.0.0.1:${config.postgresPort}:5432"
     volumes:
       - unotusk_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,8 +30,6 @@ services:
     image: redis:7-alpine
     container_name: unotusk-redis
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${config.redisPort}:6379"
     volumes:
       - unotusk_redis_data:/data
     healthcheck:
@@ -46,9 +41,9 @@ services:
       - unotusk-network
 
   migration:
-    build:
-      context: $rootContext
-      dockerfile: infrastructure/docker/Dockerfile.worker
+${projectRoot != null ? '''    build:
+      context: $projectRoot
+      dockerfile: infrastructure/docker/Dockerfile.worker''' : '    image: unotusk-worker:0.1.0'}
     container_name: unotusk-migration
     depends_on:
       postgres:
@@ -61,9 +56,9 @@ services:
       - unotusk-network
 
   api:
-    build:
-      context: $rootContext
-      dockerfile: infrastructure/docker/Dockerfile.api
+${projectRoot != null ? '''    build:
+      context: $projectRoot
+      dockerfile: infrastructure/docker/Dockerfile.api''' : '    image: unotusk-api:0.1.0'}
     container_name: unotusk-api
     restart: unless-stopped
     depends_on:
@@ -94,18 +89,28 @@ services:
       - unotusk-network
 
   worker:
-    build:
-      context: $rootContext
-      dockerfile: infrastructure/docker/Dockerfile.worker
+${projectRoot != null ? '''    build:
+      context: $projectRoot
+      dockerfile: infrastructure/docker/Dockerfile.worker''' : '    image: unotusk-worker:0.1.0'}
     container_name: unotusk-worker
     restart: unless-stopped
     depends_on:
       migration:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
       - REDIS_URL=redis://redis:6379/0
+      - AUTH_SECRET=${config.authSecret}
+      - LLM_PROVIDER=${config.llmProvider == LlmProviderType.groq ? "groq" : "claude"}
+      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY"}=${config.llmApiKey}
+      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL"}=${config.llmProvider.defaultModel}
       - QUEUE_NAME=unotusk_tasks
     networks:
       - unotusk-network
@@ -132,8 +137,6 @@ services:
       POSTGRES_USER: ${config.postgresUser}
       POSTGRES_PASSWORD: ${config.postgresPassword}
       POSTGRES_DB: ${config.postgresDb}
-    ports:
-      - "127.0.0.1:${config.postgresPort}:5432"
     volumes:
       - unotusk_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -148,8 +151,6 @@ services:
     image: redis:7-alpine
     container_name: unotusk-redis
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:${config.redisPort}:6379"
     volumes:
       - unotusk_redis_data:/data
     healthcheck:
@@ -211,10 +212,20 @@ services:
     depends_on:
       migration:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
       - REDIS_URL=redis://redis:6379/0
+      - AUTH_SECRET=${config.authSecret}
+      - LLM_PROVIDER=${config.llmProvider == LlmProviderType.groq ? "groq" : "claude"}
+      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY"}=${config.llmApiKey}
+      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL"}=${config.llmProvider.defaultModel}
       - QUEUE_NAME=unotusk_tasks
     networks:
       - unotusk-network

@@ -18,9 +18,9 @@ class OverviewMetricStrip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Row(
         children: [
@@ -28,6 +28,7 @@ class OverviewMetricStrip extends StatelessWidget {
             label: 'Project Type',
             value: '$primaryLang Project',
             subtitle: '${metrics.languagesCount} languages detected',
+            isAccent: true,
           ),
           const _VerticalDivider(),
           _MetricItem(
@@ -57,11 +58,13 @@ class _MetricItem extends StatelessWidget {
   final String label;
   final String value;
   final String subtitle;
+  final bool isAccent;
 
   const _MetricItem({
     required this.label,
     required this.value,
     required this.subtitle,
+    this.isAccent = false,
   });
 
   @override
@@ -72,25 +75,26 @@ class _MetricItem extends StatelessWidget {
         children: [
           Text(
             label,
-            style: AppTextStyles.label.copyWith(
-              fontSize: 12,
-              color: AppColors.slate500,
+            style: AppTextStyles.monoBadge.copyWith(
+              fontSize: 11,
+              color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             value,
             style: AppTextStyles.h2.copyWith(
               fontSize: 18,
-              color: AppColors.slate900,
+              color: isAccent ? AppColors.accent : AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
             style: AppTextStyles.bodySmall.copyWith(
-              fontSize: 12,
-              color: AppColors.slate500,
+              fontSize: 11,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -105,10 +109,10 @@ class _VerticalDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 36,
+      height: 42,
       width: 1,
-      color: AppColors.slate200,
       margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: Theme.of(context).colorScheme.outline,
     );
   }
 }

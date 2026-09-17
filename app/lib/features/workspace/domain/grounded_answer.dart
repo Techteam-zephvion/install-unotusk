@@ -59,6 +59,11 @@ class GroundedAnswer {
     required this.createdAt,
   });
 
+  String get answer => content;
+  List<EvidenceItem> get citations => evidence;
+  String get confidenceLevel => confidence;
+  String? get reasoning => null;
+
   factory GroundedAnswer.fromJson(Map<String, dynamic> json) {
     final evidenceList = <EvidenceItem>[];
     if (json['evidence'] is List) {

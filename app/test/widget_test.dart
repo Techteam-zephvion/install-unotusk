@@ -52,48 +52,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify Login Screen is presented
+    // Verify Figma AuthFlow entry screen
     expect(find.text('Unotusk'), findsWidgets);
-    expect(find.text('Sign in to your account'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(2));
-  });
-
-  testWidgets('Server connection footer is visible on login screen', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1280, 800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-
-    SharedPreferences.setMockInitialValues({
-      'unotusk_server_url': 'http://localhost:8000',
-    });
-    final prefs = await SharedPreferences.getInstance();
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(prefs),
-          connectionRepositoryProvider.overrideWith(
-            (ref) => MockConnectionRepository(
-              ref.watch(apiClientProvider),
-              ref.watch(storageServiceProvider),
-            ),
-          ),
-          connectionControllerProvider.overrideWith(
-            (ref) => ConnectionController(
-              ref.watch(connectionRepositoryProvider),
-            )..state = const ServerConnectionState(
-                serverUrl: 'http://localhost:8000',
-                status: ConnectionStatus.connected,
-              ),
-          ),
-        ],
-        child: const UnotuskApp(),
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('http://localhost:8000'), findsOneWidget);
+    expect(find.text('Sign in to Unotusk'), findsOneWidget);
+    expect(find.text('Continue with OIDC Discovery'), findsOneWidget);
   });
 }

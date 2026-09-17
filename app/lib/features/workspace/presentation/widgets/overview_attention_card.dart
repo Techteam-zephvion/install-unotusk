@@ -19,9 +19,9 @@ class OverviewAttentionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,13 +29,14 @@ class OverviewAttentionCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.slate100,
+              color: AppColors.bgElevated,
               borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.divider),
             ),
             child: const Icon(
               Icons.warning_amber_rounded,
               size: 18,
-              color: AppColors.slate700,
+              color: AppColors.warning,
             ),
           ),
           const SizedBox(width: 14),
@@ -49,23 +50,28 @@ class OverviewAttentionCard extends StatelessWidget {
                       finding.title,
                       style: AppTextStyles.bodyMedium.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.slate900,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: finding.severity == 'CRITICAL'
                             ? AppColors.errorBg
                             : AppColors.warningBg,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: finding.severity == 'CRITICAL'
+                              ? AppColors.errorBorder
+                              : AppColors.warningBorder,
+                        ),
                       ),
                       child: Text(
                         finding.severity,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                        style: AppTextStyles.monoBadge.copyWith(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
                           color: finding.severity == 'CRITICAL'
                               ? AppColors.error
                               : AppColors.warning,
@@ -78,7 +84,7 @@ class OverviewAttentionCard extends StatelessWidget {
                 Text(
                   finding.description,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.slate600,
+                    color: AppColors.textSecondary,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -90,16 +96,17 @@ class OverviewAttentionCard extends StatelessWidget {
                     runSpacing: 4,
                     children: finding.relatedEntities.map((entity) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.slate100,
+                          color: AppColors.bgElevated,
                           borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.divider),
                         ),
                         child: Text(
                           entity,
-                          style: AppTextStyles.code.copyWith(
-                            fontSize: 11,
-                            color: AppColors.slate700,
+                          style: AppTextStyles.monoBadge.copyWith(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       );
@@ -113,8 +120,8 @@ class OverviewAttentionCard extends StatelessWidget {
           OutlinedButton(
             onPressed: onOpen,
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.slate900,
-              side: const BorderSide(color: AppColors.slate300),
+              foregroundColor: AppColors.accent,
+              side: BorderSide(color: AppColors.accent.withOpacity(0.4)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

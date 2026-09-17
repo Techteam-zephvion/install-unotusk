@@ -7,9 +7,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-unotusk}
-    ports:
-      # Bind to localhost only — prevents external network exposure in production.
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,9 +21,6 @@ services:
     image: redis:7-alpine
     container_name: unotusk-redis
     restart: unless-stopped
-    ports:
-      # Bind to localhost only — prevents external network exposure in production.
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -72,6 +66,11 @@ services:
       - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=${AUTH_SECRET:-insecure-dev-secret-please-change-in-production-min-32-chars-long}
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
     ports:
       - "${API_PORT:-8000}:8000"
     healthcheck:

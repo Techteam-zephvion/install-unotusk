@@ -13,6 +13,8 @@ class User {
     this.organizationId,
   });
 
+  String get name => fullName.isNotEmpty ? fullName : email.split('@').first;
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id']?.toString() ?? '',

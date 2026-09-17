@@ -17,13 +17,11 @@ def init_parsers() -> None:
         py_lang = tree_sitter.Language(tree_sitter_python.language())
         _parsers["Python"] = tree_sitter.Parser(py_lang)
 
-        # TypeScript
-        ts_lang = tree_sitter.Language(tree_sitter_typescript.language_typescript())
-        _parsers["TypeScript"] = tree_sitter.Parser(ts_lang)
-
-        # TSX
+        # TypeScript & TSX (language_tsx parses both standard TypeScript and TSX syntax safely)
         tsx_lang = tree_sitter.Language(tree_sitter_typescript.language_tsx())
-        _parsers["TypeScript/TSX"] = tree_sitter.Parser(tsx_lang)
+        tsx_parser = tree_sitter.Parser(tsx_lang)
+        _parsers["TypeScript"] = tsx_parser
+        _parsers["TypeScript/TSX"] = tsx_parser
 
         # JavaScript & JSX
         js_lang = tree_sitter.Language(tree_sitter_javascript.language())

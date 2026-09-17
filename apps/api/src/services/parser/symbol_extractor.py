@@ -30,20 +30,23 @@ def _get_node_text(node: tree_sitter.Node, code_bytes: bytes) -> str:
     return code_bytes[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
 
 
+def _get_node_lines(node: tree_sitter.Node, code_bytes: bytes) -> tuple[int, int]:
+    """Safely compute (start_line, end_line) from byte offsets without triggering
+    Cython Point descriptor memory bugs in Python 3.12."""
+    try:
+        sb = node.start_byte
+        eb = node.end_byte
+        start_line = code_bytes[:sb].count(b"\n") + 1
+        end_line = start_line + code_bytes[sb:eb].count(b"\n")
+        return start_line, max(start_line, end_line)
+    except Exception:
+        return 1, 1
+
+
 JS_CONTAINERS = {
     "program",
-    "statement_block",
     "export_statement",
     "export_default_statement",
-    "if_statement",
-    "for_statement",
-    "while_statement",
-    "try_statement",
-    "switch_statement",
-    "switch_case",
-    "switch_default",
-    "lexical_declaration",
-    "variable_declaration",
 }
 
 GO_CONTAINERS = {
@@ -130,22 +133,26 @@ def _extract_js_ts_symbols(
     for child in node.children:
         curr = child
         if curr.type in ("export_statement", "export_default_statement"):
-            for sub in curr.children:
-                if sub.type not in ("export", "default"):
-                    curr = sub
-                    break
+            decl = curr.child_by_field_name("declaration") or curr.child_by_field_name("value")
+            if not decl:
+                named = curr.named_children
+                if named:
+                    decl = named[0]
+            if decl:
+                curr = decl
 
         if curr.type == "class_declaration":
             name_node = curr.child_by_field_name("name")
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
                 qualified_name = f"{parent_scope}.{name}" if parent_scope else name
+                start_line, end_line = _get_node_lines(curr, code_bytes)
                 sym = ExtractedSymbol(
                     name=name,
                     symbol_type=SymbolType.CLASS,
                     qualified_name=qualified_name,
-                    start_line=curr.start_point.row + 1,
-                    end_line=curr.end_point.row + 1,
+                    start_line=start_line,
+                    end_line=end_line,
                 )
                 result.append(sym)
                 body_node = curr.child_by_field_name("body")
@@ -157,13 +164,14 @@ def _extract_js_ts_symbols(
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
                 qualified_name = f"{parent_scope}.{name}" if parent_scope else name
+                start_line, end_line = _get_node_lines(curr, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.FUNCTION,
                         qualified_name=qualified_name,
-                        start_line=curr.start_point.row + 1,
-                        end_line=curr.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
 
@@ -172,13 +180,14 @@ def _extract_js_ts_symbols(
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
                 qualified_name = f"{parent_scope}.{name}" if parent_scope else name
+                start_line, end_line = _get_node_lines(curr, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.METHOD,
                         qualified_name=qualified_name,
-                        start_line=curr.start_point.row + 1,
-                        end_line=curr.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
 
@@ -187,13 +196,14 @@ def _extract_js_ts_symbols(
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
                 qualified_name = f"{parent_scope}.{name}" if parent_scope else name
+                start_line, end_line = _get_node_lines(curr, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.INTERFACE,
                         qualified_name=qualified_name,
-                        start_line=curr.start_point.row + 1,
-                        end_line=curr.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
 
@@ -202,13 +212,14 @@ def _extract_js_ts_symbols(
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
                 qualified_name = f"{parent_scope}.{name}" if parent_scope else name
+                start_line, end_line = _get_node_lines(curr, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.TYPE,
                         qualified_name=qualified_name,
-                        start_line=curr.start_point.row + 1,
-                        end_line=curr.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
 
@@ -217,13 +228,14 @@ def _extract_js_ts_symbols(
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
                 qualified_name = f"{parent_scope}.{name}" if parent_scope else name
+                start_line, end_line = _get_node_lines(curr, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.ENUM,
                         qualified_name=qualified_name,
-                        start_line=curr.start_point.row + 1,
-                        end_line=curr.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
         elif curr.type in JS_CONTAINERS:
@@ -241,26 +253,28 @@ def _extract_go_symbols(
             name_node = child.child_by_field_name("name")
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
+                start_line, end_line = _get_node_lines(child, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.FUNCTION,
                         qualified_name=name,
-                        start_line=child.start_point.row + 1,
-                        end_line=child.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
         elif child.type == "method_declaration":
             name_node = child.child_by_field_name("name")
             if name_node:
                 name = _get_node_text(name_node, code_bytes)
+                start_line, end_line = _get_node_lines(child, code_bytes)
                 result.append(
                     ExtractedSymbol(
                         name=name,
                         symbol_type=SymbolType.METHOD,
                         qualified_name=name,
-                        start_line=child.start_point.row + 1,
-                        end_line=child.end_point.row + 1,
+                        start_line=start_line,
+                        end_line=end_line,
                     )
                 )
         elif child.type == "type_declaration":
@@ -269,13 +283,14 @@ def _extract_go_symbols(
                     name_node = spec.child_by_field_name("name")
                     if name_node:
                         name = _get_node_text(name_node, code_bytes)
+                        start_line, end_line = _get_node_lines(spec, code_bytes)
                         result.append(
                             ExtractedSymbol(
                                 name=name,
                                 symbol_type=SymbolType.TYPE,
                                 qualified_name=name,
-                                start_line=spec.start_point.row + 1,
-                                end_line=spec.end_point.row + 1,
+                                start_line=start_line,
+                                end_line=end_line,
                             )
                         )
         elif child.type in GO_CONTAINERS:

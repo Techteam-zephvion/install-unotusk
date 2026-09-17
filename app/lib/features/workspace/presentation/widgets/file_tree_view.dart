@@ -119,13 +119,13 @@ class _FileTreeViewState extends State<FileTreeView> {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 1, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.slate100 : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
-          border: isSelected ? Border.all(color: AppColors.slate300) : null,
+          color: isSelected ? AppColors.accentMuted : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: isSelected ? Border.all(color: AppColors.accent.withOpacity(0.4)) : null,
         ),
         child: InkWell(
           onTap: () => widget.onSelectFile(file),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: Padding(
             padding: EdgeInsets.only(
               left: 12.0 + (depth * 18.0) + 20.0, // align with folder contents
@@ -135,10 +135,10 @@ class _FileTreeViewState extends State<FileTreeView> {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.insert_drive_file_outlined,
-                  size: 15,
-                  color: AppColors.slate500,
+                  size: 14,
+                  color: isSelected ? AppColors.accent : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -146,7 +146,7 @@ class _FileTreeViewState extends State<FileTreeView> {
                     node.name,
                     style: AppTextStyles.bodyMedium.copyWith(
                       fontSize: 13,
-                      color: isSelected ? AppColors.slate950 : AppColors.slate800,
+                      color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                     ),
                     overflow: TextOverflow.ellipsis,

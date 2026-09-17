@@ -155,16 +155,21 @@ class RepositoryService:
         int_res = await session.execute(int_query)
         integration = int_res.scalar_one_or_none()
 
+        token = os.getenv("GITHUB_TOKEN")
         if integration is None:
             integration = Integration(
                 project_id=project.id,
                 provider=IntegrationProvider.GITHUB,
                 status=IntegrationStatus.CONNECTED,
                 external_id=data.external_id,
-                integration_metadata={},
+                integration_metadata={"github_token": token} if token else {},
             )
             session.add(integration)
             await session.flush()
+        elif token and not (integration.integration_metadata or {}).get("github_token"):
+            meta = dict(integration.integration_metadata or {})
+            meta["github_token"] = token
+            integration.integration_metadata = meta
 
         # Check existing repository record
         repo_query = select(Repository).where(

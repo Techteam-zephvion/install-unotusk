@@ -20,34 +20,34 @@ class EvidenceCitationChip extends StatelessWidget {
 
     return InkWell(
       onTap: () => onTap?.call(evidence.file, evidence.lines),
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.slate100,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppColors.slate200),
+          color: AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.code, size: 13, color: AppColors.slate700),
+            const Icon(Icons.code, size: 12, color: AppColors.accent),
             const SizedBox(width: 6),
             Text(
               displayLabel,
-              style: AppTextStyles.code.copyWith(
+              style: AppTextStyles.monoBadge.copyWith(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.slate900,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
               ),
             ),
             if (evidence.symbol != null) ...[
               const SizedBox(width: 6),
               Text(
                 '• ${evidence.symbol}',
-                style: AppTextStyles.code.copyWith(
+                style: AppTextStyles.monoBadge.copyWith(
                   fontSize: 11,
-                  color: AppColors.slate600,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],

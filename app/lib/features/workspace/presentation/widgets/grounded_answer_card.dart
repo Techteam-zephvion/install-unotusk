@@ -18,12 +18,14 @@ class GroundedAnswerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isConfirmed = answer.evidence.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -31,37 +33,42 @@ class GroundedAnswerCard extends StatelessWidget {
           // Question Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: AppColors.slate50,
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: AppColors.bgElevated,
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
               ),
-              border: Border(bottom: BorderSide(color: AppColors.slate200)),
+              border: Border(bottom: BorderSide(color: Theme.of(context).colorScheme.outline)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.help_outline, size: 16, color: AppColors.slate600),
+                const Icon(Icons.help_outline, size: 15, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     question,
-                    style: AppTextStyles.h2.copyWith(fontSize: 14, color: AppColors.slate900),
+                    style: AppTextStyles.h2.copyWith(fontSize: 14),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.slate200,
-                    borderRadius: BorderRadius.circular(4),
+                    color: isConfirmed ? AppColors.confirmedBg : AppColors.inferredBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isConfirmed
+                          ? AppColors.confirmed.withOpacity(0.35)
+                          : AppColors.inferred.withOpacity(0.35),
+                    ),
                   ),
                   child: Text(
-                    'GROUNDED',
-                    style: AppTextStyles.bodySmall.copyWith(
+                    isConfirmed ? '[CONFIRMED]' : '[INFERRED]',
+                    style: AppTextStyles.monoBadge.copyWith(
                       fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.slate700,
+                      fontWeight: FontWeight.bold,
+                      color: isConfirmed ? AppColors.confirmed : AppColors.inferred,
                     ),
                   ),
                 ),
@@ -79,19 +86,19 @@ class GroundedAnswerCard extends StatelessWidget {
                 Text(
                   answer.content,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.slate800,
-                    height: 1.5,
+                    color: AppColors.textPrimary,
+                    height: 1.55,
                   ),
                 ),
 
                 // Citations & Evidence Section
                 if (answer.evidence.isNotEmpty) ...[
-                  const Divider(height: 24, color: AppColors.slate200),
+                  Divider(height: 24, color: Theme.of(context).colorScheme.outline),
                   Text(
                     'Supporting Evidence & Citations',
-                    style: AppTextStyles.bodySmall.copyWith(
+                    style: AppTextStyles.monoBadge.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: AppColors.slate700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -105,39 +112,6 @@ class GroundedAnswerCard extends StatelessWidget {
                       );
                     }).toList(),
                   ),
-
-                  // Snippets if present
-                  ...answer.evidence.where((e) => e.snippet != null && e.snippet!.isNotEmpty).map((e) {
-                    return Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.slate950,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.slate800),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${e.file}${e.lines != null ? ':${e.lines}' : ''}',
-                            style: AppTextStyles.code.copyWith(
-                              fontSize: 11,
-                              color: AppColors.primaryMuted,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            e.snippet!,
-                            style: AppTextStyles.code.copyWith(
-                              fontSize: 12,
-                              color: AppColors.slate100,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
                 ],
               ],
             ),

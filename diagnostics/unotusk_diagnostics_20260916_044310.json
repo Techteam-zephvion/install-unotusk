@@ -1,0 +1,25 @@
+{
+  "timestamp_utc": "2026-09-16T04:43:10.718890+00:00",
+  "unotusk_version": "0.1.0",
+  "system_info": {
+    "unotusk_version": "0.1.0",
+    "platform": "Linux-7.1.5-76070105-generic-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "architecture": "x86_64",
+    "processor": "x86_64"
+  },
+  "docker_status": {
+    "docker_available": true,
+    "compose_version": "Docker Compose version v5.1.4",
+    "containers": []
+  },
+  "server_health": {
+    "url": "http://localhost:8000",
+    "liveness": "unreachable: <urlopen error [Errno 111] Connection refused>",
+    "readiness": "unreachable: <urlopen error [Errno 111] Connection refused>"
+  },
+  "sanitized_logs": {
+    "api": [],
+    "worker": []
+  }
+}

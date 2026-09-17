@@ -145,12 +145,16 @@ async def handle_generic_exception(request: Request, exc: Exception):
 
 # Register Routers
 app.include_router(health.router)
-app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-app.include_router(organizations.router, prefix=settings.API_V1_PREFIX)
-app.include_router(projects.router, prefix=settings.API_V1_PREFIX)
-app.include_router(repository.router, prefix=settings.API_V1_PREFIX)
-app.include_router(intelligence.router, prefix=settings.API_V1_PREFIX)
-app.include_router(discovery.router, prefix=settings.API_V1_PREFIX)
-app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
-app.include_router(knowledge.router, prefix=settings.API_V1_PREFIX)
-app.include_router(tasks.router, prefix=settings.API_V1_PREFIX)
+for r in [
+    auth.router,
+    organizations.router,
+    projects.router,
+    repository.router,
+    intelligence.router,
+    discovery.router,
+    reports.router,
+    knowledge.router,
+    tasks.router,
+]:
+    app.include_router(r, prefix=settings.API_V1_PREFIX)
+    app.include_router(r)

@@ -73,6 +73,8 @@ class IngestionService:
             github_token = None
             if integration and integration.integration_metadata:
                 github_token = integration.integration_metadata.get("github_token")
+            if not github_token:
+                github_token = os.getenv("GITHUB_TOKEN")
 
             # Update status to CLONING
             snapshot.status = SnapshotStatus.CLONING
@@ -376,6 +378,11 @@ class IngestionService:
                 snapshot.status = SnapshotStatus.FAILED
                 snapshot.error_message = str(e)
                 snapshot.completed_at = utc_now()
+                proj_query = select(Project).where(Project.id == repository.project_id)
+                proj_res = await session.execute(proj_query)
+                proj = proj_res.scalar_one_or_none()
+                if proj:
+                    proj.status = ProjectStatus.ERROR
                 await session.commit()
             finally:
                 if temp_dir and os.path.exists(temp_dir):

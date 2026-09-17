@@ -1,4 +1,5 @@
 import ast
+import re
 
 import tree_sitter
 
@@ -23,26 +24,16 @@ def _clean_str(text: str) -> str:
     return text.strip().strip("'\"`")
 
 
+JS_IMPORT_RE = re.compile(
+    r"""(?:^|[;\n])\s*(?:export\s+(?:[\w\s{},*]+from\s+)?|import\s+(?:(?:type\s+)?[\w\s{},*]+from\s+)?|import\s+)['"]([^'"]+)['"]""",
+    re.MULTILINE,
+)
+JS_REQUIRE_RE = re.compile(r"""(?:require|import)\s*\(\s*['"]([^'"]+)['"]\s*\)""")
+
 JS_CONTAINERS = {
     "program",
-    "statement_block",
     "export_statement",
     "export_default_statement",
-    "if_statement",
-    "for_statement",
-    "while_statement",
-    "try_statement",
-    "switch_statement",
-    "switch_case",
-    "switch_default",
-    "function_declaration",
-    "function_expression",
-    "arrow_function",
-    "method_definition",
-    "lexical_declaration",
-    "variable_declaration",
-    "variable_declarator",
-    "expression_statement",
 }
 
 GO_CONTAINERS = {
@@ -66,13 +57,14 @@ def extract_dependencies_from_tree(
     if language == "Python":
         return _extract_python_ast_dependencies(code_bytes)
 
+    if language in ("TypeScript", "TypeScript/TSX", "JavaScript", "JavaScript/JSX"):
+        return _extract_js_ts_dependencies(code_bytes)
+
     if tree is None:
         return deps
 
     root = tree.root_node
-    if language in ("TypeScript", "TypeScript/TSX", "JavaScript", "JavaScript/JSX"):
-        _extract_js_ts_dependencies(root, code_bytes, deps)
-    elif language == "Go":
+    if language == "Go":
         _extract_go_dependencies(root, code_bytes, deps)
 
     return deps
@@ -115,65 +107,52 @@ def _extract_python_ast_dependencies(code_bytes: bytes) -> list[ExtractedDepende
     return deps
 
 
-def _extract_js_ts_dependencies(
-    node: tree_sitter.Node,
-    code_bytes: bytes,
-    result: list[ExtractedDependency],
-) -> None:
-    for child in node.children:
-        if child.type == "import_statement":
-            source_node = child.child_by_field_name("source")
-            if source_node:
-                raw_path = _clean_str(
-                    code_bytes[source_node.start_byte : source_node.end_byte].decode(
-                        "utf-8", errors="replace"
-                    )
-                )
-                is_rel = (
-                    raw_path.startswith("./")
-                    or raw_path.startswith("../")
-                    or raw_path.startswith("@/")
-                )
-                result.append(
-                    ExtractedDependency(
-                        raw_target=raw_path,
-                        dependency_type=DependencyType.IMPORT,
-                        line_number=child.start_point.row + 1,
-                        is_relative=is_rel,
-                    )
-                )
+def _extract_js_ts_dependencies(code_bytes: bytes) -> list[ExtractedDependency]:
+    result: list[ExtractedDependency] = []
+    try:
+        code_str = code_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        return result
 
-        elif child.type == "call_expression":
-            fn_node = child.child_by_field_name("function")
-            if fn_node:
-                fn_text = code_bytes[fn_node.start_byte : fn_node.end_byte].decode(
-                    "utf-8", errors="replace"
-                )
-                if fn_text == "require":
-                    args_node = child.child_by_field_name("arguments")
-                    if args_node:
-                        for arg in args_node.children:
-                            if arg.type in ("string", "string_fragment", "template_string"):
-                                raw_arg = _clean_str(
-                                    code_bytes[arg.start_byte : arg.end_byte].decode(
-                                        "utf-8", errors="replace"
-                                    )
-                                )
-                                is_rel = (
-                                    raw_arg.startswith("./")
-                                    or raw_arg.startswith("../")
-                                    or raw_arg.startswith("@/")
-                                )
-                                result.append(
-                                    ExtractedDependency(
-                                        raw_target=raw_arg,
-                                        dependency_type=DependencyType.REQUIRE,
-                                        line_number=child.start_point.row + 1,
-                                        is_relative=is_rel,
-                                    )
-                                )
-        if child.type in JS_CONTAINERS:
-            _extract_js_ts_dependencies(child, code_bytes, result)
+    for match in JS_IMPORT_RE.finditer(code_str):
+        raw_path = match.group(1).strip()
+        if not raw_path:
+            continue
+        line_no = code_str.count("\n", 0, match.start()) + 1
+        is_rel = (
+            raw_path.startswith("./")
+            or raw_path.startswith("../")
+            or raw_path.startswith("@/")
+        )
+        result.append(
+            ExtractedDependency(
+                raw_target=raw_path,
+                dependency_type=DependencyType.IMPORT,
+                line_number=line_no,
+                is_relative=is_rel,
+            )
+        )
+
+    for match in JS_REQUIRE_RE.finditer(code_str):
+        raw_path = match.group(1).strip()
+        if not raw_path:
+            continue
+        line_no = code_str.count("\n", 0, match.start()) + 1
+        is_rel = (
+            raw_path.startswith("./")
+            or raw_path.startswith("../")
+            or raw_path.startswith("@/")
+        )
+        result.append(
+            ExtractedDependency(
+                raw_target=raw_path,
+                dependency_type=DependencyType.REQUIRE,
+                line_number=line_no,
+                is_relative=is_rel,
+            )
+        )
+
+    return result
 
 
 def _extract_go_dependencies(
@@ -196,7 +175,7 @@ def _extract_go_dependencies(
                             ExtractedDependency(
                                 raw_target=raw_path,
                                 dependency_type=DependencyType.IMPORT,
-                                line_number=spec.start_point.row + 1,
+                                line_number=code_bytes[:spec.start_byte].count(b"\n") + 1,
                                 is_relative=raw_path.startswith("./") or raw_path.startswith("../"),
                             )
                         )

@@ -34,12 +34,12 @@ class AppButton extends StatelessWidget {
             height: 14,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D0A08)),
             ),
           ),
           const SizedBox(width: 8),
         ] else if (icon != null) ...[
-          Icon(icon, size: 16),
+          Icon(icon, size: 15),
           const SizedBox(width: 6),
         ],
         Text(text),
@@ -52,13 +52,16 @@ class AppButton extends StatelessWidget {
         button = ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.slate300,
-            disabledForegroundColor: AppColors.slate500,
+            backgroundColor: AppColors.accent,
+            foregroundColor: const Color(0xFF0D0A08),
+            disabledBackgroundColor: AppColors.bgElevated,
+            disabledForegroundColor: AppColors.textSecondary,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-            textStyle: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            textStyle: AppTextStyles.label.copyWith(
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF0D0A08),
+            ),
           ),
           child: child,
         );
@@ -68,11 +71,11 @@ class AppButton extends StatelessWidget {
         button = OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.slate800,
-            side: const BorderSide(color: AppColors.slate300),
+            foregroundColor: AppColors.textPrimary,
+            side: const BorderSide(color: AppColors.divider),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-            textStyle: AppTextStyles.label,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            textStyle: AppTextStyles.label.copyWith(color: AppColors.textPrimary),
           ),
           child: child,
         );
@@ -85,7 +88,7 @@ class AppButton extends StatelessWidget {
             backgroundColor: AppColors.error,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
             textStyle: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600),
           ),
           child: child,
@@ -96,7 +99,7 @@ class AppButton extends StatelessWidget {
         button = TextButton(
           onPressed: isLoading ? null : onPressed,
           style: TextButton.styleFrom(
-            foregroundColor: AppColors.slate700,
+            foregroundColor: AppColors.textSecondary,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             textStyle: AppTextStyles.label,

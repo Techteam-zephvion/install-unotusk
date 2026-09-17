@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text_styles.dart';
 
 class AppTextField extends StatelessWidget {
@@ -55,7 +54,7 @@ class AppTextField extends StatelessWidget {
           onEditingComplete: onEditingComplete,
           autofocus: autofocus,
           readOnly: readOnly,
-          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate900),
+          style: AppTextStyles.bodyMedium.copyWith(color: Theme.of(context).colorScheme.onSurface),
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon,

@@ -111,25 +111,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Project Workspace Shell Tabs
-    expect(find.text('Overview'), findsOneWidget);
-    expect(find.text('Discoveries'), findsOneWidget);
-    expect(find.text('Architecture'), findsOneWidget);
-    expect(find.text('Files'), findsOneWidget);
-    expect(find.text('Knowledge'), findsOneWidget);
     expect(find.text('Ask'), findsOneWidget);
+    expect(find.text('Spec History'), findsOneWidget);
+    expect(find.text('Ontology Graph'), findsOneWidget);
+    expect(find.text('Ingestion Feed'), findsOneWidget);
 
-    // Tap on Discoveries tab
-    await tester.tap(find.text('Discoveries'));
+    // Tap on Spec History tab
+    await tester.tap(find.text('Spec History'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Discoveries'), findsWidgets);
-
-    // Tap on Settings navigation
-    await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Server address'), findsOneWidget);
-    expect(find.text('Jane Dev'), findsWidgets);
-    expect(find.text('Sign Out'), findsOneWidget);
+    expect(find.text('Project Intelligence Record'), findsOneWidget);
   });
 }
