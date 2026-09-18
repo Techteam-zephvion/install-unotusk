@@ -23,31 +23,27 @@ env:
 
 jobs:
   # ──────────────────────────────────────────────
-  # 1. Linux — tar.gz (unchanged)
+  # 1. Linux — tar.gz
   # ──────────────────────────────────────────────
   build-linux:
-    name: "🐧 Linux x64 (.tar.gz)"
+    name: "Linux x64 (.tar.gz)"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install Linux desktop dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y \
-            clang cmake ninja-build pkg-config \
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev
 
-      - name: Set up Flutter (beta)
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      - name: Enable Linux desktop
-        run: flutter config --enable-linux-desktop
+      - run: flutter config --enable-linux-desktop
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
@@ -60,14 +56,13 @@ jobs:
             --build-name="${{ github.event.inputs.version || '1.0.0' }}" \
             --build-number="${{ github.run_number }}"
 
-      - name: Package as tar.gz + sha256
+      - name: Package tar.gz + sha256
         working-directory: ${{ env.APP_DIR }}/build/linux/x64/release
         run: |
           tar -czf unotusk-employee-linux-x64.tar.gz bundle/
           sha256sum unotusk-employee-linux-x64.tar.gz > unotusk-employee-linux-x64.tar.gz.sha256
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: unotusk-employee-linux-x64
           path: |
@@ -76,26 +71,23 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────
-  # 2. Windows — MSI installer (WiX v3)
+  # 2. Windows — MSI installer via WiX v3
   # ──────────────────────────────────────────────
   build-windows:
-    name: "🪟 Windows x64 (.msi)"
+    name: "Windows x64 (.msi)"
     runs-on: windows-latest
     env:
       APP_VERSION: ${{ github.event.inputs.version || '1.0.0' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Flutter (beta)
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
+      - run: flutter config --enable-windows-desktop
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
@@ -103,146 +95,114 @@ jobs:
 
       - name: Build Windows release
         working-directory: ${{ env.APP_DIR }}
+        shell: pwsh
         run: |
           flutter build windows --release `
             --build-name="$env:APP_VERSION" `
             --build-number="${{ github.run_number }}"
 
-      - name: Locate WiX v3 toolchain
+      - name: Locate WiX v3
         id: wix
         shell: pwsh
         run: |
-          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -ErrorAction SilentlyContinue |
+          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
                  Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
           if (-not $dir) {
-            Write-Host "WiX not found pre-installed — installing via Chocolatey..."
             choco install wixtoolset -y --no-progress | Out-Null
             $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
                    Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
           }
-          $bin = "$dir\bin"
-          Write-Host "WiX bin: $bin"
-          echo "WIX_BIN=$bin" >> $env:GITHUB_OUTPUT
+          echo "WIX_BIN=$dir\bin" >> $env:GITHUB_OUTPUT
+          Write-Host "WiX found at: $dir\bin"
 
-      - name: Harvest files and build MSI
+      - name: Harvest files + write WXS via Python + build MSI
         shell: pwsh
         env:
           WIX_BIN: ${{ steps.wix.outputs.WIX_BIN }}
-          RELEASE_DIR: ${{ env.APP_DIR }}\build\windows\x64\runner\Release
         run: |
-          $heat    = "$env:WIX_BIN\heat.exe"
-          $candle  = "$env:WIX_BIN\candle.exe"
-          $light   = "$env:WIX_BIN\light.exe"
-          $src     = (Resolve-Path $env:RELEASE_DIR).Path
+          $src = (Resolve-Path "${{ env.APP_DIR }}\build\windows\x64\runner\Release").Path
 
-          # --- Harvest all files from the Flutter release bundle ---
-          & $heat dir $src `
-            -o Components.wxs `
-            -scom -sreg -srd `
-            -dr INSTALLFOLDER `
-            -cg AppComponents `
-            -var var.SourceDir `
-            -nologo
-          if ($LASTEXITCODE -ne 0) { throw "heat.exe failed" }
+          # Harvest all files from the Flutter release directory
+          & "$env:WIX_BIN\heat.exe" dir $src `
+            -o Components.wxs -scom -sreg -srd `
+            -dr INSTALLFOLDER -cg AppComponents `
+            -var var.SourceDir -nologo
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-          # --- Minimal license RTF (required by WixUI_Minimal) ---
-          '{\rtf1\ansi\deff0 Unotusk Employee App\line Internal Use Only.\line Copyright (C) 2026 Techteam Zephvion.}' |
-            Out-File License.rtf -Encoding ascii
+          # Write License.rtf (required by WixUI_Minimal)
+          '{\rtf1\ansi Unotusk Employee App - Internal Use Only.}' | Out-File License.rtf -Encoding ascii
 
-          # --- Product.wxs ---
+          # Use Python (always present on windows-latest) to write Product.wxs safely
           $ver = "$env:APP_VERSION.0"
-          $wxs = @"
-<?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*"
-           Name="Unotusk Employee"
-           Language="1033"
-           Version="$ver"
-           Manufacturer="Techteam Zephvion"
-           UpgradeCode="7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D">
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Unotusk Employee is already installed." />
-    <MediaTemplate EmbedCab="yes" />
-    <Feature Id="ProductFeature" Title="Unotusk Employee" Level="1">
-      <ComponentGroupRef Id="AppComponents" />
-      <ComponentRef Id="DesktopShortcutComp" />
-      <ComponentRef Id="StartMenuShortcutComp" />
-    </Feature>
-    <UIRef Id="WixUI_Minimal" />
-    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
-  </Product>
+          python -c "
+          import sys
+          wxs = '''<?xml version='1.0' encoding='UTF-8'?>
+          <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+            <Product Id='*' Name='Unotusk Employee' Language='1033'
+                     Version='{ver}' Manufacturer='Techteam Zephvion'
+                     UpgradeCode='7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D'>
+              <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>
+              <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>
+              <MediaTemplate EmbedCab='yes'/>
+              <Feature Id='ProductFeature' Title='Unotusk Employee' Level='1'>
+                <ComponentGroupRef Id='AppComponents'/>
+                <ComponentRef Id='DesktopShortcutComp'/>
+                <ComponentRef Id='StartMenuShortcutComp'/>
+              </Feature>
+              <UIRef Id='WixUI_Minimal'/>
+              <WixVariable Id='WixUILicenseRtf' Value='License.rtf'/>
+            </Product>
+            <Fragment>
+              <Directory Id='TARGETDIR' Name='SourceDir'>
+                <Directory Id='ProgramFiles64Folder'>
+                  <Directory Id='INSTALLFOLDER' Name='Unotusk Employee'/>
+                </Directory>
+                <Directory Id='DesktopFolder'/>
+                <Directory Id='ProgramMenuFolder'>
+                  <Directory Id='StartMenuAppFolder' Name='Unotusk Employee'/>
+                </Directory>
+              </Directory>
+            </Fragment>
+            <Fragment>
+              <DirectoryRef Id='DesktopFolder'>
+                <Component Id='DesktopShortcutComp' Guid='A1B2C3D4-E5F6-7890-ABCD-111111111111' Win64='yes'>
+                  <Shortcut Id='DesktopShortcut' Name='Unotusk Employee'
+                            Target='[INSTALLFOLDER]app.exe' WorkingDirectory='INSTALLFOLDER'/>
+                  <RegistryValue Root='HKCU' Key='Software\TechteamZephvion\UnotuskEmployee'
+                                 Name='DesktopShortcut' Type='integer' Value='1' KeyPath='yes'/>
+                </Component>
+              </DirectoryRef>
+              <DirectoryRef Id='StartMenuAppFolder'>
+                <Component Id='StartMenuShortcutComp' Guid='B2C3D4E5-F6A7-8901-BCDE-222222222222' Win64='yes'>
+                  <Shortcut Id='StartMenuShortcut' Name='Unotusk Employee'
+                            Target='[INSTALLFOLDER]app.exe' WorkingDirectory='INSTALLFOLDER'/>
+                  <RemoveFolder Id='RemoveStartMenuFolder' Directory='StartMenuAppFolder' On='uninstall'/>
+                  <RegistryValue Root='HKCU' Key='Software\TechteamZephvion\UnotuskEmployee'
+                                 Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>
+                </Component>
+              </DirectoryRef>
+            </Fragment>
+          </Wix>'''.replace('{ver}', sys.argv[1])
+          open('Product.wxs', 'w').write(wxs)
+          print('Product.wxs written OK')
+          " "$ver"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-  <Fragment>
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="Unotusk Employee" />
-      </Directory>
-      <Directory Id="DesktopFolder" />
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="StartMenuAppFolder" Name="Unotusk Employee" />
-      </Directory>
-    </Directory>
-  </Fragment>
+          # Compile
+          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-  <Fragment>
-    <DirectoryRef Id="DesktopFolder">
-      <Component Id="DesktopShortcutComp"
-                 Guid="A1B2C3D4-E5F6-7890-ABCD-111111111111"
-                 Win64="yes">
-        <Shortcut Id="DesktopShortcut"
-                  Name="Unotusk Employee"
-                  Description="Unotusk Employee Application"
-                  Target="[INSTALLFOLDER]app.exe"
-                  WorkingDirectory="INSTALLFOLDER" />
-        <RegistryValue Root="HKCU"
-                       Key="Software\TechteamZephvion\UnotuskEmployee"
-                       Name="DesktopShortcut"
-                       Type="integer" Value="1" KeyPath="yes" />
-      </Component>
-    </DirectoryRef>
+          # Link
+          & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension `
+            Product.wixobj Components.wixobj -o unotusk-employee-windows-x64.msi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-    <DirectoryRef Id="StartMenuAppFolder">
-      <Component Id="StartMenuShortcutComp"
-                 Guid="B2C3D4E5-F6A7-8901-BCDE-222222222222"
-                 Win64="yes">
-        <Shortcut Id="StartMenuShortcut"
-                  Name="Unotusk Employee"
-                  Description="Unotusk Employee Application"
-                  Target="[INSTALLFOLDER]app.exe"
-                  WorkingDirectory="INSTALLFOLDER" />
-        <RemoveFolder Id="RemoveStartMenuFolder"
-                      Directory="StartMenuAppFolder"
-                      On="uninstall" />
-        <RegistryValue Root="HKCU"
-                       Key="Software\TechteamZephvion\UnotuskEmployee"
-                       Name="StartMenuShortcut"
-                       Type="integer" Value="1" KeyPath="yes" />
-      </Component>
-    </DirectoryRef>
-  </Fragment>
-</Wix>
-"@
-          $wxs | Out-File Product.wxs -Encoding UTF8
-
-          # --- Compile ---
-          & $candle -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
-          if ($LASTEXITCODE -ne 0) { throw "candle.exe failed" }
-
-          # --- Link ---
-          & $light -nologo -ext WixUIExtension `
-            Product.wixobj Components.wixobj `
-            -o unotusk-employee-windows-x64.msi
-          if ($LASTEXITCODE -ne 0) { throw "light.exe failed" }
-
-          # --- Checksum ---
+          # Checksum
           $hash = (Get-FileHash unotusk-employee-windows-x64.msi -Algorithm SHA256).Hash
-          "$hash  unotusk-employee-windows-x64.msi" |
-            Out-File unotusk-employee-windows-x64.msi.sha256 -Encoding ascii
+          "$hash  unotusk-employee-windows-x64.msi" | Out-File unotusk-employee-windows-x64.msi.sha256 -Encoding ascii
+          Write-Host "Done. MSI size: $([math]::Round((Get-Item unotusk-employee-windows-x64.msi).Length/1MB,1)) MB"
 
-          Write-Host "MSI size: $((Get-Item unotusk-employee-windows-x64.msi).Length / 1MB -as [int]) MB"
-
-      - name: Upload Windows MSI artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: unotusk-employee-windows-x64
           path: |
@@ -251,24 +211,21 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────
-  # 3. macOS — DMG disk image (create-dmg)
+  # 3. macOS — DMG disk image
   # ──────────────────────────────────────────────
   build-macos:
-    name: "🍎 macOS (.dmg)"
+    name: "macOS (.dmg)"
     runs-on: macos-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Flutter (beta)
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      - name: Enable macOS desktop
-        run: flutter config --enable-macos-desktop
+      - run: flutter config --enable-macos-desktop
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
@@ -287,50 +244,32 @@ jobs:
       - name: Create DMG
         working-directory: ${{ env.APP_DIR }}/build/macos/Build/Products/Release
         run: |
-          # Find the .app bundle (handles any app name)
-          APP_BUNDLE=$(ls -d *.app 2>/dev/null | head -1)
-          if [ -z "$APP_BUNDLE" ]; then
-            echo "ERROR: No .app bundle found in Release directory"
-            ls -la
-            exit 1
-          fi
-          echo "Building DMG for: $APP_BUNDLE"
+          APP=$(ls -d *.app 2>/dev/null | head -1)
+          if [ -z "$APP" ]; then echo "No .app found"; ls -la; exit 1; fi
+          echo "Creating DMG for: $APP"
 
-          # Create styled DMG with Applications shortcut
           create-dmg \
             --volname "Unotusk Employee" \
             --window-pos 200 120 \
             --window-size 660 400 \
             --icon-size 128 \
-            --icon "$APP_BUNDLE" 180 185 \
-            --hide-extension "$APP_BUNDLE" \
+            --icon "$APP" 180 185 \
+            --hide-extension "$APP" \
             --app-drop-link 480 185 \
             --no-internet-enable \
-            "unotusk-employee-macos.dmg" \
-            "$APP_BUNDLE" || {
-              # Fallback: create-dmg exits 1 when it can't set custom volume icon
-              # The DMG is still valid — only warn, don't fail
-              echo "Warning: create-dmg returned non-zero (usually icon styling only)"
-            }
+            "unotusk-employee-macos.dmg" "$APP" || true
 
-          # If DMG still not produced, fall back to plain hdiutil
           if [ ! -f "unotusk-employee-macos.dmg" ]; then
             echo "Falling back to hdiutil..."
-            mkdir -p _dmg_stage
-            cp -r "$APP_BUNDLE" _dmg_stage/
-            ln -s /Applications _dmg_stage/Applications
-            hdiutil create \
-              -volname "Unotusk Employee" \
-              -srcfolder _dmg_stage \
-              -ov -format UDZO \
-              "unotusk-employee-macos.dmg"
+            mkdir -p _stage && cp -r "$APP" _stage/ && ln -s /Applications _stage/Applications
+            hdiutil create -volname "Unotusk Employee" -srcfolder _stage \
+              -ov -format UDZO "unotusk-employee-macos.dmg"
           fi
 
           shasum -a 256 unotusk-employee-macos.dmg > unotusk-employee-macos.dmg.sha256
           echo "DMG size: $(du -sh unotusk-employee-macos.dmg | cut -f1)"
 
-      - name: Upload macOS DMG artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: unotusk-employee-macos
           path: |
@@ -342,56 +281,38 @@ jobs:
   # 4. GitHub Release — only on v* tags
   # ──────────────────────────────────────────────
   release:
-    name: "📦 GitHub Release"
+    name: "GitHub Release"
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: dist/
 
-      - name: List downloaded files
-        run: find dist/ -type f | sort
+      - run: find dist/ -type f | sort
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           name: "Unotusk Employee App ${{ github.ref_name }}"
           body: |
             ## Unotusk Employee App — ${{ github.ref_name }}
 
-            ### Downloads
-
             | Platform | File | Format |
             |---|---|---|
-            | 🐧 Linux x64 | `unotusk-employee-linux-x64.tar.gz` | Archive |
-            | 🪟 Windows x64 | `unotusk-employee-windows-x64.msi` | MSI Installer |
-            | 🍎 macOS | `unotusk-employee-macos.dmg` | Disk Image |
+            | Linux x64 | `unotusk-employee-linux-x64.tar.gz` | Archive |
+            | Windows x64 | `unotusk-employee-windows-x64.msi` | MSI Installer |
+            | macOS | `unotusk-employee-macos.dmg` | Disk Image |
 
-            Each binary has a matching `.sha256` checksum file for integrity verification.
+            Each binary has a matching `.sha256` checksum file.
 
-            ---
+            **Windows** — double-click the `.msi`, click Install. Creates Start Menu + Desktop shortcuts.
+            **macOS** — open the `.dmg`, drag the app to Applications.
+            **Linux** — extract the `.tar.gz` and run `bundle/app`.
 
-            ### Install instructions
-
-            **Windows** — double-click the `.msi` file, click *Install*. The app installs to `Program Files` with Start Menu and Desktop shortcuts.
-
-            **macOS** — open the `.dmg`, drag **Unotusk Employee** into **Applications**, then launch from Applications.
-
-            **Linux** — extract the `.tar.gz` and run the `app` binary:
-            ```bash
-            tar -xzf unotusk-employee-linux-x64.tar.gz
-            ./bundle/app
-            ```
-
-            ---
-
-            ### Connect to your Unotusk server
-            Open **Settings → Server URL** and enter: `http://<SERVER_LAN_IP>:8000`
+            Connect to server: `http://<SERVER_LAN_IP>:8000`
           draft: false
           prerelease: false
           files: |
