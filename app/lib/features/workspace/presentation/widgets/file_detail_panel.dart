@@ -69,12 +69,12 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
     );
 
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
+      color: AppColors.bgSurface,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.slate200),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,7 +83,7 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.slate200)),
+              border: Border(bottom: BorderSide(color: AppColors.divider)),
             ),
             child: Row(
               children: [
@@ -95,24 +95,26 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                         children: [
                           Text(
                             widget.file.filename,
-                            style: AppTextStyles.bodyMedium.copyWith(
+                            style: AppTextStyles.inter(
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.slate900,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                             decoration: BoxDecoration(
-                              color: AppColors.slate100,
+                              color: AppColors.bgElevated,
                               borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppColors.divider),
                             ),
                             child: Text(
                               widget.file.language,
-                              style: AppTextStyles.bodySmall.copyWith(
+                              style: AppTextStyles.mono(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
-                                color: AppColors.slate600,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -121,9 +123,9 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                       const SizedBox(height: 2),
                       Text(
                         widget.file.path,
-                        style: AppTextStyles.code.copyWith(
+                        style: AppTextStyles.mono(
                           fontSize: 11,
-                          color: AppColors.slate500,
+                          color: AppColors.textSecondary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -131,7 +133,7 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 16, color: AppColors.slate500),
+                  icon: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
                   onPressed: widget.onClose,
                   tooltip: 'Close Inspector',
                 ),
@@ -143,8 +145,8 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: const BoxDecoration(
-              color: AppColors.slate50,
-              border: Border(bottom: BorderSide(color: AppColors.slate200)),
+              color: AppColors.bgBase,
+              border: Border(bottom: BorderSide(color: AppColors.divider)),
             ),
             child: Row(
               children: [
@@ -189,7 +191,7 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                     return Center(
                       child: Text(
                         'No symbols parsed in this file.',
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate500),
+                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
                       ),
                     );
                   }
@@ -197,37 +199,39 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: detail.symbols.length,
-                    separatorBuilder: (c, i) => const Divider(height: 1, color: AppColors.slate100),
+                    separatorBuilder: (c, i) => const Divider(height: 1, color: AppColors.divider),
                     itemBuilder: (context, index) {
                       final sym = detail.symbols[index];
                       return ListTile(
                         dense: true,
                         title: Text(
                           sym.name,
-                          style: AppTextStyles.bodyMedium.copyWith(
+                          style: AppTextStyles.inter(
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.slate900,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         subtitle: Text(
                           sym.qualifiedName,
-                          style: AppTextStyles.code.copyWith(
+                          style: AppTextStyles.mono(
                             fontSize: 11,
-                            color: AppColors.slate600,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.slate100,
+                            color: AppColors.bgElevated,
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.divider),
                           ),
                           child: Text(
                             'L${sym.startLine}-${sym.endLine}',
-                            style: AppTextStyles.bodySmall.copyWith(
+                            style: AppTextStyles.mono(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.slate700,
+                              color: AppColors.accent,
                             ),
                           ),
                         ),
@@ -243,14 +247,15 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                       // Outgoing Dependencies
                       Text(
                         'Depends on (${detail.outgoingDependencies.length})',
-                        style: AppTextStyles.bodyMedium.copyWith(
+                        style: AppTextStyles.inter(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.slate900,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       if (detail.outgoingDependencies.isEmpty)
-                        Text('No outgoing dependencies', style: AppTextStyles.bodySmall)
+                        Text('No outgoing dependencies', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary))
                       else
                         ...detail.outgoingDependencies.map((dep) {
                           final label = dep.targetPath ?? dep.externalPackage ?? 'Unknown target';
@@ -265,24 +270,23 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.arrow_forward, size: 14, color: AppColors.slate400),
+                                  const Icon(Icons.arrow_forward, size: 14, color: AppColors.textSecondary),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       label,
-                                      style: AppTextStyles.code.copyWith(
+                                      style: AppTextStyles.mono(
                                         fontSize: 12,
-                                        color: isInternalFile ? AppColors.primary : AppColors.slate800,
-                                        decoration: isInternalFile ? TextDecoration.underline : TextDecoration.none,
+                                        color: isInternalFile ? AppColors.accent : AppColors.textPrimary,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   Text(
                                     'line ${dep.lineNumber}',
-                                    style: AppTextStyles.bodySmall.copyWith(
+                                    style: AppTextStyles.mono(
                                       fontSize: 11,
-                                      color: AppColors.slate400,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -290,19 +294,20 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                             ),
                           );
                         }),
-                      const Divider(height: 28, color: AppColors.slate200),
+                      const Divider(height: 28, color: AppColors.divider),
 
                       // Incoming References (Used By)
                       Text(
                         'Used by (${detail.incomingReferences.length} files)',
-                        style: AppTextStyles.bodyMedium.copyWith(
+                        style: AppTextStyles.inter(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.slate900,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       if (detail.incomingReferences.isEmpty)
-                        Text('No incoming references recorded', style: AppTextStyles.bodySmall)
+                        Text('No incoming references recorded', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary))
                       else
                         ...detail.incomingReferences.map((ref) {
                           final sourcePath = ref.sourcePath ?? 'Unknown file';
@@ -315,24 +320,23 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
                               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.subdirectory_arrow_right, size: 14, color: AppColors.slate400),
+                                  const Icon(Icons.subdirectory_arrow_right, size: 14, color: AppColors.textSecondary),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       sourcePath,
-                                      style: AppTextStyles.code.copyWith(
+                                      style: AppTextStyles.mono(
                                         fontSize: 12,
-                                        color: AppColors.primary,
-                                        decoration: TextDecoration.underline,
+                                        color: AppColors.accent,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   Text(
                                     'line ${ref.lineNumber}',
-                                    style: AppTextStyles.bodySmall.copyWith(
+                                    style: AppTextStyles.mono(
                                       fontSize: 11,
-                                      color: AppColors.slate400,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -360,18 +364,20 @@ class _FileDetailPanelState extends ConsumerState<FileDetailPanel> {
           _activeSegmentIndex = index;
         });
       },
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.slate900 : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
+          color: isSelected ? AppColors.accent : AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isSelected ? AppColors.accent : AppColors.divider),
         ),
         child: Text(
           title,
-          style: AppTextStyles.bodySmall.copyWith(
+          style: AppTextStyles.inter(
+            fontSize: 12,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected ? Colors.white : AppColors.slate700,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
           ),
         ),
       ),

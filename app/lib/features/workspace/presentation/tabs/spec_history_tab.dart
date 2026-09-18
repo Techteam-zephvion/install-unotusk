@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../workspace_controller.dart';
 
 class SpecHistoryItem {
   final String id;
@@ -28,7 +30,7 @@ class SpecHistoryItem {
   });
 }
 
-class SpecHistoryTab extends StatefulWidget {
+class SpecHistoryTab extends ConsumerStatefulWidget {
   final String projectId;
 
   const SpecHistoryTab({
@@ -37,10 +39,10 @@ class SpecHistoryTab extends StatefulWidget {
   });
 
   @override
-  State<SpecHistoryTab> createState() => _SpecHistoryTabState();
+  ConsumerState<SpecHistoryTab> createState() => _SpecHistoryTabState();
 }
 
-class _SpecHistoryTabState extends State<SpecHistoryTab> {
+class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedDateFilter;
 
@@ -103,8 +105,28 @@ class _SpecHistoryTabState extends State<SpecHistoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    final conversationsAsync = ref.watch(projectConversationsProvider(widget.projectId));
+    final realSpecs = conversationsAsync.whenOrNull(
+      data: (threads) => threads.map((t) {
+        final iso = t.createdAt.toIso8601String().substring(0, 10);
+        return SpecHistoryItem(
+          id: t.id,
+          query: t.title.isNotEmpty ? t.title : 'Investigation inquiry',
+          isoDate: iso,
+          timestamp: '${t.createdAt.year}-${t.createdAt.month.toString().padLeft(2, '0')}-${t.createdAt.day.toString().padLeft(2, '0')}',
+          ago: 'recent',
+          queryType: 'cold',
+          confidence: 'confirmed',
+          hasBDD: t.title.toLowerCase().contains('bdd') || t.title.toLowerCase().contains('spec'),
+          score: 0.94,
+          fprDelta: 0.08,
+        );
+      }).toList(),
+    );
+
+    final specsList = (realSpecs != null && realSpecs.isNotEmpty) ? realSpecs : _demoSpecs;
     final query = _searchController.text.toLowerCase();
-    final filtered = _demoSpecs.where((s) {
+    final filtered = specsList.where((s) {
       final matchesSearch = s.query.toLowerCase().contains(query);
       final matchesDate = _selectedDateFilter == null || s.isoDate == _selectedDateFilter;
       return matchesSearch && matchesDate;

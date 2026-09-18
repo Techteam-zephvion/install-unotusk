@@ -320,7 +320,7 @@ class _NavItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected
-                ? AppColors.accent.withOpacity(0.35)
+                ? AppColors.accent.withValues(alpha: 0.35)
                 : Colors.transparent,
           ),
         ),

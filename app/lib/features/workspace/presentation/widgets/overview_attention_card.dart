@@ -121,7 +121,7 @@ class OverviewAttentionCard extends StatelessWidget {
             onPressed: onOpen,
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.accent,
-              side: BorderSide(color: AppColors.accent.withOpacity(0.4)),
+              side: BorderSide(color: AppColors.accent.withValues(alpha: 0.4)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

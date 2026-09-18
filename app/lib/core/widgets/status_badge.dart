@@ -23,32 +23,32 @@ class StatusBadge extends StatelessWidget {
     switch (variant) {
       case BadgeVariant.success:
         bg = AppColors.liveBg;
-        border = AppColors.live.withOpacity(0.35);
+        border = AppColors.live.withValues(alpha: 0.35);
         text = AppColors.live;
         break;
       case BadgeVariant.warning:
         bg = AppColors.warningBg;
-        border = AppColors.warning.withOpacity(0.35);
+        border = AppColors.warning.withValues(alpha: 0.35);
         text = AppColors.warning;
         break;
       case BadgeVariant.error:
         bg = AppColors.errorBg;
-        border = AppColors.error.withOpacity(0.35);
+        border = AppColors.error.withValues(alpha: 0.35);
         text = AppColors.error;
         break;
       case BadgeVariant.info:
         bg = AppColors.infoBg;
-        border = AppColors.info.withOpacity(0.35);
+        border = AppColors.info.withValues(alpha: 0.35);
         text = AppColors.info;
         break;
       case BadgeVariant.confirmed:
         bg = AppColors.confirmedBg;
-        border = AppColors.confirmed.withOpacity(0.4);
+        border = AppColors.confirmed.withValues(alpha: 0.4);
         text = AppColors.confirmed;
         break;
       case BadgeVariant.inferred:
         bg = AppColors.inferredBg;
-        border = AppColors.inferred.withOpacity(0.4);
+        border = AppColors.inferred.withValues(alpha: 0.4);
         text = AppColors.inferred;
         break;
       case BadgeVariant.neutral:

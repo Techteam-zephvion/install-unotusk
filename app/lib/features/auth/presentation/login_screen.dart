@@ -203,7 +203,7 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(animation: _anim, builder: (_, __) => Opacity(opacity: _anim.value, child: Container(width: widget.size, height: widget.size, decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color))));
+  Widget build(BuildContext context) => AnimatedBuilder(animation: _anim, builder: (context, child) => Opacity(opacity: _anim.value, child: Container(width: widget.size, height: widget.size, decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color))));
 }
 
 class _EntryCard extends StatelessWidget {

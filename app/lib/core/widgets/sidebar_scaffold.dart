@@ -10,6 +10,11 @@ class SidebarScaffold extends StatefulWidget {
   final ValueChanged<int> onIndexChanged;
   final VoidCallback onNewQuery;
   final ValueChanged<String>? onLoadRecentChat;
+  final List<String>? recentChats;
+  final String? projectName;
+  final String? projectBranch;
+  final List<({String id, String name})>? availableProjects;
+  final ValueChanged<String>? onSelectProject;
   final String userName;
   final String userOrg;
   final VoidCallback onLogOut;
@@ -21,6 +26,11 @@ class SidebarScaffold extends StatefulWidget {
     required this.onIndexChanged,
     required this.onNewQuery,
     this.onLoadRecentChat,
+    this.recentChats,
+    this.projectName,
+    this.projectBranch,
+    this.availableProjects,
+    this.onSelectProject,
     this.userName = 'Naren D',
     this.userOrg = 'Unotusk Corp',
     required this.onLogOut,
@@ -43,7 +53,7 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
     {'title': 'Ingestion Feed', 'icon': Icons.sensors_outlined},
   ];
 
-  static const List<String> _recentChats = [
+  static const List<String> _defaultRecentChats = [
     'Why choose Postgres over Mongo in March?',
     'Which team owns the auth service?',
     'Generate a BDD spec for rate-limiter',
@@ -245,29 +255,36 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
 
                       // Recent query items list
                       Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          itemCount: _recentChats.length,
-                          itemBuilder: (context, idx) {
-                            final chatTitle = _recentChats[idx];
-                            return InkWell(
-                              onTap: () {
-                                widget.onIndexChanged(0); // Switch to Ask Tab
-                                widget.onLoadRecentChat?.call(chatTitle);
-                              },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                                child: Text(
-                                  chatTitle,
-                                  style: AppTextStyles.inter(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
+                        child: Builder(
+                          builder: (context) {
+                            final chatList = (widget.recentChats != null && widget.recentChats!.isNotEmpty)
+                                ? widget.recentChats!
+                                : _defaultRecentChats;
+                            return ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              itemCount: chatList.length,
+                              itemBuilder: (context, idx) {
+                                final chatTitle = chatList[idx];
+                                return InkWell(
+                                  onTap: () {
+                                    widget.onIndexChanged(0); // Switch to Ask Tab
+                                    widget.onLoadRecentChat?.call(chatTitle);
+                                  },
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                                    child: Text(
+                                      chatTitle,
+                                      style: AppTextStyles.inter(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                                );
+                              },
                             );
                           },
                         ),
@@ -405,8 +422,89 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                       height: 52,
                       padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // Left side: Project Context & Switcher
+                          if (widget.projectName != null)
+                            Row(
+                              children: [
+                                if (widget.availableProjects != null && widget.availableProjects!.length > 1)
+                                  PopupMenuButton<String>(
+                                    color: AppColors.bgElevated,
+                                    offset: const Offset(0, 36),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      side: const BorderSide(color: AppColors.divider),
+                                    ),
+                                    onSelected: (id) => widget.onSelectProject?.call(id),
+                                    itemBuilder: (context) => widget.availableProjects!.map((p) {
+                                      return PopupMenuItem(
+                                        value: p.id,
+                                        child: Text(p.name, style: AppTextStyles.inter(fontSize: 13)),
+                                      );
+                                    }).toList(),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.bgSurface,
+                                        border: Border.all(color: AppColors.divider),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.folder_outlined, size: 14, color: AppColors.accent),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            widget.projectName!,
+                                            style: AppTextStyles.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                                          ),
+                                          if (widget.projectBranch != null) ...[
+                                            Text(
+                                              ' · ${widget.projectBranch}',
+                                              style: AppTextStyles.caption.copyWith(fontSize: 11),
+                                            ),
+                                          ],
+                                          const SizedBox(width: 6),
+                                          const Icon(Icons.unfold_more, size: 14, color: AppColors.textSecondary),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.bgSurface,
+                                      border: Border.all(color: AppColors.divider),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.folder_outlined, size: 14, color: AppColors.accent),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          widget.projectName!,
+                                          style: AppTextStyles.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                                        ),
+                                        if (widget.projectBranch != null) ...[
+                                          Text(
+                                            ' · ${widget.projectBranch}',
+                                            style: AppTextStyles.caption.copyWith(fontSize: 11),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            )
+                          else
+                            const SizedBox.shrink(),
+
+                          // Right side: Notifications & Theme toggle
+                          Row(
+                            children: [
                           // Notification Bell
                           InkWell(
                             onTap: () => setState(() => _notifOpen = !_notifOpen),
@@ -468,6 +566,8 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                                 ),
                               ),
                             ),
+                          ),
+                            ],
                           ),
                         ],
                       ),

@@ -58,4 +58,43 @@ void main() {
     await tester.tap(find.text('Open Employee App'));
     await tester.pump();
   });
+
+  testWidgets('ReadyScreen dynamically resolves LAN IP and displays LAN Server URL with badge',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final mockLauncher = AppLauncher(
+      processExecutor: (exec, args, {workingDirectory, environment}) async =>
+          ProcessResult(1234, 0, '', ''),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        appLauncherProvider.overrideWithValue(mockLauncher),
+      ],
+    );
+    container.read(configControllerProvider.notifier).updateServerPort('8000');
+    container.read(configControllerProvider.notifier).updateLanIp('10.0.0.59');
+    container.read(wizardControllerProvider.notifier).setStep(WizardStep.ready);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const UnotuskSetupApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unotusk is ready.'), findsOneWidget);
+    expect(find.text('LAN Server URL (Employee Clients)'), findsOneWidget);
+    expect(find.text('LAN REACHABLE'), findsOneWidget);
+    expect(find.text('http://10.0.0.59:8000'), findsOneWidget);
+    expect(find.text('Local host address: '), findsOneWidget);
+    expect(find.text('http://localhost:8000'), findsOneWidget);
+  });
 }

@@ -8,6 +8,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/logging/diagnostic_logs_modal.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../connection/presentation/connection_controller.dart';
 
@@ -147,28 +148,55 @@ class SettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // Section 3: Application
-              Text('Application', style: AppTextStyles.h3),
+              // Section 3: Application & Diagnostics
+              Text('Application & Diagnostics', style: AppTextStyles.h3),
               const SizedBox(height: 8),
               AppCard(
                 padding: const EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Unotusk Employee Client', style: AppTextStyles.label),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Desktop Foundation v${AppConfig.appVersion}',
-                          style: AppTextStyles.bodySmall,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Unotusk Employee Client', style: AppTextStyles.label),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Desktop Foundation v${AppConfig.appVersion}',
+                              style: AppTextStyles.bodySmall,
+                            ),
+                          ],
+                        ),
+                        StatusBadge(
+                          label: 'DESKTOP-FIRST',
+                          variant: BadgeVariant.info,
                         ),
                       ],
                     ),
-                    StatusBadge(
-                      label: 'DESKTOP-FIRST',
-                      variant: BadgeVariant.info,
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Pilot Event Logs', style: AppTextStyles.label),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Inspect sanitized in-memory event stream for LAN testing',
+                              style: AppTextStyles.bodySmall,
+                            ),
+                          ],
+                        ),
+                        AppButton(
+                          text: 'View Logs',
+                          icon: Icons.receipt_long_outlined,
+                          variant: AppButtonVariant.secondary,
+                          onPressed: () => DiagnosticLogsModal.show(context),
+                        ),
+                      ],
                     ),
                   ],
                 ),

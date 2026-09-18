@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/network/api_client.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_state.dart';
@@ -7,14 +8,17 @@ final authControllerProvider =
     StateNotifierProvider<AuthController, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
   final apiClient = ref.watch(apiClientProvider);
-  return AuthController(repository, apiClient);
+  final logger = ref.watch(appLoggerProvider);
+  return AuthController(repository, apiClient, logger: logger);
 });
 
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _repository;
   final ApiClient _apiClient;
+  final AppLogger? _logger;
 
-  AuthController(this._repository, this._apiClient) : super(const AuthState()) {
+  AuthController(this._repository, this._apiClient, {this._logger})
+      : super(const AuthState()) {
     _apiClient.onUnauthorized = handleUnauthorized;
     _restoreSession();
   }
@@ -24,6 +28,10 @@ class AuthController extends StateNotifier<AuthState> {
     final user = _repository.getSavedUser();
 
     if (token != null && token.isNotEmpty && user != null) {
+      _logger?.info(
+        AppLogEvent.sessionRestored,
+        metadata: {'email': user.email, 'role': user.role},
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
         token: token,
@@ -38,10 +46,18 @@ class AuthController extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    _logger?.info(
+      AppLogEvent.loginAttempt,
+      metadata: {'email': email},
+    );
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
 
     try {
       final result = await _repository.login(email: email, password: password);
+      _logger?.info(
+        AppLogEvent.loginSuccess,
+        metadata: {'email': email, 'role': result.user.role},
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
         token: result.token,
@@ -49,6 +65,11 @@ class AuthController extends StateNotifier<AuthState> {
       );
       return true;
     } catch (e) {
+      _logger?.error(
+        AppLogEvent.loginFailure,
+        message: e.toString(),
+        metadata: {'email': email},
+      );
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.toString(),
@@ -91,6 +112,7 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   void handleUnauthorized() {
+    _logger?.warning(AppLogEvent.sessionExpired);
     _repository.logout();
     state = const AuthState(
       status: AuthStatus.unauthenticated,

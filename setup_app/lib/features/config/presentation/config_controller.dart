@@ -125,6 +125,12 @@ class ConfigController extends StateNotifier<ConfigState> {
     }
   }
 
+  void updateLanIp(String ip) {
+    state = state.copyWith(
+      config: state.config.copyWith(lanIp: ip),
+    );
+  }
+
   bool validateAll() {
     updateAdminEmail(state.config.adminEmail);
     updateAdminPassword(state.config.adminPassword);

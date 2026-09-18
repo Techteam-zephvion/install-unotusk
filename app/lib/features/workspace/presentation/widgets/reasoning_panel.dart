@@ -26,10 +26,12 @@ class ReasoningData {
 
 class ReasoningPanel extends StatefulWidget {
   final ReasoningData reasoning;
+  final ValueChanged<String>? onCitationTap;
 
   const ReasoningPanel({
     super.key,
     required this.reasoning,
+    this.onCitationTap,
   });
 
   @override
@@ -248,18 +250,22 @@ class _ReasoningPanelState extends State<ReasoningPanel> {
                     spacing: 6,
                     runSpacing: 6,
                     children: widget.reasoning.citations.map((c) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgElevated,
-                          border: Border.all(color: AppColors.divider),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          c,
-                          style: AppTextStyles.mono(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                      return InkWell(
+                        onTap: widget.onCitationTap != null ? () => widget.onCitationTap!(c) : null,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgElevated,
+                            border: Border.all(color: AppColors.divider),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            c,
+                            style: AppTextStyles.mono(
+                              fontSize: 11,
+                              color: AppColors.accent,
+                            ),
                           ),
                         ),
                       );

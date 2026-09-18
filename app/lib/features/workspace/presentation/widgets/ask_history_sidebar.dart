@@ -48,7 +48,7 @@ class AskHistorySidebar extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.accentMuted,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.accent.withOpacity(0.35)),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -101,7 +101,7 @@ class AskHistorySidebar extends StatelessWidget {
                                 color: isSelected ? AppColors.accent : Colors.transparent,
                                 width: 3,
                               ),
-                              bottom: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.5)),
+                              bottom: BorderSide(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5)),
                             ),
                           ),
                           child: Column(

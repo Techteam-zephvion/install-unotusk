@@ -59,8 +59,8 @@ class GroundedAnswerCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isConfirmed
-                          ? AppColors.confirmed.withOpacity(0.35)
-                          : AppColors.inferred.withOpacity(0.35),
+                          ? AppColors.confirmed.withValues(alpha: 0.35)
+                          : AppColors.inferred.withValues(alpha: 0.35),
                     ),
                   ),
                   child: Text(

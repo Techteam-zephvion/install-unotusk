@@ -121,7 +121,7 @@ class _FileTreeViewState extends State<FileTreeView> {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accentMuted : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
-          border: isSelected ? Border.all(color: AppColors.accent.withOpacity(0.4)) : null,
+          border: isSelected ? Border.all(color: AppColors.accent.withValues(alpha: 0.4)) : null,
         ),
         child: InkWell(
           onTap: () => widget.onSelectFile(file),

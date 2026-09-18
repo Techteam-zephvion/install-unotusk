@@ -6,6 +6,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/logging/diagnostic_logs_modal.dart';
 import '../domain/connection_state.dart';
 import 'connection_controller.dart';
 
@@ -168,6 +169,14 @@ class _ServerConnectionScreenState extends ConsumerState<ServerConnectionScreen>
                       isFullWidth: true,
                     ),
                   ],
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                      label: const Text('View Connection Logs', style: TextStyle(fontSize: 12)),
+                      onPressed: () => DiagnosticLogsModal.show(context),
+                    ),
+                  ),
                 ],
               ),
             ),

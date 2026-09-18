@@ -217,18 +217,28 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
             const SizedBox(height: 20),
             _buildSettingRow(
               label: 'Theme',
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.divider),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Text(_selectedTheme, style: AppTextStyles.inter(fontSize: 13)),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.textSecondary),
-                  ],
+              child: PopupMenuButton<String>(
+                color: AppColors.bgElevated,
+                initialValue: _selectedTheme,
+                onSelected: (val) => setState(() => _selectedTheme = val),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'Dark', child: Text('Dark (Warm Slate)')),
+                  const PopupMenuItem(value: 'Light', child: Text('Light')),
+                  const PopupMenuItem(value: 'System', child: Text('System')),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(_selectedTheme, style: AppTextStyles.inter(fontSize: 13)),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.textSecondary),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -240,7 +250,23 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
             const Divider(color: AppColors.divider, height: 24),
             _buildSettingRow(
               label: 'Voice Model',
-              child: Text(_selectedVoice, style: AppTextStyles.inter(fontSize: 13, color: AppColors.textSecondary)),
+              child: PopupMenuButton<String>(
+                color: AppColors.bgElevated,
+                initialValue: _selectedVoice,
+                onSelected: (val) => setState(() => _selectedVoice = val),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'Ember (Warm & Natural)', child: Text('Ember (Warm & Natural)')),
+                  const PopupMenuItem(value: 'Cove (Direct & Authoritative)', child: Text('Cove (Direct & Authoritative)')),
+                  const PopupMenuItem(value: 'Breeze (Crisp)', child: Text('Breeze (Crisp)')),
+                ],
+                child: Row(
+                  children: [
+                    Text(_selectedVoice, style: AppTextStyles.inter(fontSize: 13, color: AppColors.textSecondary)),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.keyboard_arrow_down, size: 14, color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
             ),
           ],
         );
@@ -417,7 +443,7 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.accent,
+          activeThumbColor: AppColors.accent,
         ),
       ],
     );

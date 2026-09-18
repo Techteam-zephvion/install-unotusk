@@ -21,11 +21,13 @@ from apps.api.src.api.routes import (
     tasks,
 )
 from apps.api.src.config.settings import settings
+from apps.api.src.core.logging import RequestTracingMiddleware, setup_server_logging
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+setup_server_logging()
 logger = logging.getLogger("unotusk-api")
 
 
@@ -44,10 +46,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Correlation & Request Tracing Middleware
+app.add_middleware(RequestTracingMiddleware)
+
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

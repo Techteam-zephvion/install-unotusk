@@ -432,7 +432,7 @@ class _AskInputBarState extends State<AskInputBar> {
                 Switch(
                   value: _piEnabled,
                   onChanged: (v) => setState(() => _piEnabled = v),
-                  activeColor: AppColors.accent,
+                  activeThumbColor: AppColors.accent,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],
@@ -477,7 +477,7 @@ class _AskInputBarState extends State<AskInputBar> {
                 Switch(
                   value: _thinkingEnabled,
                   onChanged: (v) => setState(() => _thinkingEnabled = v),
-                  activeColor: AppColors.accent,
+                  activeThumbColor: AppColors.accent,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],

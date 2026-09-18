@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../domain/grounded_answer.dart';
+import '../../domain/project_file.dart';
 import '../../data/workspace_repository.dart';
+import '../workspace_controller.dart';
 import '../widgets/ask_input_bar.dart';
 import '../widgets/constellation_loader.dart';
 import '../widgets/bdd_contract_card.dart';
 import '../widgets/reasoning_panel.dart';
+import '../widgets/file_detail_panel.dart';
 
 class ChatMessageItem {
   final String id;
@@ -32,10 +35,12 @@ class ChatMessageItem {
 
 class AskTab extends ConsumerStatefulWidget {
   final String projectId;
+  final String? initialQuery;
 
   const AskTab({
     super.key,
     required this.projectId,
+    this.initialQuery,
   });
 
   @override
@@ -79,10 +84,92 @@ class _AskTabState extends ConsumerState<AskTab> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _runQuery(widget.initialQuery!);
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _queryController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _openFileCitation(String filePath, {String? lines}) async {
+    int? startLine;
+    int? endLine;
+    if (lines != null && lines.isNotEmpty) {
+      final parts = lines.split('-');
+      if (parts.isNotEmpty) startLine = int.tryParse(parts[0].trim());
+      if (parts.length > 1) endLine = int.tryParse(parts[1].trim());
+      endLine ??= startLine;
+    }
+
+    ProjectFile targetFile;
+    try {
+      final files = await ref.read(projectFilesProvider(widget.projectId).future);
+      final filename = filePath.split('/').last;
+      targetFile = files.firstWhere(
+        (f) => f.path == filePath || f.filename == filename,
+        orElse: () => ProjectFile(
+          id: 'cite-${filePath.hashCode.abs()}',
+          snapshotId: 'current',
+          path: filePath,
+          filename: filename,
+          extension: filename.contains('.') ? filename.split('.').last : '',
+          language: filename.endsWith('.rs') ? 'Rust' : (filename.endsWith('.py') ? 'Python' : 'Markdown'),
+          sizeBytes: 2048,
+          contentHash: 'hash',
+          isBinary: false,
+          isGenerated: false,
+          isTest: false,
+          lineCount: 120,
+          parserSupported: true,
+        ),
+      );
+    } catch (_) {
+      final filename = filePath.split('/').last;
+      targetFile = ProjectFile(
+        id: 'cite-${filePath.hashCode.abs()}',
+        snapshotId: 'current',
+        path: filePath,
+        filename: filename,
+        extension: filename.contains('.') ? filename.split('.').last : '',
+        language: filename.endsWith('.rs') ? 'Rust' : (filename.endsWith('.py') ? 'Python' : 'Markdown'),
+        sizeBytes: 2048,
+        contentHash: 'hash',
+        isBinary: false,
+        isGenerated: false,
+        isTest: false,
+        lineCount: 120,
+        parserSupported: true,
+      );
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 880, maxHeight: 720),
+          child: FileDetailPanel(
+            projectId: widget.projectId,
+            file: targetFile,
+            initialHighlightStartLine: startLine,
+            initialHighlightEndLine: endLine,
+            onClose: () => Navigator.of(ctx).pop(),
+          ),
+        ),
+      ),
+    );
   }
 
   void _runQuery(String queryText) async {
@@ -545,7 +632,10 @@ class _AskTabState extends ConsumerState<AskTab> {
           children: [
             // Reasoning accordion at top
             if (msg.reasoning != null)
-              ReasoningPanel(reasoning: msg.reasoning!),
+              ReasoningPanel(
+                reasoning: msg.reasoning!,
+                onCitationTap: _openFileCitation,
+              ),
 
             // BDD Contract Card if present
             if (msg.bdd != null)
@@ -572,26 +662,40 @@ class _AskTabState extends ConsumerState<AskTab> {
                 spacing: 8,
                 runSpacing: 6,
                 children: answer.evidence.map((ev) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgSurface,
-                      border: Border.all(color: AppColors.divider),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.description_outlined, size: 12, color: AppColors.textSecondary),
-                        const SizedBox(width: 6),
-                        Text(
-                          ev.file,
-                          style: AppTextStyles.mono(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                  return InkWell(
+                    onTap: () => _openFileCitation(ev.file, lines: ev.lines),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgSurface,
+                        border: Border.all(color: AppColors.divider),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.description_outlined, size: 12, color: AppColors.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            ev.file,
+                            style: AppTextStyles.mono(
+                              fontSize: 11,
+                              color: AppColors.accent,
+                            ),
                           ),
-                        ),
-                      ],
+                          if (ev.lines != null && ev.lines!.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              'L${ev.lines}',
+                              style: AppTextStyles.mono(
+                                fontSize: 10,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   );
                 }).toList(),

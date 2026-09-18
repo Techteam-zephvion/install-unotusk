@@ -126,7 +126,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _notifications.length,
-            separatorBuilder: (_, __) => const Divider(color: AppColors.divider, height: 1),
+            separatorBuilder: (context, index) => const Divider(color: AppColors.divider, height: 1),
             itemBuilder: (context, index) {
               final item = _notifications[index];
               return Container(

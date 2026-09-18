@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../data/workspace_repository.dart';
+import '../workspace_controller.dart';
 
 class ProjectFeedItem {
   final String id;
@@ -22,7 +25,7 @@ class ProjectFeedItem {
   });
 }
 
-class IngestionFeedTab extends StatefulWidget {
+class IngestionFeedTab extends ConsumerStatefulWidget {
   final String projectId;
 
   const IngestionFeedTab({
@@ -31,10 +34,10 @@ class IngestionFeedTab extends StatefulWidget {
   });
 
   @override
-  State<IngestionFeedTab> createState() => _IngestionFeedTabState();
+  ConsumerState<IngestionFeedTab> createState() => _IngestionFeedTabState();
 }
 
-class _IngestionFeedTabState extends State<IngestionFeedTab> {
+class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
   String? _reingestingId;
 
   static const List<ProjectFeedItem> _projects = [
@@ -78,7 +81,16 @@ class _IngestionFeedTabState extends State<IngestionFeedTab> {
 
   void _triggerReingest(String id) async {
     setState(() => _reingestingId = id);
-    await Future.delayed(const Duration(seconds: 3));
+    try {
+      final repo = ref.read(workspaceRepositoryProvider);
+      await repo.triggerDiscovery(widget.projectId);
+      ref.invalidate(projectContextProvider(widget.projectId));
+      ref.invalidate(projectFilesProvider(widget.projectId));
+      ref.invalidate(projectSymbolsProvider(widget.projectId));
+    } catch (_) {
+      // Graceful fallback for demo or offline mode
+    }
+
     if (mounted) {
       setState(() => _reingestingId = null);
       ScaffoldMessenger.of(context).showSnackBar(

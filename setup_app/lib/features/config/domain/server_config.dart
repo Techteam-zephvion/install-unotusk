@@ -46,6 +46,7 @@ class ServerConfig {
   final String postgresDb;
   final int postgresPort;
   final int redisPort;
+  final String? lanIp;
 
   ServerConfig({
     this.serverName = AppConstants.defaultServerName,
@@ -60,10 +61,19 @@ class ServerConfig {
     this.postgresDb = AppConstants.defaultDbName,
     this.postgresPort = AppConstants.defaultPostgresPort,
     this.redisPort = AppConstants.defaultRedisPort,
+    this.lanIp,
   })  : authSecret = authSecret ?? SecretGenerator.generateHexSecret(32),
         postgresPassword = postgresPassword ?? SecretGenerator.generateHexSecret(16);
 
-  String get serverUrl => 'http://localhost:$serverPort';
+  String get serverUrl => (lanIp != null && lanIp!.isNotEmpty && lanIp != '127.0.0.1')
+      ? 'http://$lanIp:$serverPort'
+      : 'http://localhost:$serverPort';
+
+  String get lanUrl => (lanIp != null && lanIp!.isNotEmpty)
+      ? 'http://$lanIp:$serverPort'
+      : 'http://localhost:$serverPort';
+
+  String get localUrl => 'http://localhost:$serverPort';
 
   String generateEnvFileContent() {
     final buffer = StringBuffer();
@@ -108,6 +118,7 @@ class ServerConfig {
     String? postgresDb,
     int? postgresPort,
     int? redisPort,
+    String? lanIp,
   }) {
     return ServerConfig(
       serverName: serverName ?? this.serverName,
@@ -122,6 +133,7 @@ class ServerConfig {
       postgresDb: postgresDb ?? this.postgresDb,
       postgresPort: postgresPort ?? this.postgresPort,
       redisPort: redisPort ?? this.redisPort,
+      lanIp: lanIp ?? this.lanIp,
     );
   }
 }
