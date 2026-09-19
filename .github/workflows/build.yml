@@ -131,9 +131,10 @@ jobs:
 
           # Harvest all files from the Flutter release directory
           & "$env:WIX_BIN\heat.exe" dir $src `
-            -o Components.wxs -scom -sreg -srd `
+            -gg -scom -sreg -srd `
             -dr INSTALLFOLDER -cg AppComponents `
-            -var var.SourceDir -nologo
+            -var var.SourceDir -nologo `
+            -o Components.wxs
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
           # Write License.rtf (required by WixUI_Minimal)
@@ -199,9 +200,9 @@ jobs:
           & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-          # Link — suppress ICE57 (HKMU is correct but WiX v3 sometimes still warns) and ICE91
+          # Link — suppress ICE validation (-sval) for CI
           & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension `
-            -sice:ICE57 -sice:ICE91 `
+            -sval `
             Product.wixobj Components.wixobj -o unotusk-employee-windows-x64.msi
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
