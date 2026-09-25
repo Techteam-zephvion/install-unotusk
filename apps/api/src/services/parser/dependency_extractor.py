@@ -81,7 +81,7 @@ def _extract_python_ast_dependencies(code_bytes: bytes) -> list[ExtractedDepende
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                pkg = alias.name.split(".")[0]
+                pkg = alias.name
                 deps.append(
                     ExtractedDependency(
                         raw_target=pkg,

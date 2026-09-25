@@ -50,3 +50,87 @@ const logger = require('pino');
 
     pkg_dep = next(d for d in deps if d.raw_target == "react")
     assert pkg_dep.is_relative is False
+
+
+def test_python_qualified_import_extraction():
+    code = b"""
+import math
+import a.b.c
+import apps.api.src.models.user
+import os, sys, foo.bar.baz as fbb
+"""
+    # For Python, AST parsing is used directly without requiring Tree-sitter tree
+    deps = extract_dependencies_from_tree(None, code, "Python")
+    targets = [d.raw_target for d in deps]
+
+    # Verify complete import paths are preserved
+    assert "math" in targets
+    assert "a.b.c" in targets
+    assert "apps.api.src.models.user" in targets
+    assert "os" in targets
+    assert "sys" in targets
+    assert "foo.bar.baz" in targets
+
+    # Verify not truncated to first dot segment
+    assert "a" not in targets
+    assert "apps" not in targets
+    assert "foo" not in targets
+
+    # Verify dependency attributes
+    math_dep = next(d for d in deps if d.raw_target == "math")
+    assert math_dep.is_relative is False
+    assert math_dep.dependency_type == DependencyType.IMPORT
+
+    abc_dep = next(d for d in deps if d.raw_target == "a.b.c")
+    assert abc_dep.is_relative is False
+    assert abc_dep.dependency_type == DependencyType.IMPORT
+
+    user_dep = next(d for d in deps if d.raw_target == "apps.api.src.models.user")
+    assert user_dep.is_relative is False
+    assert user_dep.dependency_type == DependencyType.IMPORT
+
+
+def test_python_qualified_import_resolution():
+    import os
+    from unittest.mock import MagicMock
+
+    code = b"""
+import math
+import a.b.c
+import apps.api.src.models.user
+import urllib.request
+"""
+    deps = extract_dependencies_from_tree(None, code, "Python")
+
+    # Simulate repository files map in IngestionService
+    mock_file_user = MagicMock()
+    mock_file_user.id = "user-file-uuid"
+    mock_file_abc = MagicMock()
+    mock_file_abc.id = "abc-file-uuid"
+
+    created_files_map = {
+        "apps/api/src/models/user.py": mock_file_user,
+        "src/a/b/c.py": mock_file_abc,
+    }
+
+    # Resolution logic from IngestionService (apps/api/src/services/ingestion_service.py:341-347)
+    resolved: dict[str, str | None] = {}
+    for dep in deps:
+        target_file_id = None
+        if not dep.is_relative:
+            for p, rf in created_files_map.items():
+                p_no_ext = os.path.splitext(p)[0]
+                target_as_path = dep.raw_target.replace(".", "/")
+                if p_no_ext == target_as_path or p_no_ext.endswith(target_as_path):
+                    target_file_id = rf.id
+                    break
+        resolved[dep.raw_target] = target_file_id
+
+    # 1. Target internal files are correctly identified
+    assert resolved["apps.api.src.models.user"] == "user-file-uuid"
+    assert resolved["a.b.c"] == "abc-file-uuid"
+
+    # 2. External packages (with or without dots) are NOT treated as internal files
+    assert resolved["math"] is None
+    assert resolved["urllib.request"] is None
+
