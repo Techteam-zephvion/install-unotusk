@@ -10,7 +10,10 @@ from apps.api.src.models.enums import ReportStatus
 from apps.api.src.models.report import ProjectIntelligenceReport
 from apps.api.src.services.report_engine.fact_builder import FactBuilder
 from apps.api.src.services.report_engine.interpretation_engine import InterpretationEngine
-from apps.api.src.services.report_engine.synthesizer import ClaudeReportSynthesizer
+from apps.api.src.services.report_engine.synthesizer import (
+    ReportSynthesizer,
+    get_report_synthesizer,
+)
 
 logger = logging.getLogger("unotusk-report")
 
@@ -28,6 +31,7 @@ class ProjectReportEngine:
         discovery_run_id: uuid.UUID | None = None,
         report_id: uuid.UUID | None = None,
         session: AsyncSession | None = None,
+        synthesizer: ReportSynthesizer | None = None,
     ) -> ProjectIntelligenceReport:
         if session is not None:
             return await cls._execute_generation(
@@ -36,6 +40,7 @@ class ProjectReportEngine:
                 snapshot_id=snapshot_id,
                 discovery_run_id=discovery_run_id,
                 report_id=report_id,
+                synthesizer=synthesizer,
             )
 
         async with AsyncSessionLocal() as db:
@@ -45,6 +50,7 @@ class ProjectReportEngine:
                 snapshot_id=snapshot_id,
                 discovery_run_id=discovery_run_id,
                 report_id=report_id,
+                synthesizer=synthesizer,
             )
 
     @classmethod
@@ -55,6 +61,7 @@ class ProjectReportEngine:
         snapshot_id: uuid.UUID,
         discovery_run_id: uuid.UUID | None = None,
         report_id: uuid.UUID | None = None,
+        synthesizer: ReportSynthesizer | None = None,
     ) -> ProjectIntelligenceReport:
         logger.info(f"Starting Project Intelligence Report generation for project {project_id}")
 
@@ -96,9 +103,9 @@ class ProjectReportEngine:
             # 3. Interpretation & Structure Assembly
             doc = InterpretationEngine.build_report_document(facts)
 
-            # 4. Optional Constrained Synthesis with Offline Fallback
-            synthesizer = ClaudeReportSynthesizer()
-            enhanced_doc = await synthesizer.synthesize(doc)
+            # 4. Optional Constrained Synthesis using configured LLM Provider (with Offline Fallback)
+            active_synthesizer = synthesizer or get_report_synthesizer()
+            enhanced_doc = await active_synthesizer.synthesize(doc)
 
             # 5. Persist Completed Report
             report.status = ReportStatus.COMPLETED
@@ -114,8 +121,10 @@ class ProjectReportEngine:
 
         except Exception as exc:
             logger.error(f"Report generation failed for project {project_id}: {exc}", exc_info=True)
+            await session.rollback()
             report.status = ReportStatus.FAILED
             report.error_message = str(exc)
+            session.add(report)
             await session.commit()
             await session.refresh(report)
             raise

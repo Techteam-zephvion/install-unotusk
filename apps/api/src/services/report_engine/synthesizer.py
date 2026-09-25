@@ -7,6 +7,9 @@ from apps.api.src.schemas.report import ReportDocument
 logger = logging.getLogger("unotusk-report")
 
 
+SUPPORTED_REPORT_PROVIDERS = {"groq", "claude", "anthropic", "offline"}
+
+
 class ReportSynthesizer:
     def __init__(
         self,
@@ -14,13 +17,26 @@ class ReportSynthesizer:
         api_key: str | None = None,
         model: str | None = None,
     ) -> None:
-        self.provider = (provider or settings.LLM_PROVIDER or "offline").lower()
+        raw_provider = (provider or settings.LLM_PROVIDER or "offline").strip().lower()
+        self.raw_provider = raw_provider
+
+        if raw_provider not in SUPPORTED_REPORT_PROVIDERS:
+            logger.error(f"Unsupported LLM provider configured for report synthesis: '{raw_provider}'")
+            raise ValueError(
+                f"Unsupported LLM provider: '{raw_provider}'. "
+                f"Supported providers are: 'groq', 'claude' (or 'anthropic'), 'offline'."
+            )
+
+        self.provider = raw_provider
+
         self.groq_api_key = api_key if self.provider == "groq" else settings.GROQ_API_KEY
         self.groq_model = model if self.provider == "groq" else settings.GROQ_MODEL
         self.anthropic_api_key = (
-            api_key if self.provider == "claude" else settings.ANTHROPIC_API_KEY
+            api_key if self.provider in ("claude", "anthropic") else settings.ANTHROPIC_API_KEY
         )
-        self.anthropic_model = model if self.provider == "claude" else settings.ANTHROPIC_MODEL
+        self.anthropic_model = (
+            model if self.provider in ("claude", "anthropic") else settings.ANTHROPIC_MODEL
+        )
 
         self._groq_client = None
         self._anthropic_client = None
@@ -35,7 +51,7 @@ class ReportSynthesizer:
             except Exception as e:
                 logger.warning(f"Could not initialize Groq client for report synthesizer: {e}")
 
-        elif self.provider == "claude" and self.anthropic_api_key:
+        elif self.provider in ("claude", "anthropic") and self.anthropic_api_key:
             try:
                 import anthropic
 
@@ -46,12 +62,14 @@ class ReportSynthesizer:
 
     async def synthesize(self, doc: ReportDocument) -> ReportDocument:
         """
-        Enhances executive summary narrative and descriptions using configured LLM (Groq or Claude).
+        Enhances executive summary narrative and descriptions using configured LLM (Groq or Claude/Anthropic).
         Guarantees deterministic fallback if LLM fails, times out, or returns invalid JSON.
         """
-        if self.provider == "groq" and self._groq_client:
+        if self.provider == "groq" and (
+            self._groq_client or (self._client and hasattr(self._client, "chat"))
+        ):
             return await self._synthesize_with_groq(doc)
-        elif self.provider == "claude" and (
+        elif self.provider in ("claude", "anthropic") and (
             self._anthropic_client or (self._client and hasattr(self._client, "messages"))
         ):
             return await self._synthesize_with_claude(doc)
@@ -185,6 +203,40 @@ class ClaudeReportSynthesizer(ReportSynthesizer):
         super().__init__(provider="claude", api_key=api_key, model=model)
 
 
+class AnthropicReportSynthesizer(ReportSynthesizer):
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+        super().__init__(provider="anthropic", api_key=api_key, model=model)
+
+
 class GroqReportSynthesizer(ReportSynthesizer):
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         super().__init__(provider="groq", api_key=api_key, model=model)
+
+
+def get_report_synthesizer(
+    provider: str | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+) -> ReportSynthesizer:
+    """
+    Factory function returning the configured ReportSynthesizer dynamically based on
+    settings.LLM_PROVIDER or explicit provider parameter.
+    Supported: 'groq', 'claude', 'anthropic', 'offline'.
+    Raises ValueError for unsupported providers.
+    """
+    selected_provider = (provider or settings.LLM_PROVIDER or "offline").strip().lower()
+    if selected_provider == "groq":
+        return GroqReportSynthesizer(api_key=api_key, model=model)
+    elif selected_provider == "claude":
+        return ClaudeReportSynthesizer(api_key=api_key, model=model)
+    elif selected_provider == "anthropic":
+        return AnthropicReportSynthesizer(api_key=api_key, model=model)
+    elif selected_provider == "offline":
+        return ReportSynthesizer(provider="offline")
+    else:
+        logger.error(f"Unsupported LLM provider for report synthesis: '{selected_provider}'")
+        raise ValueError(
+            f"Unsupported LLM provider: '{selected_provider}'. "
+            f"Supported providers are: 'groq', 'claude' (or 'anthropic'), 'offline'."
+        )
+
