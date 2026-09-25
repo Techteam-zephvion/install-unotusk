@@ -1,4 +1,5 @@
 import abc
+import posixpath
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -71,6 +72,46 @@ class DiscoveryContext:
         if dep.target_file_id and dep.target_file_id in self.file_by_id:
             return self.file_by_id[dep.target_file_id].path
         return dep.external_package or ""
+
+    def resolve_dep_target_path(self, dep: CodeDependency, src_path: str = "") -> str | None:
+        """Resolves a dependency to an internal repository file path, or None if external."""
+        if dep.target_file_id and dep.target_file_id in self.file_by_id:
+            return self.file_by_id[dep.target_file_id].path
+
+        target_raw = (dep.external_package or "").strip("'\"`")
+        if not target_raw:
+            return None
+
+        # Exact match against repository paths
+        if target_raw in self.file_by_path:
+            return target_raw
+
+        # Relative path resolution e.g. ./session, ../utils
+        if target_raw.startswith(".") and src_path:
+            src_dir = posixpath.dirname(src_path)
+            candidate_base = posixpath.normpath(posixpath.join(src_dir, target_raw))
+            for ext in ("", ".py", ".ts", ".tsx", ".js", ".jsx"):
+                cand = candidate_base + ext
+                if cand in self.file_by_path:
+                    return cand
+            for idx in ("/index.ts", "/index.js", "/index.tsx", "/index.jsx", "/__init__.py"):
+                cand = candidate_base + idx
+                if cand in self.file_by_path:
+                    return cand
+
+        # Dot-notated module import (e.g. src.auth.service -> src/auth/service.py)
+        target_as_slash = target_raw.replace(".", "/")
+        for p in self.file_by_path:
+            p_no_ext = posixpath.splitext(p)[0]
+            if (
+                p == target_raw
+                or p.endswith("/" + target_raw)
+                or p_no_ext == target_as_slash
+                or p_no_ext.endswith("/" + target_as_slash)
+            ):
+                return p
+
+        return None
 
 
 class DiscoveryAnalyzer(abc.ABC):

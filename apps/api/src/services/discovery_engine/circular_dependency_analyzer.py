@@ -33,11 +33,7 @@ class CircularDependencyAnalyzer(DiscoveryAnalyzer):
         for src_file in ctx.files:
             deps = ctx.dependencies_by_file_id.get(src_file.id, [])
             for dep in deps:
-                resolved_target = self._resolve_target_path(
-                    src_path=src_file.path,
-                    target=ctx.get_target_for_dep(dep),
-                    all_paths=all_paths,
-                )
+                resolved_target = ctx.resolve_dep_target_path(dep, src_file.path)
                 if resolved_target and resolved_target != src_file.path:
                     graph[src_file.path].append((resolved_target, dep))
 

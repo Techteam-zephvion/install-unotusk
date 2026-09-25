@@ -35,8 +35,8 @@ class ArchitectureAnalyzer(DiscoveryAnalyzer):
                 # Rule 1: Production code importing test code/fixtures
                 if not is_test_file:
                     if (
-                        target_clean.startswith("tests")
-                        or target_clean.startswith("test")
+                        target_clean in ("tests", "test")
+                        or target_clean.startswith(("tests/", "test/", "tests.", "test."))
                         or "/tests/" in target_clean
                         or "/test/" in target_clean
                         or "conftest" in target_clean

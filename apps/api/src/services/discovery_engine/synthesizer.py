@@ -9,14 +9,23 @@ logger = logging.getLogger("unotusk-discovery")
 
 class FindingSynthesizer:
     def __init__(self) -> None:
-        self.api_key = settings.ANTHROPIC_API_KEY
-        self.model = settings.ANTHROPIC_MODEL
+        self.provider = (settings.LLM_PROVIDER or "offline").lower()
         self._client = None
-        if self.api_key:
+        self._groq_client = None
+        self.model = settings.GROQ_MODEL if self.provider == "groq" else settings.ANTHROPIC_MODEL
+
+        if self.provider == "groq" and settings.GROQ_API_KEY:
+            try:
+                import groq
+
+                self._groq_client = groq.AsyncGroq(api_key=settings.GROQ_API_KEY)
+            except Exception as e:
+                logger.warning(f"Could not initialize Groq client for synthesizer: {e}")
+        elif self.provider == "claude" and settings.ANTHROPIC_API_KEY:
             try:
                 import anthropic
 
-                self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
+                self._client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
             except Exception as e:
                 logger.warning(f"Could not initialize Anthropic client for synthesizer: {e}")
 
@@ -60,7 +69,8 @@ class FindingSynthesizer:
                         f" (Project Knowledge: Team states '{top_k.content}')."
                     )
 
-        if not self._client or not findings:
+        has_client = self._client is not None or self._groq_client is not None
+        if not has_client or not findings:
             return findings
 
         # Enhance only top 3 findings to stay efficient and responsive
@@ -84,13 +94,23 @@ class FindingSynthesizer:
                     f"REC: <recommendation>"
                 )
 
-                response = await self._client.messages.create(
-                    model=self.model,
-                    max_tokens=256,
-                    messages=[{"role": "user", "content": prompt}],
-                )
+                text = ""
+                if self._groq_client:
+                    response = await self._groq_client.chat.completions.create(
+                        model=self.model,
+                        max_tokens=256,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    if response.choices and response.choices[0].message:
+                        text = response.choices[0].message.content or ""
+                elif self._client:
+                    response = await self._client.messages.create(
+                        model=self.model,
+                        max_tokens=256,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    text = response.content[0].text if response.content else ""
 
-                text = response.content[0].text if response.content else ""
                 if "WHY:" in text and "REC:" in text:
                     parts = text.split("REC:")
                     why_part = parts[0].replace("WHY:", "").strip()
@@ -101,6 +121,6 @@ class FindingSynthesizer:
                         finding.recommendation = rec_part
 
             except Exception as e:
-                logger.warning(f"Could not enhance finding {finding.title} with Claude: {e}")
+                logger.warning(f"Could not enhance finding {finding.title} with LLM: {e}")
 
         return findings

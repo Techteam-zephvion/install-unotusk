@@ -17,7 +17,8 @@ def deduplicate_findings(findings: list[CandidateFinding]) -> list[CandidateFind
     for finding in findings:
         # Build canonical fingerprint
         entities_sorted = sorted(finding.related_entities)
-        fingerprint = f"{finding.category.value}:{':'.join(entities_sorted)}"
+        entities_key = ":".join(entities_sorted) if entities_sorted else finding.title
+        fingerprint = f"{finding.category.value}:{entities_key}"
 
         if fingerprint not in deduped:
             deduped[fingerprint] = finding

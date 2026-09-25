@@ -27,20 +27,12 @@ class CouplingAnalyzer(DiscoveryAnalyzer):
 
         # 1. Map consumers per file: file_path -> set of consuming file paths
         consumers_by_file: dict[str, set[str]] = defaultdict(set)
-        all_paths = set(ctx.file_by_path.keys())
-
         for src_file in ctx.files:
             deps = ctx.dependencies_by_file_id.get(src_file.id, [])
             for dep in deps:
-                # Match target with project files
-                target_clean = ctx.get_target_for_dep(dep).strip("'\"")
-                for path in all_paths:
-                    if (
-                        path == target_clean
-                        or path.endswith(target_clean)
-                        or target_clean.replace(".", "/") in path
-                    ) and path != src_file.path:
-                        consumers_by_file[path].add(src_file.path)
+                resolved_target = ctx.resolve_dep_target_path(dep, src_file.path)
+                if resolved_target and resolved_target != src_file.path:
+                    consumers_by_file[resolved_target].add(src_file.path)
 
         # 2. Check for high-coupling hotspots
         for target_path, consumers in consumers_by_file.items():

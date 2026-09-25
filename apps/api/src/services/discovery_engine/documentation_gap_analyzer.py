@@ -25,19 +25,12 @@ class DocumentationGapAnalyzer(DiscoveryAnalyzer):
 
         # 1. Map inbound consumers for files
         consumers_by_file: dict[str, set[str]] = defaultdict(set)
-        all_paths = set(ctx.file_by_path.keys())
-
         for src_file in ctx.files:
             deps = ctx.dependencies_by_file_id.get(src_file.id, [])
             for dep in deps:
-                target_clean = ctx.get_target_for_dep(dep).strip("'\"")
-                for path in all_paths:
-                    if (
-                        path == target_clean
-                        or path.endswith(target_clean)
-                        or target_clean.replace(".", "/") in path
-                    ) and path != src_file.path:
-                        consumers_by_file[path].add(src_file.path)
+                resolved_target = ctx.resolve_dep_target_path(dep, src_file.path)
+                if resolved_target and resolved_target != src_file.path:
+                    consumers_by_file[resolved_target].add(src_file.path)
 
         # 2. Collect documentation chunks (e.g. README.md, docs)
         doc_texts = [

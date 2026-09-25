@@ -191,13 +191,14 @@ class ProjectDiscoveryEngine:
 
             created_findings: list[Finding] = []
             for c in final_candidates:
+                safe_title = c.title if len(c.title) <= 255 else (c.title[:251] + "...")
                 finding = Finding(
                     id=uuid.uuid4(),
                     project_id=project_id,
                     snapshot_id=snapshot_id,
                     discovery_run_id=discovery_run.id,
                     category=c.category,
-                    title=c.title,
+                    title=safe_title,
                     description=c.description,
                     why_it_matters=c.why_it_matters,
                     severity=c.severity,
@@ -226,8 +227,12 @@ class ProjectDiscoveryEngine:
 
         except Exception as e:
             logger.error(f"Discovery pipeline failed: {e}", exc_info=True)
-            discovery_run.status = DiscoveryJobStatus.FAILED
-            discovery_run.error_message = str(e)
-            discovery_run.completed_at = utc_now()
-            await session.commit()
+            try:
+                await session.rollback()
+                discovery_run.status = DiscoveryJobStatus.FAILED
+                discovery_run.error_message = str(e)[:1000]
+                discovery_run.completed_at = utc_now()
+                await session.commit()
+            except Exception as commit_err:
+                logger.error(f"Failed to record discovery failure status: {commit_err}")
             raise
