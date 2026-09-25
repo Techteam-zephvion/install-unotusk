@@ -28,7 +28,6 @@ class CircularDependencyAnalyzer(DiscoveryAnalyzer):
 
         # 1. Build directed graph: file_path -> list of (target_file_path, dependency_obj)
         graph: dict[str, list[tuple[str, Any]]] = defaultdict(list)
-        all_paths = set(ctx.file_by_path.keys())
 
         for src_file in ctx.files:
             deps = ctx.dependencies_by_file_id.get(src_file.id, [])

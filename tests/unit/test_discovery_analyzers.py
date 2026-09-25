@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
     DependencyType,
@@ -9,7 +10,6 @@ from apps.api.src.models.enums import (
     FindingSeverity,
     SymbolType,
 )
-from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.services.discovery_engine.architecture_analyzer import ArchitectureAnalyzer
@@ -678,6 +678,7 @@ def test_deduplicator_handles_empty_entities():
 async def test_analyzer_failure_isolation():
     """Verify that an exception in one analyzer does not abort the other analyzers."""
     import asyncio
+
     from apps.api.src.services.discovery_engine.base import DiscoveryAnalyzer
 
     class CrashingAnalyzer(DiscoveryAnalyzer):
@@ -745,6 +746,7 @@ def test_finding_title_length_sanitization():
 async def test_synthesizer_deterministic_fallback():
     """Verify synthesizer enhances knowledge and falls back cleanly without LLM keys."""
     from unittest.mock import MagicMock
+
     from apps.api.src.services.discovery_engine.synthesizer import FindingSynthesizer
 
     finding = CandidateFinding(
