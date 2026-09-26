@@ -48,9 +48,14 @@ class GroqProvider(LLMProvider):
                     for msg in conversation_history[-6:]:  # Keep recent history
                         messages.append({"role": msg["role"], "content": msg["content"]})
 
+                # Cap context characters to ensure request never exceeds model TPM limit (~14k chars / ~3.5k tokens)
+                safe_context = project_context
+                if len(safe_context) > 14000:
+                    safe_context = safe_context[:14000] + "\n... [context truncated to stay within token budget]"
+
                 user_prompt = (
                     f"## PROJECT CONTEXT EVIDENCE\n\n"
-                    f"{project_context}\n\n"
+                    f"{safe_context}\n\n"
                     f"## USER QUESTION\n"
                     f"{question}\n\n"
                     f"Please provide an evidence-grounded answer based strictly on the above context."
@@ -60,7 +65,7 @@ class GroqProvider(LLMProvider):
                 response = await self._client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    max_tokens=2048,
+                    max_tokens=1500,
                     temperature=0.1,
                 )
 

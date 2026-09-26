@@ -50,10 +50,10 @@ class Settings(BaseSettings):
 
     # Groq LLM Settings
     GROQ_API_KEY: str | None = Field(default=None)
-    GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile")
+    GROQ_MODEL: str = Field(default="qwen/qwen3.8-27b")
 
     # Context Budget
-    CONTEXT_BUDGET_TOKENS: int = Field(default=16000)
+    CONTEXT_BUDGET_TOKENS: int = Field(default=3500)
 
 
 settings = Settings()

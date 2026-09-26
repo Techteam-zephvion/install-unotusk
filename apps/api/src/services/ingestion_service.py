@@ -204,7 +204,7 @@ class IngestionService:
                     if f_info["parser_supported"] and content:
                         tree = parse_code(content, f_info["language"])
                         if tree is not None:
-                            content_lines = content.decode("utf-8", errors="replace").splitlines()
+                            content_lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
                             # Extract symbols
                             extracted_symbols = extract_symbols_from_tree(
                                 tree, content, f_info["language"]
@@ -214,9 +214,9 @@ class IngestionService:
                                 code_sym = CodeSymbol(
                                     id=uuid.uuid4(),
                                     file_id=repo_file.id,
-                                    name=sym.name,
+                                    name=sym.name.replace("\x00", ""),
                                     symbol_type=sym.symbol_type,
-                                    qualified_name=sym.qualified_name,
+                                    qualified_name=sym.qualified_name.replace("\x00", "") if sym.qualified_name else None,
                                     start_line=sym.start_line,
                                     end_line=sym.end_line,
                                     symbol_metadata=sym.metadata,
@@ -234,9 +234,9 @@ class IngestionService:
                                         file_id=repo_file.id,
                                         symbol_id=code_sym.id,
                                         chunk_type=sym.symbol_type.value,
-                                        name=sym.name,
+                                        name=sym.name.replace("\x00", ""),
                                         path=repo_file.path,
-                                        content="\n".join(sym_lines),
+                                        content="\n".join(sym_lines).replace("\x00", ""),
                                         start_line=sym.start_line,
                                         end_line=sym.end_line,
                                     )
@@ -247,9 +247,9 @@ class IngestionService:
                                     child_code_sym = CodeSymbol(
                                         id=uuid.uuid4(),
                                         file_id=repo_file.id,
-                                        name=child_sym.name,
+                                        name=child_sym.name.replace("\x00", ""),
                                         symbol_type=child_sym.symbol_type,
-                                        qualified_name=child_sym.qualified_name,
+                                        qualified_name=child_sym.qualified_name.replace("\x00", "") if child_sym.qualified_name else None,
                                         start_line=child_sym.start_line,
                                         end_line=child_sym.end_line,
                                         parent_symbol_id=code_sym.id,
@@ -269,9 +269,9 @@ class IngestionService:
                                             file_id=repo_file.id,
                                             symbol_id=child_code_sym.id,
                                             chunk_type=child_sym.symbol_type.value,
-                                            name=child_sym.name,
+                                            name=child_sym.name.replace("\x00", ""),
                                             path=repo_file.path,
-                                            content="\n".join(child_lines),
+                                            content="\n".join(child_lines).replace("\x00", ""),
                                             start_line=child_sym.start_line,
                                             end_line=child_sym.end_line,
                                         )
@@ -286,7 +286,7 @@ class IngestionService:
 
                     # For config files, documentation, or files with no symbols, store file header chunk
                     if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
-                        lines = content.decode("utf-8", errors="replace").splitlines()[:100]
+                        lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()[:100]
                         if lines:
                             file_chunk = CodeChunk(
                                 id=uuid.uuid4(),
@@ -300,7 +300,7 @@ class IngestionService:
                                 else "MODULE",
                                 name=f_info["filename"],
                                 path=repo_file.path,
-                                content="\n".join(lines),
+                                content="\n".join(lines).replace("\x00", ""),
                                 start_line=1,
                                 end_line=len(lines),
                             )

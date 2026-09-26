@@ -10,6 +10,17 @@ from apps.api.src.schemas.health import HealthResponse, ReadyResponse
 router = APIRouter(tags=["Health"])
 
 
+@router.get("/")
+async def root():
+    return {
+        "service": "Unotusk MVP API",
+        "status": "online",
+        "version": "0.1.0",
+        "health": "/health",
+        "message": "Unotusk MVP API is running. Connect via the Unotusk Employee Desktop Client using Server URL: http://10.0.0.59:8000",
+    }
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     return HealthResponse(

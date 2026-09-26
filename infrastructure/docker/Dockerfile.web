@@ -13,6 +13,7 @@ COPY apps/web/ ./
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
 
+RUN mkdir -p /app/apps/web/public
 RUN npm run build
 
 # Production runner
@@ -25,7 +26,7 @@ ENV PORT=3000
 COPY --from=builder /app/apps/web/package.json ./
 COPY --from=builder /app/apps/web/node_modules ./node_modules
 COPY --from=builder /app/apps/web/.next ./.next
-COPY --from=builder /app/apps/web/public ./public 2>/dev/null || true
+COPY --from=builder /app/apps/web/public ./public
 
 EXPOSE 3000
 
