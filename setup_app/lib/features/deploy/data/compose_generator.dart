@@ -1,25 +1,32 @@
 import '../../config/domain/server_config.dart';
 
 class ComposeGenerator {
-  /// Generates a Docker Compose configuration for local development.
+  /// Generates a Docker Compose configuration for local/multi-server deployment.
   ///
-  /// The caller must supply [projectRoot] (the Unotusk source directory)
-  /// for the build context.
+  /// Secrets and database credentials are read via Docker Compose environment
+  /// substitution from the accompanying `.env` file (${POSTGRES_PASSWORD},
+  /// ${AUTH_SECRET}, ${GROQ_API_KEY} / ${ANTHROPIC_API_KEY}) to avoid baking
+  /// plaintext credentials into the compose YAML.
+  ///
+  /// Global container names are omitted so Docker isolates each deployment
+  /// by project name (`docker compose -p <project>`).
   static String generateDockerCompose(ServerConfig config, {String? projectRoot}) {
+    final apiKeyVar = config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY";
+    final modelVar = config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL";
+
     return '''
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: unotusk-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${config.postgresUser}
-      POSTGRES_PASSWORD: ${config.postgresPassword}
-      POSTGRES_DB: ${config.postgresDb}
+      POSTGRES_USER: \${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}
+      POSTGRES_DB: \${POSTGRES_DB:-unotusk}
     volumes:
       - unotusk_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${config.postgresUser} -d ${config.postgresDb}"]
+      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER:-postgres} -d \${POSTGRES_DB:-unotusk}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,7 +35,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: unotusk-redis
     restart: unless-stopped
     volumes:
       - unotusk_redis_data:/data
@@ -43,14 +49,13 @@ services:
   migration:
 ${projectRoot != null ? '''    build:
       context: $projectRoot
-      dockerfile: infrastructure/docker/Dockerfile.worker''' : '    image: unotusk-worker:0.1.0'}
-    container_name: unotusk-migration
+      dockerfile: infrastructure/docker/Dockerfile.api''' : '    image: unotusk-api:0.1.0'}
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
-      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - DATABASE_URL=\${DATABASE_URL}
+      - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
     command: ["alembic", "upgrade", "head"]
     networks:
       - unotusk-network
@@ -59,7 +64,6 @@ ${projectRoot != null ? '''    build:
 ${projectRoot != null ? '''    build:
       context: $projectRoot
       dockerfile: infrastructure/docker/Dockerfile.api''' : '    image: unotusk-api:0.1.0'}
-    container_name: unotusk-api
     restart: unless-stopped
     depends_on:
       migration:
@@ -71,13 +75,13 @@ ${projectRoot != null ? '''    build:
     environment:
       - APP_ENV=production
       - DEBUG=false
-      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
-      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - DATABASE_URL=\${DATABASE_URL}
+      - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - AUTH_SECRET=${config.authSecret}
-      - LLM_PROVIDER=${config.llmProvider == LlmProviderType.groq ? "groq" : "claude"}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY"}=${config.llmApiKey}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL"}=${config.llmProvider.defaultModel}
+      - AUTH_SECRET=\${AUTH_SECRET}
+      - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
+      - $apiKeyVar=\${$apiKeyVar}
+      - $modelVar=\${$modelVar}
     ports:
       - "${config.serverPort}:8000"
     healthcheck:
@@ -92,7 +96,6 @@ ${projectRoot != null ? '''    build:
 ${projectRoot != null ? '''    build:
       context: $projectRoot
       dockerfile: infrastructure/docker/Dockerfile.worker''' : '    image: unotusk-worker:0.1.0'}
-    container_name: unotusk-worker
     restart: unless-stopped
     depends_on:
       migration:
@@ -104,13 +107,13 @@ ${projectRoot != null ? '''    build:
     environment:
       - APP_ENV=production
       - DEBUG=false
-      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
-      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - DATABASE_URL=\${DATABASE_URL}
+      - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - AUTH_SECRET=${config.authSecret}
-      - LLM_PROVIDER=${config.llmProvider == LlmProviderType.groq ? "groq" : "claude"}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY"}=${config.llmApiKey}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL"}=${config.llmProvider.defaultModel}
+      - AUTH_SECRET=\${AUTH_SECRET}
+      - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
+      - $apiKeyVar=\${$apiKeyVar}
+      - $modelVar=\${$modelVar}
       - QUEUE_NAME=unotusk_tasks
     networks:
       - unotusk-network
@@ -125,22 +128,24 @@ networks:
 ''';
   }
 
-  /// Generates a Docker Compose configuration for production using a prebuilt [imageTag].
+  /// Generates a Docker Compose configuration for production using prebuilt images.
   static String generateProductionCompose(ServerConfig config, {required String imageTag}) {
+    final apiKeyVar = config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY";
+    final modelVar = config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL";
+
     return '''
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: unotusk-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${config.postgresUser}
-      POSTGRES_PASSWORD: ${config.postgresPassword}
-      POSTGRES_DB: ${config.postgresDb}
+      POSTGRES_USER: \${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}
+      POSTGRES_DB: \${POSTGRES_DB:-unotusk}
     volumes:
       - unotusk_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${config.postgresUser} -d ${config.postgresDb}"]
+      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER:-postgres} -d \${POSTGRES_DB:-unotusk}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -149,7 +154,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: unotusk-redis
     restart: unless-stopped
     volumes:
       - unotusk_redis_data:/data
@@ -163,20 +167,18 @@ services:
 
   migration:
     image: $imageTag
-    container_name: unotusk-migration
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
-      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - DATABASE_URL=\${DATABASE_URL}
+      - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
     command: ["alembic", "upgrade", "head"]
     networks:
       - unotusk-network
 
   api:
     image: $imageTag
-    container_name: unotusk-api
     restart: unless-stopped
     depends_on:
       migration:
@@ -188,13 +190,13 @@ services:
     environment:
       - APP_ENV=production
       - DEBUG=false
-      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
-      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - DATABASE_URL=\${DATABASE_URL}
+      - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - AUTH_SECRET=${config.authSecret}
-      - LLM_PROVIDER=${config.llmProvider == LlmProviderType.groq ? "groq" : "claude"}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY"}=${config.llmApiKey}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL"}=${config.llmProvider.defaultModel}
+      - AUTH_SECRET=\${AUTH_SECRET}
+      - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
+      - $apiKeyVar=\${$apiKeyVar}
+      - $modelVar=\${$modelVar}
     ports:
       - "${config.serverPort}:8000"
     healthcheck:
@@ -207,7 +209,6 @@ services:
 
   worker:
     image: $imageTag
-    container_name: unotusk-worker
     restart: unless-stopped
     depends_on:
       migration:
@@ -219,13 +220,13 @@ services:
     environment:
       - APP_ENV=production
       - DEBUG=false
-      - DATABASE_URL=postgresql+asyncpg://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
-      - SYNC_DATABASE_URL=postgresql://${config.postgresUser}:${config.postgresPassword}@postgres:5432/${config.postgresDb}
+      - DATABASE_URL=\${DATABASE_URL}
+      - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - AUTH_SECRET=${config.authSecret}
-      - LLM_PROVIDER=${config.llmProvider == LlmProviderType.groq ? "groq" : "claude"}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY"}=${config.llmApiKey}
-      - ${config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL"}=${config.llmProvider.defaultModel}
+      - AUTH_SECRET=\${AUTH_SECRET}
+      - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
+      - $apiKeyVar=\${$apiKeyVar}
+      - $modelVar=\${$modelVar}
       - QUEUE_NAME=unotusk_tasks
     networks:
       - unotusk-network

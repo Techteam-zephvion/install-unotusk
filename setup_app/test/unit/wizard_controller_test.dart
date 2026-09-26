@@ -17,7 +17,10 @@ void main() {
       expect(controller.state.currentStep, WizardStep.target);
 
       controller.nextStep();
-      expect(controller.state.currentStep, WizardStep.check);
+      expect(controller.state.currentStep, WizardStep.systemCheck);
+
+      controller.nextStep();
+      expect(controller.state.currentStep, WizardStep.networkCheck);
 
       controller.nextStep();
       expect(controller.state.currentStep, WizardStep.configure);
