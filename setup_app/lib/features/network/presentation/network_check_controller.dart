@@ -13,12 +13,14 @@ class NetworkCheckState {
   final bool isRunning;
   final bool hasCriticalFailure;
   final String? detectedIp;
+  final int? availablePort;
 
   const NetworkCheckState({
     this.items = const [],
     this.isRunning = false,
     this.hasCriticalFailure = false,
     this.detectedIp,
+    this.availablePort,
   });
 
   bool get isAllPassed =>
@@ -31,12 +33,14 @@ class NetworkCheckState {
     bool? isRunning,
     bool? hasCriticalFailure,
     String? detectedIp,
+    int? availablePort,
   }) {
     return NetworkCheckState(
       items: items ?? this.items,
       isRunning: isRunning ?? this.isRunning,
       hasCriticalFailure: hasCriticalFailure ?? this.hasCriticalFailure,
       detectedIp: detectedIp ?? this.detectedIp,
+      availablePort: availablePort ?? this.availablePort,
     );
   }
 }
@@ -72,6 +76,10 @@ class NetworkCheckController extends StateNotifier<NetworkCheckState> {
       ],
     );
 
+    
+    // 0. Find Available Port
+    final port = await validator.findAvailablePort(targetConfig, 8000);
+    
     // 1. LAN IP
     final ipCheck = await validator.checkLanIp(targetConfig);
     _updateItem(ipCheck);
@@ -82,17 +90,19 @@ class NetworkCheckController extends StateNotifier<NetworkCheckState> {
     }
 
     if (ipCheck.status.isFailed) {
-      state = state.copyWith(isRunning: false, hasCriticalFailure: true, detectedIp: detectedIp);
+      state = state.copyWith(isRunning: false, hasCriticalFailure: true, detectedIp: detectedIp,
+      availablePort: port);
       return;
     }
 
     // 2. Firewall
     _setItemStatus('firewall', CheckStatus.checking);
-    final fwCheck = await validator.checkFirewall(targetConfig, apiPort: 8000);
+    final fwCheck = await validator.checkFirewall(targetConfig, apiPort: port);
     _updateItem(fwCheck);
 
     if (fwCheck.status.isFailed) {
-      state = state.copyWith(isRunning: false, hasCriticalFailure: true, detectedIp: detectedIp);
+      state = state.copyWith(isRunning: false, hasCriticalFailure: true, detectedIp: detectedIp,
+      availablePort: port);
       return;
     }
 
@@ -100,6 +110,7 @@ class NetworkCheckController extends StateNotifier<NetworkCheckState> {
       isRunning: false,
       hasCriticalFailure: false,
       detectedIp: detectedIp,
+      availablePort: port,
     );
   }
 

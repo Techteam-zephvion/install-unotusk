@@ -66,6 +66,7 @@ class NetworkCheckScreen extends ConsumerWidget {
                         ? () {
                             if (checkState.detectedIp != null) {
                               ref.read(configControllerProvider.notifier).updateLanIp(checkState.detectedIp!);
+                              if (checkState.availablePort != null) ref.read(configControllerProvider.notifier).updateServerPort(checkState.availablePort!.toString());
                             }
                             wizardNotifier.nextStep();
                           }

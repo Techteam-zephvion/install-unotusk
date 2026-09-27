@@ -9,6 +9,34 @@ class NetworkValidator {
   NetworkValidator({ProcessExecutor? processExecutor})
       : _processExecutor = processExecutor ?? Process.run;
 
+  Future<int> findAvailablePort(TargetConfig config, int startPort) async {
+    int port = startPort;
+    while (port < 9000) {
+      final script = '''
+#!/bin/sh
+if ss -tln | grep -q ":$port "; then
+  echo "IN_USE"
+elif netstat -tln | grep -q ":$port "; then
+  echo "IN_USE"
+else
+  echo "AVAILABLE"
+fi
+''';
+      final res = config.isLocal
+          ? await _processExecutor('sh', ['-c', script])
+          : await _processExecutor('ssh', [
+              '-p', config.port.toString(),
+              '${config.username}@${config.host}',
+              script
+            ]);
+      if (res.stdout.toString().trim() == 'AVAILABLE') {
+        return port;
+      }
+      port++;
+    }
+    return startPort;
+  }
+
   Future<CheckItem> checkLanIp(TargetConfig config) async {
     try {
       final script = '''

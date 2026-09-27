@@ -12,7 +12,7 @@ void main() {
         llmApiKey: 'gsk_mock_123',
       );
 
-      final compose = ComposeGenerator.generateDockerCompose(config);
+      final compose = ComposeGenerator.generateProductionCompose(config, imageVersion: '1.0.0');
       // Secrets must NOT be inlined in plaintext in the compose file
       expect(compose, isNot(contains('gsk_mock_123')));
       expect(compose, contains(r'GROQ_API_KEY=${GROQ_API_KEY}'));
@@ -39,8 +39,8 @@ void main() {
         llmApiKey: 'gsk_mock_123',
       );
 
-      final compose = ComposeGenerator.generateProductionCompose(config, imageTag: 'unotusk-api:0.1.0');
-      expect(compose, contains('image: unotusk-api:0.1.0'));
+      final compose = ComposeGenerator.generateProductionCompose(config, imageVersion: '1.0.0');
+      expect(compose, contains('image: ghcr.io/techteam-zephvion/unotusk-api:1.0.0'));
       expect(compose, contains('"8085:8000"'));
       expect(compose, isNot(contains('gsk_mock_123')));
       expect(compose, contains(r'AUTH_SECRET=${AUTH_SECRET}'));

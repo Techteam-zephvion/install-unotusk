@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -188,9 +189,9 @@ class ServerManagerScreen extends ConsumerWidget {
                 Row(
                   children: [
                     AppButton(
-                      label: 'Open App',
-                      icon: Icons.launch,
-                      onPressed: () => _launchApp(server),
+                      label: 'Copy URL',
+                      icon: Icons.copy,
+                      onPressed: () => _copyUrl(server, context),
                     ),
                     const SizedBox(width: 8),
                     AppButton(
@@ -242,10 +243,15 @@ class ServerManagerScreen extends ConsumerWidget {
     ));
   }
 
-  Future<void> _launchApp(ServerInstance server) async {
-    final executablePath = '/home/devils/PRO/Unotusk-MVP/app/build/linux/x64/release/bundle/app';
-    if (File(executablePath).existsSync()) {
-      Process.run(executablePath, [], environment: {'UNOTUSK_SERVER_URL': server.lanUrl});
+  Future<void> _copyUrl(ServerInstance server, BuildContext context) async {
+    final url = server.lanUrl;
+    if (url.isNotEmpty) {
+      // You need `import 'package:flutter/services.dart';` for Clipboard.
+      // We assume it's imported, or we will add it.
+      await Clipboard.setData(ClipboardData(text: url));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied $url to clipboard')));
+      }
     }
   }
 
