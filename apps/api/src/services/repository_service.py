@@ -1,3 +1,4 @@
+from apps.api.src.core.security_vault import encrypt_secret
 import os
 import uuid
 
@@ -94,7 +95,7 @@ class RepositoryService:
                 external_id=str(user_profile.get("id")),
                 integration_metadata={
                     "username": user_profile.get("login"),
-                    "github_token": effective_token,
+                    "github_token": encrypt_secret(effective_token),
                 },
             )
             session.add(integration)
@@ -103,7 +104,7 @@ class RepositoryService:
             integration.external_id = str(user_profile.get("id"))
             integration.integration_metadata = {
                 "username": user_profile.get("login"),
-                "github_token": effective_token,
+                "github_token": encrypt_secret(effective_token),
             }
 
         await session.commit()
@@ -162,7 +163,7 @@ class RepositoryService:
                 provider=IntegrationProvider.GITHUB,
                 status=IntegrationStatus.CONNECTED,
                 external_id=data.external_id,
-                integration_metadata={"github_token": token} if token else {},
+                integration_metadata={"github_token": encrypt_secret(token)} if token else {},
             )
             session.add(integration)
             await session.flush()

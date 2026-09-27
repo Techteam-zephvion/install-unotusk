@@ -98,14 +98,14 @@ jobs:
       - name: Package tar.gz + sha256
         working-directory: setup_app/build/linux/x64/release
         run: |
-          tar -czf unotusk-setup-linux-x64.tar.gz bundle/
-          sha256sum unotusk-setup-linux-x64.tar.gz > unotusk-setup-linux-x64.tar.gz.sha256
+          tar -czf unotusk-server-linux-x64.tar.gz bundle/
+          sha256sum unotusk-server-linux-x64.tar.gz > unotusk-server-linux-x64.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: unotusk-setup-linux-x64
+          name: unotusk-server-linux-x64
           path: |
-            setup_app/build/linux/x64/release/unotusk-setup-linux-x64.tar.gz
-            setup_app/build/linux/x64/release/unotusk-setup-linux-x64.tar.gz.sha256
+            setup_app/build/linux/x64/release/unotusk-server-linux-x64.tar.gz
+            setup_app/build/linux/x64/release/unotusk-server-linux-x64.tar.gz.sha256
           retention-days: 30
 
   build-docker-images:
@@ -389,7 +389,7 @@ jobs:
             | Platform | File | Format |
             |---|---|---|
             | Linux x64 | `unotusk-employee-linux-x64.tar.gz` | Archive |
-            | Setup App Linux x64 | `unotusk-setup-linux-x64.tar.gz` | Archive |
+            | Setup App Linux x64 | `unotusk-server-linux-x64.tar.gz` | Archive |
             | Windows x64 | `unotusk-employee-windows-x64.msi` | MSI Installer |
             | macOS | `unotusk-employee-macos.dmg` | Disk Image |
 

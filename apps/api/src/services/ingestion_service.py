@@ -1,3 +1,4 @@
+from apps.api.src.core.security_vault import decrypt_secret
 import hashlib
 import logging
 import os
@@ -72,7 +73,7 @@ class IngestionService:
             integration = int_res.scalar_one_or_none()
             github_token = None
             if integration and integration.integration_metadata:
-                github_token = integration.integration_metadata.get("github_token")
+                github_token = decrypt_secret(integration.integration_metadata.get("github_token"))
             if not github_token:
                 github_token = os.getenv("GITHUB_TOKEN")
 

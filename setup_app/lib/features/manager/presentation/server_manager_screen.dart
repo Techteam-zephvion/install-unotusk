@@ -1,3 +1,4 @@
+import 'repository_manager_screen.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -199,6 +200,17 @@ class ServerManagerScreen extends ConsumerWidget {
                       variant: AppButtonVariant.secondary,
                       icon: Icons.refresh,
                       onPressed: () => notifier.restartServer(server),
+                    ),
+                    const SizedBox(width: 8),
+                    AppButton(
+                      label: 'Manage Repos',
+                      variant: AppButtonVariant.secondary,
+                      icon: Icons.folder,
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => RepositoryManagerScreen(server: server)
+                        ));
+                      },
                     ),
                     const SizedBox(width: 8),
                     AppButton(
