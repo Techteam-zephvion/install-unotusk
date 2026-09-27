@@ -3,7 +3,7 @@
 ## Version Information
 - **Version**: v1.0.0
 - **Release Branch**: main
-- **Commit**: `e559651866e08d8a2c11da8b01802e41d64fe3cd`
+- **Commit**: `55296384b3401703b94643e8bc259e4433c54738`
 
 ## Server Images (GHCR)
 - `ghcr.io/techteam-zephvion/unotusk-api:v1.0.0`
