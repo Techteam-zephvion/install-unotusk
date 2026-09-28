@@ -32,8 +32,11 @@ class ServerManagerScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  runSpacing: 16,
                   children: [
                     Text('Unotusk Server Manager', style: AppTextStyles.h1),
                     AppButton(
@@ -93,140 +96,83 @@ class ServerManagerScreen extends ConsumerWidget {
   }
 
   Widget _buildServerCard(BuildContext context, WidgetRef ref, ServerInstance server, ServerManagerController notifier) {
-    Color statusColor;
-    String statusText;
-    
+    Color statusColor = AppColors.slate400;
+    String statusText = 'Unknown';
+
     switch (server.lastKnownState) {
       case ServerState.running:
         statusColor = AppColors.success;
-        statusText = 'RUNNING';
+        statusText = 'Running';
         break;
       case ServerState.stopped:
-        statusColor = AppColors.slate500;
-        statusText = 'STOPPED';
-        break;
-      case ServerState.starting:
-        statusColor = AppColors.primary;
-        statusText = 'STARTING';
+        statusColor = AppColors.slate400;
+        statusText = 'Stopped';
         break;
       case ServerState.degraded:
         statusColor = AppColors.warning;
-        statusText = 'DEGRADED';
+        statusText = 'Degraded';
         break;
       case ServerState.failed:
         statusColor = AppColors.error;
-        statusText = 'FAILED';
+        statusText = 'Failed';
         break;
-      default:
-        statusColor = AppColors.slate400;
-        statusText = 'UNKNOWN';
+      case ServerState.unknown:
+        break;
+      case ServerState.starting:
+        statusColor = AppColors.primary;
+        statusText = 'Starting';
+        break;
     }
 
     return AppCard(
       padding: const EdgeInsets.all(20),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(server.name, style: AppTextStyles.h3),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: statusColor,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            statusText,
-                            style: AppTextStyles.label.copyWith(
-                              color: statusColor,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text('ID: ${server.id}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500)),
-                Text('Project: ${server.composeProject}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500)),
-                const SizedBox(height: 12),
-                Text(
-                  server.lanUrl,
-                  style: AppTextStyles.code.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (server.lastKnownState == ServerState.stopped || server.lastKnownState == ServerState.failed)
-                AppButton(
-                  label: 'Start',
-                  icon: Icons.play_arrow,
-                  onPressed: () => notifier.startServer(server),
-                )
-                            else if (server.lastKnownState == ServerState.running || server.lastKnownState == ServerState.degraded)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    AppButton(
-                      label: 'Copy URL',
-                      icon: Icons.copy,
-                      onPressed: () => _copyUrl(server, context),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                children: [
+                  Text(server.name, style: AppTextStyles.h3),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                     ),
-                    AppButton(
-                      label: 'Restart',
-                      variant: AppButtonVariant.secondary,
-                      icon: Icons.refresh,
-                      onPressed: () => notifier.restartServer(server),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: statusColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          statusText,
+                          style: AppTextStyles.label.copyWith(
+                            color: statusColor,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
-                    AppButton(
-                      label: 'Manage Repos',
-                      variant: AppButtonVariant.secondary,
-                      icon: Icons.folder,
-                      onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => RepositoryManagerScreen(server: server)
-                        ));
-                      },
-                    ),
-                    AppButton(
-                      label: 'Stop',
-                      variant: AppButtonVariant.destructive,
-                      icon: Icons.stop,
-                      onPressed: () => notifier.stopServer(server),
-                    ),
-                  ],
-                ),
-              const SizedBox(height: 12),
+                  ),
+                ],
+              ),
               OutlinedButton.icon(
                 onPressed: () => _confirmDelete(context, server, notifier),
                 icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                label: Text('Delete', style: TextStyle(color: AppColors.error)),
+                label: const Text('Delete', style: TextStyle(color: AppColors.error)),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.errorBorder),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -234,6 +180,55 @@ class ServerManagerScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Text('ID: ${server.id}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500)),
+          Text('Project: ${server.composeProject}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500)),
+          const SizedBox(height: 8),
+          Text(
+            server.lanUrl.isNotEmpty ? server.lanUrl : 'No URL available',
+            style: AppTextStyles.code.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          if (server.lastKnownState == ServerState.stopped || server.lastKnownState == ServerState.failed)
+            AppButton(
+              label: 'Start',
+              icon: Icons.play_arrow,
+              onPressed: () => notifier.startServer(server),
+            )
+          else if (server.lastKnownState == ServerState.running || server.lastKnownState == ServerState.degraded)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                AppButton(
+                  label: 'Copy URL',
+                  icon: Icons.copy,
+                  onPressed: () => _copyUrl(server, context),
+                ),
+                AppButton(
+                  label: 'Restart',
+                  variant: AppButtonVariant.secondary,
+                  icon: Icons.refresh,
+                  onPressed: () => notifier.restartServer(server),
+                ),
+                AppButton(
+                  label: 'Manage Repos',
+                  variant: AppButtonVariant.secondary,
+                  icon: Icons.folder,
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => RepositoryManagerScreen(server: server)
+                    ));
+                  },
+                ),
+                AppButton(
+                  label: 'Stop',
+                  variant: AppButtonVariant.destructive,
+                  icon: Icons.stop,
+                  onPressed: () => notifier.stopServer(server),
+                ),
+              ],
+            ),
         ],
       ),
     );
