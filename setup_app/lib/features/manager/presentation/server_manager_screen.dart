@@ -186,22 +186,24 @@ class ServerManagerScreen extends ConsumerWidget {
                   icon: Icons.play_arrow,
                   onPressed: () => notifier.startServer(server),
                 )
-              else if (server.lastKnownState == ServerState.running || server.lastKnownState == ServerState.degraded)
-                Row(
+                            else if (server.lastKnownState == ServerState.running || server.lastKnownState == ServerState.degraded)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     AppButton(
                       label: 'Copy URL',
                       icon: Icons.copy,
                       onPressed: () => _copyUrl(server, context),
                     ),
-                    const SizedBox(width: 8),
                     AppButton(
                       label: 'Restart',
                       variant: AppButtonVariant.secondary,
                       icon: Icons.refresh,
                       onPressed: () => notifier.restartServer(server),
                     ),
-                    const SizedBox(width: 8),
                     AppButton(
                       label: 'Manage Repos',
                       variant: AppButtonVariant.secondary,
@@ -212,7 +214,6 @@ class ServerManagerScreen extends ConsumerWidget {
                         ));
                       },
                     ),
-                    const SizedBox(width: 8),
                     AppButton(
                       label: 'Stop',
                       variant: AppButtonVariant.destructive,
