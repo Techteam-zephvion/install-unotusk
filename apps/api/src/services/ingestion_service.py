@@ -357,7 +357,7 @@ class IngestionService:
                         id=uuid.uuid4(),
                         source_file_id=source_file_id,
                         target_file_id=target_file_id,
-                        external_package=ext_pkg,
+                        external_package=None if target_file_id else ext_pkg,
                         dependency_type=dep.dependency_type,
                         line_number=dep.line_number,
                     )

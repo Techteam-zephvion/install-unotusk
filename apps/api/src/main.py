@@ -163,4 +163,3 @@ for r in [
     tasks.router,
 ]:
     app.include_router(r, prefix=settings.API_V1_PREFIX)
-    app.include_router(r)
