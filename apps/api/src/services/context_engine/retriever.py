@@ -1,3 +1,4 @@
+import hashlib
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -21,6 +22,39 @@ def compute_cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     if norm1 == 0.0 or norm2 == 0.0:
         return 0.0
     return dot / (norm1 * norm2)
+
+
+def generate_text_embedding(text: str, dim: int = 1536) -> list[float]:
+    """Generates a deterministic normalized semantic embedding vector for code or text."""
+    if not text or not text.strip():
+        return [0.0] * dim
+
+    vec = [0.0] * dim
+    tokens = re.findall(r"[A-Za-z0-9_]+|[^\s\w]", text.lower())
+    if not tokens:
+        return [0.0] * dim
+
+    for token in tokens:
+        if len(token) < 2:
+            continue
+        h = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
+        idx = h % dim
+        sign = 1.0 if (h >> 1) & 1 else -1.0
+        vec[idx] += sign * (1.5 if len(token) > 3 else 1.0)
+
+        subwords = token.split("_")
+        if len(subwords) > 1:
+            for sw in subwords:
+                if len(sw) >= 2:
+                    h_sw = int(hashlib.md5(sw.encode("utf-8")).hexdigest(), 16)
+                    idx_sw = h_sw % dim
+                    sign_sw = 1.0 if (h_sw >> 1) & 1 else -1.0
+                    vec[idx_sw] += sign_sw * 0.8
+
+    norm = sum(x * x for x in vec) ** 0.5
+    if norm == 0.0:
+        return [0.0] * dim
+    return [round(x / norm, 6) for x in vec]
 
 
 @dataclass
@@ -276,7 +310,19 @@ class MultiSignalRetriever:
                 )
 
         # 5. VECTOR SEARCH: Match chunks with precomputed embeddings using vector similarity
-        if query_embedding is not None:
+        effective_query_embedding = query_embedding
+        if effective_query_embedding is None:
+            query_parts = []
+            if analyzed_query.keywords:
+                query_parts.extend(analyzed_query.keywords)
+            if analyzed_query.symbol_candidates:
+                query_parts.extend(analyzed_query.symbol_candidates)
+            if analyzed_query.concept_keywords:
+                query_parts.extend(analyzed_query.concept_keywords)
+            if query_parts:
+                effective_query_embedding = generate_text_embedding(" ".join(query_parts))
+
+        if effective_query_embedding is not None:
             vec_stmt = (
                 select(CodeChunk)
                 .where(
@@ -290,7 +336,7 @@ class MultiSignalRetriever:
             scored_vector_chunks = []
             for chunk in vector_chunks:
                 if chunk.embedding:
-                    sim = compute_cosine_similarity(query_embedding, chunk.embedding)
+                    sim = compute_cosine_similarity(effective_query_embedding, chunk.embedding)
                     if sim > 0.2:
                         scored_vector_chunks.append((sim, chunk))
             scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)

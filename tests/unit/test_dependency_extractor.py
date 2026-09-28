@@ -211,3 +211,57 @@ import urllib.request
     # 2. External packages (with or without dots) are NOT treated as internal files
     assert resolved["math"] is None
     assert resolved["urllib.request"] is None
+
+
+def test_multi_module_qualified_imports_and_deep_relative_paths():
+    """Verify deep multi-module Python and JS/TS imports with multiple nesting levels."""
+    # Python deep multi-module imports and relative imports
+    py_code = b"""
+from ...core.utils.helpers import format_name
+from ..services.auth.provider import TokenProvider
+from .models.user import UserProfile
+import pkg.submodule1.submodule2.service as deep_service
+from a.b.c.d.e import leaf_node
+"""
+    py_deps = extract_dependencies_from_tree(None, py_code, "Python")
+    py_target_map = {d.raw_target: d for d in py_deps}
+
+    assert "...core.utils.helpers" in py_target_map
+    assert py_target_map["...core.utils.helpers"].is_relative is True
+    assert py_target_map["...core.utils.helpers"].dependency_type == DependencyType.FROM_IMPORT
+
+    assert "..services.auth.provider" in py_target_map
+    assert py_target_map["..services.auth.provider"].is_relative is True
+
+    assert ".models.user" in py_target_map
+    assert py_target_map[".models.user"].is_relative is True
+
+    assert "pkg.submodule1.submodule2.service" in py_target_map
+    assert py_target_map["pkg.submodule1.submodule2.service"].is_relative is False
+    assert py_target_map["pkg.submodule1.submodule2.service"].dependency_type == DependencyType.IMPORT
+
+    assert "a.b.c.d.e" in py_target_map
+    assert py_target_map["a.b.c.d.e"].is_relative is False
+
+    # TypeScript deep multi-segment alias and relative paths
+    ts_code = b"""
+import { AuthProvider } from '../../services/core/auth';
+import { DatabaseClient } from '../../../infrastructure/db/client';
+import config from '@/config/database/settings';
+import * as endpoints from './api/v1/endpoints';
+"""
+    ts_deps = extract_dependencies_from_tree(None, ts_code, "TypeScript")
+    ts_target_map = {d.raw_target: d for d in ts_deps}
+
+    assert "../../services/core/auth" in ts_target_map
+    assert ts_target_map["../../services/core/auth"].is_relative is True
+
+    assert "../../../infrastructure/db/client" in ts_target_map
+    assert ts_target_map["../../../infrastructure/db/client"].is_relative is True
+
+    assert "@/config/database/settings" in ts_target_map
+    assert ts_target_map["@/config/database/settings"].is_relative is True
+
+    assert "./api/v1/endpoints" in ts_target_map
+    assert ts_target_map["./api/v1/endpoints"].is_relative is True
+

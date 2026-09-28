@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -643,4 +643,282 @@ def test_multi_signal_ranker_deduplication_and_noise_filtering():
 
     # 2. Noise candidate was filtered out
     assert not any(r.candidate.candidate_id == "chunk:noise" for r in ranked)
+
+
+@pytest.mark.asyncio
+async def test_relationship_expander_multi_hop_bfs():
+    """Verify that multi-hop BFS traversal iteratively explores relationships up to max_depth."""
+    snapshot_id = uuid.uuid4()
+    seed_file_id = uuid.uuid4()
+    hop1_file_id = uuid.uuid4()
+    hop2_file_id = uuid.uuid4()
+    hop3_file_id = uuid.uuid4()
+
+    seed_cand = RetrievedCandidate(
+        candidate_id=f"file:{seed_file_id}",
+        entity_type="FILE",
+        name="main.py",
+        path="src/main.py",
+        start_line=1,
+        end_line=50,
+        content="// Entry point",
+        file_id=seed_file_id,
+    )
+
+    file_seed = RepositoryFile(id=seed_file_id, snapshot_id=snapshot_id, path="src/main.py", filename="main.py")
+    file_hop1 = RepositoryFile(id=hop1_file_id, snapshot_id=snapshot_id, path="src/api.py", filename="api.py")
+    file_hop2 = RepositoryFile(id=hop2_file_id, snapshot_id=snapshot_id, path="src/service.py", filename="service.py")
+    file_hop3 = RepositoryFile(id=hop3_file_id, snapshot_id=snapshot_id, path="src/db.py", filename="db.py")
+
+    # Hop 1: main -> api
+    dep1 = CodeDependency(id=uuid.uuid4(), source_file_id=seed_file_id, target_file_id=hop1_file_id, line_number=5)
+    # Hop 2: api -> service
+    dep2 = CodeDependency(id=uuid.uuid4(), source_file_id=hop1_file_id, target_file_id=hop2_file_id, line_number=8)
+    # Hop 3: service -> db
+    dep3 = CodeDependency(id=uuid.uuid4(), source_file_id=hop2_file_id, target_file_id=hop3_file_id, line_number=12)
+    # Cycle: db -> main (should be skipped by visited tracking)
+    dep_cycle = CodeDependency(id=uuid.uuid4(), source_file_id=hop3_file_id, target_file_id=seed_file_id, line_number=15)
+
+    sym_hop2 = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=hop1_file_id,
+        name="ApiService",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="api.ApiService",
+        start_line=10,
+        end_line=40,
+    )
+    sym_hop3 = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=hop3_file_id,
+        name="DatabaseConnection",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="db.DatabaseConnection",
+        start_line=5,
+        end_line=30,
+    )
+    chunk_hop3 = CodeChunk(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        file_id=hop3_file_id,
+        symbol_id=sym_hop3.id,
+        name="DatabaseConnection",
+        path="src/db.py",
+        content="class DatabaseConnection:\n    def connect(self): pass",
+        start_line=5,
+        end_line=30,
+    )
+
+    session = AsyncMock()
+    dep_query_count = 0
+    sym_query_count = 0
+
+    def execute_side_effect(stmt):
+        nonlocal dep_query_count, sym_query_count
+        mock_res = MagicMock()
+        stmt_str = str(stmt)
+        if "code_symbols" in stmt_str:
+            sym_query_count += 1
+            if sym_query_count == 2:
+                mock_res.all.return_value = [(sym_hop2, file_hop1)]
+            elif sym_query_count == 3:
+                mock_res.all.return_value = [(sym_hop3, file_hop3)]
+            else:
+                mock_res.all.return_value = []
+        elif "code_dependencies" in stmt_str:
+            dep_query_count += 1
+            if dep_query_count == 1:
+                # Hop 1: seed -> hop1
+                mock_res.all.return_value = [(dep1, file_seed, file_hop1)]
+            elif dep_query_count == 2:
+                # Hop 2: hop1 -> hop2
+                mock_res.all.return_value = [(dep2, file_hop1, file_hop2)]
+            elif dep_query_count == 3:
+                # Hop 3: hop2 -> hop3 AND cycle hop3 -> seed
+                mock_res.all.return_value = [
+                    (dep3, file_hop2, file_hop3),
+                    (dep_cycle, file_hop3, file_seed),
+                ]
+            else:
+                mock_res.all.return_value = []
+        elif "code_chunks" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = [chunk_hop3]
+        else:
+            mock_res.scalars.return_value.all.return_value = []
+            mock_res.all.return_value = []
+        return mock_res
+
+    session.execute.side_effect = execute_side_effect
+
+    expanded = await RelationshipExpander.expand_candidates(
+        session=session,
+        snapshot_id=snapshot_id,
+        seed_candidates=[seed_cand],
+        max_depth=3,
+    )
+
+    # 1. Multi-hop candidates are discovered across depth 1, 2, and 3
+    hop1_cands = [c for c in expanded if "graph_expansion" in c.signals]
+    hop2_cands = [c for c in expanded if "graph_expansion_hop2" in c.signals]
+    hop3_cands = [c for c in expanded if "graph_expansion_hop3" in c.signals]
+
+    assert len(hop1_cands) >= 1
+    assert len(hop2_cands) >= 1
+    assert len(hop3_cands) >= 1
+
+    # 2. Verify signal decay across hops
+    hop1_weight = hop1_cands[0].signals["graph_expansion"]
+    hop2_weight = hop2_cands[0].signals["graph_expansion_hop2"]
+    hop3_weight = hop3_cands[0].signals["graph_expansion_hop3"]
+
+    assert hop1_weight > hop2_weight > hop3_weight
+
+    # 3. Cycle edge (db -> main) did not re-add main as an expanded candidate
+    seed_paths = [c.path for c in expanded if c.candidate_id != seed_cand.candidate_id and c.path == "src/main.py"]
+    assert len(seed_paths) == 0
+
+    # 4. Code chunk for deep symbol was fetched and updated symbol content
+    sym_cand = next(c for c in expanded if c.name == "DatabaseConnection")
+    assert "class DatabaseConnection:" in sym_cand.content
+
+
+@pytest.mark.asyncio
+async def test_multi_signal_retriever_semantic_embedding_generation_and_search():
+    """Verify semantic text embedding generation, cosine similarity scoring, and auto-derivation."""
+    from apps.api.src.services.context_engine.engine import ProjectContextEngine
+    from apps.api.src.services.context_engine.retriever import generate_text_embedding
+
+    # 1. Verify embedding dimension and normalization
+    emb1 = generate_text_embedding("user authentication and session verification")
+    assert len(emb1) == 1536
+    norm = sum(x * x for x in emb1) ** 0.5
+    assert norm == pytest.approx(1.0, rel=1e-3)
+
+    # 2. Deterministic property
+    emb1_repeat = generate_text_embedding("user authentication and session verification")
+    assert emb1 == emb1_repeat
+
+    # 3. Semantic similarity properties
+    emb_auth_sim = generate_text_embedding("user login authenticate token verification")
+    emb_css = generate_text_embedding("css background color styling layout margin border")
+
+    sim_related = compute_cosine_similarity(emb1, emb_auth_sim)
+    sim_unrelated = compute_cosine_similarity(emb1, emb_css)
+    assert sim_related > sim_unrelated
+
+    # 4. Test auto-derivation in MultiSignalRetriever when query_embedding=None
+    snapshot_id = uuid.uuid4()
+    file_id = uuid.uuid4()
+    chunk_with_emb = CodeChunk(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot_id,
+        file_id=file_id,
+        name="authenticate_user",
+        path="src/auth.py",
+        content="def authenticate_user(token: str): pass",
+        start_line=1,
+        end_line=10,
+        embedding=emb_auth_sim,
+    )
+
+    session = AsyncMock()
+
+    def execute_side_effect(stmt):
+        mock_res = MagicMock()
+        stmt_str = str(stmt)
+        if "embedding" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = [chunk_with_emb]
+        else:
+            mock_res.scalars.return_value.all.return_value = []
+            mock_res.all.return_value = []
+        return mock_res
+
+    session.execute.side_effect = execute_side_effect
+
+    analyzed = analyze_query("authentication token")
+    # query_embedding=None -> retriever will derive effective query embedding automatically
+    candidates = await MultiSignalRetriever.retrieve_candidates(
+        session=session,
+        snapshot_id=snapshot_id,
+        analyzed_query=analyzed,
+        query_embedding=None,
+    )
+
+    assert len(candidates) >= 1
+    chunk_cand = next(c for c in candidates if c.name == "authenticate_user")
+    assert "vector_similarity" in chunk_cand.signals
+    assert "semantic_match" in chunk_cand.signals
+    assert chunk_cand.signals["vector_similarity"] > 0.0
+
+    # 5. Test ProjectContextEngine.investigate derives query_embedding and produces answer
+    engine = ProjectContextEngine()
+    grounded_answer = await engine.investigate(
+        session=session,
+        snapshot_id=snapshot_id,
+        question="How does authenticate_user token verification work?",
+    )
+
+    assert grounded_answer is not None
+    assert grounded_answer.confidence in ["HIGH", "MEDIUM", "LOW"]
+    assert len(grounded_answer.evidence) >= 1
+
+
+@pytest.mark.asyncio
+async def test_claude_and_groq_providers_with_mock_client():
+    """Verify LLM grounded answer generation with mocked Anthropic and Groq clients."""
+    from apps.api.src.services.llm.groq import GroqProvider
+
+    evidence = [
+        {
+            "type": "symbol",
+            "file": "src/auth/provider.py",
+            "symbol": "TokenProvider",
+            "lines": "10-40",
+            "relevance": 0.95,
+            "snippet": "class TokenProvider:\n    def verify(self): return True",
+        }
+    ]
+
+    # Test Claude with mocked client
+    claude = ClaudeProvider(api_key="mock-anthropic-key")
+    mock_claude_response = MagicMock()
+    mock_claude_response.content = [
+        MagicMock(text="TokenProvider verifies authentication tokens according to src/auth/provider.py.")
+    ]
+    mock_claude_client = MagicMock()
+    mock_claude_client.messages.create = AsyncMock(return_value=mock_claude_response)
+
+    with patch.object(claude, "_client", mock_claude_client):
+        answer = await claude.generate_grounded_answer(
+            question="How does token verification work?",
+            project_context="### [SYMBOL] src/auth/provider.py\nclass TokenProvider: pass",
+            evidence_items=evidence,
+            related_entities=["TokenProvider"],
+        )
+
+        assert answer.confidence == "HIGH"
+        assert "TokenProvider" in answer.content
+        assert answer.debug_signals["provider"] == "claude"
+
+    # Test Groq with mocked client
+    groq = GroqProvider(api_key="mock-groq-key")
+    mock_groq_choice = MagicMock()
+    mock_groq_choice.message.content = "Groq analysis: TokenProvider handles tokens in src/auth/provider.py."
+    mock_groq_resp = MagicMock()
+    mock_groq_resp.choices = [mock_groq_choice]
+    mock_groq_client = MagicMock()
+    mock_groq_client.chat.completions.create = AsyncMock(return_value=mock_groq_resp)
+
+    with patch.object(groq, "_client", mock_groq_client):
+        groq_answer = await groq.generate_grounded_answer(
+            question="How does token verification work?",
+            project_context="### [SYMBOL] src/auth/provider.py\nclass TokenProvider: pass",
+            evidence_items=evidence,
+            related_entities=["TokenProvider"],
+        )
+
+        assert groq_answer.confidence == "HIGH"
+        assert "TokenProvider" in groq_answer.content
+        assert groq_answer.debug_signals["provider"] == "groq"
+
 

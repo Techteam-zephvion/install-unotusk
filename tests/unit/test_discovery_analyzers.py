@@ -777,3 +777,94 @@ async def test_synthesizer_deterministic_fallback():
     assert "Project Knowledge: Team states 'PaymentGateway is being replaced" in enhanced[0].why_it_matters
 
 
+@pytest.mark.asyncio
+async def test_discovery_engine_pipeline_execution():
+    """Verify that ProjectDiscoveryEngine runs all analyzers, ranks, and persists findings."""
+    from apps.api.src.services.discovery_engine.engine import ProjectDiscoveryEngine
+
+    project_id = uuid.uuid4()
+    snapshot_id = uuid.uuid4()
+
+    file_a = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/auth.py", size_bytes=100)
+    file_b = RepositoryFile(id=uuid.uuid4(), snapshot_id=snapshot_id, path="src/session.py", size_bytes=100)
+
+    # Circular dependency between file_a and file_b
+    dep1 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=file_a.id,
+        external_package="src.session",
+        dependency_type=DependencyType.IMPORT,
+        line_number=1,
+    )
+    dep2 = CodeDependency(
+        id=uuid.uuid4(),
+        source_file_id=file_b.id,
+        external_package="src.auth",
+        dependency_type=DependencyType.IMPORT,
+        line_number=2,
+    )
+
+    sym1 = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=file_a.id,
+        name="AuthManager",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="auth.AuthManager",
+        start_line=1,
+        end_line=20,
+    )
+
+    from unittest.mock import AsyncMock, MagicMock
+
+    session = AsyncMock()
+    session.add = MagicMock()
+    added_records = []
+
+    def mock_add(obj):
+        added_records.append(obj)
+
+    session.add.side_effect = mock_add
+
+    def execute_side_effect(stmt):
+        mock_res = MagicMock()
+        stmt_str = str(stmt)
+        if "discovery_runs" in stmt_str:
+            mock_res.scalar_one_or_none.return_value = None
+        elif "code_symbols" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = [sym1]
+        elif "code_dependencies" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = [dep1, dep2]
+        elif "repository_files" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = [file_a, file_b]
+        elif "code_chunks" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = []
+        elif "project_knowledge" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = []
+        else:
+            mock_res.scalars.return_value.all.return_value = []
+            mock_res.all.return_value = []
+        return mock_res
+
+    session.execute.side_effect = execute_side_effect
+
+    findings = await ProjectDiscoveryEngine.run_discovery(
+        project_id=project_id,
+        snapshot_id=snapshot_id,
+        session=session,
+    )
+
+    assert len(findings) >= 1
+    # Check that circular dependency was detected and turned into finding
+    cycle_findings = [f for f in findings if f.category == FindingCategory.CIRCULAR_DEPENDENCY]
+    assert len(cycle_findings) >= 1
+    assert "src/auth.py" in cycle_findings[0].related_entities
+    assert "src/session.py" in cycle_findings[0].related_entities
+
+    # Check finding fields
+    assert cycle_findings[0].project_id == project_id
+    assert cycle_findings[0].snapshot_id == snapshot_id
+    assert len(cycle_findings[0].title) <= 255
+    assert session.commit.called
+
+
+

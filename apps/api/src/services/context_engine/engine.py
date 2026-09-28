@@ -31,6 +31,12 @@ class ProjectContextEngine:
         # 1. Query Analysis
         analyzed = analyze_query(question)
 
+        # 1b. Generate Query Embedding for semantic retrieval if not provided
+        if query_embedding is None and question:
+            from apps.api.src.services.context_engine.retriever import generate_text_embedding
+
+            query_embedding = generate_text_embedding(question)
+
         # 2. Multi-Signal Retrieval (Lexical + Vector + Semantic)
         raw_candidates = await MultiSignalRetriever.retrieve_candidates(
             session=session,

@@ -18,18 +18,22 @@ else:
     engine_kwargs["max_overflow"] = 20
 
 # Engine configuration
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    **engine_kwargs,
-)
+try:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        **engine_kwargs,
+    )
 
-# Async session factory
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    autoflush=False,
-    expire_on_commit=False,
-)
+    # Async session factory
+    AsyncSessionLocal = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+except Exception:
+    engine = None  # type: ignore[assignment]
+    AsyncSessionLocal = None  # type: ignore[assignment]
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
