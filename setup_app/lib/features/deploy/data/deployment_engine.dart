@@ -98,7 +98,7 @@ class DeploymentEngine {
       }
 
       final envContent = effectiveConfig.generateEnvFileContent();
-      final serverVersion = Platform.environment['UNOTUSK_SERVER_VERSION'] ?? 'v1.0.0';
+      final serverVersion = Platform.environment['UNOTUSK_SERVER_VERSION'] ?? 'v1.0.1';
       final composeContent = ComposeGenerator.generateProductionCompose(
         effectiveConfig,
         imageVersion: serverVersion,
