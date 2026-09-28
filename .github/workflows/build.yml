@@ -287,23 +287,32 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────────
-  # 4. GitHub Release — only on v* tags
+  # 4. GitHub Release — builds verified on push, published on v* tags
   # ──────────────────────────────────────────────
   release:
     name: "GitHub Release"
-    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
         with:
           path: dist/
 
-      - run: find dist/ -type f | sort
+      - name: Verify build artifacts
+        run: find dist/ -type f | sort
 
-      - uses: softprops/action-gh-release@v2
+      - name: Skip release for non-tag push
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          echo "Normal push build complete — all platform artifacts built and verified successfully."
+          echo "Skipping GitHub Release creation (releases are only published for version tags, e.g. v*)."
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
           name: "Unotusk Employee App ${{ github.ref_name }}"
           body: |

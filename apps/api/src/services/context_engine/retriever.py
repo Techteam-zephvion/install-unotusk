@@ -1,3 +1,4 @@
+import re
 import uuid
 from dataclasses import dataclass, field
 
@@ -36,6 +37,21 @@ class RetrievedCandidate:
     signals: dict[str, float] = field(default_factory=dict)
 
 
+DEFINITION_PATTERN = re.compile(
+    r"""^\s*(?:def\s+|class\s+|function\s+|fn\s+|export\s+(?:default\s+)?(?:class|function|const|let|var|type|interface)\s+|type\s+|interface\s+|pub\s+(?:fn|struct|enum|trait)\s+)""",
+    re.MULTILINE,
+)
+
+
+def _check_definition_match(content: str, term: str) -> bool:
+    """Checks if term appears in a definition line rather than a comment or string."""
+    term_lower = term.lower()
+    for line in content.splitlines():
+        if term_lower in line.lower() and DEFINITION_PATTERN.search(line):
+            return True
+    return False
+
+
 class MultiSignalRetriever:
     @staticmethod
     async def retrieve_candidates(
@@ -47,7 +63,7 @@ class MultiSignalRetriever:
     ) -> list[RetrievedCandidate]:
         candidates: dict[str, RetrievedCandidate] = {}
 
-        # 1. FILE SEARCH: Match paths & filenames
+        # 1. FILE SEARCH: Match paths & filenames with exact / prefix / substring differentiation
         file_conditions = []
         for p in analyzed_query.path_candidates:
             file_conditions.append(RepositoryFile.path.ilike(f"%{p}%"))
@@ -68,8 +84,25 @@ class MultiSignalRetriever:
             matched_files = file_res.scalars().all()
             for f in matched_files:
                 cid = f"file:{f.id}"
-                exact_path = any(p in f.path.lower() for p in analyzed_query.path_candidates)
-                score = 1.0 if exact_path else 0.7
+                fn_lower = f.filename.lower()
+                fn_stem = fn_lower.rsplit(".", 1)[0]
+                path_lower = f.path.lower()
+
+                # Differentiate exact filename match vs prefix match vs substring
+                is_exact = any(
+                    kw.lower() in (fn_lower, fn_stem) for kw in analyzed_query.keywords
+                ) or any(p.lower() == path_lower for p in analyzed_query.path_candidates)
+                is_prefix = any(
+                    fn_lower.startswith(kw.lower()) for kw in analyzed_query.keywords
+                ) or any(path_lower.startswith(p.lower()) for p in analyzed_query.path_candidates)
+
+                if is_exact:
+                    score = 1.5
+                elif is_prefix:
+                    score = 1.2
+                else:
+                    score = 0.8
+
                 candidates[cid] = RetrievedCandidate(
                     candidate_id=cid,
                     entity_type="FILE",
@@ -82,7 +115,7 @@ class MultiSignalRetriever:
                     signals={"file_match": score},
                 )
 
-        # 2. SYMBOL SEARCH: Match symbol names (classes, functions, methods, types)
+        # 2. SYMBOL SEARCH: Match symbol names with exact / prefix / substring differentiation
         symbol_conditions = []
         for sym in analyzed_query.symbol_candidates:
             symbol_conditions.append(CodeSymbol.name.ilike(sym))
@@ -90,6 +123,8 @@ class MultiSignalRetriever:
         for kw in analyzed_query.keywords:
             if len(kw) >= 3:
                 symbol_conditions.append(CodeSymbol.name.ilike(f"%{kw}%"))
+        for p in analyzed_query.path_candidates:
+            symbol_conditions.append(RepositoryFile.path.ilike(f"%{p}%"))
 
         if symbol_conditions:
             sym_stmt = (
@@ -104,10 +139,23 @@ class MultiSignalRetriever:
             sym_res = await session.execute(sym_stmt)
             for sym, f in sym_res.all():
                 cid = f"sym:{sym.id}"
+                sym_lower = sym.name.lower()
+
+                # Differentiate exact symbol match vs prefix vs qualified substring
                 exact_sym = any(
-                    s.lower() == sym.name.lower() for s in analyzed_query.symbol_candidates
-                )
-                score = 1.2 if exact_sym else 0.8
+                    s.lower() == sym_lower for s in analyzed_query.symbol_candidates
+                ) or any(kw.lower() == sym_lower for kw in analyzed_query.keywords)
+                prefix_sym = any(
+                    sym_lower.startswith(s.lower()) for s in analyzed_query.symbol_candidates
+                ) or any(sym_lower.startswith(kw.lower()) for kw in analyzed_query.keywords)
+
+                if exact_sym:
+                    score = 1.6
+                elif prefix_sym:
+                    score = 1.2
+                else:
+                    score = 0.8
+
                 candidates[cid] = RetrievedCandidate(
                     candidate_id=cid,
                     entity_type="SYMBOL",
@@ -121,14 +169,18 @@ class MultiSignalRetriever:
                     signals={"symbol_match": score},
                 )
 
-        # 3. CONTENT / CODE CHUNK SEARCH: Match code bodies and comments
+        # 3. CONTENT / CODE CHUNK SEARCH: Match chunk name, path, and content with definition weighting
         chunk_conditions = []
         for kw in analyzed_query.keywords:
             if len(kw) >= 3:
                 chunk_conditions.append(CodeChunk.name.ilike(f"%{kw}%"))
+                chunk_conditions.append(CodeChunk.path.ilike(f"%{kw}%"))
                 chunk_conditions.append(CodeChunk.content.ilike(f"%{kw}%"))
         for sym in analyzed_query.symbol_candidates:
+            chunk_conditions.append(CodeChunk.name.ilike(f"%{sym}%"))
             chunk_conditions.append(CodeChunk.content.ilike(f"%{sym}%"))
+        for p in analyzed_query.path_candidates:
+            chunk_conditions.append(CodeChunk.path.ilike(f"%{p}%"))
 
         if chunk_conditions:
             chunk_stmt = (
@@ -142,8 +194,42 @@ class MultiSignalRetriever:
             chunk_res = await session.execute(chunk_stmt)
             for chunk in chunk_res.scalars().all():
                 cid = f"chunk:{chunk.id}"
+                cname_lower = chunk.name.lower()
+                cpath_lower = chunk.path.lower()
+
+                # Determine lexical match quality:
+                # 1. Exact match on chunk definition name
+                # 2. Definition line match in content (e.g. def foo, class Bar)
+                # 3. Path / filename match
+                # 4. Standard content / comment match
+                exact_name = any(
+                    kw.lower() == cname_lower for kw in analyzed_query.keywords
+                ) or any(sym.lower() == cname_lower for sym in analyzed_query.symbol_candidates)
+
+                def_match = any(
+                    _check_definition_match(chunk.content, kw) for kw in analyzed_query.keywords
+                ) or any(
+                    _check_definition_match(chunk.content, sym)
+                    for sym in analyzed_query.symbol_candidates
+                )
+
+                path_match = any(
+                    p.lower() in cpath_lower for p in analyzed_query.path_candidates
+                ) or any(kw.lower() in cpath_lower for kw in analyzed_query.keywords)
+
+                if exact_name:
+                    content_score = 1.4
+                elif def_match:
+                    content_score = 1.2
+                elif path_match:
+                    content_score = 1.0
+                else:
+                    content_score = 0.6
+
                 if cid in candidates:
-                    candidates[cid].signals["content_match"] = 0.8
+                    candidates[cid].signals["content_match"] = max(
+                        candidates[cid].signals.get("content_match", 0.0), content_score
+                    )
                 else:
                     candidates[cid] = RetrievedCandidate(
                         candidate_id=cid,
@@ -155,7 +241,7 @@ class MultiSignalRetriever:
                         content=chunk.content,
                         file_id=chunk.file_id,
                         symbol_id=chunk.symbol_id,
-                        signals={"content_match": 0.8},
+                        signals={"content_match": content_score},
                     )
 
         # 4. DEPENDENCY SEARCH: Match packages and imported modules
@@ -305,4 +391,18 @@ class MultiSignalRetriever:
                             signals={"semantic_match": 0.85},
                         )
 
-        return list(candidates.values())
+        # 7. ORDER CANDIDATES BY QUERY RELEVANCE
+        weights = {
+            "symbol_match": 1.5,
+            "file_match": 1.3,
+            "vector_similarity": 1.4,
+            "semantic_match": 1.2,
+            "content_match": 1.1,
+            "dependency_match": 0.9,
+        }
+
+        def initial_score(c: RetrievedCandidate) -> float:
+            return sum(c.signals.get(k, 0.0) * w for k, w in weights.items())
+
+        ordered_candidates = sorted(candidates.values(), key=initial_score, reverse=True)
+        return ordered_candidates

@@ -84,10 +84,12 @@ class RelationshipExpander:
             is_outbound = dep.source_file_id in seed_file_ids[:10]
 
             if is_outbound:
+                # Outbound dependency: seed (src_file) imports target (tgt_file)
+                # When target repository file is present, use its path (no raw strings)
                 target_desc = tgt_file.path if tgt_file else (dep.external_package or "external module")
-                content = f"Outbound Dependency: {src_file.path} -> {target_desc} (line {dep.line_number})"
+                content = f"Outbound Dependency: {src_file.path} -> {target_desc} (imports {target_desc}, line {dep.line_number})"
                 dep_name = tgt_file.filename if tgt_file else (dep.external_package or "dependency")
-                primary_file = src_file
+                primary_file = tgt_file if tgt_file else src_file
                 if tgt_file and tgt_file.id not in seed_file_ids:
                     hop1_connected_file_ids.add(tgt_file.id)
                     fcid = f"file:{tgt_file.id}"
@@ -104,9 +106,10 @@ class RelationshipExpander:
                             signals={"graph_expansion": 0.4},
                         )
             else:
-                # Inbound dependency: src_file imports the seed file (tgt_file)
+                # Inbound dependency: caller (src_file) imports the seed file (tgt_file)
+                # Candidate entity being gathered is the calling file (source_file)
                 target_seed_desc = tgt_file.path if tgt_file else "seed module"
-                content = f"Inbound Dependency: {src_file.path} imports {target_seed_desc} (line {dep.line_number})"
+                content = f"Inbound Dependency: {target_seed_desc} imported by {src_file.path} ({src_file.path} imports {target_seed_desc}, line {dep.line_number})"
                 dep_name = src_file.filename or "caller dependency"
                 primary_file = src_file
                 if src_file.id not in seed_file_ids:
@@ -185,15 +188,16 @@ class RelationshipExpander:
                 cid = f"dep:{dep.id}"
                 if cid not in expanded:
                     target_desc = tgt_file.path if tgt_file else (dep.external_package or "external module")
+                    primary_file = tgt_file if tgt_file else src_file
                     expanded[cid] = RetrievedCandidate(
                         candidate_id=cid,
                         entity_type="DEPENDENCY",
                         name=tgt_file.filename if tgt_file else (dep.external_package or "dependency"),
-                        path=src_file.path,
+                        path=primary_file.path,
                         start_line=dep.line_number,
                         end_line=dep.line_number,
-                        content=f"Transitive Dependency (2-hop): {src_file.path} -> {target_desc} (line {dep.line_number})",
-                        file_id=src_file.id,
+                        content=f"Transitive Dependency (2-hop): {src_file.path} imports {target_desc} (line {dep.line_number})",
+                        file_id=primary_file.id,
                         signals={"graph_expansion_hop2": 0.3},
                     )
 
