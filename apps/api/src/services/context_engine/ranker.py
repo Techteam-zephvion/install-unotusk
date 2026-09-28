@@ -34,12 +34,21 @@ class MultiSignalRanker:
                 elif sig == "content_match":
                     score += val * 1.1
                     reasons.append("Code content text match")
+                elif sig == "vector_similarity":
+                    score += val * 1.4
+                    reasons.append(f"Vector semantic similarity ({round(val, 2)})")
+                elif sig == "semantic_match":
+                    score += val * 1.2
+                    reasons.append(f"Semantic concept match ({val})")
                 elif sig == "dependency_match":
                     score += val * 0.9
                     reasons.append("Dependency import match")
                 elif sig == "graph_expansion":
                     score += val * 0.7
                     reasons.append("Graph relationship neighbor")
+                elif sig == "graph_expansion_hop2":
+                    score += val * 0.5
+                    reasons.append("Graph transitive 2-hop neighbor")
 
             # 2. Exact name matching boost
             name_lower = cand.name.lower()
@@ -58,6 +67,14 @@ class MultiSignalRanker:
                     score += 0.8
                 elif kw in content_lower:
                     score += 0.3
+
+            # 4. Concept keyword boost
+            for concept in analyzed_query.concept_keywords:
+                if concept in name_lower:
+                    score += 0.6
+                    reasons.append(f"Semantic concept match for '{concept}'")
+                elif concept in content_lower:
+                    score += 0.2
 
             # Normalize score (capped at 1.0 for UI display)
             normalized_score = min(1.0, round(score / 3.0, 2))

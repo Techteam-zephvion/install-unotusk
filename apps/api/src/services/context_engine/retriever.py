@@ -11,6 +11,17 @@ from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
 
 
+def compute_cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    if not vec1 or not vec2 or len(vec1) != len(vec2):
+        return 0.0
+    dot = sum(a * b for a, b in zip(vec1, vec2, strict=False))
+    norm1 = sum(a * a for a in vec1) ** 0.5
+    norm2 = sum(b * b for b in vec2) ** 0.5
+    if norm1 == 0.0 or norm2 == 0.0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+
 @dataclass
 class RetrievedCandidate:
     candidate_id: str
@@ -32,6 +43,7 @@ class MultiSignalRetriever:
         snapshot_id: uuid.UUID,
         analyzed_query: AnalyzedQuery,
         limit_per_signal: int = 15,
+        query_embedding: list[float] | None = None,
     ) -> list[RetrievedCandidate]:
         candidates: dict[str, RetrievedCandidate] = {}
 
@@ -176,5 +188,121 @@ class MultiSignalRetriever:
                     file_id=f.id,
                     signals={"dependency_match": 0.75},
                 )
+
+        # 5. VECTOR SEARCH: Match chunks with precomputed embeddings using vector similarity
+        if query_embedding is not None:
+            vec_stmt = (
+                select(CodeChunk)
+                .where(
+                    CodeChunk.snapshot_id == snapshot_id,
+                    CodeChunk.embedding.isnot(None),
+                )
+                .limit(limit_per_signal * 3)
+            )
+            vec_res = await session.execute(vec_stmt)
+            vector_chunks = vec_res.scalars().all()
+            scored_vector_chunks = []
+            for chunk in vector_chunks:
+                if chunk.embedding:
+                    sim = compute_cosine_similarity(query_embedding, chunk.embedding)
+                    if sim > 0.2:
+                        scored_vector_chunks.append((sim, chunk))
+            scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)
+            for sim, chunk in scored_vector_chunks[:limit_per_signal]:
+                cid = f"chunk:{chunk.id}"
+                if cid in candidates:
+                    candidates[cid].signals["vector_similarity"] = sim
+                    candidates[cid].signals["semantic_match"] = max(
+                        candidates[cid].signals.get("semantic_match", 0.0), sim
+                    )
+                else:
+                    candidates[cid] = RetrievedCandidate(
+                        candidate_id=cid,
+                        entity_type="CHUNK",
+                        name=chunk.name,
+                        path=chunk.path,
+                        start_line=chunk.start_line,
+                        end_line=chunk.end_line,
+                        content=chunk.content,
+                        file_id=chunk.file_id,
+                        symbol_id=chunk.symbol_id,
+                        signals={"vector_similarity": sim, "semantic_match": sim},
+                    )
+
+        # 6. SEMANTIC / CONCEPT SEARCH: Match domain concept synonyms across chunks and symbols
+        if analyzed_query.concept_keywords:
+            concept_chunk_conditions = []
+            for concept in analyzed_query.concept_keywords:
+                if len(concept) >= 3:
+                    concept_chunk_conditions.append(CodeChunk.name.ilike(f"%{concept}%"))
+                    concept_chunk_conditions.append(CodeChunk.content.ilike(f"%{concept}%"))
+
+            if concept_chunk_conditions:
+                concept_chunk_stmt = (
+                    select(CodeChunk)
+                    .where(
+                        CodeChunk.snapshot_id == snapshot_id,
+                        or_(*concept_chunk_conditions),
+                    )
+                    .limit(limit_per_signal)
+                )
+                concept_chunk_res = await session.execute(concept_chunk_stmt)
+                for chunk in concept_chunk_res.scalars().all():
+                    cid = f"chunk:{chunk.id}"
+                    if cid in candidates:
+                        candidates[cid].signals["semantic_match"] = max(
+                            candidates[cid].signals.get("semantic_match", 0.0), 0.85
+                        )
+                    else:
+                        candidates[cid] = RetrievedCandidate(
+                            candidate_id=cid,
+                            entity_type="CHUNK",
+                            name=chunk.name,
+                            path=chunk.path,
+                            start_line=chunk.start_line,
+                            end_line=chunk.end_line,
+                            content=chunk.content,
+                            file_id=chunk.file_id,
+                            symbol_id=chunk.symbol_id,
+                            signals={"semantic_match": 0.85},
+                        )
+
+            # Match concept keywords in symbols
+            concept_sym_conditions = []
+            for concept in analyzed_query.concept_keywords:
+                if len(concept) >= 3:
+                    concept_sym_conditions.append(CodeSymbol.name.ilike(f"%{concept}%"))
+                    concept_sym_conditions.append(CodeSymbol.qualified_name.ilike(f"%{concept}%"))
+
+            if concept_sym_conditions:
+                concept_sym_stmt = (
+                    select(CodeSymbol, RepositoryFile)
+                    .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
+                    .where(
+                        RepositoryFile.snapshot_id == snapshot_id,
+                        or_(*concept_sym_conditions),
+                    )
+                    .limit(limit_per_signal)
+                )
+                concept_sym_res = await session.execute(concept_sym_stmt)
+                for sym, f in concept_sym_res.all():
+                    cid = f"sym:{sym.id}"
+                    if cid in candidates:
+                        candidates[cid].signals["semantic_match"] = max(
+                            candidates[cid].signals.get("semantic_match", 0.0), 0.85
+                        )
+                    else:
+                        candidates[cid] = RetrievedCandidate(
+                            candidate_id=cid,
+                            entity_type="SYMBOL",
+                            name=sym.name,
+                            path=f.path,
+                            start_line=sym.start_line,
+                            end_line=sym.end_line,
+                            content=f"{sym.symbol_type.value} {sym.qualified_name} (lines {sym.start_line}-{sym.end_line} in {f.path})",
+                            file_id=f.id,
+                            symbol_id=sym.id,
+                            signals={"semantic_match": 0.85},
+                        )
 
         return list(candidates.values())

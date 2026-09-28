@@ -3,31 +3,35 @@ from typing import Any
 
 from apps.api.src.config.settings import settings
 from apps.api.src.services.discovery_engine.base import CandidateFinding
+from apps.api.src.services.llm.base import LLMProvider
+from apps.api.src.services.llm.claude import ClaudeProvider
+from apps.api.src.services.llm.factory import get_llm_provider
+from apps.api.src.services.llm.groq import GroqProvider
 
 logger = logging.getLogger("unotusk-discovery")
 
 
 class FindingSynthesizer:
-    def __init__(self) -> None:
-        self.provider = (settings.LLM_PROVIDER or "offline").lower()
+    def __init__(
+        self,
+        provider: str | None = None,
+        llm_provider: LLMProvider | None = None,
+    ) -> None:
+        raw_provider = (provider or settings.LLM_PROVIDER or "offline").strip().lower()
+        self.provider = raw_provider
+        self.llm_provider = llm_provider or get_llm_provider(raw_provider)
+
         self._client = None
         self._groq_client = None
-        self.model = settings.GROQ_MODEL if self.provider == "groq" else settings.ANTHROPIC_MODEL
 
-        if self.provider == "groq" and settings.GROQ_API_KEY:
-            try:
-                import groq
-
-                self._groq_client = groq.AsyncGroq(api_key=settings.GROQ_API_KEY)
-            except Exception as e:
-                logger.warning(f"Could not initialize Groq client for synthesizer: {e}")
-        elif self.provider == "claude" and settings.ANTHROPIC_API_KEY:
-            try:
-                import anthropic
-
-                self._client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-            except Exception as e:
-                logger.warning(f"Could not initialize Anthropic client for synthesizer: {e}")
+        if isinstance(self.llm_provider, GroqProvider):
+            self.model = self.llm_provider.model
+            self._groq_client = self.llm_provider._client
+        elif isinstance(self.llm_provider, ClaudeProvider):
+            self.model = self.llm_provider.model
+            self._client = self.llm_provider._client
+        else:
+            self.model = settings.GROQ_MODEL if self.provider == "groq" else settings.ANTHROPIC_MODEL
 
     async def enhance_recommendations(
         self,
@@ -95,21 +99,42 @@ class FindingSynthesizer:
                 )
 
                 text = ""
-                if self._groq_client:
-                    response = await self._groq_client.chat.completions.create(
-                        model=self.model,
-                        max_tokens=256,
-                        messages=[{"role": "user", "content": prompt}],
-                    )
-                    if response.choices and response.choices[0].message:
-                        text = response.choices[0].message.content or ""
-                elif self._client:
-                    response = await self._client.messages.create(
-                        model=self.model,
-                        max_tokens=256,
-                        messages=[{"role": "user", "content": prompt}],
-                    )
-                    text = response.content[0].text if response.content else ""
+                if self.provider == "groq":
+                    client = self._groq_client or self._client
+                    if client:
+                        response = await client.chat.completions.create(
+                            model=self.model,
+                            max_tokens=256,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        if response.choices and response.choices[0].message:
+                            text = response.choices[0].message.content or ""
+                elif self.provider in ("claude", "anthropic"):
+                    client = self._client or self._groq_client
+                    if client:
+                        response = await client.messages.create(
+                            model=self.model,
+                            max_tokens=256,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        text = response.content[0].text if response.content else ""
+                else:
+                    client = self._groq_client or self._client
+                    if client and hasattr(client, "chat"):
+                        response = await client.chat.completions.create(
+                            model=self.model,
+                            max_tokens=256,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        if response.choices and response.choices[0].message:
+                            text = response.choices[0].message.content or ""
+                    elif client and hasattr(client, "messages"):
+                        response = await client.messages.create(
+                            model=self.model,
+                            max_tokens=256,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        text = response.content[0].text if response.content else ""
 
                 if "WHY:" in text and "REC:" in text:
                     parts = text.split("REC:")

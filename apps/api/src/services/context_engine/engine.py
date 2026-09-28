@@ -26,22 +26,25 @@ class ProjectContextEngine:
         question: str,
         conversation_history: list[dict[str, str]] | None = None,
         project_id: uuid.UUID | None = None,
+        query_embedding: list[float] | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = analyze_query(question)
 
-        # 2. Multi-Signal Retrieval
+        # 2. Multi-Signal Retrieval (Lexical + Vector + Semantic)
         raw_candidates = await MultiSignalRetriever.retrieve_candidates(
             session=session,
             snapshot_id=snapshot_id,
             analyzed_query=analyzed,
+            query_embedding=query_embedding,
         )
 
-        # 3. Structural Relationship Expansion (1 hop)
+        # 3. Structural Relationship Expansion (Multi-hop graph traversal)
         expanded_candidates = await RelationshipExpander.expand_candidates(
             session=session,
             snapshot_id=snapshot_id,
             seed_candidates=raw_candidates,
+            max_depth=2,
         )
 
         # 4. Multi-Signal Ranking
@@ -80,7 +83,7 @@ class ProjectContextEngine:
                 f"{knowledge_context}\n\n## REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}"
             )
 
-        # 6. LLM Grounded Synthesis (Claude or deterministic offline)
+        # 6. LLM Grounded Synthesis (Claude, Groq, or deterministic offline)
         answer = await self.llm_provider.generate_grounded_answer(
             question=question,
             project_context=full_prompt_context,
@@ -90,11 +93,17 @@ class ProjectContextEngine:
         )
 
         # Attach retrieval debug signals
+        has_vector = any("vector_similarity" in c.signals for c in raw_candidates)
+        has_semantic = any("semantic_match" in c.signals for c in raw_candidates)
         answer.debug_signals.update(
             {
                 "keywords": analyzed.keywords,
                 "symbols_detected": analyzed.symbol_candidates,
                 "paths_detected": analyzed.path_candidates,
+                "concept_keywords": analyzed.concept_keywords,
+                "vector_search_used": has_vector,
+                "semantic_search_used": has_semantic,
+                "graph_traversal_depth": 2,
                 "candidates_retrieved": len(raw_candidates),
                 "candidates_expanded": len(expanded_candidates),
                 "customer_knowledge_count": len(knowledge_records),

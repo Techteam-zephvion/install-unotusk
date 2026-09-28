@@ -341,13 +341,18 @@ class IntelligenceService:
         user_id: uuid.UUID,
         project_id: uuid.UUID,
         query: str,
+        query_embedding: list[float] | None = None,
     ) -> ContextSearchResponse:
         await cls._verify_project_access(session, user_id, project_id)
         snapshot = await cls._get_active_snapshot(session, project_id)
 
         analyzed = analyze_query(query)
-        raw = await MultiSignalRetriever.retrieve_candidates(session, snapshot.id, analyzed)
-        expanded = await RelationshipExpander.expand_candidates(session, snapshot.id, raw)
+        raw = await MultiSignalRetriever.retrieve_candidates(
+            session, snapshot.id, analyzed, query_embedding=query_embedding
+        )
+        expanded = await RelationshipExpander.expand_candidates(
+            session, snapshot.id, raw, max_depth=2
+        )
         ranked = MultiSignalRanker.rank_candidates(expanded, analyzed)
 
         debug_candidates = [
