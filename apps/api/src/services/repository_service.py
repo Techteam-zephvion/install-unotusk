@@ -1,4 +1,3 @@
-from apps.api.src.core.security_vault import encrypt_secret
 import os
 import uuid
 
@@ -9,6 +8,7 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.core.security_vault import encrypt_secret
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (

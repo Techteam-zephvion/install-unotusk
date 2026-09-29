@@ -1,4 +1,3 @@
-from apps.api.src.core.security_vault import decrypt_secret
 import hashlib
 import logging
 import os
@@ -9,6 +8,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+from apps.api.src.core.security_vault import decrypt_secret
 from apps.api.src.db.session import AsyncSessionLocal
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
@@ -18,6 +18,7 @@ from apps.api.src.models.project import Project
 from apps.api.src.models.repository import Repository
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
+from apps.api.src.services.context_engine.retriever import generate_text_embedding
 from apps.api.src.services.github_client import GitHubClient
 from apps.api.src.services.parser.dependency_extractor import (
     ExtractedDependency,
@@ -229,6 +230,7 @@ class IngestionService:
                                     sym_lines = content_lines[
                                         sym.start_line - 1 : min(sym.end_line, len(content_lines))
                                     ]
+                                    sym_chunk_content = "\n".join(sym_lines).replace("\x00", "")
                                     sym_chunk = CodeChunk(
                                         id=uuid.uuid4(),
                                         snapshot_id=snapshot.id,
@@ -237,9 +239,10 @@ class IngestionService:
                                         chunk_type=sym.symbol_type.value,
                                         name=sym.name.replace("\x00", ""),
                                         path=repo_file.path,
-                                        content="\n".join(sym_lines).replace("\x00", ""),
+                                        content=sym_chunk_content,
                                         start_line=sym.start_line,
                                         end_line=sym.end_line,
+                                        embedding=generate_text_embedding(sym_chunk_content),
                                     )
                                     session.add(sym_chunk)
 
@@ -264,6 +267,7 @@ class IngestionService:
                                                 child_sym.end_line, len(content_lines)
                                             )
                                         ]
+                                        child_chunk_content = "\n".join(child_lines).replace("\x00", "")
                                         child_chunk = CodeChunk(
                                             id=uuid.uuid4(),
                                             snapshot_id=snapshot.id,
@@ -272,9 +276,10 @@ class IngestionService:
                                             chunk_type=child_sym.symbol_type.value,
                                             name=child_sym.name.replace("\x00", ""),
                                             path=repo_file.path,
-                                            content="\n".join(child_lines).replace("\x00", ""),
+                                            content=child_chunk_content,
                                             start_line=child_sym.start_line,
                                             end_line=child_sym.end_line,
+                                            embedding=generate_text_embedding(child_chunk_content),
                                         )
                                         session.add(child_chunk)
 
@@ -289,6 +294,7 @@ class IngestionService:
                     if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
                         lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()[:100]
                         if lines:
+                            file_chunk_content = "\n".join(lines).replace("\x00", "")
                             file_chunk = CodeChunk(
                                 id=uuid.uuid4(),
                                 snapshot_id=snapshot.id,
@@ -301,9 +307,10 @@ class IngestionService:
                                 else "MODULE",
                                 name=f_info["filename"],
                                 path=repo_file.path,
-                                content="\n".join(lines).replace("\x00", ""),
+                                content=file_chunk_content,
                                 start_line=1,
                                 end_line=len(lines),
+                                embedding=generate_text_embedding(file_chunk_content),
                             )
                             session.add(file_chunk)
 
@@ -351,7 +358,7 @@ class IngestionService:
                         id=uuid.uuid4(),
                         source_file_id=source_file_id,
                         target_file_id=target_file_id,
-                        external_package=ext_pkg,
+                        external_package=None if target_file_id else ext_pkg,
                         dependency_type=dep.dependency_type,
                         line_number=dep.line_number,
                     )

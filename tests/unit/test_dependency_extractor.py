@@ -1,6 +1,6 @@
 from apps.api.src.models.enums import DependencyType
 from apps.api.src.services.parser.dependency_extractor import extract_dependencies_from_tree
-from apps.api.src.services.parser.tree_sitter_parser import parse_code
+from apps.api.src.services.parser.tree_sitter_parser import _TREE_SITTER_AVAILABLE, parse_code
 
 
 def test_python_dependency_extraction():
@@ -11,7 +11,8 @@ from .local_module import helper_fn
 from fastapi import FastAPI, Depends
 """
     tree = parse_code(code, "Python")
-    assert tree is not None
+    if _TREE_SITTER_AVAILABLE:
+        assert tree is not None
     deps = extract_dependencies_from_tree(tree, code, "Python")
 
     targets = [d.raw_target for d in deps]
@@ -36,7 +37,8 @@ import { User } from '@/types';
 const logger = require('pino');
 """
     tree = parse_code(code, "TypeScript")
-    assert tree is not None
+    if _TREE_SITTER_AVAILABLE:
+        assert tree is not None
     deps = extract_dependencies_from_tree(tree, code, "TypeScript")
 
     targets = [d.raw_target for d in deps]
@@ -50,6 +52,82 @@ const logger = require('pino');
 
     pkg_dep = next(d for d in deps if d.raw_target == "react")
     assert pkg_dep.is_relative is False
+
+
+def test_typescript_dependency_extraction_robustness():
+    """Verify zero false positives from comments/strings and support for all JS/TS import patterns."""
+    code = b"""
+// 1. Single line comment: import fake1 from 'fake1';
+// const reqFake = require('fake_req_1');
+/* 2. Block comment: import fake2 from 'fake2'; */
+/*
+ * 3. Multi-line comment
+ * const fake3 = require('fake3');
+ * import fake4 from "fake4";
+ */
+const str1 = "import fake5 from 'fake5'";
+const str2 = 'require("fake6")';
+const str3 = `import fake7 from 'fake7'`;
+
+import React from 'react';
+import type { FC } from 'react';
+import {
+  Button,
+  type ButtonProps
+} from './components/Button';
+import * as utils from '../utils';
+import '@/styles.css';
+import "~/styles/global.css";
+export { helper } from './helper';
+export * from 'lodash';
+export const a = 1;
+const pino = require('pino');
+const local = require('./local');
+const dynamic = import('./dynamic');
+import tsreq = require('ts-pkg');
+"""
+    deps = extract_dependencies_from_tree(None, code, "TypeScript")
+
+    target_map = {d.raw_target: d for d in deps}
+
+    # Verify no false positives from comments or strings
+    for i in range(1, 8):
+        assert f"fake{i}" not in target_map
+    assert "fake_req_1" not in target_map
+
+    # Verify valid targets are captured
+    assert "react" in target_map
+    assert "./components/Button" in target_map
+    assert "../utils" in target_map
+    assert "@/styles.css" in target_map
+    assert "~/styles/global.css" in target_map
+    assert "./helper" in target_map
+    assert "lodash" in target_map
+    assert "pino" in target_map
+    assert "./local" in target_map
+    assert "./dynamic" in target_map
+    assert "ts-pkg" in target_map
+
+    # Check relative vs package flags
+    assert target_map["./components/Button"].is_relative is True
+    assert target_map["../utils"].is_relative is True
+    assert target_map["@/styles.css"].is_relative is True
+    assert target_map["~/styles/global.css"].is_relative is True
+    assert target_map["react"].is_relative is False
+    assert target_map["lodash"].is_relative is False
+    assert target_map["pino"].is_relative is False
+
+    # Check dependency types
+    assert target_map["pino"].dependency_type == DependencyType.REQUIRE
+    assert target_map["./local"].dependency_type == DependencyType.REQUIRE
+    assert target_map["react"].dependency_type == DependencyType.IMPORT
+    assert target_map["./dynamic"].dependency_type == DependencyType.IMPORT
+
+    # Check accurate line numbers
+    react_lines = [d.line_number for d in deps if d.raw_target == "react"]
+    assert react_lines == [14, 15]
+    assert target_map["./components/Button"].line_number == 16
+    assert target_map["pino"].line_number == 26
 
 
 def test_python_qualified_import_extraction():
@@ -133,4 +211,57 @@ import urllib.request
     # 2. External packages (with or without dots) are NOT treated as internal files
     assert resolved["math"] is None
     assert resolved["urllib.request"] is None
+
+
+def test_multi_module_qualified_imports_and_deep_relative_paths():
+    """Verify deep multi-module Python and JS/TS imports with multiple nesting levels."""
+    # Python deep multi-module imports and relative imports
+    py_code = b"""
+from ...core.utils.helpers import format_name
+from ..services.auth.provider import TokenProvider
+from .models.user import UserProfile
+import pkg.submodule1.submodule2.service as deep_service
+from a.b.c.d.e import leaf_node
+"""
+    py_deps = extract_dependencies_from_tree(None, py_code, "Python")
+    py_target_map = {d.raw_target: d for d in py_deps}
+
+    assert "...core.utils.helpers" in py_target_map
+    assert py_target_map["...core.utils.helpers"].is_relative is True
+    assert py_target_map["...core.utils.helpers"].dependency_type == DependencyType.FROM_IMPORT
+
+    assert "..services.auth.provider" in py_target_map
+    assert py_target_map["..services.auth.provider"].is_relative is True
+
+    assert ".models.user" in py_target_map
+    assert py_target_map[".models.user"].is_relative is True
+
+    assert "pkg.submodule1.submodule2.service" in py_target_map
+    assert py_target_map["pkg.submodule1.submodule2.service"].is_relative is False
+    assert py_target_map["pkg.submodule1.submodule2.service"].dependency_type == DependencyType.IMPORT
+
+    assert "a.b.c.d.e" in py_target_map
+    assert py_target_map["a.b.c.d.e"].is_relative is False
+
+    # TypeScript deep multi-segment alias and relative paths
+    ts_code = b"""
+import { AuthProvider } from '../../services/core/auth';
+import { DatabaseClient } from '../../../infrastructure/db/client';
+import config from '@/config/database/settings';
+import * as endpoints from './api/v1/endpoints';
+"""
+    ts_deps = extract_dependencies_from_tree(None, ts_code, "TypeScript")
+    ts_target_map = {d.raw_target: d for d in ts_deps}
+
+    assert "../../services/core/auth" in ts_target_map
+    assert ts_target_map["../../services/core/auth"].is_relative is True
+
+    assert "../../../infrastructure/db/client" in ts_target_map
+    assert ts_target_map["../../../infrastructure/db/client"].is_relative is True
+
+    assert "@/config/database/settings" in ts_target_map
+    assert ts_target_map["@/config/database/settings"].is_relative is True
+
+    assert "./api/v1/endpoints" in ts_target_map
+    assert ts_target_map["./api/v1/endpoints"].is_relative is True
 

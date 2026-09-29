@@ -1,7 +1,9 @@
 import base64
-import os
+
 from cryptography.fernet import Fernet
+
 from apps.api.src.config.settings import settings
+
 
 def _get_fernet() -> Fernet:
     # Ensure key is 32 URL-safe base64-encoded bytes

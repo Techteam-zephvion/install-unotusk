@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from apps.api.src.db.base import Base, UUIDMixin
 
@@ -12,6 +13,56 @@ if TYPE_CHECKING:
     from apps.api.src.models.file import RepositoryFile
     from apps.api.src.models.snapshot import RepositorySnapshot
     from apps.api.src.models.symbol import CodeSymbol
+
+try:
+    from pgvector.sqlalchemy import Vector
+
+    _HAS_PGVECTOR = True
+except ImportError:
+    Vector = None  # type: ignore[assignment]
+    _HAS_PGVECTOR = False
+
+
+class CompatibleVector(TypeDecorator):
+    """Compatible vector type that maps to Vector(1536) on PostgreSQL with pgvector,
+    or falls back cleanly to JSONB or JSON when pgvector is absent."""
+
+    impl = JSONB
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql" and _HAS_PGVECTOR and Vector is not None:
+            return dialect.type_descriptor(Vector(1536))
+        elif dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB)
+        else:
+            from sqlalchemy import JSON
+
+            return dialect.type_descriptor(JSON)
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, list | tuple):
+            return [float(x) for x in value]
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if hasattr(value, "tolist"):
+            return value.tolist()
+        if isinstance(value, str):
+            import json
+
+            try:
+                return json.loads(value)
+            except Exception:
+                cleaned = value.strip("[]")
+                return [float(x.strip()) for x in cleaned.split(",") if x.strip()]
+        if isinstance(value, list | tuple):
+            return [float(x) for x in value]
+        return value
 
 
 def utc_now() -> datetime:
@@ -66,7 +117,7 @@ class CodeChunk(Base, UUIDMixin):
         nullable=False,
     )
     embedding: Mapped[list[float] | None] = mapped_column(
-        JSONB,
+        CompatibleVector,
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

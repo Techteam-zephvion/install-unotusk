@@ -84,7 +84,7 @@ class SecretSanitizingFilter(logging.Filter):
                     return sanitize_log_message(val)
                 elif isinstance(val, dict):
                     return {k: _clean_arg(v, key_name=str(k)) for k, v in val.items()}
-                elif isinstance(val, (list, tuple)):
+                elif isinstance(val, list | tuple):
                     return type(val)(_clean_arg(v) for v in val)
                 return val
 

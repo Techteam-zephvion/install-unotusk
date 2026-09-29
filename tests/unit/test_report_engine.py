@@ -275,3 +275,64 @@ async def test_synthesizer_valid_ai_response(sample_fact_data):
         assert final_doc.executive_summary.vital_metrics.total_files == 6
         assert len(final_doc.discoveries) == 3
         assert final_doc.discoveries[0].title == deterministic_doc.discoveries[0].title
+
+
+@pytest.mark.asyncio
+async def test_report_engine_full_generation_flow(sample_fact_data):
+    """Verify ProjectReportEngine.generate_report executes the entire flow end-to-end."""
+    from apps.api.src.models.enums import ReportStatus
+    from apps.api.src.services.report_engine.engine import ProjectReportEngine
+
+    session = AsyncMock()
+    added_records = []
+
+    def mock_add(obj):
+        added_records.append(obj)
+
+    session.add = MagicMock(side_effect=mock_add)
+
+    def execute_side_effect(stmt):
+        mock_res = MagicMock()
+        stmt_str = str(stmt)
+        if "projects" in stmt_str:
+            mock_res.scalar_one.return_value = sample_fact_data.project
+        elif "repository_snapshots" in stmt_str:
+            mock_res.scalar_one.return_value = sample_fact_data.snapshot
+        elif "repository_files" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = sample_fact_data.files
+        elif "code_symbols" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = sample_fact_data.symbols
+        elif "code_dependencies" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = sample_fact_data.dependencies
+        elif "findings" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = sample_fact_data.findings
+        elif "discovery_runs" in stmt_str:
+            mock_res.scalar_one_or_none.return_value = None
+            mock_res.scalars.return_value.first.return_value = None
+        elif "project_knowledge" in stmt_str:
+            mock_res.scalars.return_value.all.return_value = []
+        else:
+            mock_res.scalars.return_value.all.return_value = []
+            mock_res.all.return_value = []
+        return mock_res
+
+    session.execute.side_effect = execute_side_effect
+
+    mock_synthesizer = MagicMock()
+    mock_synthesizer.synthesize = AsyncMock(side_effect=lambda doc: doc)
+
+    report = await ProjectReportEngine.generate_report(
+        project_id=sample_fact_data.project.id,
+        snapshot_id=sample_fact_data.snapshot.id,
+        session=session,
+        synthesizer=mock_synthesizer,
+    )
+
+    assert report is not None
+    assert report.status == ReportStatus.COMPLETED
+    assert report.project_id == sample_fact_data.project.id
+    assert report.snapshot_id == sample_fact_data.snapshot.id
+    assert report.report_data["executive_summary"]["vital_metrics"]["total_files"] == 6
+    assert len(report.report_data["discoveries"]) == 3
+    assert session.commit.called
+

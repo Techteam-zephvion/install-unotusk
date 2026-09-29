@@ -1,15 +1,23 @@
-import tree_sitter
-import tree_sitter_go
-import tree_sitter_javascript
-import tree_sitter_python
-import tree_sitter_typescript
+from typing import Any
 
-_parsers: dict[str, tree_sitter.Parser] = {}
+try:
+    import tree_sitter
+    import tree_sitter_go
+    import tree_sitter_javascript
+    import tree_sitter_python
+    import tree_sitter_typescript
+
+    _TREE_SITTER_AVAILABLE = True
+except ImportError:
+    tree_sitter = None  # type: ignore[assignment]
+    _TREE_SITTER_AVAILABLE = False
+
+_parsers: dict[str, Any] = {}
 
 
 def init_parsers() -> None:
     global _parsers
-    if _parsers:
+    if not _TREE_SITTER_AVAILABLE or _parsers:
         return
 
     try:
@@ -36,14 +44,16 @@ def init_parsers() -> None:
         print(f"Warning: Error initializing Tree-sitter parsers: {e}")
 
 
-def get_parser(language: str) -> tree_sitter.Parser | None:
+def get_parser(language: str) -> Any | None:
     """Retrieve Tree-sitter parser for supported language, or None if unsupported."""
     init_parsers()
     return _parsers.get(language)
 
 
-def parse_code(code_bytes: bytes, language: str) -> tree_sitter.Tree | None:
+def parse_code(code_bytes: bytes, language: str) -> Any | None:
     """Parse source code bytes into AST tree using appropriate language parser."""
+    if not _TREE_SITTER_AVAILABLE:
+        return None
     parser = get_parser(language)
     if parser is None:
         return None

@@ -1,3 +1,5 @@
+import hashlib
+import re
 import uuid
 from dataclasses import dataclass, field
 
@@ -9,6 +11,50 @@ from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
+
+
+def compute_cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    if not vec1 or not vec2 or len(vec1) != len(vec2):
+        return 0.0
+    dot = sum(a * b for a, b in zip(vec1, vec2, strict=False))
+    norm1 = sum(a * a for a in vec1) ** 0.5
+    norm2 = sum(b * b for b in vec2) ** 0.5
+    if norm1 == 0.0 or norm2 == 0.0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+
+def generate_text_embedding(text: str, dim: int = 1536) -> list[float]:
+    """Generates a deterministic normalized semantic embedding vector for code or text."""
+    if not text or not text.strip():
+        return [0.0] * dim
+
+    vec = [0.0] * dim
+    tokens = re.findall(r"[A-Za-z0-9_]+|[^\s\w]", text.lower())
+    if not tokens:
+        return [0.0] * dim
+
+    for token in tokens:
+        if len(token) < 2:
+            continue
+        h = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
+        idx = h % dim
+        sign = 1.0 if (h >> 1) & 1 else -1.0
+        vec[idx] += sign * (1.5 if len(token) > 3 else 1.0)
+
+        subwords = token.split("_")
+        if len(subwords) > 1:
+            for sw in subwords:
+                if len(sw) >= 2:
+                    h_sw = int(hashlib.md5(sw.encode("utf-8")).hexdigest(), 16)
+                    idx_sw = h_sw % dim
+                    sign_sw = 1.0 if (h_sw >> 1) & 1 else -1.0
+                    vec[idx_sw] += sign_sw * 0.8
+
+    norm = sum(x * x for x in vec) ** 0.5
+    if norm == 0.0:
+        return [0.0] * dim
+    return [round(x / norm, 6) for x in vec]
 
 
 @dataclass
@@ -25,6 +71,21 @@ class RetrievedCandidate:
     signals: dict[str, float] = field(default_factory=dict)
 
 
+DEFINITION_PATTERN = re.compile(
+    r"""^\s*(?:def\s+|class\s+|function\s+|fn\s+|export\s+(?:default\s+)?(?:class|function|const|let|var|type|interface)\s+|type\s+|interface\s+|pub\s+(?:fn|struct|enum|trait)\s+)""",
+    re.MULTILINE,
+)
+
+
+def _check_definition_match(content: str, term: str) -> bool:
+    """Checks if term appears in a definition line rather than a comment or string."""
+    term_lower = term.lower()
+    for line in content.splitlines():
+        if term_lower in line.lower() and DEFINITION_PATTERN.search(line):
+            return True
+    return False
+
+
 class MultiSignalRetriever:
     @staticmethod
     async def retrieve_candidates(
@@ -32,10 +93,11 @@ class MultiSignalRetriever:
         snapshot_id: uuid.UUID,
         analyzed_query: AnalyzedQuery,
         limit_per_signal: int = 15,
+        query_embedding: list[float] | None = None,
     ) -> list[RetrievedCandidate]:
         candidates: dict[str, RetrievedCandidate] = {}
 
-        # 1. FILE SEARCH: Match paths & filenames
+        # 1. FILE SEARCH: Match paths & filenames with exact / prefix / substring differentiation
         file_conditions = []
         for p in analyzed_query.path_candidates:
             file_conditions.append(RepositoryFile.path.ilike(f"%{p}%"))
@@ -56,8 +118,25 @@ class MultiSignalRetriever:
             matched_files = file_res.scalars().all()
             for f in matched_files:
                 cid = f"file:{f.id}"
-                exact_path = any(p in f.path.lower() for p in analyzed_query.path_candidates)
-                score = 1.0 if exact_path else 0.7
+                fn_lower = f.filename.lower()
+                fn_stem = fn_lower.rsplit(".", 1)[0]
+                path_lower = f.path.lower()
+
+                # Differentiate exact filename match vs prefix match vs substring
+                is_exact = any(
+                    kw.lower() in (fn_lower, fn_stem) for kw in analyzed_query.keywords
+                ) or any(p.lower() == path_lower for p in analyzed_query.path_candidates)
+                is_prefix = any(
+                    fn_lower.startswith(kw.lower()) for kw in analyzed_query.keywords
+                ) or any(path_lower.startswith(p.lower()) for p in analyzed_query.path_candidates)
+
+                if is_exact:
+                    score = 1.5
+                elif is_prefix:
+                    score = 1.2
+                else:
+                    score = 0.8
+
                 candidates[cid] = RetrievedCandidate(
                     candidate_id=cid,
                     entity_type="FILE",
@@ -70,7 +149,7 @@ class MultiSignalRetriever:
                     signals={"file_match": score},
                 )
 
-        # 2. SYMBOL SEARCH: Match symbol names (classes, functions, methods, types)
+        # 2. SYMBOL SEARCH: Match symbol names with exact / prefix / substring differentiation
         symbol_conditions = []
         for sym in analyzed_query.symbol_candidates:
             symbol_conditions.append(CodeSymbol.name.ilike(sym))
@@ -78,6 +157,8 @@ class MultiSignalRetriever:
         for kw in analyzed_query.keywords:
             if len(kw) >= 3:
                 symbol_conditions.append(CodeSymbol.name.ilike(f"%{kw}%"))
+        for p in analyzed_query.path_candidates:
+            symbol_conditions.append(RepositoryFile.path.ilike(f"%{p}%"))
 
         if symbol_conditions:
             sym_stmt = (
@@ -92,10 +173,23 @@ class MultiSignalRetriever:
             sym_res = await session.execute(sym_stmt)
             for sym, f in sym_res.all():
                 cid = f"sym:{sym.id}"
+                sym_lower = sym.name.lower()
+
+                # Differentiate exact symbol match vs prefix vs qualified substring
                 exact_sym = any(
-                    s.lower() == sym.name.lower() for s in analyzed_query.symbol_candidates
-                )
-                score = 1.2 if exact_sym else 0.8
+                    s.lower() == sym_lower for s in analyzed_query.symbol_candidates
+                ) or any(kw.lower() == sym_lower for kw in analyzed_query.keywords)
+                prefix_sym = any(
+                    sym_lower.startswith(s.lower()) for s in analyzed_query.symbol_candidates
+                ) or any(sym_lower.startswith(kw.lower()) for kw in analyzed_query.keywords)
+
+                if exact_sym:
+                    score = 1.6
+                elif prefix_sym:
+                    score = 1.2
+                else:
+                    score = 0.8
+
                 candidates[cid] = RetrievedCandidate(
                     candidate_id=cid,
                     entity_type="SYMBOL",
@@ -109,14 +203,18 @@ class MultiSignalRetriever:
                     signals={"symbol_match": score},
                 )
 
-        # 3. CONTENT / CODE CHUNK SEARCH: Match code bodies and comments
+        # 3. CONTENT / CODE CHUNK SEARCH: Match chunk name, path, and content with definition weighting
         chunk_conditions = []
         for kw in analyzed_query.keywords:
             if len(kw) >= 3:
                 chunk_conditions.append(CodeChunk.name.ilike(f"%{kw}%"))
+                chunk_conditions.append(CodeChunk.path.ilike(f"%{kw}%"))
                 chunk_conditions.append(CodeChunk.content.ilike(f"%{kw}%"))
         for sym in analyzed_query.symbol_candidates:
+            chunk_conditions.append(CodeChunk.name.ilike(f"%{sym}%"))
             chunk_conditions.append(CodeChunk.content.ilike(f"%{sym}%"))
+        for p in analyzed_query.path_candidates:
+            chunk_conditions.append(CodeChunk.path.ilike(f"%{p}%"))
 
         if chunk_conditions:
             chunk_stmt = (
@@ -130,8 +228,42 @@ class MultiSignalRetriever:
             chunk_res = await session.execute(chunk_stmt)
             for chunk in chunk_res.scalars().all():
                 cid = f"chunk:{chunk.id}"
+                cname_lower = chunk.name.lower()
+                cpath_lower = chunk.path.lower()
+
+                # Determine lexical match quality:
+                # 1. Exact match on chunk definition name
+                # 2. Definition line match in content (e.g. def foo, class Bar)
+                # 3. Path / filename match
+                # 4. Standard content / comment match
+                exact_name = any(
+                    kw.lower() == cname_lower for kw in analyzed_query.keywords
+                ) or any(sym.lower() == cname_lower for sym in analyzed_query.symbol_candidates)
+
+                def_match = any(
+                    _check_definition_match(chunk.content, kw) for kw in analyzed_query.keywords
+                ) or any(
+                    _check_definition_match(chunk.content, sym)
+                    for sym in analyzed_query.symbol_candidates
+                )
+
+                path_match = any(
+                    p.lower() in cpath_lower for p in analyzed_query.path_candidates
+                ) or any(kw.lower() in cpath_lower for kw in analyzed_query.keywords)
+
+                if exact_name:
+                    content_score = 1.4
+                elif def_match:
+                    content_score = 1.2
+                elif path_match:
+                    content_score = 1.0
+                else:
+                    content_score = 0.6
+
                 if cid in candidates:
-                    candidates[cid].signals["content_match"] = 0.8
+                    candidates[cid].signals["content_match"] = max(
+                        candidates[cid].signals.get("content_match", 0.0), content_score
+                    )
                 else:
                     candidates[cid] = RetrievedCandidate(
                         candidate_id=cid,
@@ -143,7 +275,7 @@ class MultiSignalRetriever:
                         content=chunk.content,
                         file_id=chunk.file_id,
                         symbol_id=chunk.symbol_id,
-                        signals={"content_match": 0.8},
+                        signals={"content_match": content_score},
                     )
 
         # 4. DEPENDENCY SEARCH: Match packages and imported modules
@@ -177,4 +309,146 @@ class MultiSignalRetriever:
                     signals={"dependency_match": 0.75},
                 )
 
-        return list(candidates.values())
+        # 5. VECTOR SEARCH: Match chunks with precomputed embeddings using vector similarity
+        effective_query_embedding = query_embedding
+        if effective_query_embedding is None:
+            query_parts = []
+            if analyzed_query.keywords:
+                query_parts.extend(analyzed_query.keywords)
+            if analyzed_query.symbol_candidates:
+                query_parts.extend(analyzed_query.symbol_candidates)
+            if analyzed_query.concept_keywords:
+                query_parts.extend(analyzed_query.concept_keywords)
+            if query_parts:
+                effective_query_embedding = generate_text_embedding(" ".join(query_parts))
+
+        if effective_query_embedding is not None:
+            vec_stmt = (
+                select(CodeChunk)
+                .where(
+                    CodeChunk.snapshot_id == snapshot_id,
+                    CodeChunk.embedding.isnot(None),
+                )
+                .limit(limit_per_signal * 3)
+            )
+            vec_res = await session.execute(vec_stmt)
+            vector_chunks = vec_res.scalars().all()
+            scored_vector_chunks = []
+            for chunk in vector_chunks:
+                if chunk.embedding:
+                    sim = compute_cosine_similarity(effective_query_embedding, chunk.embedding)
+                    if sim > 0.2:
+                        scored_vector_chunks.append((sim, chunk))
+            scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)
+            for sim, chunk in scored_vector_chunks[:limit_per_signal]:
+                cid = f"chunk:{chunk.id}"
+                if cid in candidates:
+                    candidates[cid].signals["vector_similarity"] = sim
+                    candidates[cid].signals["semantic_match"] = max(
+                        candidates[cid].signals.get("semantic_match", 0.0), sim
+                    )
+                else:
+                    candidates[cid] = RetrievedCandidate(
+                        candidate_id=cid,
+                        entity_type="CHUNK",
+                        name=chunk.name,
+                        path=chunk.path,
+                        start_line=chunk.start_line,
+                        end_line=chunk.end_line,
+                        content=chunk.content,
+                        file_id=chunk.file_id,
+                        symbol_id=chunk.symbol_id,
+                        signals={"vector_similarity": sim, "semantic_match": sim},
+                    )
+
+        # 6. SEMANTIC / CONCEPT SEARCH: Match domain concept synonyms across chunks and symbols
+        if analyzed_query.concept_keywords:
+            concept_chunk_conditions = []
+            for concept in analyzed_query.concept_keywords:
+                if len(concept) >= 3:
+                    concept_chunk_conditions.append(CodeChunk.name.ilike(f"%{concept}%"))
+                    concept_chunk_conditions.append(CodeChunk.content.ilike(f"%{concept}%"))
+
+            if concept_chunk_conditions:
+                concept_chunk_stmt = (
+                    select(CodeChunk)
+                    .where(
+                        CodeChunk.snapshot_id == snapshot_id,
+                        or_(*concept_chunk_conditions),
+                    )
+                    .limit(limit_per_signal)
+                )
+                concept_chunk_res = await session.execute(concept_chunk_stmt)
+                for chunk in concept_chunk_res.scalars().all():
+                    cid = f"chunk:{chunk.id}"
+                    if cid in candidates:
+                        candidates[cid].signals["semantic_match"] = max(
+                            candidates[cid].signals.get("semantic_match", 0.0), 0.85
+                        )
+                    else:
+                        candidates[cid] = RetrievedCandidate(
+                            candidate_id=cid,
+                            entity_type="CHUNK",
+                            name=chunk.name,
+                            path=chunk.path,
+                            start_line=chunk.start_line,
+                            end_line=chunk.end_line,
+                            content=chunk.content,
+                            file_id=chunk.file_id,
+                            symbol_id=chunk.symbol_id,
+                            signals={"semantic_match": 0.85},
+                        )
+
+            # Match concept keywords in symbols
+            concept_sym_conditions = []
+            for concept in analyzed_query.concept_keywords:
+                if len(concept) >= 3:
+                    concept_sym_conditions.append(CodeSymbol.name.ilike(f"%{concept}%"))
+                    concept_sym_conditions.append(CodeSymbol.qualified_name.ilike(f"%{concept}%"))
+
+            if concept_sym_conditions:
+                concept_sym_stmt = (
+                    select(CodeSymbol, RepositoryFile)
+                    .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
+                    .where(
+                        RepositoryFile.snapshot_id == snapshot_id,
+                        or_(*concept_sym_conditions),
+                    )
+                    .limit(limit_per_signal)
+                )
+                concept_sym_res = await session.execute(concept_sym_stmt)
+                for sym, f in concept_sym_res.all():
+                    cid = f"sym:{sym.id}"
+                    if cid in candidates:
+                        candidates[cid].signals["semantic_match"] = max(
+                            candidates[cid].signals.get("semantic_match", 0.0), 0.85
+                        )
+                    else:
+                        candidates[cid] = RetrievedCandidate(
+                            candidate_id=cid,
+                            entity_type="SYMBOL",
+                            name=sym.name,
+                            path=f.path,
+                            start_line=sym.start_line,
+                            end_line=sym.end_line,
+                            content=f"{sym.symbol_type.value} {sym.qualified_name} (lines {sym.start_line}-{sym.end_line} in {f.path})",
+                            file_id=f.id,
+                            symbol_id=sym.id,
+                            signals={"semantic_match": 0.85},
+                        )
+
+        # 7. ORDER CANDIDATES BY QUERY RELEVANCE
+        weights = {
+            "symbol_match": 1.5,
+            "file_match": 1.3,
+            "vector_similarity": 1.4,
+            "semantic_match": 1.2,
+            "content_match": 1.1,
+            "dependency_match": 0.9,
+        }
+
+        def initial_score(c: RetrievedCandidate) -> float:
+            return sum(c.signals.get(k, 0.0) * w for k, w in weights.items())
+
+        ordered_candidates = sorted(candidates.values(), key=initial_score, reverse=True)
+        return ordered_candidates

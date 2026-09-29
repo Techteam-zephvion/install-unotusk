@@ -1,7 +1,10 @@
 import ast
 from typing import Any
 
-import tree_sitter
+try:
+    import tree_sitter
+except ImportError:
+    tree_sitter = None  # type: ignore[assignment]
 
 from apps.api.src.models.enums import SymbolType
 
@@ -100,7 +103,7 @@ def _extract_python_ast_symbols(code_bytes: bytes) -> list[ExtractedSymbol]:
             )
             symbols.append(class_sym)
             for item in node.body:
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
                     class_sym.children.append(
                         ExtractedSymbol(
                             name=item.name,
@@ -110,7 +113,7 @@ def _extract_python_ast_symbols(code_bytes: bytes) -> list[ExtractedSymbol]:
                             end_line=getattr(item, "end_lineno", item.lineno),
                         )
                     )
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             symbols.append(
                 ExtractedSymbol(
                     name=node.name,
