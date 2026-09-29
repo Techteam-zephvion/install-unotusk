@@ -38,6 +38,8 @@ class TestIngestionFailureRecovery:
         create_test_project,
     ):
         """Ingesting an empty directory must complete without corrupting the snapshot record."""
+        if db_session is None:
+            pytest.skip("Database session is not available in offline test environment")
         import uuid
 
         from apps.api.src.models.enums import IntegrationProvider, IntegrationStatus, SnapshotStatus

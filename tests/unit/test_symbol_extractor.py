@@ -1,8 +1,14 @@
+import pytest
+
 from apps.api.src.models.enums import SymbolType
 from apps.api.src.services.parser.symbol_extractor import extract_symbols_from_tree
-from apps.api.src.services.parser.tree_sitter_parser import parse_code
+from apps.api.src.services.parser.tree_sitter_parser import (
+    _TREE_SITTER_AVAILABLE,
+    parse_code,
+)
 
 
+@pytest.mark.skipif(not _TREE_SITTER_AVAILABLE, reason="tree-sitter parsers not available")
 def test_python_symbol_extraction():
     code = b"""
 class DataProcessor:
@@ -29,6 +35,7 @@ def top_level_func(a, b):
     assert cls_sym.children[0].qualified_name == "DataProcessor.process_data"
 
 
+@pytest.mark.skipif(not _TREE_SITTER_AVAILABLE, reason="tree-sitter parsers not available")
 def test_typescript_symbol_extraction():
     code = b"""
 export interface UserProfile {

@@ -43,3 +43,25 @@ def test_jwt_token_expiration():
 def test_invalid_jwt_token():
     assert decode_access_token("not.a.valid.jwt.token") is None
     assert decode_access_token("") is None
+
+
+def test_security_vault_token_encryption_and_decryption():
+    from apps.api.src.core.security_vault import decrypt_secret, encrypt_secret
+
+    plain_token = "ghp_secureTokenTest1234567890abcdef"
+    cipher_token = encrypt_secret(plain_token)
+
+    assert cipher_token != plain_token
+    assert not cipher_token.startswith("ghp_")
+    decrypted = decrypt_secret(cipher_token)
+    assert decrypted == plain_token
+
+
+def test_security_vault_empty_and_legacy_fallback():
+    from apps.api.src.core.security_vault import decrypt_secret, encrypt_secret
+
+    assert encrypt_secret("") == ""
+    assert decrypt_secret("") == ""
+    # Plain text fallback (legacy compatibility)
+    assert decrypt_secret("plain_legacy_token") == "plain_legacy_token"
+

@@ -42,6 +42,29 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _clean_null(text: str | None) -> str | None:
+    if text is None:
+        return None
+    return text.replace("\x00", "")
+
+
+def _clean_dict_null(d: dict | None) -> dict | None:
+    if not d:
+        return d
+    cleaned = {}
+    for k, v in d.items():
+        clean_k = k.replace("\x00", "") if isinstance(k, str) else k
+        if isinstance(v, str):
+            cleaned[clean_k] = v.replace("\x00", "")
+        elif isinstance(v, list):
+            cleaned[clean_k] = [x.replace("\x00", "") if isinstance(x, str) else x for x in v]
+        elif isinstance(v, dict):
+            cleaned[clean_k] = _clean_dict_null(v)
+        else:
+            cleaned[clean_k] = v
+    return cleaned
+
+
 class IngestionService:
     @staticmethod
     async def run_ingestion(
@@ -49,15 +72,20 @@ class IngestionService:
         override_local_dir: str | None = None,
     ) -> None:
         """Execute the end-to-end repository ingestion pipeline."""
-        async with AsyncSessionLocal() as session:
-            # 1. Fetch snapshot & repository
-            query = select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
-            result = await session.execute(query)
-            snapshot = result.scalar_one_or_none()
+        if AsyncSessionLocal is None:
+            logger.error("Database session factory is not available.")
+            return
 
-            if snapshot is None:
-                logger.error(f"Ingestion snapshot {snapshot_id} not found.")
-                return
+        try:
+            async with AsyncSessionLocal() as session:
+                # 1. Fetch snapshot & repository
+                query = select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
+                result = await session.execute(query)
+                snapshot = result.scalar_one_or_none()
+
+                if snapshot is None:
+                    logger.error(f"Ingestion snapshot {snapshot_id} not found.")
+                    return
 
             repo_query = select(Repository).where(Repository.id == snapshot.repository_id)
             repo_res = await session.execute(repo_query)
@@ -213,15 +241,17 @@ class IngestionService:
                             )
                             extracted_symbols_count = len(extracted_symbols)
                             for sym in extracted_symbols:
+                                clean_sym_name = _clean_null(sym.name) or ""
+                                clean_sym_qual = _clean_null(sym.qualified_name)
                                 code_sym = CodeSymbol(
                                     id=uuid.uuid4(),
                                     file_id=repo_file.id,
-                                    name=sym.name.replace("\x00", ""),
+                                    name=clean_sym_name,
                                     symbol_type=sym.symbol_type,
-                                    qualified_name=sym.qualified_name.replace("\x00", "") if sym.qualified_name else None,
+                                    qualified_name=clean_sym_qual,
                                     start_line=sym.start_line,
                                     end_line=sym.end_line,
-                                    symbol_metadata=sym.metadata,
+                                    symbol_metadata=_clean_dict_null(sym.metadata),
                                 )
                                 session.add(code_sym)
 
@@ -230,15 +260,15 @@ class IngestionService:
                                     sym_lines = content_lines[
                                         sym.start_line - 1 : min(sym.end_line, len(content_lines))
                                     ]
-                                    sym_chunk_content = "\n".join(sym_lines).replace("\x00", "")
+                                    sym_chunk_content = _clean_null("\n".join(sym_lines)) or ""
                                     sym_chunk = CodeChunk(
                                         id=uuid.uuid4(),
                                         snapshot_id=snapshot.id,
                                         file_id=repo_file.id,
                                         symbol_id=code_sym.id,
                                         chunk_type=sym.symbol_type.value,
-                                        name=sym.name.replace("\x00", ""),
-                                        path=repo_file.path,
+                                        name=clean_sym_name,
+                                        path=_clean_null(repo_file.path) or "",
                                         content=sym_chunk_content,
                                         start_line=sym.start_line,
                                         end_line=sym.end_line,
@@ -248,16 +278,18 @@ class IngestionService:
 
                                 # Children (e.g. methods within class)
                                 for child_sym in sym.children:
+                                    clean_child_name = _clean_null(child_sym.name) or ""
+                                    clean_child_qual = _clean_null(child_sym.qualified_name)
                                     child_code_sym = CodeSymbol(
                                         id=uuid.uuid4(),
                                         file_id=repo_file.id,
-                                        name=child_sym.name.replace("\x00", ""),
+                                        name=clean_child_name,
                                         symbol_type=child_sym.symbol_type,
-                                        qualified_name=child_sym.qualified_name.replace("\x00", "") if child_sym.qualified_name else None,
+                                        qualified_name=clean_child_qual,
                                         start_line=child_sym.start_line,
                                         end_line=child_sym.end_line,
                                         parent_symbol_id=code_sym.id,
-                                        symbol_metadata=child_sym.metadata,
+                                        symbol_metadata=_clean_dict_null(child_sym.metadata),
                                     )
                                     session.add(child_code_sym)
 
@@ -267,15 +299,15 @@ class IngestionService:
                                                 child_sym.end_line, len(content_lines)
                                             )
                                         ]
-                                        child_chunk_content = "\n".join(child_lines).replace("\x00", "")
+                                        child_chunk_content = _clean_null("\n".join(child_lines)) or ""
                                         child_chunk = CodeChunk(
                                             id=uuid.uuid4(),
                                             snapshot_id=snapshot.id,
                                             file_id=repo_file.id,
                                             symbol_id=child_code_sym.id,
                                             chunk_type=child_sym.symbol_type.value,
-                                            name=child_sym.name.replace("\x00", ""),
-                                            path=repo_file.path,
+                                            name=clean_child_name,
+                                            path=_clean_null(repo_file.path) or "",
                                             content=child_chunk_content,
                                             start_line=child_sym.start_line,
                                             end_line=child_sym.end_line,
@@ -292,9 +324,9 @@ class IngestionService:
 
                     # For config files, documentation, or files with no symbols, store file header chunk
                     if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
-                        lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()[:100]
+                        lines = _clean_null(content.decode("utf-8", errors="replace")).splitlines()[:100]
                         if lines:
-                            file_chunk_content = "\n".join(lines).replace("\x00", "")
+                            file_chunk_content = _clean_null("\n".join(lines)) or ""
                             file_chunk = CodeChunk(
                                 id=uuid.uuid4(),
                                 snapshot_id=snapshot.id,
@@ -305,8 +337,8 @@ class IngestionService:
                                     (".json", ".yml", ".yaml", ".toml", ".txt", ".md")
                                 )
                                 else "MODULE",
-                                name=f_info["filename"],
-                                path=repo_file.path,
+                                name=_clean_null(f_info["filename"]) or "",
+                                path=_clean_null(repo_file.path) or "",
                                 content=file_chunk_content,
                                 start_line=1,
                                 end_line=len(lines),
@@ -354,11 +386,12 @@ class IngestionService:
                                 target_file_id = rf.id
                                 break
 
+                    clean_ext_pkg = _clean_null(ext_pkg) if ext_pkg else None
                     code_dep = CodeDependency(
                         id=uuid.uuid4(),
                         source_file_id=source_file_id,
                         target_file_id=target_file_id,
-                        external_package=None if target_file_id else ext_pkg,
+                        external_package=None if target_file_id else clean_ext_pkg,
                         dependency_type=dep.dependency_type,
                         line_number=dep.line_number,
                     )
@@ -395,3 +428,5 @@ class IngestionService:
             finally:
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception as e:
+            logger.error(f"Ingestion failed for snapshot {snapshot_id}: {e}")

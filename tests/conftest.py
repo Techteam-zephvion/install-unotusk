@@ -74,69 +74,93 @@ def pytest_pyfunc_call(pyfuncitem):
         return True
 
 
-@async_fixture(autouse=True)
-async def clean_database():
+@pytest.fixture(autouse=True)
+def clean_database():
     if test_engine is None:
         yield
         return
     try:
-        async with test_engine.begin() as conn:
-            await conn.execute(
-                text(
-                    "TRUNCATE TABLE findings, discovery_runs, "
-                    "project_intelligence_reports, project_knowledge, messages, conversations, "
-                    "code_dependencies, code_chunks, code_symbols, repository_files, "
-                    "repository_snapshots, repositories, integrations, projects, "
-                    "organization_memberships, organizations, users CASCADE;"
+        async def _truncate():
+            async with test_engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "TRUNCATE TABLE findings, discovery_runs, "
+                        "project_intelligence_reports, project_knowledge, messages, conversations, "
+                        "code_dependencies, code_chunks, code_symbols, repository_files, "
+                        "repository_snapshots, repositories, integrations, projects, "
+                        "organization_memberships, organizations, users CASCADE;"
+                    )
                 )
-            )
+
+        try:
+            asyncio.run(_truncate())
+        except RuntimeError:
+            try:
+                loop = asyncio.get_event_loop_policy().get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(_truncate())
+                else:
+                    loop.run_until_complete(_truncate())
+            except Exception:
+                pass
     except Exception:
         pass
     yield
 
 
-@async_fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    if TestSessionLocal is None:
-        yield None
-        return
-    async with TestSessionLocal() as session:
-        yield session
+if _HAS_PYTEST_ASYNCIO:
 
-
-@async_fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    if TestSessionLocal is None:
-        yield None
-        return
-
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    @pytest_asyncio.fixture
+    async def db_session() -> AsyncGenerator[AsyncSession, None]:
+        if TestSessionLocal is None:
+            yield None
+            return
         async with TestSessionLocal() as session:
-            try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
+            yield session
 
-    try:
-        from apps.api.src.main import app
-    except ImportError:
+    @pytest_asyncio.fixture
+    async def client() -> AsyncGenerator[AsyncClient, None]:
+        if TestSessionLocal is None:
+            yield None
+            return
+
+        async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+            async with TestSessionLocal() as session:
+                try:
+                    yield session
+                except Exception:
+                    await session.rollback()
+                    raise
+                finally:
+                    await session.close()
+
+        try:
+            from apps.api.src.main import app
+        except ImportError:
+            yield None
+            return
+
+        app.dependency_overrides[get_db] = override_get_db
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+
+        app.dependency_overrides.clear()
+
+else:
+
+    @pytest.fixture
+    def db_session():
         yield None
-        return
 
-    app.dependency_overrides[get_db] = override_get_db
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-
-    app.dependency_overrides.clear()
+    @pytest.fixture
+    def client():
+        yield None
 
 
-@async_fixture
-async def create_test_user(db_session: AsyncSession):
+@pytest.fixture
+def create_test_user(db_session: AsyncSession):
     async def _create(
         email: str = "test@example.com",
         name: str = "Test User",
@@ -155,8 +179,8 @@ async def create_test_user(db_session: AsyncSession):
     return _create
 
 
-@async_fixture
-async def create_test_org(db_session: AsyncSession):
+@pytest.fixture
+def create_test_org(db_session: AsyncSession):
     async def _create(
         user: User,
         name: str = "Test Org",
@@ -185,8 +209,8 @@ async def create_test_org(db_session: AsyncSession):
     return _create
 
 
-@async_fixture
-async def create_test_project(db_session: AsyncSession):
+@pytest.fixture
+def create_test_project(db_session: AsyncSession):
     async def _create(
         organization: Organization,
         name: str = "Test Project",

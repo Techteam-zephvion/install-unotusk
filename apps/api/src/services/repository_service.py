@@ -8,7 +8,7 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
-from apps.api.src.core.security_vault import encrypt_secret
+from apps.api.src.core.security_vault import decrypt_secret, encrypt_secret
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
@@ -133,7 +133,8 @@ class RepositoryService:
 
         token = None
         if integration and integration.integration_metadata:
-            token = integration.integration_metadata.get("github_token")
+            encrypted_token = integration.integration_metadata.get("github_token")
+            token = decrypt_secret(encrypted_token) if encrypted_token else None
         if not token:
             token = os.getenv("GITHUB_TOKEN")
 
@@ -169,7 +170,7 @@ class RepositoryService:
             await session.flush()
         elif token and not (integration.integration_metadata or {}).get("github_token"):
             meta = dict(integration.integration_metadata or {})
-            meta["github_token"] = token
+            meta["github_token"] = encrypt_secret(token)
             integration.integration_metadata = meta
 
         # Check existing repository record

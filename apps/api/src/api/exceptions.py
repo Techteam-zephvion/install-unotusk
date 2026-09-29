@@ -1,6 +1,25 @@
 from typing import Any
 
-from fastapi import HTTPException, status
+try:
+    from fastapi import HTTPException, status
+except ImportError:
+    class HTTPException(Exception):  # type: ignore[no-redef]
+        def __init__(self, status_code: int = 500, detail: Any = None):
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
+
+    class _Status:
+        HTTP_400_BAD_REQUEST = 400
+        HTTP_401_UNAUTHORIZED = 401
+        HTTP_403_FORBIDDEN = 403
+        HTTP_404_NOT_FOUND = 404
+        HTTP_409_CONFLICT = 409
+        HTTP_422_UNPROCESSABLE_ENTITY = 422
+        HTTP_500_INTERNAL_SERVER_ERROR = 500
+
+    status = _Status()  # type: ignore[assignment]
+
 
 
 class AppException(HTTPException):

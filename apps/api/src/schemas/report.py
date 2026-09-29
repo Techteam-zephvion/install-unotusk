@@ -85,6 +85,7 @@ class ImportantDependency(BaseModel):
 
 
 class TestingAndDocs(BaseModel):
+    __test__ = False
     testing_observed: list[ClaimItem] = Field(default_factory=list)
     testing_derived: str
     testing_recommended: str
