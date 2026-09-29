@@ -55,6 +55,10 @@ def extract_dependencies_from_tree(
         return _extract_python_ast_dependencies(code_bytes)
 
     if language in ("TypeScript", "TypeScript/TSX", "JavaScript", "JavaScript/JSX"):
+        if tree is not None:
+            _extract_js_ts_tree_dependencies(tree.root_node, code_bytes, deps)
+            if deps:
+                return deps
         return _extract_js_ts_dependencies(code_bytes)
 
     if tree is None:
@@ -102,6 +106,96 @@ def _extract_python_ast_dependencies(code_bytes: bytes) -> list[ExtractedDepende
                 )
 
     return deps
+
+
+def _extract_js_ts_tree_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    """Extracts dependencies using Tree-Sitter AST nodes for JS/TS."""
+    if node is None:
+        return
+
+    node_type = getattr(node, "type", "")
+    if node_type == "import_statement":
+        source_node = node.child_by_field_name("source")
+        if source_node is None:
+            for child in getattr(node, "children", []):
+                if getattr(child, "type", "") == "string":
+                    source_node = child
+                    break
+        if source_node:
+            raw_target = _clean_str(
+                code_bytes[source_node.start_byte : source_node.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+            )
+            if raw_target:
+                line_no = code_bytes[:source_node.start_byte].count(b"\n") + 1
+                result.append(
+                    ExtractedDependency(
+                        raw_target=raw_target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=line_no,
+                        is_relative=_is_relative_import(raw_target),
+                    )
+                )
+    elif node_type == "export_statement":
+        source_node = node.child_by_field_name("source")
+        if source_node:
+            raw_target = _clean_str(
+                code_bytes[source_node.start_byte : source_node.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+            )
+            if raw_target:
+                line_no = code_bytes[:source_node.start_byte].count(b"\n") + 1
+                result.append(
+                    ExtractedDependency(
+                        raw_target=raw_target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=line_no,
+                        is_relative=_is_relative_import(raw_target),
+                    )
+                )
+    elif node_type == "call_expression":
+        fn_node = node.child_by_field_name("function")
+        if fn_node:
+            fn_name = (
+                code_bytes[fn_node.start_byte : fn_node.end_byte]
+                .decode("utf-8", errors="replace")
+                .strip()
+            )
+            if fn_name in ("require", "import"):
+                args_node = node.child_by_field_name("arguments")
+                if args_node and getattr(args_node, "children", None):
+                    for arg in args_node.children:
+                        if getattr(arg, "type", "") == "string":
+                            raw_target = _clean_str(
+                                code_bytes[arg.start_byte : arg.end_byte].decode(
+                                    "utf-8", errors="replace"
+                                )
+                            )
+                            if raw_target:
+                                line_no = code_bytes[:arg.start_byte].count(b"\n") + 1
+                                dep_type = (
+                                    DependencyType.REQUIRE
+                                    if fn_name == "require"
+                                    else DependencyType.IMPORT
+                                )
+                                result.append(
+                                    ExtractedDependency(
+                                        raw_target=raw_target,
+                                        dependency_type=dep_type,
+                                        line_number=line_no,
+                                        is_relative=_is_relative_import(raw_target),
+                                    )
+                                )
+                            break
+
+    for child in getattr(node, "children", []):
+        _extract_js_ts_tree_dependencies(child, code_bytes, result)
 
 
 def _extract_js_ts_dependencies(code_bytes: bytes) -> list[ExtractedDependency]:
@@ -178,7 +272,7 @@ def _extract_js_ts_dependencies(code_bytes: bytes) -> list[ExtractedDependency]:
 
         start_line = line_no
 
-        # 1. require('...')
+        # 1. require(...)
         if code_str.startswith("require", i) and not (
             i + 7 < n and (code_str[i + 7].isalnum() or code_str[i + 7] in "_$")
         ):
@@ -357,7 +451,7 @@ def _extract_go_dependencies(
     code_bytes: bytes,
     result: list[ExtractedDependency],
 ) -> None:
-    for child in node.children:
+    for child in getattr(node, "children", []):
         if child.type == "import_declaration":
             for spec in child.children:
                 if spec.type == "import_spec":

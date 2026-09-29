@@ -1,0 +1,78 @@
+{
+  "timestamp_utc": "2026-09-24T07:16:31.813454+00:00",
+  "unotusk_version": "0.1.0",
+  "system_info": {
+    "unotusk_version": "0.1.0",
+    "platform": "Linux-7.1.5-76070105-generic-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "architecture": "x86_64",
+    "processor": "x86_64",
+    "total_ram_mb": 15236.7,
+    "disk_total_gb": 459.5,
+    "disk_free_gb": 118.8
+  },
+  "network_info": {
+    "hostname": "pop-os",
+    "port_8000_listening": false,
+    "interfaces": [
+      {
+        "name": "lo",
+        "ips": [
+          "127.0.0.1"
+        ],
+        "operstate": "UNKNOWN"
+      },
+      {
+        "name": "wlo1",
+        "ips": [
+          "10.0.0.59"
+        ],
+        "operstate": "UP"
+      },
+      {
+        "name": "lxcbr0",
+        "ips": [
+          "10.0.3.1"
+        ],
+        "operstate": "DOWN"
+      }
+    ],
+    "default_gateway": "10.0.0.1"
+  },
+  "docker_status": {
+    "docker_available": true,
+    "compose_version": "Docker Compose version v5.1.4",
+    "containers": [
+      {
+        "name": "auth-service-postgres-1",
+        "image": "postgres:16-alpine",
+        "status": "Exited (0) 2 days ago",
+        "state": "exited",
+        "ports": ""
+      },
+      {
+        "name": "unotusk-2-postgres-1",
+        "image": "postgres:16-alpine",
+        "status": "Exited (0) 2 days ago",
+        "state": "exited",
+        "ports": ""
+      },
+      {
+        "name": "nammadharani-redis-1",
+        "image": "redis:7-alpine",
+        "status": "Exited (0) 2 days ago",
+        "state": "exited",
+        "ports": ""
+      }
+    ]
+  },
+  "server_health": {
+    "url": "http://localhost:8000",
+    "liveness": "unreachable: <urlopen error [Errno 111] Connection refused>",
+    "readiness": "unreachable: <urlopen error [Errno 111] Connection refused>"
+  },
+  "sanitized_logs": {
+    "api": [],
+    "worker": []
+  }
+}

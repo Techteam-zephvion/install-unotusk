@@ -20,8 +20,7 @@ class RelationshipExpander:
         max_expansions: int = 10,
         max_depth: int = 2,
     ) -> list[RetrievedCandidate]:
-        """
-        Iteratively expands seed candidates through multi-hop BFS graph traversal.
+        """Iteratively expands seed candidates through multi-hop BFS graph traversal.
         Discovers direct and transitive outbound dependencies, inbound callers,
         and defined symbols up to max_depth.
         """

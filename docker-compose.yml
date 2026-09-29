@@ -60,17 +60,18 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - APP_ENV=${APP_ENV:-development}
-      - DEBUG=${DEBUG:-true}
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=${AUTH_SECRET:-insecure-dev-secret-please-change-in-production-min-32-chars-long}
       - LLM_PROVIDER=${LLM_PROVIDER:-groq}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - CONTEXT_BUDGET_TOKENS=${CONTEXT_BUDGET_TOKENS:-3500}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -95,7 +96,18 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
+      - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - REDIS_URL=redis://redis:6379/0
+      - AUTH_SECRET=${AUTH_SECRET:-insecure-dev-secret-please-change-in-production-min-32-chars-long}
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - CONTEXT_BUDGET_TOKENS=${CONTEXT_BUDGET_TOKENS:-3500}
       - QUEUE_NAME=unotusk_tasks
     networks:
       - unotusk-network

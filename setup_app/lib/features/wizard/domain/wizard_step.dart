@@ -1,7 +1,8 @@
 enum WizardStep {
   welcome,
   target,
-  check,
+  systemCheck,
+  networkCheck,
   configure,
   install,
   verify,
@@ -13,8 +14,10 @@ enum WizardStep {
         return 'Welcome';
       case WizardStep.target:
         return 'Target';
-      case WizardStep.check:
-        return 'Check Server';
+      case WizardStep.systemCheck:
+        return 'System Check';
+      case WizardStep.networkCheck:
+        return 'Network Check';
       case WizardStep.configure:
         return 'Configure';
       case WizardStep.install:

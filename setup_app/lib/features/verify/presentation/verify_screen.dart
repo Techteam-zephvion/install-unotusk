@@ -17,6 +17,7 @@ class VerifyScreen extends ConsumerWidget {
     final verifyNotifier = ref.read(verifyControllerProvider.notifier);
     final wizardNotifier = ref.read(wizardControllerProvider.notifier);
     final serverUrl = ref.watch(configControllerProvider).config.serverUrl;
+    final lanUrl = verifyState.lanServerUrl;
 
     return Center(
       child: ConstrainedBox(
@@ -29,7 +30,7 @@ class VerifyScreen extends ConsumerWidget {
               Text('Verifying Server Health', style: AppTextStyles.h1),
               const SizedBox(height: 6),
               Text(
-                'Checking server responsiveness and database connectivity.',
+                'Checking server responsiveness and network connectivity.',
                 style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
               ),
               const SizedBox(height: 24),
@@ -47,19 +48,19 @@ class VerifyScreen extends ConsumerWidget {
                             child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                           ),
                           const SizedBox(width: 12),
-                          Text('Waiting for server startup...', style: AppTextStyles.bodyMedium),
+                          Text('Waiting for services...', style: AppTextStyles.bodyMedium),
                         ] else if (verifyState.isSuccess) ...[
                           const Icon(Icons.check_circle, size: 20, color: AppColors.success),
                           const SizedBox(width: 10),
                           Text(
-                            'Running',
+                            'Services Running',
                             style: AppTextStyles.h2.copyWith(color: AppColors.success),
                           ),
                         ] else ...[
                           const Icon(Icons.cancel, size: 20, color: AppColors.error),
                           const SizedBox(width: 10),
                           Text(
-                            'Unhealthy',
+                            'Verification Failed',
                             style: AppTextStyles.h2.copyWith(color: AppColors.error),
                           ),
                         ],
@@ -68,7 +69,11 @@ class VerifyScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 16),
-                    _buildMetricRow('Server Address', serverUrl),
+                    _buildMetricRow('Local Health Check', serverUrl, isSuccess: verifyState.isLocalHealthy),
+                    if (lanUrl != null) ...[
+                      const SizedBox(height: 10),
+                      _buildMetricRow('LAN Health Check', lanUrl, isSuccess: verifyState.isLanHealthy),
+                    ],
                     const SizedBox(height: 10),
                     _buildMetricRow(
                       'Database',
@@ -81,10 +86,6 @@ class VerifyScreen extends ConsumerWidget {
                       verifyState.healthStatus?.redisStatus ?? (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
                       isSuccess: verifyState.healthStatus?.redisStatus == 'connected',
                     ),
-                    if (verifyState.healthStatus?.version != null) ...[
-                      const SizedBox(height: 10),
-                      _buildMetricRow('API Version', 'v${verifyState.healthStatus!.version}'),
-                    ],
                   ],
                 ),
               ),
@@ -109,7 +110,7 @@ class VerifyScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        verifyState.errorMessage ?? 'Server failed to start in time.',
+                        verifyState.errorMessage ?? 'Server failed to start in time or LAN is blocked.',
                         style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate800),
                       ),
                     ],

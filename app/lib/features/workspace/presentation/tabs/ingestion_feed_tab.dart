@@ -8,7 +8,7 @@ import '../workspace_controller.dart';
 class ProjectFeedItem {
   final String id;
   final String name;
-  final String upsStatus; // active | degraded
+  final String serverStatus; // active | degraded
   final String ingestionStatus; // live | ingesting | error
   final double fpr;
   final int days;
@@ -17,7 +17,7 @@ class ProjectFeedItem {
   const ProjectFeedItem({
     required this.id,
     required this.name,
-    required this.upsStatus,
+    required this.serverStatus,
     required this.ingestionStatus,
     required this.fpr,
     required this.days,
@@ -43,8 +43,8 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
   static const List<ProjectFeedItem> _projects = [
     ProjectFeedItem(
       id: 'proj-1',
-      name: 'Unotusk Auth Service (US)',
-      upsStatus: 'active',
+      name: 'Unotusk Core API',
+      serverStatus: 'active',
       ingestionStatus: 'live',
       fpr: 0.88,
       days: 67,
@@ -52,8 +52,8 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
     ),
     ProjectFeedItem(
       id: 'proj-2',
-      name: 'Unotusk Company Server (UPS)',
-      upsStatus: 'active',
+      name: 'Billing & Payments Service',
+      serverStatus: 'active',
       ingestionStatus: 'live',
       fpr: 0.92,
       days: 67,
@@ -61,8 +61,8 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
     ),
     ProjectFeedItem(
       id: 'proj-3',
-      name: 'AI PIE Intelligence Engine',
-      upsStatus: 'active',
+      name: 'Project Intelligence Engine',
+      serverStatus: 'active',
       ingestionStatus: 'live',
       fpr: 0.95,
       days: 58,
@@ -70,8 +70,8 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
     ),
     ProjectFeedItem(
       id: 'proj-4',
-      name: 'Unotusk Employee Client (UCA)',
-      upsStatus: 'active',
+      name: 'Unotusk Employee Client',
+      serverStatus: 'active',
       ingestionStatus: 'live',
       fpr: 0.85,
       days: 42,
@@ -173,8 +173,8 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
                               Row(
                                 children: [
                                   _buildStatusIndicator(
-                                    label: 'UPS ${proj.upsStatus.toUpperCase()}',
-                                    isActive: proj.upsStatus == 'active',
+                                    label: 'SERVER ${proj.serverStatus.toUpperCase()}',
+                                    isActive: proj.serverStatus == 'active',
                                   ),
                                   const SizedBox(width: 8),
                                   _buildStatusIndicator(

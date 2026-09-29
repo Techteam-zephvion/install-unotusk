@@ -73,6 +73,83 @@ jobs:
   # ──────────────────────────────────────────────
   # 2. Windows — MSI installer via WiX v3
   # ──────────────────────────────────────────────
+  build-setup-linux:
+    name: "Setup App Linux x64"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config             libgtk-3-dev liblzma-dev libstdc++-12-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - run: flutter config --enable-linux-desktop
+      - name: Install dependencies
+        working-directory: setup_app
+        run: flutter pub get
+      - name: Build Setup App
+        working-directory: setup_app
+        run: |
+          flutter build linux --release             --build-name="${{ github.event.inputs.version || '1.0.0' }}"             --build-number="${{ github.run_number }}"
+      - name: Package tar.gz + sha256
+        working-directory: setup_app/build/linux/x64/release
+        run: |
+          tar -czf unotusk-server-linux-x64.tar.gz bundle/
+          sha256sum unotusk-server-linux-x64.tar.gz > unotusk-server-linux-x64.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-server-linux-x64
+          path: |
+            setup_app/build/linux/x64/release/unotusk-server-linux-x64.tar.gz
+            setup_app/build/linux/x64/release/unotusk-server-linux-x64.tar.gz.sha256
+          retention-days: 30
+
+  build-docker-images:
+    name: "Build and Push Docker Images"
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata for API
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/unotusk-api
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.api
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+      - name: Extract metadata for Worker
+        id: meta-worker
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/unotusk-worker
+      - name: Build and push Worker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.worker
+          push: true
+          tags: ${{ steps.meta-worker.outputs.tags }}
+          labels: ${{ steps.meta-worker.outputs.labels }}
+
   build-windows:
     name: "Windows x64 (.msi)"
     runs-on: windows-latest
@@ -291,7 +368,7 @@ jobs:
   # ──────────────────────────────────────────────
   release:
     name: "GitHub Release"
-    needs: [build-linux, build-windows, build-macos]
+    needs: [build-linux, build-setup-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -321,6 +398,7 @@ jobs:
             | Platform | File | Format |
             |---|---|---|
             | Linux x64 | `unotusk-employee-linux-x64.tar.gz` | Archive |
+            | Setup App Linux x64 | `unotusk-server-linux-x64.tar.gz` | Archive |
             | Windows x64 | `unotusk-employee-windows-x64.msi` | MSI Installer |
             | macOS | `unotusk-employee-macos.dmg` | Disk Image |
 
