@@ -1,0 +1,65 @@
+name: Build Windows App (.exe)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows desktop build
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run unit & widget tests
+        run: flutter test
+
+      - name: Build Windows Executable (.exe)
+        run: flutter build windows --release
+
+      - name: Package Release into ZIP
+        shell: pwsh
+        run: |
+          # Detect release folder (supports both modern x64 and older paths)
+          if (Test-Path "build\windows\x64\runner\Release") {
+            $releaseDir = "build\windows\x64\runner\Release"
+          } elseif (Test-Path "build\windows\runner\Release") {
+            $releaseDir = "build\windows\runner\Release"
+          } else {
+            Write-Error "Release build folder not found!"
+            exit 1
+          }
+          Write-Host "Packaging build from: $releaseDir"
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath "unotusk-windows-x64.zip" -Force
+
+      - name: Upload Build Artifact (.zip containing .exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-windows-x64
+          path: unotusk-windows-x64.zip
+          retention-days: 30
+
+      - name: Create GitHub Release (when pushing a version tag like v1.0.0)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: unotusk-windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

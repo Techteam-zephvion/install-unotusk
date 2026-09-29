@@ -16,6 +16,10 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+#ifndef DWMWA_CAPTION_COLOR
+#define DWMWA_CAPTION_COLOR 35
+#endif
+
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
 /// Registry key for app theme preference.
@@ -95,8 +99,7 @@ const wchar_t* WindowClassRegistrar::GetWindowClass() {
     window_class.cbClsExtra = 0;
     window_class.cbWndExtra = 0;
     window_class.hInstance = GetModuleHandle(nullptr);
-    window_class.hIcon =
-        LoadIcon(window_class.hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+    window_class.hIcon = nullptr;
     window_class.hbrBackground = 0;
     window_class.lpszMenuName = nullptr;
     window_class.lpfnWndProc = Win32Window::WndProc;
@@ -134,7 +137,8 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  HWND window = CreateWindow(
+  HWND window = CreateWindowEx(
+      WS_EX_DLGMODALFRAME | WS_EX_APPWINDOW,
       window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
@@ -143,6 +147,9 @@ bool Win32Window::Create(const std::wstring& title,
   if (!window) {
     return false;
   }
+
+  SendMessage(window, WM_SETICON, ICON_SMALL, (LPARAM)NULL);
+  SendMessage(window, WM_SETICON, ICON_BIG, (LPARAM)NULL);
 
   UpdateTheme(window);
 
@@ -284,5 +291,7 @@ void Win32Window::UpdateTheme(HWND const window) {
     BOOL enable_dark_mode = light_mode == 0;
     DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
                           &enable_dark_mode, sizeof(enable_dark_mode));
+    COLORREF caption_color = enable_dark_mode ? RGB(0x18, 0x18, 0x16) : RGB(0xF9, 0xF9, 0xF9);
+    DwmSetWindowAttribute(window, DWMWA_CAPTION_COLOR, &caption_color, sizeof(caption_color));
   }
 }

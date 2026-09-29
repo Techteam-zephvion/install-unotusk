@@ -2,7 +2,7 @@ name: Build Employee App — All Platforms
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, "Frontend*"]
     tags:
       - "v*"
   workflow_dispatch:
