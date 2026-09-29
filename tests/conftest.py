@@ -7,7 +7,9 @@ from collections.abc import AsyncGenerator
 from unittest.mock import MagicMock
 
 # Provide mock for asyncpg if not installed in host environment
-if "asyncpg" not in sys.modules:
+try:
+    import asyncpg  # noqa: F401
+except ImportError:
     sys.modules["asyncpg"] = MagicMock()
 
 import pytest
@@ -32,7 +34,10 @@ os.environ["APP_ENV"] = "test"
 os.environ["DEBUG"] = "true"
 TEST_DB_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test",
+    os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test",
+    ),
 )
 os.environ["DATABASE_URL"] = TEST_DB_URL
 
@@ -59,7 +64,7 @@ except Exception:
 
 def pytest_pyfunc_call(pyfuncitem):
     """Allows running async def test functions in unit tests without requiring pytest-asyncio plugin."""
-    if inspect.iscoroutinefunction(pyfuncitem.obj):
+    if not _HAS_PYTEST_ASYNCIO and inspect.iscoroutinefunction(pyfuncitem.obj):
         args = [
             pyfuncitem.funcargs[arg]
             for arg in pyfuncitem._fixtureinfo.argnames

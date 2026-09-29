@@ -9,7 +9,7 @@ import '../data/repository_client.dart';
 class RepositoryManagerScreen extends ConsumerStatefulWidget {
   final ServerInstance server;
 
-  const RepositoryManagerScreen({Key? key, required this.server}) : super(key: key);
+  const RepositoryManagerScreen({super.key, required this.server});
 
   @override
   ConsumerState<RepositoryManagerScreen> createState() => _RepositoryManagerScreenState();
@@ -167,9 +167,11 @@ class _RepositoryManagerScreenState extends ConsumerState<RepositoryManagerScree
                     owner,
                     repoName,
                   );
+                  if (!context.mounted) return;
                   Navigator.pop(context);
                   _loadProjects();
                 } catch (e) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               },

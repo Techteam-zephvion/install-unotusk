@@ -1,6 +1,5 @@
 import 'repository_manager_screen.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -250,6 +249,7 @@ class ServerManagerScreen extends ConsumerWidget {
     
     ref.read(wizardControllerProvider.notifier).reset();
     
+    if (!context.mounted) return;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (context) => const WizardShell(),
     ));
