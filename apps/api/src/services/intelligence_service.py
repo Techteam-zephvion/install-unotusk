@@ -98,6 +98,7 @@ class IntelligenceService:
         project_id: uuid.UUID,
         question: str,
         conversation_id: uuid.UUID | None = None,
+        thinking_tier: str | None = None,
     ) -> GroundedAnswerResponse:
         project = await cls._verify_project_access(session, user_id, project_id)
         snapshot = await cls._get_active_snapshot(session, project_id)
@@ -169,6 +170,7 @@ class IntelligenceService:
             question=question,
             conversation_history=history_turns,
             project_id=project.id,
+            thinking_tier=thinking_tier,
         )
 
         # 5. Persist Assistant Message

@@ -52,6 +52,7 @@ class _AskTabState extends ConsumerState<AskTab> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessageItem> _messages = [];
   bool _isGenerating = false;
+  ThinkingTier _selectedTier = ThinkingTier.warm;
 
   static const List<String> _promptSuggestions = [
     'Why choose Postgres over Mongo in March?',
@@ -88,7 +89,7 @@ class _AskTabState extends ConsumerState<AskTab> {
     super.initState();
     if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _runQuery(widget.initialQuery!);
+        _runQuery(widget.initialQuery!, tier: _selectedTier);
       });
     }
   }
@@ -172,9 +173,12 @@ class _AskTabState extends ConsumerState<AskTab> {
     );
   }
 
-  void _runQuery(String queryText) async {
+  void _runQuery(String queryText, {ThinkingTier? tier}) async {
     final text = queryText.trim();
     if (text.isEmpty || _isGenerating) return;
+
+    final activeTier = tier ?? _selectedTier;
+    _selectedTier = activeTier;
 
     final queryId = 'q-${DateTime.now().millisecondsSinceEpoch}';
     final genId = 'g-${DateTime.now().millisecondsSinceEpoch}';
@@ -227,6 +231,7 @@ class _AskTabState extends ConsumerState<AskTab> {
       final groundedAnswer = await repository.askQuestion(
         widget.projectId,
         text,
+        thinkingTier: activeTier.name,
       );
 
       if (!mounted) return;
@@ -426,8 +431,11 @@ class _AskTabState extends ConsumerState<AskTab> {
                       AskInputBar(
                         controller: _queryController,
                         isGenerating: _isGenerating,
-                        onSubmitted: _runQuery,
-                        onSuggestionSelect: _runQuery,
+                        initialTier: _selectedTier,
+                        onTierChanged: (tier) => setState(() => _selectedTier = tier),
+                        onSubmittedWithTier: (text, tier) => _runQuery(text, tier: tier),
+                        onSubmitted: (text) => _runQuery(text, tier: _selectedTier),
+                        onSuggestionSelect: (text) => _runQuery(text, tier: _selectedTier),
                         suggestions: _promptSuggestions,
                       ),
                       const SizedBox(height: 10),
@@ -459,7 +467,7 @@ class _AskTabState extends ConsumerState<AskTab> {
                         itemBuilder: (context, index) {
                           final card = _heroCards[index];
                           return InkWell(
-                            onTap: () => _runQuery(card['title'] as String),
+                            onTap: () => _runQuery(card['title'] as String, tier: _selectedTier),
                             borderRadius: BorderRadius.circular(14),
                             child: Container(
                               padding: const EdgeInsets.all(14),
@@ -562,7 +570,10 @@ class _AskTabState extends ConsumerState<AskTab> {
                         AskInputBar(
                           controller: _queryController,
                           isGenerating: _isGenerating,
-                          onSubmitted: _runQuery,
+                          initialTier: _selectedTier,
+                          onTierChanged: (tier) => setState(() => _selectedTier = tier),
+                          onSubmittedWithTier: (text, tier) => _runQuery(text, tier: tier),
+                          onSubmitted: (text) => _runQuery(text, tier: _selectedTier),
                           placeholder: 'Ask a follow-up about decisions, commits, or tickets…',
                           suggestions: _promptSuggestions,
                         ),
@@ -712,9 +723,12 @@ class _AskTabState extends ConsumerState<AskTab> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Precision Index: 0.94 · Verified against 4 repository sources',
-                    style: AppTextStyles.mono(fontSize: 11, color: AppColors.textSecondary),
+                  Expanded(
+                    child: Text(
+                      'Precision Index: 0.94 · Verified against 4 repository sources',
+                      style: AppTextStyles.mono(fontSize: 11, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   Row(
                     children: [

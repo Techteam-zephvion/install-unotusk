@@ -38,6 +38,7 @@ async def ask_project(
         project_id=project_id,
         question=payload.question,
         conversation_id=payload.conversation_id,
+        thinking_tier=payload.thinking_tier,
     )
 
 

@@ -16,6 +16,7 @@ class MockApiClient extends ApiClient {
 
   dynamic mockResponseData;
   String? lastPath;
+  dynamic lastData;
 
   @override
   Future<Response<T>> get<T>(
@@ -26,6 +27,25 @@ class MockApiClient extends ApiClient {
     ProgressCallback? onReceiveProgress,
   }) async {
     lastPath = path;
+    return Response<T>(
+      data: mockResponseData as T,
+      statusCode: 200,
+      requestOptions: RequestOptions(path: path),
+    );
+  }
+
+  @override
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    lastPath = path;
+    lastData = data;
     return Response<T>(
       data: mockResponseData as T,
       statusCode: 200,
@@ -269,6 +289,59 @@ void main() {
       expect(mockClient.lastPath, '/projects/p1/findings');
       expect(findings.length, 1);
       expect(findings.first.severity, 'CRITICAL');
+    });
+
+    test('askQuestion defaults to warm thinking tier in payload', () async {
+      mockClient.mockResponseData = {
+        "conversation_id": "c1",
+        "message_id": "m1",
+        "role": "assistant",
+        "content": "Answer with warm tier",
+        "evidence": [],
+        "related_entities": [],
+        "confidence": "HIGH",
+        "created_at": "2026-09-12T12:00:00Z",
+      };
+
+      await repository.askQuestion('proj-123', 'Where is auth handled?');
+      expect(mockClient.lastPath, '/projects/proj-123/ask');
+      expect(mockClient.lastData, isA<Map<String, dynamic>>());
+      final data = mockClient.lastData as Map<String, dynamic>;
+      expect(data['question'], 'Where is auth handled?');
+      expect(data['thinking_tier'], 'warm');
+      expect(data.containsKey('conversation_id'), isFalse);
+    });
+
+    test('askQuestion forwards hot and cold thinking tiers and conversationId', () async {
+      mockClient.mockResponseData = {
+        "conversation_id": "c2",
+        "message_id": "m2",
+        "role": "assistant",
+        "content": "Deep answer",
+        "evidence": [],
+        "related_entities": [],
+        "confidence": "HIGH",
+        "created_at": "2026-09-12T12:00:00Z",
+      };
+
+      await repository.askQuestion(
+        'proj-123',
+        'Analyze architecture risks',
+        conversationId: 'c2',
+        thinkingTier: 'cold',
+      );
+      expect(mockClient.lastPath, '/projects/proj-123/ask');
+      final coldData = mockClient.lastData as Map<String, dynamic>;
+      expect(coldData['thinking_tier'], 'cold');
+      expect(coldData['conversation_id'], 'c2');
+
+      await repository.askQuestion(
+        'proj-123',
+        'Quick summary',
+        thinkingTier: 'hot',
+      );
+      final hotData = mockClient.lastData as Map<String, dynamic>;
+      expect(hotData['thinking_tier'], 'hot');
     });
   });
 }

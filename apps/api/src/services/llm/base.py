@@ -21,5 +21,6 @@ class LLMProvider(ABC):
         evidence_items: list[dict[str, Any]],
         related_entities: list[str],
         conversation_history: list[dict[str, str]] | None = None,
+        thinking_tier: str | None = None,
     ) -> GroundedAnswer:
         pass

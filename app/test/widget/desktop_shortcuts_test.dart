@@ -11,7 +11,7 @@ import 'package:app/features/workspace/presentation/workspace_screen.dart';
 
 class _ShortcutsFakeRepository extends Fake implements WorkspaceRepository {
   @override
-  Future<GroundedAnswer> askQuestion(String projectId, String question, {String? conversationId}) async {
+  Future<GroundedAnswer> askQuestion(String projectId, String question, {String? conversationId, String thinkingTier = 'warm'}) async {
     return GroundedAnswer(
       conversationId: 'c1',
       messageId: 'm1',

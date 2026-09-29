@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EvidenceItem(BaseModel):
@@ -21,6 +21,22 @@ class GroundedAskRequest(BaseModel):
     conversation_id: uuid.UUID | None = Field(
         default=None, description="Optional conversation ID to continue a thread"
     )
+    thinking_tier: str | None = Field(
+        default="warm",
+        description="Reasoning thinking tier: 'hot' (fast/light), 'warm' (balanced/default), 'cold' (deep/thorough)",
+    )
+
+    @field_validator("thinking_tier")
+    @classmethod
+    def validate_thinking_tier(cls, v: str | None) -> str:
+        if v is None:
+            return "warm"
+        v_clean = str(v).strip().lower()
+        if v_clean not in ("hot", "warm", "cold"):
+            raise ValueError(
+                f"Invalid thinking_tier: '{v}'. Supported values are: 'hot', 'warm', 'cold'."
+            )
+        return v_clean
 
 
 class GroundedAnswerResponse(BaseModel):

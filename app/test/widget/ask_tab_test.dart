@@ -11,6 +11,7 @@ class _FakeWorkspaceRepository extends Fake implements WorkspaceRepository {
     String projectId,
     String question, {
     String? conversationId,
+    String thinkingTier = 'warm',
   }) async {
     return GroundedAnswer(
       conversationId: 'c1',

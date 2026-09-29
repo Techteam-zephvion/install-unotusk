@@ -198,9 +198,11 @@ class WorkspaceRepository {
     String projectId,
     String question, {
     String? conversationId,
+    String thinkingTier = 'warm',
   }) async {
     final payload = <String, dynamic>{
       'question': question,
+      'thinking_tier': thinkingTier,
     };
     if (conversationId != null) payload['conversation_id'] = conversationId;
 

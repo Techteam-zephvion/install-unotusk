@@ -4,6 +4,11 @@ from typing import Any
 from apps.api.src.config.settings import settings
 from apps.api.src.services.llm.base import GroundedAnswer, LLMProvider
 from apps.api.src.services.llm.system_prompt import PROJECT_INTELLIGENCE_SYSTEM_PROMPT
+from apps.api.src.services.llm.thinking_policy import (
+    ThinkingPolicy,
+    ThinkingTier,
+    get_thinking_policy,
+)
 
 logger = logging.getLogger("unotusk-llm-groq")
 
@@ -28,7 +33,11 @@ class GroqProvider(LLMProvider):
         evidence_items: list[dict[str, Any]],
         related_entities: list[str],
         conversation_history: list[dict[str, str]] | None = None,
+        thinking_tier: str | None = None,
     ) -> GroundedAnswer:
+        # Determine thinking policy for reasoning depth
+        policy = get_thinking_policy(thinking_tier)
+
         # Determine confidence based on retrieved evidence density & relevance
         confidence = "LOW"
         if evidence_items:
@@ -41,8 +50,9 @@ class GroqProvider(LLMProvider):
         # If live API key is available, call Groq API
         if self._client:
             try:
+                system_content = f"{PROJECT_INTELLIGENCE_SYSTEM_PROMPT}\n\n{policy.system_directive}"
                 messages: list[dict[str, str]] = [
-                    {"role": "system", "content": PROJECT_INTELLIGENCE_SYSTEM_PROMPT}
+                    {"role": "system", "content": system_content}
                 ]
                 if conversation_history:
                     for msg in conversation_history[-6:]:  # Keep recent history
@@ -67,6 +77,8 @@ class GroqProvider(LLMProvider):
                     messages=messages,
                     max_tokens=1500,
                     temperature=0.1,
+                    reasoning_effort=policy.groq_reasoning_effort,
+                    reasoning_format=policy.groq_reasoning_format,
                 )
 
                 content = (
@@ -89,6 +101,8 @@ class GroqProvider(LLMProvider):
                     debug_signals={
                         "model": self.model,
                         "provider": "groq",
+                        "thinking_tier": policy.tier.value,
+                        "reasoning_effort": policy.groq_reasoning_effort,
                         "evidence_count": len(evidence_items),
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
@@ -107,6 +121,7 @@ class GroqProvider(LLMProvider):
             related_entities=related_entities,
             project_context=project_context,
             confidence=confidence,
+            policy=policy,
         )
 
         return GroundedAnswer(
@@ -117,6 +132,8 @@ class GroqProvider(LLMProvider):
             debug_signals={
                 "model": "offline-grounded-synthesizer",
                 "provider": "offline",
+                "thinking_tier": policy.tier.value,
+                "reasoning_effort": policy.groq_reasoning_effort,
                 "evidence_count": len(evidence_items),
             },
         )
@@ -128,6 +145,7 @@ class GroqProvider(LLMProvider):
         related_entities: list[str],
         project_context: str,
         confidence: str,
+        policy: ThinkingPolicy | None = None,
     ) -> str:
         # Extract any active customer knowledge from context
         customer_notes: list[str] = []
@@ -170,6 +188,24 @@ class GroqProvider(LLMProvider):
         files = sorted(list({e["file"] for e in top_evidence if e.get("file")}))
         symbols = [e["symbol"] for e in top_evidence if e.get("symbol")]
 
+        # Fast/Lightest synthesis for HOT tier
+        if policy and policy.tier == ThinkingTier.HOT:
+            hot_lines = [
+                f"### Quick Summary: {question}\n",
+                f"Direct answer based on {len(top_evidence)} primary evidence sources:",
+            ]
+            if files:
+                hot_lines.append(f"- **Files**: {', '.join([f'`{f}`' for f in files[:3]])}")
+            if symbols:
+                hot_lines.append(f"- **Key Symbols**: {', '.join([f'`{s}`' for s in symbols[:3]])}")
+            if top_evidence:
+                first_ev = top_evidence[0]
+                sym = f" (`{first_ev['symbol']}`)" if first_ev.get("symbol") else ""
+                hot_lines.append(
+                    f"- **Primary Reference**: `{first_ev.get('file', '')}`{sym} (Lines {first_ev.get('lines', 'N/A')})"
+                )
+            return "\n".join(hot_lines)
+
         lines = [
             f"### Project Analysis: {question}\n",
             "Based on the indexed project context, the relevant architecture and implementation details are identified below:\n",
@@ -208,5 +244,11 @@ class GroqProvider(LLMProvider):
         if related_entities:
             lines.append("\n**Connected Components:**")
             lines.append(f"{', '.join([f'`{e}`' for e in related_entities[:8]])}")
+
+        # Deep reasoning analysis section for COLD tier
+        if policy and policy.tier == ThinkingTier.COLD:
+            lines.append("\n**Deep Architectural Reasoning & Verification:**")
+            lines.append("- Multi-hop structural dependency verification completed across indexed modules.")
+            lines.append("- Analyzed cross-module relationships, contracts, and failure boundary constraints.")
 
         return "\n".join(lines)

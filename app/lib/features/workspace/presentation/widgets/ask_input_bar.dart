@@ -6,7 +6,10 @@ enum ThinkingTier { hot, warm, cold }
 
 class AskInputBar extends StatefulWidget {
   final TextEditingController controller;
-  final ValueChanged<String> onSubmitted;
+  final ValueChanged<String>? onSubmitted;
+  final void Function(String text, ThinkingTier tier)? onSubmittedWithTier;
+  final ValueChanged<ThinkingTier>? onTierChanged;
+  final ThinkingTier initialTier;
   final bool isGenerating;
   final String? placeholder;
   final ValueChanged<String>? onSuggestionSelect;
@@ -15,7 +18,10 @@ class AskInputBar extends StatefulWidget {
   const AskInputBar({
     super.key,
     required this.controller,
-    required this.onSubmitted,
+    this.onSubmitted,
+    this.onSubmittedWithTier,
+    this.onTierChanged,
+    this.initialTier = ThinkingTier.warm,
     this.isGenerating = false,
     this.placeholder,
     this.onSuggestionSelect,
@@ -29,11 +35,25 @@ class AskInputBar extends StatefulWidget {
 class _AskInputBarState extends State<AskInputBar> {
   bool _plusOpen = false;
   bool _thinkingOpen = false;
-  bool _thinkingEnabled = false;
-  ThinkingTier _thinkingTier = ThinkingTier.warm;
+  bool _thinkingEnabled = true;
+  late ThinkingTier _thinkingTier;
   String? _activeSearchMode; // 'research' | 'web' | null
   bool _piEnabled = false;
   bool _showSuggestions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _thinkingTier = widget.initialTier;
+  }
+
+  @override
+  void didUpdateWidget(AskInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTier != oldWidget.initialTier) {
+      _thinkingTier = widget.initialTier;
+    }
+  }
 
   Color get _thinkingColor {
     switch (_thinkingTier) {
@@ -54,6 +74,17 @@ class _AskInputBarState extends State<AskInputBar> {
         return 'Warm';
       case ThinkingTier.cold:
         return 'Cold';
+    }
+  }
+
+  void _submit(String text) {
+    if (widget.controller.text.trim().isEmpty || widget.isGenerating) return;
+    setState(() => _showSuggestions = false);
+    final effectiveTier = _thinkingEnabled ? _thinkingTier : ThinkingTier.warm;
+    if (widget.onSubmittedWithTier != null) {
+      widget.onSubmittedWithTier!(text, effectiveTier);
+    } else if (widget.onSubmitted != null) {
+      widget.onSubmitted!(text);
     }
   }
 
@@ -115,11 +146,30 @@ class _AskInputBarState extends State<AskInputBar> {
             ),
           ),
 
+        if (_plusOpen)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildPlusDropdown(),
+            ),
+          ),
+        if (_thinkingOpen)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 80, bottom: 8),
+              child: _buildThinkingDropdown(),
+            ),
+          ),
+        if (_showSuggestions)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildSuggestionsMenu(),
+          ),
+
         // Signature Enclosed Input Container
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
+        Container(
               decoration: BoxDecoration(
                 color: AppColors.bgElevated,
                 border: Border.all(color: AppColors.divider),
@@ -146,8 +196,7 @@ class _AskInputBarState extends State<AskInputBar> {
                       });
                     },
                     onSubmitted: (text) {
-                      setState(() => _showSuggestions = false);
-                      if (canSubmit) widget.onSubmitted(text);
+                      if (canSubmit) _submit(text);
                     },
                     style: AppTextStyles.inter(
                       fontSize: 15,
@@ -203,6 +252,7 @@ class _AskInputBarState extends State<AskInputBar> {
 
                             // Thinking Mode pill
                             InkWell(
+                              key: const Key('thinking_tier_button'),
                               onTap: () {
                                 setState(() {
                                   _thinkingOpen = !_thinkingOpen;
@@ -265,7 +315,8 @@ class _AskInputBarState extends State<AskInputBar> {
 
                             // Round Send Button
                             InkWell(
-                              onTap: canSubmit ? () => widget.onSubmitted(widget.controller.text) : null,
+                              key: const Key('ask_submit_button'),
+                              onTap: canSubmit ? () => _submit(widget.controller.text) : null,
                               borderRadius: BorderRadius.circular(16),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 150),
@@ -292,33 +343,6 @@ class _AskInputBarState extends State<AskInputBar> {
                 ],
               ),
             ),
-
-            // Plus Dropdown Popup Menu (anchored above)
-            if (_plusOpen)
-              Positioned(
-                bottom: 60,
-                left: 0,
-                child: _buildPlusDropdown(),
-              ),
-
-            // Thinking Dropdown Popup Menu (anchored above)
-            if (_thinkingOpen)
-              Positioned(
-                bottom: 60,
-                left: 80,
-                child: _buildThinkingDropdown(),
-              ),
-
-            // Auto-suggestions dropdown
-            if (_showSuggestions)
-              Positioned(
-                bottom: 60,
-                left: 0,
-                right: 0,
-                child: _buildSuggestionsMenu(),
-              ),
-          ],
-        ),
       ],
     );
   }
@@ -475,8 +499,12 @@ class _AskInputBarState extends State<AskInputBar> {
                   style: AppTextStyles.inter(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
                 Switch(
+                  key: const Key('thinking_toggle_switch'),
                   value: _thinkingEnabled,
-                  onChanged: (v) => setState(() => _thinkingEnabled = v),
+                  onChanged: (v) {
+                    setState(() => _thinkingEnabled = v);
+                    widget.onTierChanged?.call(v ? _thinkingTier : ThinkingTier.warm);
+                  },
                   activeThumbColor: AppColors.accent,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -497,12 +525,14 @@ class _AskInputBarState extends State<AskInputBar> {
     final bool isSelected = _thinkingTier == tier && _thinkingEnabled;
 
     return InkWell(
+      key: Key('thinking_tier_${tier.name}'),
       onTap: () {
         setState(() {
           _thinkingTier = tier;
           _thinkingEnabled = true;
           _thinkingOpen = false;
         });
+        widget.onTierChanged?.call(tier);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
