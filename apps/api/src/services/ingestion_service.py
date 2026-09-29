@@ -76,16 +76,15 @@ class IngestionService:
             logger.error("Database session factory is not available.")
             return
 
-        try:
-            async with AsyncSessionLocal() as session:
-                # 1. Fetch snapshot & repository
-                query = select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
-                result = await session.execute(query)
-                snapshot = result.scalar_one_or_none()
+        async with AsyncSessionLocal() as session:
+            # 1. Fetch snapshot & repository
+            query = select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
+            result = await session.execute(query)
+            snapshot = result.scalar_one_or_none()
 
-                if snapshot is None:
-                    logger.error(f"Ingestion snapshot {snapshot_id} not found.")
-                    return
+            if snapshot is None:
+                logger.error(f"Ingestion snapshot {snapshot_id} not found.")
+                return
 
             repo_query = select(Repository).where(Repository.id == snapshot.repository_id)
             repo_res = await session.execute(repo_query)
@@ -428,5 +427,3 @@ class IngestionService:
             finally:
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
-        except Exception as e:
-            logger.error(f"Ingestion failed for snapshot {snapshot_id}: {e}")

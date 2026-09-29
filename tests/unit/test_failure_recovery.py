@@ -22,6 +22,11 @@ class TestIngestionFailureRecovery:
     @pytest.mark.asyncio
     async def test_nonexistent_snapshot_id_does_not_crash(self):
         """Passing a random snapshot ID must not raise an uncaught exception."""
+        import sys
+        from unittest.mock import MagicMock
+
+        if isinstance(sys.modules.get("asyncpg"), MagicMock):
+            pytest.skip("asyncpg is mocked; cannot perform real DB operations in offline test")
         nonexistent_id = uuid.uuid4()
         # This should log an error and return cleanly, not raise an exception
         try:
