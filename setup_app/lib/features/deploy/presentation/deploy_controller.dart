@@ -58,7 +58,8 @@ class DeployController extends StateNotifier<DeployState> {
     final target = ref.read(targetControllerProvider).config;
     final config = ref.read(configControllerProvider).config;
     final serverRegistry = ServerRegistry();
-    final deployDir = '${Platform.environment['HOME'] ?? ''}/.unotusk/servers/${config.serverName}';
+    final homeDir = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final deployDir = '$homeDir/.unotusk/servers/${config.serverName}';
 
     state = state.copyWith(
       isRunning: true,

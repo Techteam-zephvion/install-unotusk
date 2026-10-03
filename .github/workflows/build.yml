@@ -299,6 +299,151 @@ jobs:
   # ──────────────────────────────────────────────
   # 3. macOS — DMG disk image
   # ──────────────────────────────────────────────
+  build-setup-windows:
+    name: "Setup App Windows x64 (.msi)"
+    runs-on: windows-latest
+    env:
+      APP_VERSION: ${{ github.event.inputs.version || '1.0.0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        working-directory: setup_app
+        run: flutter pub get
+
+      - name: Build Windows release
+        working-directory: setup_app
+        shell: pwsh
+        run: |
+          flutter build windows --release `
+            --build-name="$env:APP_VERSION" `
+            --build-number="${{ github.run_number }}"
+
+      - name: Locate WiX v3
+        id: wix
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
+                 Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dir) {
+            choco install wixtoolset -y --no-progress | Out-Null
+            $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
+                   Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          }
+          echo "WIX_BIN=$dir\bin" >> $env:GITHUB_OUTPUT
+          Write-Host "WiX found at: $dir\bin"
+
+      - name: Harvest files + build MSI
+        shell: pwsh
+        env:
+          WIX_BIN: ${{ steps.wix.outputs.WIX_BIN }}
+        run: |
+          # Resolve build output path (Flutter may put it in x64 or root runner dir)
+          $src = @(
+            "setup_app\build\windows\x64\runner\Release",
+            "setup_app\build\windows\runner\Release"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $src) { Write-Error 'Flutter Release dir not found'; exit 1 }
+          $src = (Resolve-Path $src).Path
+          Write-Host "Source dir: $src"
+
+          # Harvest all files from the Flutter release directory
+          & "$env:WIX_BIN\heat.exe" dir $src `
+            -gg -scom -sreg -srd `
+            -dr INSTALLFOLDER -cg AppComponents `
+            -var var.SourceDir -nologo `
+            -o Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          # Write License.rtf (required by WixUI_Minimal)
+          Set-Content License.rtf '{\rtf1\ansi Unotusk Server Setup - Internal Use Only.}' -Encoding ascii
+
+          # Write Product.wxs via a Python script file (avoids pwsh argument-passing issues)
+          $ver = "$env:APP_VERSION.0"
+          $wxsContent = @(
+            "<?xml version='1.0' encoding='UTF-8'?>"
+            "<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>"
+            "  <Product Id='*' Name='Unotusk Server Setup' Language='1033'"
+            "           Version='$ver' Manufacturer='Techteam Zephvion'"
+            "           UpgradeCode='9E4C5D6F-7A8B-9C0D-E1F2-3A4B5C6D7E8F'>"
+            "    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>"
+            "    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>"
+            "    <MediaTemplate EmbedCab='yes'/>"
+            "    <Feature Id='ProductFeature' Title='Unotusk Server Setup' Level='1'>"
+            "      <ComponentGroupRef Id='AppComponents'/>"
+            "      <ComponentRef Id='DesktopShortcutComp'/>"
+            "      <ComponentRef Id='StartMenuShortcutComp'/>"
+            "    </Feature>"
+            "    <UIRef Id='WixUI_Minimal'/>"
+            "    <WixVariable Id='WixUILicenseRtf' Value='License.rtf'/>"
+            "  </Product>"
+            "  <Fragment>"
+            "    <Directory Id='TARGETDIR' Name='SourceDir'>"
+            "      <Directory Id='ProgramFiles64Folder'>"
+            "        <Directory Id='INSTALLFOLDER' Name='Unotusk Server Setup'/>"
+            "      </Directory>"
+            "      <Directory Id='DesktopFolder'/>"
+            "      <Directory Id='ProgramMenuFolder'>"
+            "        <Directory Id='StartMenuAppFolder' Name='Unotusk Server Setup'/>"
+            "      </Directory>"
+            "    </Directory>"
+            "  </Fragment>"
+            "  <Fragment>"
+            "    <DirectoryRef Id='DesktopFolder'>"
+            "      <Component Id='DesktopShortcutComp' Guid='C3D4E5F6-A7B8-9012-CDEF-333333333333' Win64='yes'>"
+            "        <Shortcut Id='DesktopShortcut' Name='Unotusk Server Setup'"
+            "                  Target='[INSTALLFOLDER]setup_app.exe' WorkingDirectory='INSTALLFOLDER'/>"
+            "        <RegistryValue Root='HKMU' Key='Software\TechteamZephvion\UnotuskServer'"
+            "                       Name='DesktopShortcut' Type='integer' Value='1' KeyPath='yes'/>"
+            "      </Component>"
+            "    </DirectoryRef>"
+            "    <DirectoryRef Id='StartMenuAppFolder'>"
+            "      <Component Id='StartMenuShortcutComp' Guid='D4E5F6A7-B890-12CD-EF12-444444444444' Win64='yes'>"
+            "        <Shortcut Id='StartMenuShortcut' Name='Unotusk Server Setup'"
+            "                  Target='[INSTALLFOLDER]setup_app.exe' WorkingDirectory='INSTALLFOLDER'/>"
+            "        <RemoveFolder Id='RemoveStartMenuFolder' Directory='StartMenuAppFolder' On='uninstall'/>"
+            "        <RegistryValue Root='HKMU' Key='Software\TechteamZephvion\UnotuskServer'"
+            "                       Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>"
+            "      </Component>"
+            "    </DirectoryRef>"
+            "  </Fragment>"
+            "</Wix>"
+          ) -join "`n"
+          [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'Product.wxs'), $wxsContent)
+          Write-Host 'Product.wxs written'
+          Get-Content Product.wxs | Select-Object -First 5
+
+          # Compile
+          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          # Link — suppress ICE validation (-sval) for CI
+          & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension `
+            -sval `
+            Product.wixobj Components.wixobj -o unotusk-server-windows-x64.msi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          # Checksum
+          $hash = (Get-FileHash unotusk-server-windows-x64.msi -Algorithm SHA256).Hash
+          "$hash  unotusk-server-windows-x64.msi" | Out-File unotusk-server-windows-x64.msi.sha256 -Encoding ascii
+          Write-Host "Done. MSI: $([math]::Round((Get-Item unotusk-server-windows-x64.msi).Length/1MB,1)) MB"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-server-windows-x64
+          path: |
+            unotusk-server-windows-x64.msi
+            unotusk-server-windows-x64.msi.sha256
+          retention-days: 30
+
   build-macos:
     name: "macOS (.dmg)"
     runs-on: macos-latest
@@ -368,7 +513,7 @@ jobs:
   # ──────────────────────────────────────────────
   release:
     name: "GitHub Release"
-    needs: [build-linux, build-setup-linux, build-windows, build-macos]
+    needs: [build-linux, build-setup-linux, build-windows, build-setup-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -399,6 +544,7 @@ jobs:
             |---|---|---|
             | Linux x64 | `unotusk-employee-linux-x64.tar.gz` | Archive |
             | Setup App Linux x64 | `unotusk-server-linux-x64.tar.gz` | Archive |
+            | Setup App Windows x64 | `unotusk-server-windows-x64.msi` | MSI Installer |
             | Windows x64 | `unotusk-employee-windows-x64.msi` | MSI Installer |
             | macOS | `unotusk-employee-macos.dmg` | Disk Image |
 

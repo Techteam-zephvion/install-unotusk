@@ -10,12 +10,12 @@ class ServerRegistry {
       : _processExecutor = processExecutor ?? Process.run;
 
   String get _registryBaseDir {
-    final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
     return '$home/.unotusk/servers';
   }
 
   String get _legacyDir {
-    final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
     return '$home/.unotusk/server';
   }
 

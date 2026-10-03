@@ -197,7 +197,7 @@ class DeploymentEngine {
   }
 
   String _resolveDeploymentDir() {
-    final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
     return '$home/.unotusk/server';
   }
 
