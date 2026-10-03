@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download Unotusk — Client &amp; Server Distribution</title>
+    <title>Unotusk — Client &amp; Server Distribution</title>
     <link rel="icon" type="image/png" href="assets/favicon.png">
     
     <!-- Fonts -->
@@ -18,19 +18,18 @@
             theme: {
                 extend: {
                     colors: {
-                        bg: '#FFFFFF',
-                        surface: '#FAFAF9',
-                        surfaceRaised: '#FFFFFF',
-                        border: '#E5E4E0',
-                        borderHover: '#CBC9C2',
-                        borderStrong: '#A8A59D',
-                        ink: '#141413',
-                        inkMuted: '#5E5D59',
-                        inkSubtle: '#8C8A85',
-                        accent: '#C25E3E',
-                        accentHover: '#AC4E30',
-                        live: '#1E824C',
-                        codeBg: '#141413'
+                        paper: '#F8F7F4',
+                        surface: '#FFFFFF',
+                        surfaceTint: '#F2EFE9',
+                        ink: '#161615',
+                        inkSecondary: '#52504A',
+                        inkMuted: '#7E7B74',
+                        rule: '#DFDCD5',
+                        ruleDark: '#C2BFB6',
+                        accent: '#B84A2A',
+                        accentHover: '#9E3E22',
+                        live: '#2D6A4F',
+                        terminalBg: '#141413'
                     },
                     fontFamily: {
                         serif: ['"Young Serif"', 'Georgia', 'serif'],
@@ -43,25 +42,39 @@
     </script>
 
     <style>
+        html {
+            background-color: #F8F7F4;
+            color: #161615;
+        }
         body {
-            background-color: #FFFFFF;
-            color: #141413;
+            background-color: #F8F7F4;
+            color: #161615;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
         /* Subtle technical grid rule */
-        .bg-subtle-rule {
-            background-image: linear-gradient(to right, #F0EFEA 1px, transparent 1px),
-                              linear-gradient(to bottom, #F0EFEA 1px, transparent 1px);
-            background-size: 48px 48px;
+        .hairline-b {
+            border-bottom: 1px solid #DFDCD5;
+        }
+        .hairline-t {
+            border-top: 1px solid #DFDCD5;
+        }
+        .hairline-r {
+            border-right: 1px solid #DFDCD5;
+        }
+        .hairline-l {
+            border-left: 1px solid #DFDCD5;
+        }
+        .hairline-all {
+            border: 1px solid #DFDCD5;
         }
 
         /* Toast */
         #copy-toast {
             opacity: 0;
-            transform: translateY(8px);
-            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateY(6px);
+            transition: all 0.16s ease-out;
             pointer-events: none;
         }
         #copy-toast.show {
@@ -70,338 +83,518 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col bg-bg text-ink selection:bg-ink selection:text-white">
+<body class="min-h-screen flex flex-col bg-paper text-ink selection:bg-ink selection:text-white">
 
-    <!-- Fluid Top Navigation -->
-    <header class="w-full border-b border-border bg-bg/95 backdrop-blur-sm sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 h-16 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3 group">
-                <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-7 h-7 object-contain" />
-                <span class="font-serif text-2xl tracking-tight text-ink group-hover:text-accent transition-colors">Unotusk</span>
-            </a>
+    <!-- Masthead Header -->
+    <header class="w-full hairline-b bg-paper/95 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12 h-16 flex items-center justify-between">
+            <div class="flex items-baseline gap-4">
+                <a href="/" class="flex items-center gap-2.5">
+                    <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-6 h-6 object-contain" />
+                    <span class="font-serif text-xl tracking-tight text-ink">Unotusk</span>
+                </a>
+                <span class="hidden sm:inline-block font-mono text-[11px] text-inkMuted tracking-wider uppercase">
+                    Distribution &amp; Deployment
+                </span>
+            </div>
 
             <!-- Navigation Links -->
-            <nav class="flex items-center gap-8 text-sm">
-                <a href="#client" class="text-inkMuted hover:text-ink transition-colors font-medium">Desktop Client</a>
-                <a href="#server" class="text-inkMuted hover:text-ink transition-colors font-medium">Server Node</a>
-                <a href="#architecture" class="text-inkMuted hover:text-ink transition-colors font-medium">Architecture</a>
+            <nav class="flex items-center gap-6 sm:gap-8 font-mono text-xs">
+                <a href="#desktop-client" class="text-inkSecondary hover:text-ink transition-colors">Client</a>
+                <a href="#server-node" class="text-inkSecondary hover:text-ink transition-colors">Server Node</a>
+                <a href="#architecture" class="text-inkSecondary hover:text-ink transition-colors">Architecture</a>
+                <a href="#procedure" class="text-inkSecondary hover:text-ink transition-colors">Quick Start</a>
                 <a href="https://docs.unotusk.com" target="_blank" rel="noopener noreferrer" 
-                   class="inline-flex items-center gap-1 text-inkMuted hover:text-ink transition-colors font-medium">
-                    <span>Documentation</span>
-                    <span class="text-xs">&nearr;</span>
+                   class="text-accent hover:text-accentHover transition-colors font-medium">
+                    Docs &nearr;
                 </a>
             </nav>
         </div>
     </header>
 
-    <!-- Main Container: Expansive, Quiet, High-Craft Layout -->
-    <main class="flex-grow max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-14 py-12 lg:py-16">
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-[1240px] mx-auto w-full px-6 sm:px-10 lg:px-12 py-12 lg:py-16">
         
-        <!-- Hero Section: Clean, Authoritative Editorial -->
-        <div class="max-w-4xl mb-16 lg:mb-20">
-            <h1 class="font-serif text-4xl sm:text-5xl lg:text-[3.5rem] text-ink tracking-tight leading-[1.12] mb-6">
-                Grounded Codebase Intelligence for Your Team.
-            </h1>
-
-            <p class="text-lg sm:text-xl text-inkMuted leading-relaxed max-w-3xl mb-8">
-                Unotusk indexes AST relationships, architecture constraints, and git commit history on your private local network. Use the native <strong class="text-ink font-semibold">Desktop Client</strong> on macOS, Windows, or Linux to interrogate codebases with verified citations, or deploy the self-hosted <strong class="text-ink font-semibold">Server Node</strong> on your LAN with zero cloud egress.
-            </p>
-
-            <div class="flex flex-wrap items-center gap-4 text-sm font-mono text-inkMuted">
-                <span class="inline-flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-live"></span>
-                    <span>Single-Tenant Local LAN</span>
-                </span>
-                <span class="text-border">&bull;</span>
-                <span>Zero Cloud Egress</span>
-                <span class="text-border">&bull;</span>
-                <span>PostgreSQL 16 + pgvector</span>
-            </div>
-        </div>
-
-        <!-- Section 1: Desktop Client Distribution -->
-        <section id="client" class="mb-16 scroll-mt-24 border-t border-border pt-12">
-            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-8">
-                <div>
-                    <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight">Desktop Client</h2>
-                    <p class="text-sm text-inkMuted mt-1">Native client for software engineers, tech leads, and software architects.</p>
-                </div>
-                <div class="text-xs font-mono text-inkSubtle shrink-0">
-                    Connects to your local LAN server
-                </div>
-            </div>
-
-            <!-- 3 OS Columns Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- SECTION 1: HERO (Asymmetric Editorial Statement) -->
+        <section class="mb-16 lg:mb-20">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
                 
-                <!-- macOS Card -->
-                <div class="bg-surfaceRaised border border-border hover:border-borderHover rounded-xl p-6 transition-all flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-ink">macOS</h3>
-                            <svg class="w-5 h-5 text-inkMuted" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.82 1.11-1.96.99-3.1-.96.04-2.11.64-2.79 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.15-.55 2.78-1.29z"/></svg>
-                        </div>
-                        <p class="text-xs text-inkMuted mb-6 leading-relaxed">
-                            Universal binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel 64-bit processors.
-                        </p>
-                    </div>
+                <!-- Main Statement (8 cols) -->
+                <div class="lg:col-span-8">
+                    <h1 class="font-serif text-3xl sm:text-4xl lg:text-[2.75rem] text-ink tracking-tight leading-[1.18] mb-6">
+                        Grounded Codebase Intelligence for Your Team.
+                    </h1>
 
-                    <div>
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-macos.dmg" 
-                           class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-ink hover:bg-black text-white text-sm font-medium rounded-lg transition-colors">
-                            <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            <span>Download for macOS (.dmg)</span>
-                        </a>
-                        <div class="text-[11px] font-mono text-inkSubtle mt-2.5 text-center">
-                            macOS 12.0 or higher
-                        </div>
+                    <p class="text-base sm:text-[17px] text-inkSecondary leading-relaxed max-w-2xl mb-8">
+                        Unotusk builds a queryable, evidence-grounded model of your private codebase by analyzing AST structure, git history, architecture constraints, and persistent engineering context. Everything executes within your own infrastructure with zero cloud egress.
+                    </p>
+
+                    <!-- Plain Technical Status Line (No pills, no marketing badges) -->
+                    <div class="font-mono text-xs text-inkMuted tracking-wider flex flex-wrap items-center gap-y-2">
+                        <span class="text-ink font-medium">LOCAL LAN</span>
+                        <span class="mx-2.5 text-ruleDark">/</span>
+                        <span>SELF-HOSTED</span>
+                        <span class="mx-2.5 text-ruleDark">/</span>
+                        <span>POSTGRESQL 16 + PGVECTOR</span>
+                        <span class="mx-2.5 text-ruleDark">/</span>
+                        <span class="text-live font-medium">ZERO CLOUD EGRESS</span>
                     </div>
                 </div>
 
-                <!-- Windows Card -->
-                <div class="bg-surfaceRaised border border-border hover:border-borderHover rounded-xl p-6 transition-all flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-ink">Windows</h3>
-                            <svg class="w-5 h-5 text-inkMuted" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.051-1.899"/></svg>
-                        </div>
-                        <p class="text-xs text-inkMuted mb-6 leading-relaxed">
-                            Standard Windows installer with automatic desktop shortcut and local LAN network permissions.
-                        </p>
+                <!-- Right Technical Aside / Manifest Panel (4 cols) -->
+                <div class="lg:col-span-4 hairline-all p-5 bg-surface rounded-[2px]">
+                    <div class="font-mono text-[11px] text-inkMuted uppercase tracking-wider mb-3 pb-2 hairline-b flex items-center justify-between">
+                        <span>Distribution Spec</span>
+                        <span class="text-ink">v0.1.0-mvp</span>
                     </div>
 
-                    <div>
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-windows-x64.msi" 
-                           class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-ink hover:bg-black text-white text-sm font-medium rounded-lg transition-colors">
-                            <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            <span>Download for Windows (.msi)</span>
-                        </a>
-                        <div class="text-[11px] font-mono text-inkSubtle mt-2.5 text-center">
-                            Windows 10 / 11 64-bit
+                    <div class="font-mono text-xs space-y-2 text-inkSecondary">
+                        <div class="flex justify-between">
+                            <span class="text-inkMuted">Topology:</span>
+                            <span class="text-ink">Single-tenant local</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-inkMuted">Transport:</span>
+                            <span class="text-ink">HTTP REST (:8000)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-inkMuted">Index Engine:</span>
+                            <span class="text-ink">Tree-sitter AST Graph</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-inkMuted">Data Egress:</span>
+                            <span class="text-live">0 bytes (Air-Gapped)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-inkMuted">Status:</span>
+                            <span class="text-ink">Production MVP</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Linux Card -->
-                <div class="bg-surfaceRaised border border-border hover:border-borderHover rounded-xl p-6 transition-all flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-ink">Linux</h3>
-                            <svg class="w-5 h-5 text-inkMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        </div>
-                        <p class="text-xs text-inkMuted mb-6 leading-relaxed">
-                            Standalone x86_64 archive packaged for Ubuntu, Debian, Fedora, and Arch distributions.
-                        </p>
-                    </div>
-
-                    <div>
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-linux-x64.tar.gz" 
-                           class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-ink hover:bg-black text-white text-sm font-medium rounded-lg transition-colors">
-                            <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            <span>Download for Linux (.tar.gz)</span>
-                        </a>
-                        <div class="text-[11px] font-mono text-inkSubtle mt-2.5 text-center">
-                            glibc 2.31+ x86_64
-                        </div>
+                    <div class="mt-4 pt-3 hairline-t text-[11px] font-mono text-inkMuted leading-normal">
+                        Designed for private enterprise codebases requiring strict on-premise data isolation.
                     </div>
                 </div>
 
-            </div>
-
-            <!-- Client connection note -->
-            <div class="mt-6 p-4 rounded-lg bg-surface border border-border flex items-center justify-between text-xs font-mono text-inkMuted">
-                <div class="flex items-center gap-2">
-                    <span class="text-accent">&bull;</span>
-                    <span>Client Setup: Launch the app and enter your LAN host endpoint (e.g. <span class="text-ink font-semibold">http://10.0.0.59:8000</span>).</span>
-                </div>
-                <a href="#architecture" class="text-accent hover:underline hidden sm:inline-block">View LAN Topology &rarr;</a>
             </div>
         </section>
 
-        <!-- Section 2: Server Node & Infrastructure -->
-        <section id="server" class="mb-16 scroll-mt-24 border-t border-border pt-12">
-            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-8">
+        <!-- SECTION 2: PRODUCT ACCESS (Platform Matrix) -->
+        <section id="desktop-client" class="mb-16 lg:mb-20 scroll-mt-20">
+            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-3 mb-6 hairline-b">
                 <div>
-                    <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight">Server Node</h2>
-                    <p class="text-sm text-inkMuted mt-1">Host backend engine, PostgreSQL 16 + pgvector, and Redis task worker.</p>
+                    <h2 class="font-serif text-2xl text-ink">Desktop Client Distribution</h2>
+                    <p class="text-xs text-inkSecondary mt-1">Native client for software engineers, tech leads, and software architects.</p>
                 </div>
-                <div class="text-xs font-mono text-inkSubtle shrink-0">
-                    Dedicated LAN host machine
+                <div class="font-mono text-xs text-inkMuted">
+                    Connects directly to your local server node at launch
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                
-                <!-- Server Setup Wizard Downloads (6 cols) -->
-                <div class="lg:col-span-6 bg-surfaceRaised border border-border rounded-xl p-6 sm:p-8">
-                    <h3 class="text-base font-semibold text-ink mb-1">Server Setup Wizard (GUI)</h3>
-                    <p class="text-xs text-inkMuted leading-relaxed mb-6">
-                        An automated desktop wizard that configures Docker containers, performs pre-flight port checks, and starts the stack automatically.
-                    </p>
+            <!-- Editorial Matrix Layout (Not floating cards) -->
+            <div class="hairline-all bg-surface rounded-[2px] overflow-hidden">
+                <!-- Matrix Table Header -->
+                <div class="hidden md:grid grid-cols-12 px-6 py-3 bg-surfaceTint hairline-b font-mono text-[11px] text-inkMuted uppercase tracking-wider">
+                    <div class="col-span-2">Platform</div>
+                    <div class="col-span-3">Architecture</div>
+                    <div class="col-span-2">Format</div>
+                    <div class="col-span-2">Requirement</div>
+                    <div class="col-span-3 text-right">Download Action</div>
+                </div>
 
-                    <div class="space-y-3 mb-6">
-                        <!-- Windows Server MSI -->
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-windows-x64.msi" 
-                           class="flex items-center justify-between p-4 rounded-lg border border-border hover:border-borderStrong bg-surface hover:bg-bg transition-all group">
-                            <div>
-                                <div class="text-sm font-semibold text-ink group-hover:text-accent transition-colors">Windows Server Setup Wizard</div>
-                                <div class="text-xs text-inkMuted font-mono mt-0.5">Windows 10 / 11 / Server &bull; .msi</div>
-                            </div>
-                            <span class="text-xs font-mono text-accent font-medium group-hover:translate-x-0.5 transition-transform">Download &rarr;</span>
-                        </a>
-
-                        <!-- Linux Server Tarball -->
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-linux-x64.tar.gz" 
-                           class="flex items-center justify-between p-4 rounded-lg border border-border hover:border-borderStrong bg-surface hover:bg-bg transition-all group">
-                            <div>
-                                <div class="text-sm font-semibold text-ink group-hover:text-accent transition-colors">Linux Server Setup Wizard</div>
-                                <div class="text-xs text-inkMuted font-mono mt-0.5">Ubuntu / Debian / CentOS &bull; .tar.gz</div>
-                            </div>
-                            <span class="text-xs font-mono text-accent font-medium group-hover:translate-x-0.5 transition-transform">Download &rarr;</span>
-                        </a>
+                <!-- Row 1: macOS -->
+                <div class="grid grid-cols-1 md:grid-cols-12 px-6 py-4 hairline-b items-center gap-3 md:gap-0 hover:bg-paper/40 transition-colors">
+                    <div class="col-span-2 flex items-center gap-3">
+                        <svg class="w-4 h-4 text-ink shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.82 1.11-1.96.99-3.1-.96.04-2.11.64-2.79 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.15-.55 2.78-1.29z"/></svg>
+                        <div>
+                            <span class="font-medium text-sm text-ink block">macOS</span>
+                            <span class="text-xs text-inkMuted md:hidden">Universal (Apple Silicon + Intel)</span>
+                        </div>
                     </div>
-
-                    <div class="text-[11px] font-mono text-inkSubtle border-t border-border pt-4 flex items-center justify-between">
-                        <span>Requires Docker Engine or Docker Desktop</span>
-                        <span>API default: Port 8000</span>
+                    <div class="col-span-3 text-xs text-inkSecondary font-mono hidden md:block">
+                        Apple Silicon &amp; Intel 64-bit
+                    </div>
+                    <div class="col-span-2 text-xs text-inkSecondary font-mono hidden md:block">
+                        .dmg installer
+                    </div>
+                    <div class="col-span-2 text-xs text-inkMuted font-mono hidden md:block">
+                        macOS 12.0+
+                    </div>
+                    <div class="col-span-3 md:text-right">
+                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-macos.dmg" 
+                           class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-ink hover:bg-black text-white text-xs font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto">
+                            <span>Download .dmg</span>
+                            <span class="text-[10px] text-white/70">&darr;</span>
+                        </a>
                     </div>
                 </div>
 
-                <!-- Server Health Verification Console (6 cols) -->
-                <div class="lg:col-span-6 bg-codeBg rounded-xl p-6 text-gray-200 font-mono text-xs border border-gray-800">
-                    <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-800">
-                        <div class="text-gray-400 font-medium">Verify Server Endpoint</div>
+                <!-- Row 2: Windows -->
+                <div class="grid grid-cols-1 md:grid-cols-12 px-6 py-4 hairline-b items-center gap-3 md:gap-0 hover:bg-paper/40 transition-colors">
+                    <div class="col-span-2 flex items-center gap-3">
+                        <svg class="w-4 h-4 text-ink shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.051-1.899"/></svg>
+                        <div>
+                            <span class="font-medium text-sm text-ink block">Windows</span>
+                            <span class="text-xs text-inkMuted md:hidden">x86_64 installer</span>
+                        </div>
+                    </div>
+                    <div class="col-span-3 text-xs text-inkSecondary font-mono hidden md:block">
+                        x86_64 (64-bit)
+                    </div>
+                    <div class="col-span-2 text-xs text-inkSecondary font-mono hidden md:block">
+                        .msi package
+                    </div>
+                    <div class="col-span-2 text-xs text-inkMuted font-mono hidden md:block">
+                        Windows 10 / 11
+                    </div>
+                    <div class="col-span-3 md:text-right">
+                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-windows-x64.msi" 
+                           class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-ink hover:bg-black text-white text-xs font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto">
+                            <span>Download .msi</span>
+                            <span class="text-[10px] text-white/70">&darr;</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Row 3: Linux -->
+                <div class="grid grid-cols-1 md:grid-cols-12 px-6 py-4 items-center gap-3 md:gap-0 hover:bg-paper/40 transition-colors">
+                    <div class="col-span-2 flex items-center gap-3">
+                        <svg class="w-4 h-4 text-ink shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <div>
+                            <span class="font-medium text-sm text-ink block">Linux</span>
+                            <span class="text-xs text-inkMuted md:hidden">Standalone x86_64 archive</span>
+                        </div>
+                    </div>
+                    <div class="col-span-3 text-xs text-inkSecondary font-mono hidden md:block">
+                        x86_64 (glibc 2.31+)
+                    </div>
+                    <div class="col-span-2 text-xs text-inkSecondary font-mono hidden md:block">
+                        .tar.gz archive
+                    </div>
+                    <div class="col-span-2 text-xs text-inkMuted font-mono hidden md:block">
+                        Ubuntu / Debian / Fedora
+                    </div>
+                    <div class="col-span-3 md:text-right">
+                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-linux-x64.tar.gz" 
+                           class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-ink hover:bg-black text-white text-xs font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto">
+                            <span>Download .tar.gz</span>
+                            <span class="text-[10px] text-white/70">&darr;</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3 text-xs text-inkMuted font-mono flex items-center justify-between">
+                <span>All client distributions connect over HTTP REST to your designated server IP on port 8000.</span>
+                <span class="hidden sm:inline-block">SHA-256 signatures available in release manifests</span>
+            </div>
+        </section>
+
+        <!-- SECTION 3: SERVER NODE (Actual Infrastructure Documentation) -->
+        <section id="server-node" class="mb-16 lg:mb-20 scroll-mt-20">
+            <div class="pb-3 mb-6 hairline-b">
+                <span class="font-mono text-[11px] text-accent tracking-wider uppercase block mb-1">Infrastructure Component</span>
+                <h2 class="font-serif text-2xl text-ink">Server Node Deployment</h2>
+                <p class="text-xs text-inkSecondary mt-1">
+                    The centralized host service managing PostgreSQL 16 + pgvector, Redis task queues, and AST parsing workers.
+                </p>
+            </div>
+
+            <!-- Asymmetric Documentation Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <!-- Left: Infrastructure Spec & Packages (7 cols) -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="hairline-all bg-surface p-6 rounded-[2px]">
+                        <h3 class="font-serif text-lg text-ink mb-2">Automated Server Setup Wizard</h3>
+                        <p class="text-xs text-inkSecondary leading-relaxed mb-6">
+                            Deploy on a dedicated server or developer workstation. The wizard automatically initializes Docker containers, provisions PostgreSQL 16 with pgvector extensions, starts Redis workers, and exposes the local API endpoint.
+                        </p>
+
+                        <!-- Server Packages -->
+                        <div class="space-y-3 mb-6">
+                            <div class="flex items-center justify-between p-3.5 hairline-all bg-paper rounded-[2px]">
+                                <div>
+                                    <div class="text-xs font-semibold text-ink">Windows Server Setup Wizard</div>
+                                    <div class="text-[11px] text-inkMuted font-mono mt-0.5">Windows Server 2019/2022, Windows 10/11 x64 (.msi)</div>
+                                </div>
+                                <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-windows-x64.msi" 
+                                   class="text-xs font-mono font-medium text-ink hover:text-accent transition-colors flex items-center gap-1">
+                                    <span>Download .msi</span>
+                                    <span>&rarr;</span>
+                                </a>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3.5 hairline-all bg-paper rounded-[2px]">
+                                <div>
+                                    <div class="text-xs font-semibold text-ink">Linux Host Setup Package</div>
+                                    <div class="text-[11px] text-inkMuted font-mono mt-0.5">Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+ (.tar.gz)</div>
+                                </div>
+                                <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-linux-x64.tar.gz" 
+                                   class="text-xs font-mono font-medium text-ink hover:text-accent transition-colors flex items-center gap-1">
+                                    <span>Download .tar.gz</span>
+                                    <span>&rarr;</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Technical Environment Requirements Table -->
+                        <div class="font-mono text-xs hairline-t pt-4">
+                            <div class="text-[11px] text-inkMuted uppercase tracking-wider mb-2">Host Requirements</div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                                <div>
+                                    <span class="text-inkMuted block">Runtime:</span>
+                                    <span class="text-ink font-medium">Docker Engine 24+</span>
+                                </div>
+                                <div>
+                                    <span class="text-inkMuted block">Default Port:</span>
+                                    <span class="text-ink font-medium">:8000 (HTTP REST)</span>
+                                </div>
+                                <div>
+                                    <span class="text-inkMuted block">Database:</span>
+                                    <span class="text-ink font-medium">PostgreSQL 16 :5432</span>
+                                </div>
+                                <div>
+                                    <span class="text-inkMuted block">Task Broker:</span>
+                                    <span class="text-ink font-medium">Redis 7 :6379</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Proper Terminal Panel (5 cols) -->
+                <div class="lg:col-span-5 hairline-all bg-terminalBg text-gray-200 rounded-[2px] p-5 font-mono text-xs">
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-800">
+                        <span class="text-gray-400 text-[11px] tracking-wider uppercase font-medium">Verification Endpoint</span>
                         <button onclick="copyCode('curl -s http://localhost:8000/api/v1/health')" 
-                                class="text-xs text-gray-400 hover:text-white transition flex items-center gap-1">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                            <span>Copy Command</span>
+                                class="text-[11px] text-gray-400 hover:text-white transition flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span>Copy curl</span>
                         </button>
                     </div>
 
-                    <p class="text-gray-400 text-xs mb-3 font-sans">
-                        Run this command from any machine on your network to verify node health:
-                    </p>
+                    <div class="text-gray-400 text-[11px] mb-2 font-sans">
+                        Verify local node status from any host on your internal LAN:
+                    </div>
 
-                    <div class="bg-black/60 p-3 rounded-lg border border-gray-800 text-emerald-400 mb-4 select-all">
+                    <div class="bg-black/50 p-2.5 rounded-[2px] border border-gray-800 text-emerald-400 select-all mb-4 text-[11px] overflow-x-auto">
                         $ curl -s http://&lt;SERVER_IP&gt;:8000/api/v1/health
                     </div>
 
-                    <div class="text-gray-400 text-[11px] space-y-1">
-                        <div class="text-gray-500 font-medium">Expected Response:</div>
-                        <pre class="text-gray-300 bg-black/40 p-3 rounded border border-gray-800/80 leading-relaxed overflow-x-auto">{
+                    <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Standard Node Response:</div>
+                    <pre class="bg-black/30 p-3 rounded-[2px] border border-gray-800/80 text-gray-300 text-[11px] leading-relaxed overflow-x-auto">{
   "status": "healthy",
+  "service": "unotusk-server-node",
   "database": "postgresql+pgvector",
   "redis": "connected",
   "egress": "air-gapped-local",
   "version": "v0.1.0-mvp"
 }</pre>
+
+                    <div class="mt-3 pt-3 border-t border-gray-800 text-[10px] text-gray-500 flex justify-between">
+                        <span>TCP Listen: 0.0.0.0:8000</span>
+                        <span class="text-emerald-400">Zero Cloud Egress Confirmed</span>
                     </div>
                 </div>
 
             </div>
         </section>
 
-        <!-- Section 3: Architecture & Security -->
-        <section id="architecture" class="mb-16 scroll-mt-24 border-t border-border pt-12">
-            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-8">
-                <div>
-                    <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight">Deployment Topology</h2>
-                    <p class="text-sm text-inkMuted mt-1">Single-tenant local network communication. No cloud dependencies.</p>
-                </div>
-                <div class="text-xs font-mono text-live flex items-center gap-1.5 shrink-0">
-                    <span class="w-2 h-2 rounded-full bg-live"></span>
-                    <span>100% On-Premise Air-Gapped</span>
-                </div>
+        <!-- SECTION 4: DEPLOYMENT ARCHITECTURE (The Visual Centerpiece) -->
+        <section id="architecture" class="mb-16 lg:mb-20 scroll-mt-20">
+            <div class="pb-3 mb-6 hairline-b">
+                <span class="font-mono text-[11px] text-accent tracking-wider uppercase block mb-1">Systems Architecture</span>
+                <h2 class="font-serif text-2xl text-ink">Deployment Topology</h2>
+                <p class="text-xs text-inkSecondary mt-1">
+                    Logical data flow and network isolation boundaries. Zero communication with external cloud APIs.
+                </p>
             </div>
 
-            <!-- Architectural Topology Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+            <!-- Engineering Architecture Blueprint -->
+            <div class="hairline-all bg-surface p-6 sm:p-10 rounded-[2px]">
                 
-                <!-- Host Machine (5 cols) -->
-                <div class="md:col-span-5 bg-surface border border-border rounded-xl p-6">
-                    <div class="text-xs font-mono text-accent font-semibold mb-1">HOST INFRASTRUCTURE</div>
-                    <h3 class="text-base font-semibold text-ink mb-2">Dedicated Server Node</h3>
-                    <p class="text-xs text-inkMuted leading-relaxed mb-4">
-                        Configured via the Server Setup Wizard. Runs directly within your internal infrastructure:
-                    </p>
-                    <ul class="text-xs font-mono text-inkMuted space-y-2 border-t border-border pt-3">
-                        <li class="flex items-center gap-2">
-                            <span class="text-accent">&bull;</span>
-                            <span>PostgreSQL 16 + pgvector (Port 5432)</span>
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <span class="text-accent">&bull;</span>
-                            <span>Redis Task Queue (Port 6379)</span>
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <span class="text-accent">&bull;</span>
-                            <span>FastAPI Intelligence Engine (Port 8000)</span>
-                        </li>
-                    </ul>
-                </div>
+                <div class="max-w-2xl mx-auto space-y-3 font-mono text-xs">
+                    
+                    <!-- Node 1: Developer Machines -->
+                    <div class="hairline-all bg-surfaceTint p-3.5 rounded-[2px] flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-inkMuted uppercase tracking-wider block">01 / Source</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Developer Machines</span>
+                        </div>
+                        <span class="text-[11px] text-inkMuted">macOS, Windows, Linux</span>
+                    </div>
 
-                <!-- Network Pipeline (2 cols) -->
-                <div class="md:col-span-2 flex flex-col items-center justify-center text-center p-4 border border-dashed border-border rounded-xl bg-surfaceRaised">
-                    <span class="text-xs font-mono text-ink font-semibold">Local LAN</span>
-                    <span class="text-[11px] font-mono text-inkSubtle mt-1">HTTP REST</span>
-                    <div class="w-full my-2 border-t border-dashed border-borderStrong"></div>
-                    <span class="text-[10px] font-mono text-live bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">Zero Cloud Egress</span>
-                </div>
+                    <!-- Flow 1 -->
+                    <div class="flex items-center justify-center text-inkMuted text-xs py-0.5">
+                        <span>&darr;</span>
+                    </div>
 
-                <!-- Client Machines (5 cols) -->
-                <div class="md:col-span-5 bg-surface border border-border rounded-xl p-6">
-                    <div class="text-xs font-mono text-accent font-semibold mb-1">DEVELOPER WORKSTATIONS</div>
-                    <h3 class="text-base font-semibold text-ink mb-2">Desktop Client Apps</h3>
-                    <p class="text-xs text-inkMuted leading-relaxed mb-4">
-                        Engineers run the native client locally on macOS, Windows, or Linux to execute grounded questions:
-                    </p>
-                    <ul class="text-xs font-mono text-inkMuted space-y-2 border-t border-border pt-3">
-                        <li class="flex items-center gap-2">
-                            <span class="text-accent">&bull;</span>
-                            <span>Direct connection to host IP on port 8000</span>
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <span class="text-accent">&bull;</span>
-                            <span>Multi-signal grounded ask with AST graph traversal</span>
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <span class="text-accent">&bull;</span>
-                            <span>Proactive discovery engine &amp; architecture reports</span>
-                        </li>
-                    </ul>
+                    <!-- Node 2: Desktop Client -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] text-accent uppercase tracking-wider font-semibold">02 / Client Interface</span>
+                            <span class="text-[11px] text-inkMuted">Local Client</span>
+                        </div>
+                        <div class="font-sans font-semibold text-sm text-ink mb-1">Desktop Client</div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed">
+                            Formulates AST queries, traverses 1-hop code graphs, and renders verified citations.
+                        </p>
+                    </div>
+
+                    <!-- Flow 2: LAN Protocol Bridge -->
+                    <div class="flex flex-col items-center justify-center text-center py-1">
+                        <span class="text-inkMuted text-xs">&darr;</span>
+                        <div class="my-1 px-3 py-1 hairline-all bg-paper rounded-[2px] text-[11px] text-ink font-mono flex items-center gap-2">
+                            <span class="text-accent">&rarr;</span>
+                            <span>HTTP REST :8000</span>
+                            <span class="text-inkMuted">&bull;</span>
+                            <span>LAN only</span>
+                        </div>
+                        <span class="text-inkMuted text-xs">&darr;</span>
+                    </div>
+
+                    <!-- Node 3: Local LAN Boundary -->
+                    <div class="border border-dashed border-ruleDark p-3 rounded-[2px] text-center font-mono text-[11px] text-inkMuted bg-paper/60 uppercase tracking-wider">
+                        [ LOCAL AREA NETWORK (LAN) &bull; AIR-GAPPED &bull; ZERO CLOUD EGRESS ]
+                    </div>
+
+                    <!-- Flow 3: Server Ingress -->
+                    <div class="flex items-center justify-center text-inkMuted text-xs py-0.5">
+                        <span>&darr;</span>
+                    </div>
+
+                    <!-- Node 4: Unotusk Server Node -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] text-accent uppercase tracking-wider font-semibold">03 / Central Node</span>
+                            <span class="text-live text-[11px] font-medium">FastAPI :8000</span>
+                        </div>
+                        <div class="font-sans font-semibold text-sm text-ink mb-1">Unotusk Server Node</div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed">
+                            Python 3.12 FastAPI core engine. Coordinates background repository workers and query grounding.
+                        </p>
+                    </div>
+
+                    <!-- Flow 4: Database Bridge -->
+                    <div class="flex flex-col items-center justify-center text-center py-1">
+                        <span class="text-inkMuted text-xs">&darr;</span>
+                        <div class="my-1 px-3 py-1 hairline-all bg-paper rounded-[2px] text-[11px] text-ink font-mono flex items-center gap-2">
+                            <span class="text-accent">&rarr;</span>
+                            <span>TCP :5432 Internal</span>
+                        </div>
+                        <span class="text-inkMuted text-xs">&darr;</span>
+                    </div>
+
+                    <!-- Node 5: PostgreSQL + pgvector -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] text-inkMuted uppercase tracking-wider font-semibold">04 / Persistence Layer</span>
+                            <span class="text-[11px] text-inkMuted">Port 5432</span>
+                        </div>
+                        <div class="font-sans font-semibold text-sm text-ink mb-1">PostgreSQL 16 + pgvector</div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed">
+                            Stores Tree-sitter AST symbol tables, code chunk embeddings, architectural constraints, and discovery findings.
+                        </p>
+                    </div>
+
+                    <!-- Flow 5: Redis Task Broker Bridge -->
+                    <div class="flex flex-col items-center justify-center text-center py-1">
+                        <span class="text-inkMuted text-xs">&darr;</span>
+                        <div class="my-1 px-3 py-1 hairline-all bg-paper rounded-[2px] text-[11px] text-ink font-mono flex items-center gap-2">
+                            <span class="text-accent">&rarr;</span>
+                            <span>TCP :6379 Internal</span>
+                        </div>
+                        <span class="text-inkMuted text-xs">&darr;</span>
+                    </div>
+
+                    <!-- Node 6: Redis Task Queue -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] text-inkMuted uppercase tracking-wider font-semibold">05 / Task Broker</span>
+                            <span class="text-[11px] text-inkMuted">Port 6379</span>
+                        </div>
+                        <div class="font-sans font-semibold text-sm text-ink mb-1">Redis 7 Task Broker</div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed">
+                            Coordinates asynchronous ingestion pipelines, AST parsing worker threads, and report builds.
+                        </p>
+                    </div>
+
                 </div>
 
             </div>
         </section>
 
-        <!-- Section 4: Quick Start Steps -->
-        <section class="border-t border-border pt-12">
-            <h2 class="font-serif text-2xl text-ink tracking-tight mb-6">Quick Start Guide</h2>
+        <!-- SECTION 5: QUICK START (Vertical Technical Procedure) -->
+        <section id="procedure" class="mb-16 lg:mb-20 scroll-mt-20">
+            <div class="pb-3 mb-8 hairline-b">
+                <span class="font-mono text-[11px] text-accent tracking-wider uppercase block mb-1">Execution Order</span>
+                <h2 class="font-serif text-2xl text-ink">Installation Procedure</h2>
+                <p class="text-xs text-inkSecondary mt-1">Four-step operational sequence from bare host to active team querying.</p>
+            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+            <!-- Vertical Procedure List (Not 3 rounded cards) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 
-                <div class="bg-surfaceRaised border border-border rounded-xl p-6">
-                    <span class="font-mono text-xs text-accent font-semibold block mb-2">01</span>
-                    <h3 class="font-semibold text-ink text-sm mb-2">Deploy Host Server</h3>
-                    <p class="text-inkMuted leading-relaxed">
-                        On your server or workstation, install and run the Server Setup Wizard. Click Deploy to start the Docker services and initialize the database.
+                <div class="lg:col-span-4 text-xs text-inkSecondary leading-relaxed">
+                    <p class="mb-3">
+                        Deploying Unotusk takes approximately 3 to 5 minutes on standard developer hardware.
+                    </p>
+                    <p class="text-inkMuted">
+                        Pre-requisites: Host machine requires Docker Engine or Docker Desktop installed and running. No public domain names or SSL certificates required for internal LAN use.
                     </p>
                 </div>
 
-                <div class="bg-surfaceRaised border border-border rounded-xl p-6">
-                    <span class="font-mono text-xs text-accent font-semibold block mb-2">02</span>
-                    <h3 class="font-semibold text-ink text-sm mb-2">Share Endpoint URL</h3>
-                    <p class="text-inkMuted leading-relaxed">
-                        The wizard outputs your local IP endpoint (e.g. <code class="font-mono text-ink bg-surface px-1 py-0.5 rounded border border-border">http://10.0.0.59:8000</code>). Share this address with your engineering team.
-                    </p>
-                </div>
+                <!-- 4 Sequential Steps (8 cols) -->
+                <div class="lg:col-span-8 space-y-4 font-mono text-xs">
+                    
+                    <!-- Step 01 -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center gap-3 mb-1.5">
+                            <span class="text-accent font-semibold">01</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Deploy Host Server</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed pl-7">
+                            Download and run the Server Setup Wizard on your host server or designated developer workstation. The wizard automatically pulls container images and boots PostgreSQL, Redis, and the FastAPI engine.
+                        </p>
+                    </div>
 
-                <div class="bg-surfaceRaised border border-border rounded-xl p-6">
-                    <span class="font-mono text-xs text-accent font-semibold block mb-2">03</span>
-                    <h3 class="font-semibold text-ink text-sm mb-2">Connect Client</h3>
-                    <p class="text-inkMuted leading-relaxed">
-                        Team members launch the Desktop Client on their machines, paste the server URL, and immediately begin querying the codebase.
-                    </p>
+                    <!-- Step 02 -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center gap-3 mb-1.5">
+                            <span class="text-accent font-semibold">02</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Verify Server Health</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed pl-7 mb-2">
+                            Execute the health endpoint check from the command line to confirm local containers are operational:
+                        </p>
+                        <div class="ml-7 p-2 hairline-all bg-paper text-ink font-mono text-[11px] select-all">
+                            curl -s http://localhost:8000/api/v1/health
+                        </div>
+                    </div>
+
+                    <!-- Step 03 -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center gap-3 mb-1.5">
+                            <span class="text-accent font-semibold">03</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Share LAN Endpoint</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed pl-7">
+                            Locate your host machine's internal network IP address (e.g. <code class="text-ink bg-paper px-1 py-0.5 hairline-all">http://10.0.0.59:8000</code>). Distribute this internal URL to team members.
+                        </p>
+                    </div>
+
+                    <!-- Step 04 -->
+                    <div class="hairline-all bg-surface p-4 rounded-[2px]">
+                        <div class="flex items-center gap-3 mb-1.5">
+                            <span class="text-accent font-semibold">04</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Connect Desktop Clients</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed pl-7">
+                            Engineers launch the Desktop Client on macOS, Windows, or Linux, paste the host endpoint into the connection field, and immediately begin querying repository intelligence.
+                        </p>
+                    </div>
+
                 </div>
 
             </div>
@@ -409,25 +602,25 @@
 
     </main>
 
-    <!-- Clean Footer -->
-    <footer class="w-full border-t border-border py-10 px-6 sm:px-10 lg:px-14 mt-auto bg-surface">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-inkMuted">
+    <!-- SECTION 6: FOOTER (Minimal, Factual, Clean) -->
+    <footer class="w-full hairline-t py-8 px-6 sm:px-10 lg:px-12 bg-paper mt-auto">
+        <div class="max-w-[1240px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-inkMuted font-mono">
             <div class="flex items-center gap-3">
-                <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-5 h-5 object-contain" />
-                <span class="font-medium text-ink">&copy; 2026 Unotusk Pvt. Ltd. All rights reserved.</span>
+                <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-4 h-4 object-contain opacity-70" />
+                <span class="text-ink font-sans font-medium">&copy; 2026 Unotusk Pvt. Ltd.</span>
             </div>
             
-            <div class="flex items-center gap-6 font-mono text-xs">
+            <div class="flex items-center gap-6 text-[11px]">
                 <a href="https://docs.unotusk.com" target="_blank" rel="noopener noreferrer" class="hover:text-ink transition-colors">Documentation</a>
-                <span class="text-border">&bull;</span>
+                <span class="text-ruleDark">&bull;</span>
                 <a href="mailto:support@unotusk.com" class="hover:text-ink transition-colors">support@unotusk.com</a>
             </div>
         </div>
     </footer>
 
     <!-- Toast Notification -->
-    <div id="copy-toast" class="fixed bottom-6 right-6 bg-ink text-white px-4 py-2.5 rounded-lg text-xs font-mono shadow-xl z-50">
-        Copied to clipboard
+    <div id="copy-toast" class="fixed bottom-6 right-6 bg-ink text-white px-3.5 py-2 rounded-[2px] text-xs font-mono shadow-md z-50">
+        Command copied
     </div>
 
     <!-- Copy Helper Script -->
