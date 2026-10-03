@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'dart:convert';
 
 class RepositoryClient {
   final String baseUrl;
@@ -26,7 +25,7 @@ class RepositoryClient {
 
   Future<void> loginAdmin() async {
     try {
-      final res = await _dio.post('/auth/signup', data: {
+      await _dio.post('/auth/signup', data: {
         'email': 'admin@unotusk.local',
         'password': 'admin_password123',
         'name': 'Admin User'
@@ -71,7 +70,7 @@ class RepositoryClient {
 
     // 3. Select repository
     final resRepo = await _dio.post('/projects/$projectId/repositories/select', data: {
-      'external_id': '${owner}_${repoName}',
+      'external_id': '${owner}_$repoName',
       'owner': owner,
       'name': repoName,
       'full_name': '$owner/$repoName',

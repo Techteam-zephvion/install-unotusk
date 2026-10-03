@@ -73,6 +73,8 @@ services:
       - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
       - $apiKeyVar=\${$apiKeyVar}
       - $modelVar=\${$modelVar}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "${config.serverPort}:8000"
     healthcheck:

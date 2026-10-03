@@ -70,6 +70,7 @@ class AuthRepository {
     required String name,
     required String email,
     required String password,
+    String? organizationName,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.signup,
@@ -77,6 +78,7 @@ class AuthRepository {
         'name': name.trim(),
         'email': email.trim(),
         'password': password,
+        if (organizationName != null && organizationName.trim().isNotEmpty) 'organization_name': organizationName.trim(),
       },
     );
 

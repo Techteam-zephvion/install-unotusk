@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:setup_app/features/manager/data/server_registry.dart';
 import 'package:setup_app/features/manager/domain/server_instance.dart';
-import 'package:setup_app/features/manager/data/server_manager_controller.dart';
 
 void main() {
   test('ServerRegistry generates sequential IDs', () async {

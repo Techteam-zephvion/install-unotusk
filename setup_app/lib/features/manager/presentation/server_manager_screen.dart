@@ -1,6 +1,5 @@
 import 'repository_manager_screen.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -23,52 +22,53 @@ class ServerManagerScreen extends ConsumerWidget {
     final notifier = ref.read(serverManagerProvider.notifier);
 
     return Scaffold(
-      
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: [
-                    Text('Unotusk Server Manager', style: AppTextStyles.h1),
-                    AppButton(
-                      label: 'Add Server',
-                      icon: Icons.add,
-                      onPressed: () => _startNewServerWizard(context, ref),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Manage multiple independent UNOTUSK server instances on this machine.',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
-                ),
-                const SizedBox(height: 32),
-                if (state.isLoading)
-                  const Center(child: CircularProgressIndicator())
-                else if (state.error != null)
-                  Center(child: Text('Error: ${state.error}', style: TextStyle(color: AppColors.error)))
-                else if (state.servers.isEmpty)
-                  _buildEmptyState(context, ref)
-                else
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: state.servers.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        return _buildServerCard(context, ref, state.servers[index], notifier);
-                      },
-                    ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      Text('Unotusk Server Manager', style: AppTextStyles.h1),
+                      AppButton(
+                        label: 'Add Server',
+                        icon: Icons.add,
+                        onPressed: () => _startNewServerWizard(context, ref),
+                      ),
+                    ],
                   ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Manage multiple independent UNOTUSK server instances on this machine.',
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
+                  ),
+                  const SizedBox(height: 32),
+                  if (state.isLoading)
+                    const Expanded(child: Center(child: CircularProgressIndicator()))
+                  else if (state.error != null)
+                    Expanded(child: Center(child: Text('Error: ${state.error}', style: TextStyle(color: AppColors.error))))
+                  else if (state.servers.isEmpty)
+                    Expanded(child: _buildEmptyState(context, ref))
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: state.servers.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          return _buildServerCard(context, ref, state.servers[index], notifier);
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -246,6 +246,7 @@ class ServerManagerScreen extends ConsumerWidget {
     
     ref.read(wizardControllerProvider.notifier).reset();
     
+    if (!context.mounted) return;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (context) => const WizardShell(),
     ));

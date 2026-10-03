@@ -46,6 +46,9 @@ class Project(Base, UUIDMixin, TimestampMixin):
         default=ProjectStatus.CREATED,
         nullable=False,
     )
+    port: Mapped[int | None] = mapped_column(
+        nullable=True,
+    )
 
     # Relationships
     organization: Mapped["Organization"] = relationship(
