@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download Unotusk</title>
+    <title>Download Unotusk — Client &amp; Server Distribution</title>
     <link rel="icon" type="image/png" href="assets/favicon.png">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;450;500;600&family=Young+Serif&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;450;500;600;700&family=Young+Serif&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,14 +20,16 @@
                     colors: {
                         bg: '#FAF9F6',
                         surface: '#FFFFFF',
-                        border: '#E8E6E1',
-                        borderHover: '#D1CEC7',
+                        surfaceSubtle: '#F4F2EB',
+                        border: '#E7E4DC',
+                        borderHover: '#D3CFBF',
                         text: '#191817',
-                        textMuted: '#686661',
-                        textSubtle: '#96948E',
+                        textMuted: '#6B6862',
+                        textSubtle: '#9A978F',
                         accent: '#D97757',
                         accentHover: '#C46647',
-                        codeBg: '#F3F1EC'
+                        live: '#3B9B85',
+                        codeBg: '#1A1918'
                     },
                     fontFamily: {
                         serif: ['"Young Serif"', 'Georgia', 'serif'],
@@ -47,6 +49,18 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* Subtle technical background grid */
+        .bg-grid {
+            background-image: radial-gradient(circle at 1px 1px, rgba(25, 24, 23, 0.04) 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+
+        /* Terminal styling */
+        .terminal-glow {
+            box-shadow: 0 16px 40px -8px rgba(25, 24, 23, 0.12), 0 0 0 1px rgba(25, 24, 23, 0.06);
+        }
+
+        /* Toast */
         #copy-toast {
             opacity: 0;
             transform: translateY(8px);
@@ -59,218 +73,401 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col bg-bg text-text">
+<body class="min-h-screen flex flex-col bg-bg bg-grid text-text selection:bg-accent selection:text-white">
 
-    <!-- Minimal Header -->
-    <header class="w-full border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-40">
-        <div class="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+    <!-- Fluid Top Navigation -->
+    <header class="w-full border-b border-border bg-surface/85 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 h-16 flex items-center justify-between">
             <a href="/" class="flex items-center gap-3">
                 <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-7 h-7 object-contain" />
                 <span class="font-serif text-xl tracking-tight text-text">Unotusk</span>
             </a>
 
-            <div class="flex items-center gap-5 text-sm">
-                <a href="#server" class="text-textMuted hover:text-text transition-colors">Server</a>
-                <a href="#client" class="text-textMuted hover:text-text transition-colors">Desktop</a>
+            <!-- Navigation Links -->
+            <nav class="flex items-center gap-6 text-sm">
+                <a href="#downloads" class="text-textMuted hover:text-text transition-colors">Downloads</a>
+                <a href="#topology" class="text-textMuted hover:text-text transition-colors">Architecture</a>
+                <a href="#quickstart" class="text-textMuted hover:text-text transition-colors">Quick Start</a>
                 <a href="https://docs.unotusk.com" target="_blank" rel="noopener noreferrer" 
                    class="text-textMuted hover:text-text transition-colors">
-                    Docs
+                    Docs &nearr;
                 </a>
                 <span class="text-border">|</span>
-                <span class="font-mono text-xs text-textSubtle bg-codeBg px-2 py-0.5 rounded border border-border">v0.1.0-mvp</span>
-            </div>
+                <span class="font-mono text-xs text-textSubtle bg-surfaceSubtle px-2 py-0.5 rounded border border-border">v0.1.0-mvp</span>
+            </nav>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-grow max-w-4xl mx-auto w-full px-6 py-12">
+    <!-- Main Container: Expansive max-w-7xl Layout -->
+    <main class="flex-grow max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-14 py-12 lg:py-16">
         
-        <!-- Clean Hero -->
-        <div class="mb-12">
-            <h1 class="font-serif text-4xl sm:text-5xl text-text tracking-tight mb-3">
-                Download Unotusk
-            </h1>
-            <p class="text-base text-textMuted max-w-2xl leading-relaxed">
-                Evidence-grounded codebase intelligence for engineering teams. Install the Desktop Client on your machine or deploy the private Server node on your local network.
-            </p>
+        <!-- Hero Section: Expansive 2-Column Split -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center mb-16 lg:mb-20">
+            
+            <!-- Left Column: Copy & Direct Call to Action (7 cols) -->
+            <div class="lg:col-span-7">
+                <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-surfaceSubtle border border-border text-xs font-mono text-textMuted mb-6">
+                    <span class="w-1.5 h-1.5 rounded-full bg-live"></span>
+                    <span>Single-Tenant &bull; Local LAN Distribution</span>
+                </div>
+
+                <h1 class="font-serif text-4xl sm:text-5xl lg:text-[3.25rem] text-text tracking-tight leading-[1.15] mb-5">
+                    Grounded Codebase Intelligence for Your Team.
+                </h1>
+
+                <p class="text-base sm:text-lg text-textMuted leading-relaxed max-w-2xl mb-8">
+                    Unotusk runs directly inside your infrastructure. Use the native <strong class="text-text font-medium">Desktop Client</strong> to ask deep questions across your AST and commit history, or deploy the <strong class="text-text font-medium">Server Node</strong> on your local LAN with zero cloud egress.
+                </p>
+
+                <!-- Action Jump Buttons -->
+                <div class="flex flex-wrap items-center gap-4">
+                    <a href="#downloads-client" 
+                       class="inline-flex items-center gap-2 px-5 py-2.5 bg-text hover:bg-black text-white text-sm font-medium rounded-lg shadow-sm transition-all">
+                        <span>Get Desktop Client</span>
+                        <svg class="w-4 h-4 text-textSubtle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                    </a>
+
+                    <a href="#downloads-server" 
+                       class="inline-flex items-center gap-2 px-5 py-2.5 bg-surface hover:bg-surfaceSubtle text-text border border-border hover:border-borderHover text-sm font-medium rounded-lg shadow-sm transition-all">
+                        <span>Deploy Server Node</span>
+                        <svg class="w-4 h-4 text-textSubtle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Right Column: Interactive Node Console Simulator (5 cols) -->
+            <div class="lg:col-span-5">
+                <div class="bg-codeBg rounded-xl p-4 terminal-glow text-gray-200 font-mono text-xs border border-gray-800">
+                    <!-- Window Controls & Tabs -->
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-800">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-[#EC6A5E]"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-[#F5BF4F]"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-[#62C554]"></span>
+                            <span class="ml-2 text-gray-500 text-[11px]">unotusk-node</span>
+                        </div>
+                        
+                        <!-- Interactive Command Tabs -->
+                        <div class="flex items-center gap-1 text-[11px]">
+                            <button onclick="setTerminalTab('status')" id="term-btn-status" class="px-2 py-0.5 rounded bg-gray-800 text-white transition">status</button>
+                            <button onclick="setTerminalTab('ask')" id="term-btn-ask" class="px-2 py-0.5 rounded text-gray-400 hover:text-white transition">query</button>
+                            <button onclick="setTerminalTab('health')" id="term-btn-health" class="px-2 py-0.5 rounded text-gray-400 hover:text-white transition">health</button>
+                        </div>
+                    </div>
+
+                    <!-- Terminal Content Display -->
+                    <div id="term-display" class="space-y-2 py-1 leading-relaxed min-h-[175px]">
+                        <div><span class="text-accent">$</span> unotusk node status</div>
+                        <div class="text-gray-400 pl-3">
+                            <span class="text-emerald-400">&bull;</span> Endpoint: <span class="text-white">http://10.0.0.59:8000</span><br>
+                            <span class="text-emerald-400">&bull;</span> Database: <span class="text-gray-300">PostgreSQL 16 + pgvector</span><br>
+                            <span class="text-emerald-400">&bull;</span> Memory:   <span class="text-gray-300">Tree-sitter AST Graph</span><br>
+                            <span class="text-emerald-400">&bull;</span> Egress:   <span class="text-emerald-400">0 packets (Air-Gapped LAN)</span><br>
+                            <span class="text-gray-500 mt-1 block">Ready for Employee Client connections.</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2.5 mt-2 border-t border-gray-800 text-[11px] text-gray-500 flex items-center justify-between">
+                        <span>Single-Tenant Local Stack</span>
+                        <span class="text-emerald-400">REST: Port 8000</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
-        <!-- 1. DESKTOP CLIENT SECTION -->
-        <section id="client" class="mb-14 scroll-mt-20">
-            <div class="flex items-baseline justify-between mb-4 pb-2 border-b border-border">
-                <h2 class="text-lg font-semibold text-text">Desktop Client</h2>
-                <span class="text-xs font-mono text-textSubtle">For engineers &amp; architects</span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Section: Downloads (Side-by-Side Wide Grid) -->
+        <div id="downloads" class="pt-8 mb-16 scroll-mt-20">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                <!-- macOS Card -->
-                <div class="bg-surface border border-border hover:border-borderHover rounded-xl p-5 flex flex-col justify-between transition-all">
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-base font-semibold text-text">macOS</span>
-                            <svg class="w-4 h-4 text-textMuted" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.82 1.11-1.96.99-3.1-.96.04-2.11.64-2.79 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.15-.55 2.78-1.29z"/>
-                            </svg>
+                <!-- 1. Desktop Client Block (7 cols) -->
+                <div id="downloads-client" class="lg:col-span-7 bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-sm">
+                    <div class="flex items-center justify-between pb-4 mb-6 border-b border-border">
+                        <div>
+                            <h2 class="text-lg font-semibold text-text">Desktop Client</h2>
+                            <p class="text-xs text-textMuted mt-0.5">For software engineers, leads, and architects</p>
                         </div>
-                        <p class="text-xs text-textMuted mb-5 leading-normal">
-                            Universal dmg for Apple Silicon and Intel.
-                        </p>
+                        <span class="text-xs font-mono bg-surfaceSubtle text-textMuted px-2.5 py-1 rounded border border-border">Client App</span>
                     </div>
-                    <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-macos.dmg" 
-                       class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-text hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Download .dmg</span>
-                    </a>
+
+                    <!-- 3 OS Cards in a Row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-5">
+                        
+                        <!-- macOS -->
+                        <div class="border border-border hover:border-borderHover rounded-xl p-4 bg-bg/50 hover:bg-bg transition-all flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-sm text-text">macOS</span>
+                                    <svg class="w-4 h-4 text-textMuted" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.82 1.11-1.96.99-3.1-.96.04-2.11.64-2.79 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.15-.55 2.78-1.29z"/></svg>
+                                </div>
+                                <p class="text-[11px] text-textMuted font-mono mb-4">Apple Silicon &amp; Intel</p>
+                            </div>
+                            <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-macos.dmg" 
+                               class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-text hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                <span>.dmg</span>
+                            </a>
+                        </div>
+
+                        <!-- Windows -->
+                        <div class="border border-border hover:border-borderHover rounded-xl p-4 bg-bg/50 hover:bg-bg transition-all flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-sm text-text">Windows</span>
+                                    <svg class="w-4 h-4 text-textMuted" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.051-1.899"/></svg>
+                                </div>
+                                <p class="text-[11px] text-textMuted font-mono mb-4">Windows 10 / 11 x64</p>
+                            </div>
+                            <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-windows-x64.msi" 
+                               class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-text hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                <span>.msi</span>
+                            </a>
+                        </div>
+
+                        <!-- Linux -->
+                        <div class="border border-border hover:border-borderHover rounded-xl p-4 bg-bg/50 hover:bg-bg transition-all flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-sm text-text">Linux</span>
+                                    <svg class="w-4 h-4 text-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                </div>
+                                <p class="text-[11px] text-textMuted font-mono mb-4">Ubuntu / Debian / Arch</p>
+                            </div>
+                            <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-linux-x64.tar.gz" 
+                               class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-text hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                <span>.tar.gz</span>
+                            </a>
+                        </div>
+
+                    </div>
+
+                    <div class="text-xs text-textMuted leading-relaxed flex items-center gap-2 font-mono">
+                        <span class="text-accent">&bull;</span>
+                        <span>On launch, enter your local host IP (e.g. <span class="text-text font-medium">http://10.0.0.59:8000</span>).</span>
+                    </div>
                 </div>
 
-                <!-- Windows Card -->
-                <div class="bg-surface border border-border hover:border-borderHover rounded-xl p-5 flex flex-col justify-between transition-all">
+                <!-- 2. Server Setup Wizard Block (5 cols) -->
+                <div id="downloads-server" class="lg:col-span-5 bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col justify-between">
                     <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-base font-semibold text-text">Windows</span>
-                            <svg class="w-4 h-4 text-textMuted" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.051-1.899"/>
-                            </svg>
+                        <div class="flex items-center justify-between pb-4 mb-6 border-b border-border">
+                            <div>
+                                <h2 class="text-lg font-semibold text-text">Server Setup Wizard</h2>
+                                <p class="text-xs text-textMuted mt-0.5">For dedicated host administrators</p>
+                            </div>
+                            <span class="text-xs font-mono bg-surfaceSubtle text-accent px-2.5 py-1 rounded border border-border">Host Node</span>
                         </div>
-                        <p class="text-xs text-textMuted mb-5 leading-normal">
-                            Standard installer for Windows 10 &amp; 11 (64-bit).
-                        </p>
-                    </div>
-                    <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-windows-x64.msi" 
-                       class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-text hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Download .msi</span>
-                    </a>
-                </div>
 
-                <!-- Linux Card -->
-                <div class="bg-surface border border-border hover:border-borderHover rounded-xl p-5 flex flex-col justify-between transition-all">
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-base font-semibold text-text">Linux</span>
-                            <svg class="w-4 h-4 text-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
-                        <p class="text-xs text-textMuted mb-5 leading-normal">
-                            Compiled binary for Ubuntu, Debian, Fedora, Arch.
+                        <p class="text-xs text-textMuted leading-relaxed mb-6">
+                            Automated setup wizard. Starts PostgreSQL 16 + pgvector, Redis, and FastAPI in Docker without manual compose scripting.
                         </p>
+
+                        <!-- Server Download Options -->
+                        <div class="space-y-3 mb-6">
+                            <!-- Windows Server -->
+                            <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-windows-x64.msi" 
+                               class="w-full flex items-center justify-between p-3.5 rounded-xl border border-border hover:border-accent bg-bg/50 hover:bg-bg transition-all group">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-surface border border-border flex items-center justify-center font-mono text-xs font-medium text-text">
+                                        WIN
+                                    </div>
+                                    <div class="text-left">
+                                        <div class="text-xs font-semibold text-text group-hover:text-accent transition-colors">Windows Server Wizard</div>
+                                        <div class="text-[11px] text-textMuted font-mono">Windows 10/11 &bull; .msi</div>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-mono text-accent font-medium">Download &rarr;</span>
+                            </a>
+
+                            <!-- Linux Server -->
+                            <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-linux-x64.tar.gz" 
+                               class="w-full flex items-center justify-between p-3.5 rounded-xl border border-border hover:border-accent bg-bg/50 hover:bg-bg transition-all group">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-surface border border-border flex items-center justify-center font-mono text-xs font-medium text-text">
+                                        LIN
+                                    </div>
+                                    <div class="text-left">
+                                        <div class="text-xs font-semibold text-text group-hover:text-accent transition-colors">Linux Server Wizard</div>
+                                        <div class="text-[11px] text-textMuted font-mono">Ubuntu / Debian &bull; .tar.gz</div>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-mono text-accent font-medium">Download &rarr;</span>
+                            </a>
+                        </div>
                     </div>
-                    <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-linux-x64.tar.gz" 
-                       class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-text hover:bg-black text-white text-xs font-medium rounded-lg transition-colors">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Download .tar.gz</span>
-                    </a>
+
+                    <div class="text-[11px] font-mono text-textSubtle border-t border-border pt-3 flex items-center justify-between">
+                        <span>Requires Docker Desktop / Engine</span>
+                        <span>Auto-deploys port 8000</span>
+                    </div>
                 </div>
 
             </div>
-        </section>
+        </div>
 
-        <!-- 2. SERVER SETUP WIZARD SECTION -->
-        <section id="server" class="mb-14 scroll-mt-20">
-            <div class="flex items-baseline justify-between mb-4 pb-2 border-b border-border">
-                <h2 class="text-lg font-semibold text-text">Server Setup Wizard</h2>
-                <span class="text-xs font-mono text-textSubtle">For host administrators</span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                <!-- Windows Server MSI -->
-                <div class="bg-surface border border-border hover:border-borderHover rounded-xl p-5 flex flex-col justify-between transition-all">
+        <!-- Section: Architecture Topology (Visual & Free) -->
+        <div id="topology" class="mb-16 pt-6 scroll-mt-20">
+            <div class="bg-surface border border-border rounded-2xl p-6 sm:p-8">
+                <div class="flex items-center justify-between pb-4 mb-6 border-b border-border">
                     <div>
-                        <div class="flex items-center justify-between mb-1.5">
-                            <span class="text-base font-semibold text-text">Windows Server</span>
-                            <span class="text-[11px] font-mono bg-codeBg text-textMuted px-1.5 py-0.5 rounded border border-border">.msi</span>
-                        </div>
-                        <p class="text-xs text-textMuted mb-5 leading-normal">
-                            GUI setup wizard. Requires Docker Desktop running.
-                        </p>
+                        <h2 class="text-base font-semibold text-text">Deployment Architecture</h2>
+                        <p class="text-xs text-textMuted mt-0.5">How your local node and client applications communicate</p>
                     </div>
-                    <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-windows-x64.msi" 
-                       class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-accent hover:bg-accentHover text-white text-xs font-medium rounded-lg transition-colors">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Download Windows Server .msi</span>
-                    </a>
+                    <span class="text-xs font-mono text-live bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded">Zero Cloud Egress</span>
                 </div>
 
-                <!-- Linux Server Tarball -->
-                <div class="bg-surface border border-border hover:border-borderHover rounded-xl p-5 flex flex-col justify-between transition-all">
-                    <div>
-                        <div class="flex items-center justify-between mb-1.5">
-                            <span class="text-base font-semibold text-text">Linux Server</span>
-                            <span class="text-[11px] font-mono bg-codeBg text-textMuted px-1.5 py-0.5 rounded border border-border">.tar.gz</span>
-                        </div>
-                        <p class="text-xs text-textMuted mb-5 leading-normal">
-                            Desktop wizard for Ubuntu / Debian. Requires Docker Engine.
+                <!-- Interactive Visual Schematic -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                    
+                    <!-- Admin Server Block (5 cols) -->
+                    <div class="md:col-span-5 bg-surfaceSubtle border border-border rounded-xl p-4">
+                        <div class="text-xs font-mono text-accent font-semibold mb-1">01 / DEDICATED HOST</div>
+                        <h3 class="font-medium text-sm text-text mb-2">Local Server Node</h3>
+                        <p class="text-xs text-textMuted mb-3 leading-relaxed">
+                            Admin launches Setup Wizard. It starts Docker containers and provides the local endpoint:
                         </p>
+                        <div class="bg-white border border-border rounded p-2 text-xs font-mono text-text flex items-center justify-between">
+                            <span>http://10.0.0.59:8000</span>
+                            <span class="text-[10px] text-live bg-emerald-50 px-1 rounded">Active</span>
+                        </div>
                     </div>
-                    <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-linux-x64.tar.gz" 
-                       class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 bg-accent hover:bg-accentHover text-white text-xs font-medium rounded-lg transition-colors">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span>Download Linux Server .tar.gz</span>
-                    </a>
+
+                    <!-- Connection Pipeline Bridge (2 cols) -->
+                    <div class="md:col-span-2 flex flex-col items-center justify-center text-center py-2">
+                        <div class="hidden md:flex flex-col items-center w-full">
+                            <span class="text-[11px] font-mono text-textSubtle mb-1">Internal LAN</span>
+                            <div class="w-full border-t border-dashed border-borderHover relative">
+                                <span class="absolute right-0 -top-1.5 text-textMuted">&rarr;</span>
+                            </div>
+                            <span class="text-[10px] font-mono text-live mt-1">HTTP REST</span>
+                        </div>
+                        <div class="md:hidden text-xs font-mono text-textSubtle py-2">
+                            &darr; 100% Direct Local LAN &darr;
+                        </div>
+                    </div>
+
+                    <!-- Client Team Block (5 cols) -->
+                    <div class="md:col-span-5 bg-surfaceSubtle border border-border rounded-xl p-4">
+                        <div class="text-xs font-mono text-accent font-semibold mb-1">02 / TEAM MEMBERS</div>
+                        <h3 class="font-medium text-sm text-text mb-2">Desktop Clients</h3>
+                        <p class="text-xs text-textMuted mb-3 leading-relaxed">
+                            Engineers install app on macOS, Windows, or Linux and paste host IP. Test connectivity:
+                        </p>
+                        <div class="bg-white border border-border rounded p-2 text-xs font-mono text-textMuted flex items-center justify-between">
+                            <code>curl -s http://&lt;IP&gt;:8000/api/v1/health</code>
+                            <button onclick="copyCode('curl -s http://10.0.0.59:8000/api/v1/health')" class="text-accent hover:underline text-[11px]">Copy</button>
+                        </div>
+                    </div>
+
                 </div>
-
             </div>
-        </section>
+        </div>
 
-        <!-- 3. HOW IT WORKS / QUICK START -->
-        <section class="pt-8 border-t border-border">
-            <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-textSubtle mb-5">
-                Quick Start
+        <!-- Section: Quick Start (Clean Horizontal Steps) -->
+        <div id="quickstart" class="pt-6 border-t border-border scroll-mt-20">
+            <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-textSubtle mb-6">
+                3-Minute Quick Start Guide
             </h2>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <!-- Step 1 -->
-                <div class="border border-border bg-surface rounded-xl p-4">
-                    <span class="font-mono text-[11px] text-accent font-semibold block mb-1">01 &bull; ADMIN</span>
-                    <h3 class="font-medium text-text text-sm mb-1.5">Host Machine</h3>
-                    <p class="text-textMuted leading-relaxed mb-3">
-                        Launch the Server Wizard on your host. Click deploy to start PostgreSQL 16, Redis, and FastAPI in Docker. Copy the emitted local address:
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
+                
+                <div class="bg-surface border border-border rounded-xl p-5">
+                    <span class="font-mono text-accent font-semibold block mb-1">STEP 1</span>
+                    <h3 class="font-semibold text-text text-sm mb-2">Deploy Server Host</h3>
+                    <p class="text-textMuted leading-relaxed">
+                        On your server or workstation, run the Server Setup Wizard. Click <strong>Deploy</strong> to start the database and backend services automatically.
                     </p>
-                    <div class="font-mono text-[11px] text-textMuted bg-codeBg px-2.5 py-1.5 rounded border border-border">
-                        http://&lt;local-ip&gt;:8000
-                    </div>
                 </div>
 
-                <!-- Step 2 -->
-                <div class="border border-border bg-surface rounded-xl p-4">
-                    <span class="font-mono text-[11px] text-accent font-semibold block mb-1">02 &bull; TEAM</span>
-                    <h3 class="font-medium text-text text-sm mb-1.5">Client Connection</h3>
-                    <p class="text-textMuted leading-relaxed mb-3">
-                        Launch the Desktop Client on your laptop and enter the Server IP provided by the admin. Verify connection:
+                <div class="bg-surface border border-border rounded-xl p-5">
+                    <span class="font-mono text-accent font-semibold block mb-1">STEP 2</span>
+                    <h3 class="font-semibold text-text text-sm mb-2">Share Local IP</h3>
+                    <p class="text-textMuted leading-relaxed">
+                        The wizard displays your LAN endpoint (e.g. <code class="font-mono text-text bg-surfaceSubtle px-1 py-0.5 rounded">http://10.0.0.59:8000</code>). Copy and share it with your team.
                     </p>
-                    <div class="font-mono text-[11px] text-textMuted bg-codeBg px-2.5 py-1.5 rounded border border-border flex items-center justify-between">
-                        <code>curl http://&lt;ip&gt;:8000/api/v1/health</code>
-                        <button onclick="copySnippet('curl http://localhost:8000/api/v1/health')" class="text-accent hover:underline ml-2">Copy</button>
-                    </div>
                 </div>
+
+                <div class="bg-surface border border-border rounded-xl p-5">
+                    <span class="font-mono text-accent font-semibold block mb-1">STEP 3</span>
+                    <h3 class="font-semibold text-text text-sm mb-2">Open Desktop Client</h3>
+                    <p class="text-textMuted leading-relaxed">
+                        Team members launch the desktop app on their laptops, enter the IP, and begin querying the codebase with zero cloud egress.
+                    </p>
+                </div>
+
             </div>
-        </section>
+        </div>
 
     </main>
 
-    <!-- Clean Minimal Footer -->
-    <footer class="w-full border-t border-border py-6 px-6 mt-auto">
-        <div class="max-w-4xl mx-auto flex items-center justify-between text-xs text-textMuted">
-            <div class="flex items-center gap-2">
+    <!-- Clean Footer -->
+    <footer class="w-full border-t border-border py-8 px-6 sm:px-10 lg:px-14 mt-auto bg-surface/50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-textMuted">
+            <div class="flex items-center gap-2.5">
                 <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-4 h-4 opacity-50" />
-                <span>&copy; 2026 Zephvion Pvt. Ltd. &bull; Unotusk</span>
+                <span>&copy; 2026 Zephvion Pvt. Ltd. &bull; Unotusk Project Intelligence MVP</span>
             </div>
-            <div>
-                <a href="https://docs.unotusk.com" class="hover:text-text transition-colors">Documentation</a>
+            
+            <div class="flex items-center gap-6 font-mono text-[11px]">
+                <a href="https://docs.unotusk.com" target="_blank" rel="noopener noreferrer" class="hover:text-text transition-colors">docs.unotusk.com</a>
+                <span class="text-border">&bull;</span>
+                <a href="https://github.com/Techteam-zephvion/install-unotusk" target="_blank" rel="noopener noreferrer" class="hover:text-text transition-colors">GitHub Repository</a>
             </div>
         </div>
     </footer>
 
-    <!-- Copy Toast -->
-    <div id="copy-toast" class="fixed bottom-6 right-6 bg-text text-white px-3.5 py-2 rounded-lg text-xs font-mono shadow-md z-50">
+    <!-- Toast Notification -->
+    <div id="copy-toast" class="fixed bottom-6 right-6 bg-text text-white px-4 py-2.5 rounded-xl text-xs font-mono shadow-xl z-50">
         Copied to clipboard
     </div>
 
+    <!-- Interactive Terminal & Copy Script -->
     <script>
-        function copySnippet(text) {
+        const TERMINAL_OUTPUTS = {
+            'status': `<div><span class="text-accent">$</span> unotusk node status</div>
+<div class="text-gray-400 pl-3">
+    <span class="text-emerald-400">&bull;</span> Endpoint: <span class="text-white">http://10.0.0.59:8000</span><br>
+    <span class="text-emerald-400">&bull;</span> Database: <span class="text-gray-300">PostgreSQL 16 + pgvector</span><br>
+    <span class="text-emerald-400">&bull;</span> Memory:   <span class="text-gray-300">Tree-sitter AST Graph</span><br>
+    <span class="text-emerald-400">&bull;</span> Egress:   <span class="text-emerald-400">0 packets (Air-Gapped LAN)</span><br>
+    <span class="text-gray-500 mt-1 block">Ready for Employee Client connections.</span>
+</div>`,
+            'ask': `<div><span class="text-accent">$</span> curl -X POST http://10.0.0.59:8000/api/v1/ask -d '{"q":"auth model"}'</div>
+<div class="text-gray-400 pl-3">
+    <span class="text-emerald-400">&bull;</span> Routing:   <span class="text-white">Local AST traversal (1-hop)</span><br>
+    <span class="text-emerald-400">&bull;</span> Grounding: <span class="text-white">[CONFIRMED]</span> Session tokens (bcrypt)<br>
+    <span class="text-emerald-400">&bull;</span> Latency:   <span class="text-gray-300">42ms (Internal LAN)</span><br>
+    <span class="text-gray-300 mt-1 block">Response streamed directly to client desktop.</span>
+</div>`,
+            'health': `<div><span class="text-accent">$</span> curl http://10.0.0.59:8000/api/v1/health</div>
+<div class="text-gray-400 pl-3">
+    <span class="text-emerald-400">{</span><br>
+    &nbsp;&nbsp;"status": <span class="text-emerald-400">"healthy"</span>,<br>
+    &nbsp;&nbsp;"postgres": <span class="text-emerald-400">"connected"</span>,<br>
+    &nbsp;&nbsp;"redis": <span class="text-emerald-400">"connected"</span>,<br>
+    &nbsp;&nbsp;"tenant": <span class="text-white">"single-tenant-local"</span><br>
+    <span class="text-emerald-400">}</span>
+</div>`
+        };
+
+        function setTerminalTab(tab) {
+            document.querySelectorAll('[id^="term-btn-"]').forEach(btn => {
+                btn.className = 'px-2 py-0.5 rounded text-gray-400 hover:text-white transition';
+            });
+            const activeBtn = document.getElementById('term-btn-' + tab);
+            if (activeBtn) {
+                activeBtn.className = 'px-2 py-0.5 rounded bg-gray-800 text-white transition';
+            }
+            const display = document.getElementById('term-display');
+            if (display && TERMINAL_OUTPUTS[tab]) {
+                display.innerHTML = TERMINAL_OUTPUTS[tab];
+            }
+        }
+
+        function copyCode(text) {
             navigator.clipboard.writeText(text).then(() => {
                 const toast = document.getElementById('copy-toast');
                 toast.classList.add('show');
