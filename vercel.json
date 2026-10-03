@@ -1,8 +1,11 @@
 {
+  "buildCommand": "bash vercel-build.sh",
+  "outputDirectory": "app/build/web",
+  "framework": null,
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/apps/install-site/$1"
+      "destination": "/index.html"
     }
   ]
 }
