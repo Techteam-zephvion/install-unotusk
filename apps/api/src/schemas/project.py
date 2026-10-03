@@ -27,6 +27,7 @@ class ProjectRead(ProjectBase):
     organization_id: uuid.UUID
     slug: str
     status: ProjectStatus
+    port: int | None = None
     created_at: datetime
     updated_at: datetime
 

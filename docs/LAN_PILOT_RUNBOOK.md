@@ -11,8 +11,9 @@
 | Operation | Command | Expected Result |
 |---|---|---|
 | **Verify LAN Server Health** | `./scripts/verify_lan_connectivity.sh` | `✓ ALL CHECKS PASSED: Server is fully ready` |
-| **Clean Server Reset (Preserve Data)** | `./scripts/clean_server_reset.sh` | Rebuilds and restarts API & worker, preserves Postgres/Redis data |
+| **Clean Server Reset (Preserve Data)** | `./scripts/clean_server_reset.sh` | Safely stops Unotusk containers and resets state, preserves Postgres/Redis data |
 | **Clean Server Reset (Factory Wipe)** | `./scripts/clean_server_reset.sh --wipe-data` | Complete wipe of database and Redis, fresh schema migration |
+| **Start Server Stack** | `docker compose up -d` | Launches postgres, redis, migration, api, worker, and web |
 | **Export Diagnostics Bundle** | `python3 scripts/export_diagnostics.py` | Generates SHA256-verified sanitized `.tar.gz` in `diagnostics/` |
 | **Package Linux Client** | `./scripts/package_release.sh` | Builds release archive in `dist/unotusk-employee-linux-x64.tar.gz` |
 
@@ -45,7 +46,7 @@ Connect Employee Apps (Windows/macOS) using this Server URL:
 
 ---
 
-### Step 3: Clean Server State Verification
+### Step 3: Clean Server State Verification & Startup
 If starting a new test session, perform a clean server reset:
 ```bash
 # To preserve existing test projects and user accounts:
@@ -54,7 +55,12 @@ If starting a new test session, perform a clean server reset:
 # To perform a complete factory wipe (fresh database):
 ./scripts/clean_server_reset.sh --wipe-data
 ```
-> **Safety Guarantee**: The clean reset script strictly targets ONLY the 5 Unotusk MVP containers (`unotusk-api`, `unotusk-worker`, `unotusk-migration`, `unotusk-postgres`, `unotusk-redis`). All other Docker projects on the machine are 100% untouched.
+> **Safety Guarantee**: The clean reset script strictly targets ONLY Unotusk MVP containers (`unotusk-api`, `unotusk-worker`, `unotusk-migration`, `unotusk-postgres`, `unotusk-redis`, `unotusk-web`). All other Docker projects on the machine are 100% untouched.
+
+Next, start the Unotusk Docker Compose stack:
+```bash
+docker compose up -d
+```
 
 ---
 
@@ -68,6 +74,7 @@ Required state:
 - `unotusk-redis`: `healthy` (Internal port 6379)
 - `unotusk-api`: `healthy` (Port 8000 exposed to LAN)
 - `unotusk-worker`: `Up`
+- `unotusk-web`: `Up` (Port 3000)
 
 ---
 

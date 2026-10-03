@@ -167,12 +167,16 @@ class _RepositoryManagerScreenState extends ConsumerState<RepositoryManagerScree
                     owner,
                     repoName,
                   );
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-                  _loadProjects();
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                  }
+                  if (mounted) {
+                    _loadProjects();
+                  }
                 } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
                 }
               },
               child: const Text('Connect'),

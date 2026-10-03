@@ -108,7 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   Future<void> _handleNewOrgRegister() async {
     if (_nameCtrl.text.trim().isEmpty || _orgCtrl.text.trim().isEmpty || !_agreed) return;
     setState(() => _screen = _AuthScreen.authenticating);
-    final success = await ref.read(authControllerProvider.notifier).signup(name: _nameCtrl.text.trim(), email: _emailCtrl.text.trim(), password: _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : 'oidc_placeholder');
+    final success = await ref.read(authControllerProvider.notifier).signup(name: _nameCtrl.text.trim(), email: _emailCtrl.text.trim(), password: _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : 'oidc_placeholder', organizationName: _orgCtrl.text.trim());
     if (!mounted) return;
     if (success) { context.go('/projects'); }
     else { setState(() { _deniedReason = ref.read(authControllerProvider).errorMessage ?? 'Registration failed.'; _screen = _AuthScreen.denied; }); }

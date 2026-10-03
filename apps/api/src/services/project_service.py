@@ -58,6 +58,9 @@ class ProjectService:
                 )
             slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
 
+        from apps.api.src.services.orchestrator_service import OrchestratorService
+        import logging
+
         # 3. Create Project
         project = Project(
             organization_id=data.organization_id,
@@ -69,7 +72,18 @@ class ProjectService:
         session.add(project)
         await session.flush()
 
-        # 4. Create Integration placeholder (ready for Stage 1)
+        # 4. Orchestrate Data Plane
+        try:
+            assigned_port = await OrchestratorService.spawn_project_container(
+                project_id=project.id,
+                organization_id=data.organization_id
+            )
+            project.port = assigned_port
+        except Exception as e:
+            logging.getLogger("unotusk-api").error(f"Failed to orchestrate project: {e}")
+            # Non-fatal for MVP, just fallback or log
+
+        # 5. Create Integration placeholder (ready for Stage 1)
         integration = Integration(
             project_id=project.id,
             provider=IntegrationProvider.GITHUB,

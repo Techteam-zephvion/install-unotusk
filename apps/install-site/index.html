@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unotusk Client Installer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #181816; /* Warm Dark Figma UI from AGENTS.md */
+            color: #E8E8E8;
+            font-family: 'Inter', sans-serif; /* fallback to Inter */
+        }
+        .font-serif-custom {
+            font-family: 'Instrument Serif', serif;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="w-full p-6 border-b border-gray-800 flex justify-between items-center bg-[#1c1c1a]">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-emerald-600 flex items-center justify-center font-bold text-white">U</div>
+            <h1 class="text-xl font-medium tracking-wide">Unotusk</h1>
+        </div>
+        <nav>
+            <a href="https://github.com/unotusk" class="text-sm text-gray-400 hover:text-white transition">Documentation</a>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col items-center justify-center p-8 max-w-4xl mx-auto w-full">
+        <div class="text-center mb-12">
+            <h2 class="text-5xl md:text-6xl font-serif-custom mb-6 text-white leading-tight">Install Unotusk MVP Client</h2>
+            <p class="text-lg text-gray-400 max-w-2xl mx-auto">Download the native employee desktop application to connect to your local Unotusk Server instance.</p>
+        </div>
+
+        <!-- Downloads Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+            <!-- Linux -->
+            <div class="bg-[#242422] border border-gray-700 rounded-xl p-8 flex flex-col items-center hover:border-gray-500 transition shadow-lg">
+                <svg class="w-16 h-16 text-gray-300 mb-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.001 22.029c-3.151 0-5.83-2.122-6.529-5.111l-.105-.446c-.05-.213-.191-.383-.391-.475-.853-.385-1.428-1.222-1.428-2.176 0-1.121.758-2.072 1.83-2.327l.45-.106c.214-.052.395-.197.498-.398.549-1.077 1.488-1.921 2.651-2.383l.317-.124c.266-.104.457-.336.507-.614.07-.384.19-.757.359-1.111l.147-.306c.125-.259.13-.559.012-.821-.219-.488-.331-1.011-.331-1.547 0-2.177 1.771-3.948 3.948-3.948 2.177 0 3.948 1.771 3.948 3.948 0 .536-.112 1.059-.331 1.547-.118.262-.113.562.012.821l.147.306c.169.354.289.727.359 1.111.05.278.241.51.507.614l.317.124c1.163.462 2.102 1.306 2.651 2.383.103.201.284.346.498.398l.45.106c1.072.255 1.83 1.206 1.83 2.327 0 .954-.575 1.791-1.428 2.176-.2.092-.341.262-.391.475l-.105.446c-.699 2.989-3.378 5.111-6.529 5.111zm-3.08-9.155c-.754 0-1.365.611-1.365 1.365s.611 1.365 1.365 1.365 1.365-.611 1.365-1.365-.611-1.365-1.365-1.365zm6.16 0c-.754 0-1.365.611-1.365 1.365s.611 1.365 1.365 1.365 1.365-.611 1.365-1.365-.611-1.365-1.365-1.365z"/>
+                </svg>
+                <h3 class="text-2xl font-semibold mb-2">Linux</h3>
+                <p class="text-sm text-gray-400 mb-6 text-center">Ubuntu 22.04+ / Debian (x64)</p>
+                <a href="#" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg w-full text-center transition">
+                    Download .tar.gz
+                </a>
+                <code class="mt-4 text-xs text-gray-500 block">v0.1.0 • 12MB</code>
+            </div>
+
+            <!-- Windows -->
+            <div class="bg-[#242422] border border-gray-700 rounded-xl p-8 flex flex-col items-center hover:border-gray-500 transition shadow-lg">
+                <svg class="w-16 h-16 text-gray-300 mb-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.949-1.801"/>
+                </svg>
+                <h3 class="text-2xl font-semibold mb-2">Windows</h3>
+                <p class="text-sm text-gray-400 mb-6 text-center">Windows 10 / 11 (x64)</p>
+                <a href="#" class="px-6 py-3 bg-[#1e293b] hover:bg-[#334155] text-white font-medium rounded-lg w-full text-center transition">
+                    Download .zip
+                </a>
+                <code class="mt-4 text-xs text-gray-500 block">v0.1.0 • 15MB</code>
+            </div>
+        </div>
+        
+        <div class="mt-16 w-full max-w-3xl bg-[#1c1c1a] border border-gray-800 rounded-xl p-8">
+            <h4 class="text-xl font-medium mb-4">Installation Instructions</h4>
+            <div class="space-y-4 text-gray-300 text-sm">
+                <p>1. Download the appropriate package for your operating system.</p>
+                <p>2. Extract the archive to your preferred location.</p>
+                <p>3. Run the application executable (`app` on Linux, `app.exe` on Windows).</p>
+                <p>4. On launch, enter your local Unotusk Server IP (e.g. `http://10.0.0.59:8000`) provided by your administrator.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full p-6 text-center text-sm text-gray-600 border-t border-gray-800 mt-auto">
+        &copy; 2026 Unotusk Intelligence. Single-Tenant MVP.
+    </footer>
+</body>
+</html>

@@ -57,7 +57,7 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
     try {
       final res = await _processExecutor(
         'docker',
-        ['compose', '-p', server.composeProject, 'ps', '--format', 'json'],
+        ['compose', '-p', server.composeProject, 'ps', '--all', '--format', 'json'],
         workingDirectory: server.deploymentDir,
       );
       

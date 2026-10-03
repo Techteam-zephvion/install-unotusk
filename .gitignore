@@ -45,3 +45,5 @@ validation_repos/
 # Legacy prototypes
 legacy/
 docs/Unotusk MVP Design/*
+# Chat sessions
+sessions/

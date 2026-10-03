@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+
 class RepositoryClient {
   final String baseUrl;
   late final Dio _dio;
