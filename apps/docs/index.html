@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unotusk Documentation — Architecture, Deployment &amp; Operations</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Young+Serif&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        paper: '#F8F7F4',
+                        surface: '#FFFFFF',
+                        surfaceTint: '#F2EFE9',
+                        ink: '#161615',
+                        inkSecondary: '#52504A',
+                        inkMuted: '#7E7B74',
+                        rule: '#DFDCD5',
+                        ruleDark: '#C2BFB6',
+                        accent: '#B84A2A',
+                        accentHover: '#9E3E22',
+                        live: '#2D6A4F',
+                        terminalBg: '#141413'
+                    },
+                    fontFamily: {
+                        serif: ['"Young Serif"', 'Georgia', 'serif'],
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                        mono: ['"IBM Plex Mono"', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html {
+            background-color: #F8F7F4;
+            color: #161615;
+            scroll-behavior: smooth;
+        }
+        body {
+            background-color: #F8F7F4;
+            color: #161615;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .hairline-b { border-bottom: 1px solid #DFDCD5; }
+        .hairline-t { border-top: 1px solid #DFDCD5; }
+        .hairline-r { border-right: 1px solid #DFDCD5; }
+        .hairline-l { border-left: 1px solid #DFDCD5; }
+        .hairline-all { border: 1px solid #DFDCD5; }
+
+        /* Custom scrollbar for doc content */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F8F7F4;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #DFDCD5;
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #C2BFB6;
+        }
+
+        /* Toast */
+        #copy-toast {
+            opacity: 0;
+            transform: translateY(6px);
+            transition: all 0.16s ease-out;
+            pointer-events: none;
+        }
+        #copy-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Active Nav Styling */
+        .doc-link.active {
+            color: #B84A2A;
+            font-weight: 600;
+            border-left: 2px solid #B84A2A;
+            padding-left: 10px;
+            background-color: rgba(184, 74, 42, 0.04);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-paper text-ink selection:bg-ink selection:text-white">
+
+    <!-- Top Documentation Bar -->
+    <header class="w-full hairline-b bg-paper/95 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button id="mobile-menu-btn" class="md:hidden p-2 text-inkSecondary hover:text-ink">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <a href="/" class="flex items-center gap-2.5">
+                    <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-6 h-6 object-contain" />
+                    <span class="font-serif text-xl tracking-tight text-ink">Unotusk</span>
+                    <span class="font-mono text-xs text-accent font-semibold px-1.5 py-0.5 bg-paper hairline-all rounded-[2px]">DOCS</span>
+                </a>
+            </div>
+
+            <!-- Global Search & Direct Links -->
+            <div class="flex items-center gap-4 sm:gap-6 font-mono text-xs">
+                <div class="relative hidden sm:block w-64">
+                    <input type="text" id="doc-search" placeholder="Search documentation..." 
+                           class="w-full bg-surface hairline-all px-3 py-1.5 rounded-[2px] text-xs text-ink placeholder-inkMuted focus:outline-none focus:border-accent font-mono transition-colors" />
+                    <span class="absolute right-2.5 top-2 text-[10px] text-inkMuted border border-rule px-1 rounded bg-paper">/</span>
+                </div>
+
+                <a href="https://install.unotusk.com" target="_blank" rel="noopener noreferrer" 
+                   class="text-inkSecondary hover:text-ink transition-colors font-medium hidden sm:inline-flex items-center gap-1">
+                    <span>Downloads</span>
+                    <span class="text-[10px]">&nearr;</span>
+                </a>
+                <a href="mailto:support@unotusk.com" class="text-inkSecondary hover:text-ink transition-colors font-medium">
+                    Support
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Docs Shell: 3-Column Layout -->
+    <div class="max-w-[1400px] mx-auto w-full flex-grow flex">
+        
+        <!-- Sidebar Navigation (Desktop) -->
+        <aside id="doc-sidebar" class="w-72 shrink-0 hairline-r bg-paper p-6 pb-20 hidden md:block overflow-y-auto max-h-[calc(100vh-4rem)] sticky top-16 text-xs font-mono">
+            
+            <div class="space-y-6">
+                <!-- Section 1 -->
+                <div>
+                    <div class="text-[11px] text-inkMuted uppercase tracking-wider font-semibold mb-2.5">1. Getting Started</div>
+                    <ul class="space-y-1 text-inkSecondary">
+                        <li><a href="#overview" class="doc-link block py-1 hover:text-ink transition-colors">Architecture Overview</a></li>
+                        <li><a href="#quick-start" class="doc-link block py-1 hover:text-ink transition-colors">3-Minute Quick Start</a></li>
+                        <li><a href="#system-requirements" class="doc-link block py-1 hover:text-ink transition-colors">Hardware Requirements</a></li>
+                    </ul>
+                </div>
+
+                <!-- Section 2 -->
+                <div>
+                    <div class="text-[11px] text-inkMuted uppercase tracking-wider font-semibold mb-2.5">2. Server Node Deployment</div>
+                    <ul class="space-y-1 text-inkSecondary">
+                        <li><a href="#server-wizard" class="doc-link block py-1 hover:text-ink transition-colors">Windows Server Setup (.msi)</a></li>
+                        <li><a href="#server-linux" class="doc-link block py-1 hover:text-ink transition-colors">Linux Host Setup (.tar.gz)</a></li>
+                        <li><a href="#server-docker" class="doc-link block py-1 hover:text-ink transition-colors">Headless Docker Compose</a></li>
+                        <li><a href="#port-allocation" class="doc-link block py-1 hover:text-ink transition-colors">Port Allocation &amp; Networking</a></li>
+                        <li><a href="#server-health" class="doc-link block py-1 hover:text-ink transition-colors">Health Verification API</a></li>
+                    </ul>
+                </div>
+
+                <!-- Section 3 -->
+                <div>
+                    <div class="text-[11px] text-inkMuted uppercase tracking-wider font-semibold mb-2.5">3. Desktop Client</div>
+                    <ul class="space-y-1 text-inkSecondary">
+                        <li><a href="#client-install" class="doc-link block py-1 hover:text-ink transition-colors">Client Installation</a></li>
+                        <li><a href="#client-connection" class="doc-link block py-1 hover:text-ink transition-colors">Connecting to Host LAN</a></li>
+                        <li><a href="#grounded-ask" class="doc-link block py-1 hover:text-ink transition-colors">Evidentiary Grounded Ask</a></li>
+                        <li><a href="#discoveries-engine" class="doc-link block py-1 hover:text-ink transition-colors">Proactive Discoveries</a></li>
+                        <li><a href="#team-knowledge" class="doc-link block py-1 hover:text-ink transition-colors">Curating ADRs &amp; Constraints</a></li>
+                    </ul>
+                </div>
+
+                <!-- Section 4 -->
+                <div>
+                    <div class="text-[11px] text-inkMuted uppercase tracking-wider font-semibold mb-2.5">4. Systems Architecture</div>
+                    <ul class="space-y-1 text-inkSecondary">
+                        <li><a href="#air-gap-security" class="doc-link block py-1 hover:text-ink transition-colors">Air-Gap &amp; Zero Cloud Egress</a></li>
+                        <li><a href="#treesitter-engine" class="doc-link block py-1 hover:text-ink transition-colors">Tree-sitter AST Ingestion</a></li>
+                        <li><a href="#postgres-pgvector" class="doc-link block py-1 hover:text-ink transition-colors">PostgreSQL 16 + pgvector</a></li>
+                        <li><a href="#redis-worker" class="doc-link block py-1 hover:text-ink transition-colors">Redis 7 Task Broker</a></li>
+                    </ul>
+                </div>
+
+                <!-- Section 5 -->
+                <div>
+                    <div class="text-[11px] text-inkMuted uppercase tracking-wider font-semibold mb-2.5">5. Operations &amp; Runbooks</div>
+                    <ul class="space-y-1 text-inkSecondary">
+                        <li><a href="#hotfix-ports" class="doc-link block py-1 hover:text-ink transition-colors">Resolving Port Conflicts</a></li>
+                        <li><a href="#backup-restore" class="doc-link block py-1 hover:text-ink transition-colors">Backup &amp; Restore (pgvector)</a></li>
+                        <li><a href="#diagnostics-logging" class="doc-link block py-1 hover:text-ink transition-colors">Diagnostic Logs &amp; Audit</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-4 hairline-t text-[11px] text-inkMuted">
+                <span>Version: v0.1.0-mvp</span><br>
+                <span>Entity: Unotusk Pvt. Ltd.</span>
+            </div>
+        </aside>
+
+        <!-- Main Documentation Content -->
+        <main class="flex-grow p-6 sm:p-10 lg:p-14 max-w-4xl">
+            
+            <!-- DOC SECTION 1: ARCHITECTURE OVERVIEW -->
+            <article id="overview" class="doc-article pb-12 mb-12 hairline-b">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">1.1 Introduction</div>
+                <h1 class="font-serif text-3xl sm:text-4xl text-ink tracking-tight mb-4">Architecture Overview</h1>
+                <p class="text-base text-inkSecondary leading-relaxed mb-6">
+                    Unotusk is a self-contained, single-tenant intelligence engine for engineering teams. Unlike cloud-hosted AI coding assistants that transmit source code and AST tokens to external multi-tenant infrastructure, Unotusk runs 100% within your private infrastructure.
+                </p>
+
+                <div class="hairline-all p-5 bg-surface rounded-[2px] mb-6 font-mono text-xs">
+                    <div class="text-ink font-semibold mb-2 uppercase text-[11px] tracking-wider">Core Operating Invariants:</div>
+                    <ul class="space-y-2 text-inkSecondary">
+                        <li class="flex items-start gap-2">
+                            <span class="text-live font-bold">&bull;</span>
+                            <span><strong>Zero Cloud Egress:</strong> 0 packets leave your internal network during AST parsing, vector embedding search, and query grounding.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-live font-bold">&bull;</span>
+                            <span><strong>Evidentiary Grounding:</strong> Every response includes verifiable citation chips pointing to exact file paths and line ranges. If code evidence does not exist, the engine declares the absence rather than hallucinating.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-live font-bold">&bull;</span>
+                            <span><strong>Single-Tenant Local Stack:</strong> Deployed as a dedicated Server Node (PostgreSQL 16 + pgvector, Redis, FastAPI) communicating with native Desktop Clients over internal LAN HTTP REST (:8000).</span>
+                        </li>
+                    </ul>
+                </div>
+            </article>
+
+            <!-- DOC SECTION 2: QUICK START -->
+            <article id="quick-start" class="doc-article pb-12 mb-12 hairline-b">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">1.2 Getting Started</div>
+                <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">3-Minute Quick Start Guide</h2>
+                <p class="text-sm sm:text-base text-inkSecondary leading-relaxed mb-6">
+                    Setting up Unotusk involves two straightforward steps: starting the local Server Node on a designated workstation or server, and pointing your team’s Desktop Clients to its internal IP address.
+                </p>
+
+                <div class="space-y-5 font-mono text-xs">
+                    <!-- Step 1 -->
+                    <div class="hairline-all p-5 bg-surface rounded-[2px]">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-accent font-bold text-sm">STEP 1:</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Launch Server Setup Wizard</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed mb-3">
+                            On your host server or workstation, run the Server Setup Wizard. The wizard verifies Docker connectivity and port availability, then boots the stack:
+                        </p>
+                        <div class="p-3 bg-terminalBg text-emerald-400 rounded-[2px] text-xs">
+                            $ ./setup_app
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="hairline-all p-5 bg-surface rounded-[2px]">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-accent font-bold text-sm">STEP 2:</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Verify Endpoint Status</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed mb-3">
+                            Confirm the API engine is listening and connected to the database:
+                        </p>
+                        <div class="p-3 bg-terminalBg text-gray-200 rounded-[2px] text-xs">
+                            <div class="text-emerald-400 mb-1">$ curl -s http://localhost:8000/api/v1/health</div>
+                            <div class="text-gray-400 text-[11px]">{ "status": "healthy", "database": "postgresql+pgvector", "redis": "connected" }</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="hairline-all p-5 bg-surface rounded-[2px]">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-accent font-bold text-sm">STEP 3:</span>
+                            <span class="font-sans font-semibold text-sm text-ink">Connect Desktop Clients</span>
+                        </div>
+                        <p class="font-sans text-xs text-inkSecondary leading-relaxed">
+                            Share the host machine's internal LAN IP (e.g. <code class="bg-paper px-1.5 py-0.5 hairline-all text-ink">http://10.0.0.59:8000</code>) with engineers. On first launch of the native macOS, Windows, or Linux desktop app, paste this endpoint to begin querying.
+                        </p>
+                    </div>
+                </div>
+            </article>
+
+            <!-- DOC SECTION 3: SYSTEM REQUIREMENTS -->
+            <article id="system-requirements" class="doc-article pb-12 mb-12 hairline-b">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">1.3 Hardware Sizing</div>
+                <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">Host System Requirements</h2>
+                <p class="text-sm sm:text-base text-inkSecondary leading-relaxed mb-6">
+                    Hardware sizing depends on the number of concurrent engineering repositories and total lines of code indexed.
+                </p>
+
+                <!-- Hardware Table -->
+                <div class="hairline-all bg-surface rounded-[2px] overflow-hidden mb-6 text-xs font-mono">
+                    <div class="grid grid-cols-12 px-5 py-3 bg-surfaceTint hairline-b text-inkMuted font-semibold uppercase text-[11px]">
+                        <div class="col-span-3">Deployment Tier</div>
+                        <div class="col-span-2">vCPU</div>
+                        <div class="col-span-2">Memory</div>
+                        <div class="col-span-2">Disk</div>
+                        <div class="col-span-3">Capacity</div>
+                    </div>
+                    <div class="grid grid-cols-12 px-5 py-3.5 hairline-b items-center text-inkSecondary">
+                        <div class="col-span-3 font-semibold text-ink">Pilot / Local</div>
+                        <div class="col-span-2">2 Cores</div>
+                        <div class="col-span-2">4 GB</div>
+                        <div class="col-span-2">20 GB SSD</div>
+                        <div class="col-span-3 text-inkMuted">1–5 repos (&lt;50k LOC)</div>
+                    </div>
+                    <div class="grid grid-cols-12 px-5 py-3.5 hairline-b items-center text-inkSecondary bg-paper/30">
+                        <div class="col-span-3 font-semibold text-ink">Standard Team</div>
+                        <div class="col-span-2">4 Cores</div>
+                        <div class="col-span-2">8 GB</div>
+                        <div class="col-span-2">50 GB SSD</div>
+                        <div class="col-span-3 text-inkMuted">5–25 repos (&lt;250k LOC)</div>
+                    </div>
+                    <div class="grid grid-cols-12 px-5 py-3.5 items-center text-inkSecondary">
+                        <div class="col-span-3 font-semibold text-ink">Enterprise Core</div>
+                        <div class="col-span-2">8 Cores</div>
+                        <div class="col-span-2">16 GB</div>
+                        <div class="col-span-2">100 GB NVMe</div>
+                        <div class="col-span-3 text-inkMuted">25+ enterprise codebases</div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-inkMuted font-mono">
+                    Host OS: Ubuntu 20.04+, Debian 11+, RHEL 8+, macOS 12+, or Windows 10/11 x64 with Docker Desktop or Docker Engine 24+.
+                </div>
+            </article>
+
+            <!-- DOC SECTION 4: SERVER NODE DEPLOYMENT -->
+            <article id="server-wizard" class="doc-article pb-12 mb-12 hairline-b">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">2.1 Infrastructure</div>
+                <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">Server Node Setup</h2>
+                
+                <h3 class="font-serif text-lg text-ink mt-6 mb-2">Automated Setup Wizard (GUI)</h3>
+                <p class="text-sm text-inkSecondary leading-relaxed mb-4">
+                    The Setup Wizard is recommended for Windows Server hosts and desktop workstations. It handles container orchestration, pre-flight port checks, and database migrations with single-click verification.
+                </p>
+                <div class="hairline-all p-4 bg-surface rounded-[2px] font-mono text-xs mb-6">
+                    <span class="text-ink font-semibold">Downloads:</span>
+                    <ul class="mt-2 space-y-1 text-inkSecondary">
+                        <li>&bull; <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-windows-x64.msi" class="text-accent hover:underline">Windows Server Setup Wizard (.msi)</a></li>
+                        <li>&bull; <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-linux-x64.tar.gz" class="text-accent hover:underline">Linux Host Setup Wizard (.tar.gz)</a></li>
+                    </ul>
+                </div>
+
+                <h3 id="server-docker" class="font-serif text-lg text-ink mt-6 mb-2">Headless Linux Deployment (Docker Compose)</h3>
+                <p class="text-sm text-inkSecondary leading-relaxed mb-4">
+                    For headless Ubuntu, Debian, or enterprise servers, run the stack directly with Docker Compose:
+                </p>
+
+                <div class="bg-terminalBg text-gray-200 p-5 rounded-[2px] font-mono text-xs overflow-x-auto mb-6">
+<pre class="text-gray-300"><span class="text-gray-500"># 1. Start backend services</span>
+docker compose up -d
+
+<span class="text-gray-500"># 2. Check running container status</span>
+docker compose ps
+
+<span class="text-gray-500"># 3. View live FastAPI backend logs</span>
+docker compose logs -f api</pre>
+                </div>
+
+                <h3 id="port-allocation" class="font-serif text-lg text-ink mt-6 mb-2">Port Allocation</h3>
+                <div class="hairline-all bg-surface p-4 rounded-[2px] text-xs font-mono mb-4">
+                    <div class="grid grid-cols-3 gap-2 py-1 hairline-b font-semibold text-ink">
+                        <div>Port</div>
+                        <div>Protocol</div>
+                        <div>Service</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 py-1.5 hairline-b text-inkSecondary">
+                        <div class="text-accent font-semibold">:8000</div>
+                        <div>HTTP REST / WS</div>
+                        <div>FastAPI Intelligence Core (Client Ingress)</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 py-1.5 hairline-b text-inkSecondary">
+                        <div>:5432</div>
+                        <div>TCP / SQL</div>
+                        <div>PostgreSQL 16 + pgvector (Internal only)</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 py-1.5 text-inkSecondary">
+                        <div>:6379</div>
+                        <div>TCP</div>
+                        <div>Redis 7 Task Broker (Internal only)</div>
+                    </div>
+                </div>
+            </article>
+
+            <!-- DOC SECTION 5: DESKTOP CLIENT -->
+            <article id="client-install" class="doc-article pb-12 mb-12 hairline-b">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">3.1 Client Experience</div>
+                <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">Desktop Client Guide</h2>
+                <p class="text-sm sm:text-base text-inkSecondary leading-relaxed mb-6">
+                    The Desktop Client is the primary interface for software engineers and architects. It communicates directly with your local server node without passing through third-party servers.
+                </p>
+
+                <h3 id="grounded-ask" class="font-serif text-lg text-ink mt-6 mb-2">Evidentiary Grounded Ask</h3>
+                <p class="text-sm text-inkSecondary leading-relaxed mb-4">
+                    Press <kbd class="px-1.5 py-0.5 bg-paper hairline-all font-mono text-xs text-ink rounded">Ctrl + K</kbd> to open Grounded Ask. Type any architecture or implementation question:
+                </p>
+                <div class="hairline-all p-4 bg-surface rounded-[2px] text-xs font-mono text-inkSecondary mb-6">
+                    <div class="text-ink font-semibold mb-1">Example Queries:</div>
+                    <ul class="space-y-1 text-inkMuted">
+                        <li>&bull; <span class="text-ink">"Where are incoming HTTP requests authenticated?"</span></li>
+                        <li>&bull; <span class="text-ink">"Which modules have direct dependencies on the payment gateway?"</span></li>
+                        <li>&bull; <span class="text-ink">"Trace the execution flow from route dispatch to database commit."</span></li>
+                    </ul>
+                </div>
+
+                <h3 id="discoveries-engine" class="font-serif text-lg text-ink mt-6 mb-2">Proactive Discovery Analyzers</h3>
+                <p class="text-sm text-inkSecondary leading-relaxed mb-4">
+                    Upon repository ingestion, Unotusk runs 9 deterministic structural analyzers across the parsed AST:
+                </p>
+                <ul class="text-xs font-mono text-inkSecondary space-y-1.5 mb-6 pl-4 list-disc">
+                    <li><strong>Circular Dependency Detection:</strong> Uncovers import cycles across packages.</li>
+                    <li><strong>Component Coupling:</strong> Highlights tightly-coupled classes and God objects.</li>
+                    <li><strong>Test Coverage Gaps:</strong> Identifies public interfaces with zero associated unit test specs.</li>
+                    <li><strong>Security Boundary Violations:</strong> Detects unvalidated parameters in controller actions.</li>
+                </ul>
+            </article>
+
+            <!-- DOC SECTION 6: SYSTEMS ARCHITECTURE -->
+            <article id="air-gap-security" class="doc-article pb-12 mb-12 hairline-b">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">4.1 Security &amp; Isolation</div>
+                <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">Systems Architecture &amp; Data Isolation</h2>
+                <p class="text-sm sm:text-base text-inkSecondary leading-relaxed mb-6">
+                    Unotusk is designed for air-gapped security protocols. The system contains an offline deterministic synthesizer fallback, allowing complete codebase navigation and AST traversal with <strong>zero external internet connectivity</strong>.
+                </p>
+
+                <div class="hairline-all p-5 bg-surface rounded-[2px] font-mono text-xs mb-6">
+                    <div class="font-semibold text-ink mb-2 uppercase text-[11px]">Data Storage &amp; Encryption:</div>
+                    <p class="font-sans text-xs text-inkSecondary leading-relaxed mb-3">
+                        Relational schemas and vector chunk embeddings are stored in PostgreSQL 16 utilizing the <code>pgvector</code> extension with HNSW indexing. Code chunks and symbol references never leave the PostgreSQL database container.
+                    </p>
+                    <div class="text-inkMuted text-[11px]">
+                        Database connection: <code>postgresql://postgres:&lt;POSTGRES_PASSWORD&gt;@postgres:5432/unotusk_db</code>
+                    </div>
+                </div>
+            </article>
+
+            <!-- DOC SECTION 7: TROUBLESHOOTING -->
+            <article id="hotfix-ports" class="doc-article pb-12 mb-12">
+                <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">5.1 Operations Runbook</div>
+                <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">Troubleshooting &amp; Operations</h2>
+
+                <h3 class="font-serif text-lg text-ink mt-6 mb-2">Port 8000 Conflict Resolution</h3>
+                <p class="text-sm text-inkSecondary leading-relaxed mb-4">
+                    If another service (e.g. an existing development server or internal proxy) binds to port 8000:
+                </p>
+
+                <div class="bg-terminalBg text-gray-200 p-4 rounded-[2px] font-mono text-xs mb-6">
+<pre class="text-gray-300"><span class="text-gray-500"># 1. Identify conflicting process</span>
+sudo lsof -i :8000
+
+<span class="text-gray-500"># 2. Or rebind Unotusk port in .env</span>
+API_PORT=8080
+
+<span class="text-gray-500"># 3. Restart stack</span>
+docker compose up -d</pre>
+                </div>
+
+                <h3 id="diagnostics-logging" class="font-serif text-lg text-ink mt-6 mb-2">Health &amp; Diagnostic Logs</h3>
+                <p class="text-sm text-inkSecondary leading-relaxed mb-4">
+                    Unotusk automatically redacts all credentials, tokens, and passwords in all logs. To export complete diagnostics:
+                </p>
+                <div class="bg-terminalBg text-gray-200 p-3 rounded-[2px] font-mono text-xs">
+                    docker compose logs --tail=200 > unotusk-diagnostics.log
+                </div>
+            </article>
+
+        </main>
+    </div>
+
+    <!-- Minimal Docs Footer -->
+    <footer class="w-full hairline-t py-8 px-6 sm:px-10 bg-paper">
+        <div class="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-inkMuted font-mono">
+            <div class="flex items-center gap-3">
+                <img src="assets/unotusk-mark.svg" alt="Unotusk" class="w-4 h-4 object-contain opacity-70" />
+                <span class="font-sans font-medium text-ink">&copy; 2026 Unotusk Pvt. Ltd. All rights reserved.</span>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <a href="https://install.unotusk.com" class="hover:text-ink transition-colors">Install Page &nearr;</a>
+                <span class="text-ruleDark">&bull;</span>
+                <a href="mailto:support@unotusk.com" class="hover:text-ink transition-colors">support@unotusk.com</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="copy-toast" class="fixed bottom-6 right-6 bg-ink text-white px-3.5 py-2 rounded-[2px] text-xs font-mono shadow-md z-50">
+        Copied to clipboard
+    </div>
+
+    <!-- Script for Navigation, Search, and Copy -->
+    <script>
+        // Active link tracking on scroll
+        const articles = document.querySelectorAll('.doc-article');
+        const navLinks = document.querySelectorAll('.doc-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            articles.forEach(article => {
+                const articleTop = article.offsetTop - 100;
+                if (window.pageYOffset >= articleTop) {
+                    current = article.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Search filtering
+        const searchInput = document.getElementById('doc-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase().trim();
+                articles.forEach(article => {
+                    const text = article.innerText.toLowerCase();
+                    if (term === '' || text.includes(term)) {
+                        article.style.display = 'block';
+                    } else {
+                        article.style.display = 'none';
+                    }
+                });
+            });
+
+            // Keyboard shortcut '/' to search
+            window.addEventListener('keydown', (e) => {
+                if (e.key === '/' && document.activeElement !== searchInput) {
+                    e.preventDefault();
+                    searchInput.focus();
+                }
+            });
+        }
+
+        // Mobile drawer toggle
+        const mobileBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('doc-sidebar');
+        if (mobileBtn && sidebar) {
+            mobileBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('hidden');
+                sidebar.classList.toggle('fixed');
+                sidebar.classList.toggle('inset-0');
+                sidebar.classList.toggle('z-50');
+                sidebar.classList.toggle('bg-paper');
+            });
+        }
+
+        // Copy helper
+        function copyCode(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const toast = document.getElementById('copy-toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -2,6 +2,16 @@
   "rewrites": [
     {
       "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "docs.unotusk.com"
+        }
+      ],
+      "destination": "/apps/docs/$1"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/apps/install-site/$1"
     }
   ]
