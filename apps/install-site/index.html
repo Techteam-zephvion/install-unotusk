@@ -146,7 +146,7 @@
                 <div class="lg:col-span-4 hairline-all p-6 sm:p-7 bg-surface rounded-[2px]">
                     <div class="font-mono text-xs text-inkMuted uppercase tracking-wider mb-4 pb-2.5 hairline-b flex items-center justify-between">
                         <span>Distribution Spec</span>
-                        <span class="text-ink font-semibold">v0.1.0-mvp</span>
+                        <span class="text-ink font-semibold" data-version-tag>v1.0.1-rudra</span>
                     </div>
 
                     <div class="font-mono text-sm space-y-3 text-inkSecondary">
@@ -187,8 +187,9 @@
                     <h2 class="font-serif text-3xl sm:text-4xl text-ink">Desktop Client Distribution</h2>
                     <p class="text-sm sm:text-base text-inkSecondary mt-1.5">Native client for software engineers, tech leads, and software architects.</p>
                 </div>
-                <div class="font-mono text-xs sm:text-sm text-inkMuted">
-                    Connects directly to your local server node at launch
+                <div class="font-mono text-xs sm:text-sm text-inkMuted flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-live"></span>
+                    <span data-release-meta>Release v1.0.1 "Rudra" &bull; 2026-10-04</span>
                 </div>
             </div>
 
@@ -222,7 +223,8 @@
                         macOS 12.0+
                     </div>
                     <div class="col-span-3 md:text-right">
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-macos.dmg" 
+                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-employee-macos.dmg" 
+                           data-download="employeeMacos"
                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-ink hover:bg-black text-white text-sm font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto shadow-sm">
                             <span>Download .dmg</span>
                             <span class="text-xs text-white/70">&darr;</span>
@@ -249,7 +251,8 @@
                         Windows 10 / 11
                     </div>
                     <div class="col-span-3 md:text-right">
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-windows-x64.msi" 
+                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-employee-windows-x64.msi" 
+                           data-download="employeeWindows"
                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-ink hover:bg-black text-white text-sm font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto shadow-sm">
                             <span>Download .msi</span>
                             <span class="text-xs text-white/70">&darr;</span>
@@ -276,7 +279,8 @@
                         Ubuntu / Debian / Fedora
                     </div>
                     <div class="col-span-3 md:text-right">
-                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-employee-linux-x64.tar.gz" 
+                        <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-employee-linux-x64.tar.gz" 
+                           data-download="employeeLinux"
                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-ink hover:bg-black text-white text-sm font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto shadow-sm">
                             <span>Download .tar.gz</span>
                             <span class="text-xs text-white/70">&darr;</span>
@@ -319,7 +323,8 @@
                                     <div class="text-sm sm:text-base font-semibold text-ink">Windows Server Setup Wizard</div>
                                     <div class="text-xs sm:text-sm text-inkMuted font-mono mt-1">Windows Server 2019/2022, Windows 10/11 x64 (.msi)</div>
                                 </div>
-                                <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-windows-x64.msi" 
+                                <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-server-windows-x64.msi" 
+                                   data-download="serverWindows"
                                    class="text-sm font-mono font-semibold text-ink hover:text-accent transition-colors flex items-center gap-1.5">
                                     <span>Download .msi</span>
                                     <span>&rarr;</span>
@@ -331,7 +336,8 @@
                                     <div class="text-sm sm:text-base font-semibold text-ink">Linux Host Setup Package</div>
                                     <div class="text-xs sm:text-sm text-inkMuted font-mono mt-1">Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+ (.tar.gz)</div>
                                 </div>
-                                <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/latest/download/unotusk-server-linux-x64.tar.gz" 
+                                <a href="https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-server-linux-x64.tar.gz" 
+                                   data-download="serverLinux"
                                    class="text-sm font-mono font-semibold text-ink hover:text-accent transition-colors flex items-center gap-1.5">
                                     <span>Download .tar.gz</span>
                                     <span>&rarr;</span>
@@ -624,7 +630,7 @@
         Command copied
     </div>
 
-    <!-- Copy Helper Script -->
+    <!-- Scripts -->
     <script>
         function copyCode(text) {
             navigator.clipboard.writeText(text).then(() => {
@@ -633,6 +639,47 @@
                 setTimeout(() => toast.classList.remove('show'), 2000);
             });
         }
+
+        // Dynamic Release Link & Version Synchronization
+        (function syncReleaseManifest() {
+            fetch('/version.json?t=' + Date.now())
+                .then(res => {
+                    if (!res.ok) throw new Error('Manifest response status ' + res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data || !data.downloads) return;
+
+                    // Update version tag badges
+                    const tag = data.tag || ('v' + data.version);
+                    document.querySelectorAll('[data-version-tag]').forEach(el => {
+                        el.textContent = tag;
+                    });
+
+                    // Update release meta lines
+                    if (data.releaseDate) {
+                        const codenameStr = data.codename ? ` "${data.codename}"` : '';
+                        document.querySelectorAll('[data-release-meta]').forEach(el => {
+                            el.textContent = `Release ${tag}${codenameStr} \u2022 ${data.releaseDate}`;
+                        });
+                        document.querySelectorAll('[data-release-date]').forEach(el => {
+                            el.textContent = data.releaseDate;
+                        });
+                    }
+
+                    // Update all platform download links
+                    Object.entries(data.downloads).forEach(([key, item]) => {
+                        const linkEl = document.querySelector(`[data-download="${key}"]`);
+                        if (linkEl && item && item.url) {
+                            linkEl.href = item.url;
+                        }
+                    });
+                })
+                .catch(err => {
+                    // Graceful fallback: pre-rendered HTML static v1.0.1 links remain active
+                    console.info('Unotusk distribution running with bundled release links:', err.message);
+                });
+        })();
     </script>
 </body>
 </html>

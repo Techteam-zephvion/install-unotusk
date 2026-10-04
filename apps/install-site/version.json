@@ -1,0 +1,40 @@
+{
+  "version": "1.0.1",
+  "codename": "Rudra",
+  "tag": "v1.0.1-rudra",
+  "releaseDate": "2026-10-04",
+  "channel": "stable",
+  "repository": "Techteam-zephvion/install-unotusk",
+  "downloads": {
+    "employeeMacos": {
+      "filename": "unotusk-employee-macos.dmg",
+      "format": ".dmg disk image",
+      "platform": "macOS 12.0+ (Apple Silicon & Intel)",
+      "url": "https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-employee-macos.dmg"
+    },
+    "employeeWindows": {
+      "filename": "unotusk-employee-windows-x64.msi",
+      "format": ".msi installer",
+      "platform": "Windows 10 / 11 (x86_64)",
+      "url": "https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-employee-windows-x64.msi"
+    },
+    "employeeLinux": {
+      "filename": "unotusk-employee-linux-x64.tar.gz",
+      "format": ".tar.gz standalone archive",
+      "platform": "Linux (glibc 2.31+)",
+      "url": "https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-employee-linux-x64.tar.gz"
+    },
+    "serverWindows": {
+      "filename": "unotusk-server-windows-x64.msi",
+      "format": ".msi installer",
+      "platform": "Windows Server 2019/2022, Windows 10/11 x64",
+      "url": "https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-server-windows-x64.msi"
+    },
+    "serverLinux": {
+      "filename": "unotusk-server-linux-x64.tar.gz",
+      "format": ".tar.gz archive",
+      "platform": "Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+",
+      "url": "https://github.com/Techteam-zephvion/install-unotusk/releases/download/v1.0.1-rudra/unotusk-server-linux-x64.tar.gz"
+    }
+  }
+}

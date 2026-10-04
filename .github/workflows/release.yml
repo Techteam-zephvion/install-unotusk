@@ -1,0 +1,659 @@
+name: Release — Build Multi-Platform Installers & Sync Portal
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release Tag / Codename (e.g. v1.0.1-rudra, aditya, v1.0.1-dhruv)"
+        required: true
+        default: "v1.0.1-rudra"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.x"
+  FLUTTER_CHANNEL: "stable"
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || github.event.inputs.tag || 'v1.0.1-rudra' }}
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Employee Desktop App: Linux x64 (.tar.gz)
+  # ─────────────────────────────────────────────────────────────
+  build-employee-linux:
+    name: "Employee App: Linux x64 (.tar.gz)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - run: flutter config --enable-linux-desktop
+
+      - name: Install dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build Linux release
+        working-directory: app
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          NUM_VER=$(echo "$TAG" | grep -oP '\d+\.\d+(\.\d+)?' || echo "1.0.1")
+          flutter build linux --release \
+            --build-name="${NUM_VER}" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Package tar.gz + sha256
+        working-directory: app/build/linux/x64/release
+        run: |
+          tar -czvf unotusk-employee-linux-x64.tar.gz bundle/
+          sha256sum unotusk-employee-linux-x64.tar.gz > unotusk-employee-linux-x64.tar.gz.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-employee-linux-x64
+          path: |
+            app/build/linux/x64/release/unotusk-employee-linux-x64.tar.gz
+            app/build/linux/x64/release/unotusk-employee-linux-x64.tar.gz.sha256
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Employee Desktop App: Windows x64 (.msi via WiX)
+  # ─────────────────────────────────────────────────────────────
+  build-employee-windows:
+    name: "Employee App: Windows x64 (.msi)"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build Windows release
+        working-directory: app
+        shell: pwsh
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          $numVer = [regex]::Match($env:TAG, '\d+\.\d+(\.\d+)?').Value
+          if (-not $numVer) { $numVer = "1.0.1" }
+          flutter build windows --release `
+            --build-name="$numVer" `
+            --build-number="${{ github.run_number }}"
+
+      - name: Locate or Install WiX Toolset
+        id: wix
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
+                 Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dir) {
+            choco install wixtoolset -y --no-progress | Out-Null
+            $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
+                   Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          }
+          echo "WIX_BIN=$dir\bin" >> $env:GITHUB_OUTPUT
+          Write-Host "WiX found at: $dir\bin"
+
+      - name: Harvest files + compile MSI
+        shell: pwsh
+        env:
+          WIX_BIN: ${{ steps.wix.outputs.WIX_BIN }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          $src = @(
+            "app\build\windows\x64\runner\Release",
+            "app\build\windows\runner\Release"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $src) { Write-Error 'Flutter Release dir not found'; exit 1 }
+          $src = (Resolve-Path $src).Path
+          Write-Host "Source dir: $src"
+
+          & "$env:WIX_BIN\heat.exe" dir $src `
+            -gg -scom -sreg -srd `
+            -dr INSTALLFOLDER -cg AppComponents `
+            -var var.SourceDir -nologo `
+            -o Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          Set-Content License.rtf '{\rtf1\ansi Unotusk Employee App - Internal Use Only.}' -Encoding ascii
+
+          $numVer = [regex]::Match($env:TAG, '\d+\.\d+(\.\d+)?').Value
+          if (-not $numVer) { $numVer = "1.0.1" }
+          $ver = "$numVer.0"
+
+          $wxsContent = @(
+            "<?xml version='1.0' encoding='UTF-8'?>"
+            "<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>"
+            "  <Product Id='*' Name='Unotusk Employee' Language='1033'"
+            "           Version='$ver' Manufacturer='Unotusk Pvt. Ltd.'"
+            "           UpgradeCode='7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D'>"
+            "    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>"
+            "    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>"
+            "    <MediaTemplate EmbedCab='yes'/>"
+            "    <Feature Id='ProductFeature' Title='Unotusk Employee' Level='1'>"
+            "      <ComponentGroupRef Id='AppComponents'/>"
+            "      <ComponentRef Id='DesktopShortcutComp'/>"
+            "      <ComponentRef Id='StartMenuShortcutComp'/>"
+            "    </Feature>"
+            "    <UIRef Id='WixUI_Minimal'/>"
+            "    <WixVariable Id='WixUILicenseRtf' Value='License.rtf'/>"
+            "  </Product>"
+            "  <Fragment>"
+            "    <Directory Id='TARGETDIR' Name='SourceDir'>"
+            "      <Directory Id='ProgramFiles64Folder'>"
+            "        <Directory Id='INSTALLFOLDER' Name='Unotusk Employee'/>"
+            "      </Directory>"
+            "      <Directory Id='DesktopFolder'/>"
+            "      <Directory Id='ProgramMenuFolder'>"
+            "        <Directory Id='StartMenuAppFolder' Name='Unotusk Employee'/>"
+            "      </Directory>"
+            "    </Directory>"
+            "  </Fragment>"
+            "  <Fragment>"
+            "    <DirectoryRef Id='DesktopFolder'>"
+            "      <Component Id='DesktopShortcutComp' Guid='A1B2C3D4-E5F6-7890-ABCD-111111111111' Win64='yes'>"
+            "        <Shortcut Id='DesktopShortcut' Name='Unotusk Employee'"
+            "                  Target='[INSTALLFOLDER]app.exe' WorkingDirectory='INSTALLFOLDER'/>"
+            "        <RegistryValue Root='HKMU' Key='Software\Unotusk\Employee'"
+            "                       Name='DesktopShortcut' Type='integer' Value='1' KeyPath='yes'/>"
+            "      </Component>"
+            "    </DirectoryRef>"
+            "    <DirectoryRef Id='StartMenuAppFolder'>"
+            "      <Component Id='StartMenuShortcutComp' Guid='B2C3D4E5-F6A7-8901-BCDE-222222222222' Win64='yes'>"
+            "        <Shortcut Id='StartMenuShortcut' Name='Unotusk Employee'"
+            "                  Target='[INSTALLFOLDER]app.exe' WorkingDirectory='INSTALLFOLDER'/>"
+            "        <RemoveFolder Id='RemoveStartMenuFolder' Directory='StartMenuAppFolder' On='uninstall'/>"
+            "        <RegistryValue Root='HKMU' Key='Software\Unotusk\Employee'"
+            "                       Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>"
+            "      </Component>"
+            "    </DirectoryRef>"
+            "  </Fragment>"
+            "</Wix>"
+          ) -join "`n"
+          [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'Product.wxs'), $wxsContent)
+
+          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension -sval Product.wixobj Components.wixobj -o unotusk-employee-windows-x64.msi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $hash = (Get-FileHash unotusk-employee-windows-x64.msi -Algorithm SHA256).Hash
+          "$hash  unotusk-employee-windows-x64.msi" | Out-File unotusk-employee-windows-x64.msi.sha256 -Encoding ascii
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-employee-windows-x64
+          path: |
+            unotusk-employee-windows-x64.msi
+            unotusk-employee-windows-x64.msi.sha256
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Employee Desktop App: macOS (.dmg)
+  # ─────────────────────────────────────────────────────────────
+  build-employee-macos:
+    name: "Employee App: macOS (.dmg)"
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - run: flutter config --enable-macos-desktop
+
+      - name: Install dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build macOS release
+        working-directory: app
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          NUM_VER=$(echo "$TAG" | grep -oP '\d+\.\d+(\.\d+)?' || echo "1.0.1")
+          flutter build macos --release \
+            --build-name="${NUM_VER}" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        working-directory: app/build/macos/Build/Products/Release
+        run: |
+          APP=$(ls -d *.app 2>/dev/null | head -1)
+          if [ -z "$APP" ]; then echo "No .app found"; ls -la; exit 1; fi
+
+          create-dmg \
+            --volname "Unotusk Employee" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 128 \
+            --icon "$APP" 180 185 \
+            --hide-extension "$APP" \
+            --app-drop-link 480 185 \
+            --no-internet-enable \
+            "unotusk-employee-macos.dmg" "$APP" || true
+
+          if [ ! -f "unotusk-employee-macos.dmg" ]; then
+            mkdir -p _stage && cp -r "$APP" _stage/ && ln -s /Applications _stage/Applications
+            hdiutil create -volname "Unotusk Employee" -srcfolder _stage \
+              -ov -format UDZO "unotusk-employee-macos.dmg"
+          fi
+
+          shasum -a 256 unotusk-employee-macos.dmg > unotusk-employee-macos.dmg.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-employee-macos
+          path: |
+            app/build/macos/Build/Products/Release/unotusk-employee-macos.dmg
+            app/build/macos/Build/Products/Release/unotusk-employee-macos.dmg.sha256
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Server Setup App: Linux x64 (.tar.gz)
+  # ─────────────────────────────────────────────────────────────
+  build-server-linux:
+    name: "Server Setup App: Linux x64 (.tar.gz)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - run: flutter config --enable-linux-desktop
+
+      - name: Install dependencies
+        working-directory: setup_app
+        run: flutter pub get
+
+      - name: Build Linux release
+        working-directory: setup_app
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          NUM_VER=$(echo "$TAG" | grep -oP '\d+\.\d+(\.\d+)?' || echo "1.0.1")
+          flutter build linux --release \
+            --build-name="${NUM_VER}" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Package Server tar.gz + sha256
+        working-directory: setup_app/build/linux/x64/release
+        run: |
+          tar -czvf unotusk-server-linux-x64.tar.gz bundle/
+          sha256sum unotusk-server-linux-x64.tar.gz > unotusk-server-linux-x64.tar.gz.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-server-linux-x64
+          path: |
+            setup_app/build/linux/x64/release/unotusk-server-linux-x64.tar.gz
+            setup_app/build/linux/x64/release/unotusk-server-linux-x64.tar.gz.sha256
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # 5. Server Setup App: Windows x64 (.msi via WiX)
+  # ─────────────────────────────────────────────────────────────
+  build-server-windows:
+    name: "Server Setup App: Windows x64 (.msi)"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        working-directory: setup_app
+        run: flutter pub get
+
+      - name: Build Windows release
+        working-directory: setup_app
+        shell: pwsh
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          $numVer = [regex]::Match($env:TAG, '\d+\.\d+(\.\d+)?').Value
+          if (-not $numVer) { $numVer = "1.0.1" }
+          flutter build windows --release `
+            --build-name="$numVer" `
+            --build-number="${{ github.run_number }}"
+
+      - name: Locate or Install WiX Toolset
+        id: wix
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
+                 Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dir) {
+            choco install wixtoolset -y --no-progress | Out-Null
+            $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
+                   Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          }
+          echo "WIX_BIN=$dir\bin" >> $env:GITHUB_OUTPUT
+          Write-Host "WiX found at: $dir\bin"
+
+      - name: Harvest files + compile Server MSI
+        shell: pwsh
+        env:
+          WIX_BIN: ${{ steps.wix.outputs.WIX_BIN }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          $src = @(
+            "setup_app\build\windows\x64\runner\Release",
+            "setup_app\build\windows\runner\Release"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $src) { Write-Error 'Flutter Release dir not found'; exit 1 }
+          $src = (Resolve-Path $src).Path
+          Write-Host "Source dir: $src"
+
+          & "$env:WIX_BIN\heat.exe" dir $src `
+            -gg -scom -sreg -srd `
+            -dr INSTALLFOLDER -cg AppComponents `
+            -var var.SourceDir -nologo `
+            -o Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          Set-Content License.rtf '{\rtf1\ansi Unotusk Server Setup - Internal Use Only.}' -Encoding ascii
+
+          $numVer = [regex]::Match($env:TAG, '\d+\.\d+(\.\d+)?').Value
+          if (-not $numVer) { $numVer = "1.0.1" }
+          $ver = "$numVer.0"
+
+          $wxsContent = @(
+            "<?xml version='1.0' encoding='UTF-8'?>"
+            "<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>"
+            "  <Product Id='*' Name='Unotusk Server Setup' Language='1033'"
+            "           Version='$ver' Manufacturer='Unotusk Pvt. Ltd.'"
+            "           UpgradeCode='9E4C5D6F-7A8B-9C0D-E1F2-3A4B5C6D7E8F'>"
+            "    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>"
+            "    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>"
+            "    <MediaTemplate EmbedCab='yes'/>"
+            "    <Feature Id='ProductFeature' Title='Unotusk Server Setup' Level='1'>"
+            "      <ComponentGroupRef Id='AppComponents'/>"
+            "      <ComponentRef Id='DesktopShortcutComp'/>"
+            "      <ComponentRef Id='StartMenuShortcutComp'/>"
+            "    </Feature>"
+            "    <UIRef Id='WixUI_Minimal'/>"
+            "    <WixVariable Id='WixUILicenseRtf' Value='License.rtf'/>"
+            "  </Product>"
+            "  <Fragment>"
+            "    <Directory Id='TARGETDIR' Name='SourceDir'>"
+            "      <Directory Id='ProgramFiles64Folder'>"
+            "        <Directory Id='INSTALLFOLDER' Name='Unotusk Server Setup'/>"
+            "      </Directory>"
+            "      <Directory Id='DesktopFolder'/>"
+            "      <Directory Id='ProgramMenuFolder'>"
+            "        <Directory Id='StartMenuAppFolder' Name='Unotusk Server Setup'/>"
+            "      </Directory>"
+            "    </Directory>"
+            "  </Fragment>"
+            "  <Fragment>"
+            "    <DirectoryRef Id='DesktopFolder'>"
+            "      <Component Id='DesktopShortcutComp' Guid='C3D4E5F6-A7B8-9012-CDEF-333333333333' Win64='yes'>"
+            "        <Shortcut Id='DesktopShortcut' Name='Unotusk Server Setup'"
+            "                  Target='[INSTALLFOLDER]setup_app.exe' WorkingDirectory='INSTALLFOLDER'/>"
+            "        <RegistryValue Root='HKMU' Key='Software\Unotusk\ServerSetup'"
+            "                       Name='DesktopShortcut' Type='integer' Value='1' KeyPath='yes'/>"
+            "      </Component>"
+            "    </DirectoryRef>"
+            "    <DirectoryRef Id='StartMenuAppFolder'>"
+            "      <Component Id='StartMenuShortcutComp' Guid='D4E5F6A7-B890-12CD-EF12-444444444444' Win64='yes'>"
+            "        <Shortcut Id='StartMenuShortcut' Name='Unotusk Server Setup'"
+            "                  Target='[INSTALLFOLDER]setup_app.exe' WorkingDirectory='INSTALLFOLDER'/>"
+            "        <RemoveFolder Id='RemoveStartMenuFolder' Directory='StartMenuAppFolder' On='uninstall'/>"
+            "        <RegistryValue Root='HKMU' Key='Software\Unotusk\ServerSetup'"
+            "                       Name='StartMenuShortcut' Type='integer' Value='1' KeyPath='yes'/>"
+            "      </Component>"
+            "    </DirectoryRef>"
+            "  </Fragment>"
+            "</Wix>"
+          ) -join "`n"
+          [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'Product.wxs'), $wxsContent)
+
+          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension -sval Product.wixobj Components.wixobj -o unotusk-server-windows-x64.msi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $hash = (Get-FileHash unotusk-server-windows-x64.msi -Algorithm SHA256).Hash
+          "$hash  unotusk-server-windows-x64.msi" | Out-File unotusk-server-windows-x64.msi.sha256 -Encoding ascii
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unotusk-server-windows-x64
+          path: |
+            unotusk-server-windows-x64.msi
+            unotusk-server-windows-x64.msi.sha256
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # 6. Docker Container Images: GHCR
+  # ─────────────────────────────────────────────────────────────
+  docker-containers:
+    name: "Docker Images (API & Worker)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push API Image
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          CLEAN_VER="${TAG#v}"
+          docker build \
+            -t ghcr.io/${{ github.repository_owner }}/unotusk-api:${TAG} \
+            -t ghcr.io/${{ github.repository_owner }}/unotusk-api:${CLEAN_VER} \
+            -t ghcr.io/${{ github.repository_owner }}/unotusk-api:latest \
+            -f infrastructure/docker/Dockerfile.api .
+          docker push ghcr.io/${{ github.repository_owner }}/unotusk-api --all-tags
+
+      - name: Build & Push Worker Image
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          CLEAN_VER="${TAG#v}"
+          docker build \
+            -t ghcr.io/${{ github.repository_owner }}/unotusk-worker:${TAG} \
+            -t ghcr.io/${{ github.repository_owner }}/unotusk-worker:${CLEAN_VER} \
+            -t ghcr.io/${{ github.repository_owner }}/unotusk-worker:latest \
+            -f infrastructure/docker/Dockerfile.worker .
+          docker push ghcr.io/${{ github.repository_owner }}/unotusk-worker --all-tags
+
+  # ─────────────────────────────────────────────────────────────
+  # 7. Publish GitHub Release with Hindu Codename
+  # ─────────────────────────────────────────────────────────────
+  release:
+    name: "Publish GitHub Release"
+    needs:
+      - build-employee-linux
+      - build-employee-windows
+      - build-employee-macos
+      - build-server-linux
+      - build-server-windows
+      - docker-containers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Stage files for release
+        run: |
+          mkdir -p release_assets
+          find dist/ -type f \( -name "*.tar.gz" -o -name "*.msi" -o -name "*.dmg" -o -name "*.sha256" \) -exec cp {} release_assets/ \;
+          ls -la release_assets/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Unotusk Release ${{ env.RELEASE_TAG }}"
+          body: |
+            ## Unotusk Release — ${{ env.RELEASE_TAG }}
+
+            ### Client Desktop Applications
+            | Platform | Asset | Format |
+            |---|---|---|
+            | macOS | `unotusk-employee-macos.dmg` | Disk Image (Universal) |
+            | Windows | `unotusk-employee-windows-x64.msi` | MSI Package (x64) |
+            | Linux | `unotusk-employee-linux-x64.tar.gz` | Standalone Archive (glibc 2.31+) |
+
+            ### Server Infrastructure Setup
+            | Component | Asset | Format |
+            |---|---|---|
+            | Windows Server Setup | `unotusk-server-windows-x64.msi` | MSI Package (x64) |
+            | Linux Server Setup | `unotusk-server-linux-x64.tar.gz` | Host Package (.tar.gz) |
+
+            ### Docker Images
+            - `ghcr.io/${{ github.repository_owner }}/unotusk-api:${{ env.RELEASE_TAG }}`
+            - `ghcr.io/${{ github.repository_owner }}/unotusk-worker:${{ env.RELEASE_TAG }}`
+
+            *All binaries have matching `.sha256` checksums attached.*
+          draft: false
+          prerelease: false
+          files: release_assets/*
+
+  # ─────────────────────────────────────────────────────────────
+  # 8. Automated Sync: Update install.unotusk.com Links
+  # ─────────────────────────────────────────────────────────────
+  update-install-site:
+    name: "Sync install.unotusk.com Download Links"
+    needs: [release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update version manifest & install site links
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          TAG="${RELEASE_TAG}"
+          TODAY=$(date -u +"%Y-%m-%d")
+
+          echo "Synchronizing install.unotusk.com to release $TAG on $TODAY"
+
+          python3 -c "
+          import json, re
+
+          tag = '$TAG'
+          date = '$TODAY'
+          manifest_path = 'apps/install-site/version.json'
+          
+          with open(manifest_path, 'r') as f:
+              data = json.load(f)
+              
+          num_match = re.search(r'\d+\.\d+(\.\d+)?', tag)
+          clean_ver = num_match.group(0) if num_match else '1.0.1'
+
+          # Extract Hindu codename (e.g. from v1.0.1-rudra or rudra)
+          alpha_matches = re.findall(r'[a-zA-Z]{3,}', tag)
+          codename = alpha_matches[-1].capitalize() if alpha_matches else data.get('codename', 'Rudra')
+
+          data['version'] = clean_ver
+          data['codename'] = codename
+          data['tag'] = tag
+          data['releaseDate'] = date
+          repo = data.get('repository', 'Techteam-zephvion/install-unotusk')
+          base_url = f'https://github.com/{repo}/releases/download/{tag}'
+          
+          for key, item in data['downloads'].items():
+              item['url'] = f'{base_url}/{item[\"filename\"]}'
+              
+          with open(manifest_path, 'w') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+
+          # Also update fallback static links in index.html
+          html_path = 'apps/install-site/index.html'
+          with open(html_path, 'r') as f:
+              html = f.read()
+
+          html = re.sub(r'/releases/download/[^/]+/', f'/releases/download/{tag}/', html)
+          html = re.sub(r'data-version-tag>[^<]+<', f'data-version-tag>{tag}<', html)
+          html = re.sub(r'data-release-meta>[^<]+<', f'data-release-meta>Release {tag} \"{codename}\" • {date}<', html)
+
+          with open(html_path, 'w') as f:
+              f.write(html)
+          "
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/install-site/version.json apps/install-site/index.html
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit for install-site."
+          else
+            git commit -m "chore(release): update install.unotusk.com links to ${TAG} [skip ci]"
+            git push origin main
+          fi
