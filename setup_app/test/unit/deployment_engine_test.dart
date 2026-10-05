@@ -49,7 +49,7 @@ void main() {
       final engine = DeploymentEngine(
         processExecutor: (exec, args, {workingDirectory, environment}) async {
           if (args.contains('up')) {
-            return ProcessResult(1234, 1, '', 'Bind for 0.0.0.0:8000 failed: port is already allocated');
+            return ProcessResult(1234, 1, '', 'Bind for 0.0.0.0:28000 failed: port is already allocated');
           }
           return ProcessResult(1234, 0, 'ok', '');
         },
@@ -63,7 +63,7 @@ void main() {
       );
 
       expect(result.isSuccess, false);
-      expect(result.errorMessage, contains('Port 8000 is already in use.'));
+      expect(result.errorMessage, contains('Port 28000 is already in use.'));
       expect(result.technicalLogs, contains('port is already allocated'));
     });
 

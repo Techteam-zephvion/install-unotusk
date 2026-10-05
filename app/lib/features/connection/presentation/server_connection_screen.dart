@@ -99,7 +99,7 @@ class _ServerConnectionScreenState extends ConsumerState<ServerConnectionScreen>
                   AppTextField(
                     controller: _urlController,
                     label: 'Server address',
-                    hint: 'http://localhost:8000',
+                    hint: 'http://localhost:28000',
                     keyboardType: TextInputType.url,
                     prefixIcon: const Icon(Icons.dns_outlined, size: 16),
                     validator: (value) {

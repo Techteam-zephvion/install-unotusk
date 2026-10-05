@@ -78,7 +78,7 @@ class NetworkCheckController extends StateNotifier<NetworkCheckState> {
 
     
     // 0. Find Available Port
-    final port = await validator.findAvailablePort(targetConfig, 8000);
+    final port = await validator.findAvailablePort(targetConfig, 28000);
     
     // 1. LAN IP
     final ipCheck = await validator.checkLanIp(targetConfig);

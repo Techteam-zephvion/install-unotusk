@@ -21,6 +21,7 @@ from apps.api.src.api.routes import (
     tasks,
 )
 from apps.api.src.config.settings import settings
+from apps.api.src.core.data_plane_middleware import DataPlaneSecurityMiddleware
 from apps.api.src.core.logging import RequestTracingMiddleware, setup_server_logging
 
 logging.basicConfig(
@@ -48,6 +49,9 @@ app = FastAPI(
 
 # Correlation & Request Tracing Middleware
 app.add_middleware(RequestTracingMiddleware)
+
+# Data Plane Container-Level Authorization & Boundary Middleware
+app.add_middleware(DataPlaneSecurityMiddleware)
 
 # CORS Middleware
 app.add_middleware(
@@ -163,3 +167,4 @@ for r in [
     tasks.router,
 ]:
     app.include_router(r, prefix=settings.API_V1_PREFIX)
+    app.include_router(r)

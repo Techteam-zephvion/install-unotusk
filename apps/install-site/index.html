@@ -156,7 +156,7 @@
                         </div>
                         <div class="flex justify-between">
                             <span class="text-inkMuted">Transport:</span>
-                            <span class="text-ink font-medium">HTTP REST (:8000)</span>
+                            <span class="text-ink font-medium">HTTP REST (:28000)</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-inkMuted">Index Engine:</span>
@@ -290,7 +290,7 @@
             </div>
 
             <div class="mt-4 text-sm text-inkMuted font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span>All client distributions connect over HTTP REST to your designated server IP on port 8000.</span>
+                <span>All client distributions connect over HTTP REST to your designated server IP on port 28000.</span>
                 <span class="hidden sm:inline-block">SHA-256 verified signatures in release manifest</span>
             </div>
         </section>
@@ -355,7 +355,7 @@
                                 </div>
                                 <div>
                                     <span class="text-inkMuted block text-xs">Default Port:</span>
-                                    <span class="text-ink font-semibold">:8000 (HTTP REST)</span>
+                                    <span class="text-ink font-semibold">:28000 (HTTP REST)</span>
                                 </div>
                                 <div>
                                     <span class="text-inkMuted block text-xs">Database:</span>
@@ -374,7 +374,7 @@
                 <div class="lg:col-span-5 hairline-all bg-terminalBg text-gray-200 rounded-[2px] p-6 sm:p-7 font-mono text-xs sm:text-sm">
                     <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-gray-800">
                         <span class="text-gray-400 text-xs tracking-wider uppercase font-semibold">Verification Endpoint</span>
-                        <button onclick="copyCode('curl -s http://localhost:8000/api/v1/health')" 
+                        <button onclick="copyCode('curl -s http://localhost:28000/api/v1/health')" 
                                 class="text-xs text-gray-400 hover:text-white transition flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                             <span>Copy curl</span>
@@ -386,7 +386,7 @@
                     </div>
 
                     <div class="bg-black/50 p-3 rounded-[2px] border border-gray-800 text-emerald-400 select-all mb-5 text-xs sm:text-sm overflow-x-auto">
-                        $ curl -s http://&lt;SERVER_IP&gt;:8000/api/v1/health
+                        $ curl -s http://&lt;SERVER_IP&gt;:28000/api/v1/health
                     </div>
 
                     <div class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 font-semibold">Standard Node Response:</div>
@@ -400,7 +400,7 @@
 }</pre>
 
                     <div class="mt-4 pt-3.5 border-t border-gray-800 text-xs text-gray-500 flex justify-between">
-                        <span>TCP Listen: 0.0.0.0:8000</span>
+                        <span>TCP Listen: 0.0.0.0:28000</span>
                         <span class="text-emerald-400 font-medium">Zero Cloud Egress Confirmed</span>
                     </div>
                 </div>
@@ -454,7 +454,7 @@
                         <span class="text-inkMuted text-sm">&darr;</span>
                         <div class="my-1.5 px-4 py-1.5 hairline-all bg-paper rounded-[2px] text-xs sm:text-sm text-ink font-mono flex items-center gap-2.5">
                             <span class="text-accent font-bold">&rarr;</span>
-                            <span class="font-semibold">HTTP REST :8000</span>
+                            <span class="font-semibold">HTTP REST :28000</span>
                             <span class="text-inkMuted">&bull;</span>
                             <span>LAN only</span>
                         </div>
@@ -475,7 +475,7 @@
                     <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
                         <div class="flex items-center justify-between mb-1.5">
                             <span class="text-xs text-accent uppercase tracking-wider font-semibold">03 / Central Node</span>
-                            <span class="text-live text-xs sm:text-sm font-semibold">FastAPI :8000</span>
+                            <span class="text-live text-xs sm:text-sm font-semibold">FastAPI :28000</span>
                         </div>
                         <div class="font-sans font-semibold text-base sm:text-lg text-ink mb-1.5">Unotusk Server Node</div>
                         <p class="font-sans text-sm text-inkSecondary leading-relaxed">
@@ -576,7 +576,7 @@
                             Execute the health endpoint check from the command line to confirm local containers are operational:
                         </p>
                         <div class="ml-8 p-3 hairline-all bg-paper text-ink font-mono text-xs sm:text-sm select-all">
-                            curl -s http://localhost:8000/api/v1/health
+                            curl -s http://localhost:28000/api/v1/health
                         </div>
                     </div>
 
@@ -587,7 +587,7 @@
                             <span class="font-sans font-semibold text-base sm:text-lg text-ink">Share LAN Endpoint</span>
                         </div>
                         <p class="font-sans text-sm text-inkSecondary leading-relaxed pl-8">
-                            Locate your host machine's internal network IP address (e.g. <code class="text-ink bg-paper px-1.5 py-0.5 hairline-all font-semibold">http://10.0.0.59:8000</code>). Distribute this internal URL to team members.
+                            Locate your host machine's internal network IP address (e.g. <code class="text-ink bg-paper px-1.5 py-0.5 hairline-all font-semibold">http://10.0.0.59:28000</code>). Distribute this internal URL to team members.
                         </p>
                     </div>
 

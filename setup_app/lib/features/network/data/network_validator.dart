@@ -102,7 +102,7 @@ echo \$IP_ADDR
     return false;
   }
 
-  Future<CheckItem> checkFirewall(TargetConfig config, {int apiPort = 8000}) async {
+  Future<CheckItem> checkFirewall(TargetConfig config, {int apiPort = 28000}) async {
     try {
       final script = '''
 #!/bin/sh

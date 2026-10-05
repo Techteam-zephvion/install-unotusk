@@ -24,7 +24,7 @@ from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.knowledge import ProjectKnowledge
-from apps.api.src.models.membership import OrganizationMembership
+from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
 from apps.api.src.models.message import Message
 from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
@@ -60,6 +60,7 @@ __all__ = [
     "Project",
     "ProjectIntelligenceReport",
     "ProjectKnowledge",
+    "ProjectMembership",
     "ProjectStatus",
     "ReportStatus",
     "Repository",

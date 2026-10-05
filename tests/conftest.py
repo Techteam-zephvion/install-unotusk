@@ -44,7 +44,7 @@ os.environ["DATABASE_URL"] = TEST_DB_URL
 from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.auth.security import create_access_token, hash_password
 from apps.api.src.models.enums import MembershipRole, ProjectStatus
-from apps.api.src.models.membership import OrganizationMembership
+from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
 from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
 from apps.api.src.models.user import User
@@ -87,7 +87,8 @@ def clean_database():
                         "TRUNCATE TABLE findings, discovery_runs, "
                         "project_intelligence_reports, project_knowledge, messages, conversations, "
                         "code_dependencies, code_chunks, code_symbols, repository_files, "
-                        "repository_snapshots, repositories, integrations, projects, "
+                        "repository_snapshots, repositories, integrations, "
+                        "project_memberships, projects, "
                         "organization_memberships, organizations, users CASCADE;"
                     )
                 )
@@ -229,6 +230,26 @@ def create_test_project(db_session: AsyncSession):
         db_session.add(proj)
         await db_session.commit()
         return proj
+
+    return _create
+
+
+@pytest.fixture
+def create_test_project_membership(db_session: AsyncSession):
+    async def _create(
+        project: Project,
+        user: User,
+        role: MembershipRole = MembershipRole.MEMBER,
+    ) -> ProjectMembership:
+        pm = ProjectMembership(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            user_id=user.id,
+            role=role,
+        )
+        db_session.add(pm)
+        await db_session.commit()
+        return pm
 
     return _create
 

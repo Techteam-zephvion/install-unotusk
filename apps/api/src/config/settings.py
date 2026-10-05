@@ -55,5 +55,13 @@ class Settings(BaseSettings):
     # Context Budget
     CONTEXT_BUDGET_TOKENS: int = Field(default=3500)
 
+    # Data Plane Isolation (set when running as dedicated project container)
+    DATA_PLANE_PROJECT_ID: str | None = Field(default=None)
+    DATA_PLANE_ORG_ID: str | None = Field(default=None)
+
+    @property
+    def is_data_plane(self) -> bool:
+        return bool(self.DATA_PLANE_PROJECT_ID and self.DATA_PLANE_PROJECT_ID.strip())
+
 
 settings = Settings()

@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from apps.api.src.models.enums import ProjectStatus
+from apps.api.src.models.enums import MembershipRole, ProjectStatus
 
 
 class ProjectBase(BaseModel):
@@ -30,5 +30,34 @@ class ProjectRead(ProjectBase):
     port: int | None = None
     created_at: datetime
     updated_at: datetime
+    role: MembershipRole | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectMemberAdd(BaseModel):
+    user_id: uuid.UUID | None = None
+    email: str | None = None
+    role: MembershipRole = MembershipRole.MEMBER
+
+    @model_validator(mode="after")
+    def check_user_identifier(self) -> "ProjectMemberAdd":
+        if not self.user_id and not self.email:
+            raise ValueError("Either user_id or email must be provided")
+        return self
+
+
+class ProjectMemberUpdateRole(BaseModel):
+    role: MembershipRole
+
+
+class ProjectMemberRead(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    user_id: uuid.UUID
+    role: MembershipRole
+    created_at: datetime
+    user_name: str | None = None
+    user_email: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -500,25 +500,27 @@ jobs:
         env:
           TAG: ${{ env.RELEASE_TAG }}
         run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           CLEAN_VER="${TAG#v}"
           docker build \
-            -t ghcr.io/${{ github.repository_owner }}/unotusk-api:${TAG} \
-            -t ghcr.io/${{ github.repository_owner }}/unotusk-api:${CLEAN_VER} \
-            -t ghcr.io/${{ github.repository_owner }}/unotusk-api:latest \
+            -t ghcr.io/${OWNER_LC}/unotusk-api:${TAG} \
+            -t ghcr.io/${OWNER_LC}/unotusk-api:${CLEAN_VER} \
+            -t ghcr.io/${OWNER_LC}/unotusk-api:latest \
             -f infrastructure/docker/Dockerfile.api .
-          docker push ghcr.io/${{ github.repository_owner }}/unotusk-api --all-tags
+          docker push ghcr.io/${OWNER_LC}/unotusk-api --all-tags
 
       - name: Build & Push Worker Image
         env:
           TAG: ${{ env.RELEASE_TAG }}
         run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           CLEAN_VER="${TAG#v}"
           docker build \
-            -t ghcr.io/${{ github.repository_owner }}/unotusk-worker:${TAG} \
-            -t ghcr.io/${{ github.repository_owner }}/unotusk-worker:${CLEAN_VER} \
-            -t ghcr.io/${{ github.repository_owner }}/unotusk-worker:latest \
+            -t ghcr.io/${OWNER_LC}/unotusk-worker:${TAG} \
+            -t ghcr.io/${OWNER_LC}/unotusk-worker:${CLEAN_VER} \
+            -t ghcr.io/${OWNER_LC}/unotusk-worker:latest \
             -f infrastructure/docker/Dockerfile.worker .
-          docker push ghcr.io/${{ github.repository_owner }}/unotusk-worker --all-tags
+          docker push ghcr.io/${OWNER_LC}/unotusk-worker --all-tags
 
   # ─────────────────────────────────────────────────────────────
   # 7. Publish GitHub Release with Hindu Codename
@@ -571,8 +573,8 @@ jobs:
             | Linux Server Setup | `unotusk-server-linux-x64.tar.gz` | Host Package (.tar.gz) |
 
             ### Docker Images
-            - `ghcr.io/${{ github.repository_owner }}/unotusk-api:${{ env.RELEASE_TAG }}`
-            - `ghcr.io/${{ github.repository_owner }}/unotusk-worker:${{ env.RELEASE_TAG }}`
+            - `ghcr.io/techteam-zephvion/unotusk-api:${{ env.RELEASE_TAG }}`
+            - `ghcr.io/techteam-zephvion/unotusk-worker:${{ env.RELEASE_TAG }}`
 
             *All binaries have matching `.sha256` checksums attached.*
           draft: false

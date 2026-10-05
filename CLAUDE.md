@@ -32,7 +32,6 @@ PostgreSQL 16 + pgvector         Redis 7 + Background Worker
 - **Worker (`services/workers/`)**: Lightweight Redis task consumer executing repository ingestion, discovery analysis, and report generation asynchronously.
 - **Database**: PostgreSQL 16 with `pgvector` extension.
 - **LLM Grounding**: Multi-provider (`apps/api/src/services/llm/`): Groq (`qwen/qwen3.8-27b` default) or Claude 3.5 Sonnet, with deterministic offline synthesizer fallback for zero-hallucination testing and offline environments.
-- **Web Frontend (`apps/web/`)**: Secondary Next.js 14 companion web client containerized in Docker Compose.
 
 ## 2. Explicitly Out of Scope for MVP
 
@@ -49,17 +48,14 @@ PostgreSQL 16 + pgvector         Redis 7 + Background Worker
 
 ```
 Unotusk-MVP/
-├── app/                  Flutter Desktop Employee Client (Warm Dark Figma UI)
+├── app/                  Flutter Employee Client (Warm Dark Figma UI)
 ├── setup_app/            Flutter Server Setup Wizard
 ├── apps/
-│   ├── api/              FastAPI Backend & Embedded Intelligence Engines
-│   └── web/              Next.js 14 Web Client (Dockerized)
-├── packages/
-│   └── types/            Shared TypeScript API types
+│   └── api/              FastAPI Backend & Embedded Intelligence Engines
 ├── services/
 │   └── workers/          Redis background task consumer (worker.py)
 ├── infrastructure/
-│   └── docker/           Dockerfiles for api, worker, and web
+│   └── docker/           Dockerfiles for api and worker
 ├── scripts/              Operational, verification, and packaging scripts
 ├── tests/                Pytest suite (unit, integration, api, security)
 ├── docs/                 Product specs, runbooks, and pilot reviews

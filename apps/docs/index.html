@@ -227,7 +227,7 @@
                         </li>
                         <li class="flex items-start gap-2">
                             <span class="text-live font-bold">&bull;</span>
-                            <span><strong>Single-Tenant Local Stack:</strong> Deployed as a dedicated Server Node (PostgreSQL 16 + pgvector, Redis, FastAPI) communicating with native Desktop Clients over internal LAN HTTP REST (:8000).</span>
+                            <span><strong>Single-Tenant Local Stack:</strong> Deployed as a dedicated Server Node (PostgreSQL 16 + pgvector, Redis, FastAPI) communicating with native Desktop Clients over internal LAN HTTP REST (:28000).</span>
                         </li>
                     </ul>
                 </div>
@@ -266,7 +266,7 @@
                             Confirm the API engine is listening and connected to the database:
                         </p>
                         <div class="p-3 bg-terminalBg text-gray-200 rounded-[2px] text-xs">
-                            <div class="text-emerald-400 mb-1">$ curl -s http://localhost:8000/api/v1/health</div>
+                            <div class="text-emerald-400 mb-1">$ curl -s http://localhost:28000/api/v1/health</div>
                             <div class="text-gray-400 text-[11px]">{ "status": "healthy", "database": "postgresql+pgvector", "redis": "connected" }</div>
                         </div>
                     </div>
@@ -278,7 +278,7 @@
                             <span class="font-sans font-semibold text-sm text-ink">Connect Desktop Clients</span>
                         </div>
                         <p class="font-sans text-xs text-inkSecondary leading-relaxed">
-                            Share the host machine's internal LAN IP (e.g. <code class="bg-paper px-1.5 py-0.5 hairline-all text-ink">http://10.0.0.59:8000</code>) with engineers. On first launch of the native macOS, Windows, or Linux desktop app, paste this endpoint to begin querying.
+                            Share the host machine's internal LAN IP (e.g. <code class="bg-paper px-1.5 py-0.5 hairline-all text-ink">http://10.0.0.59:28000</code>) with engineers. On first launch of the native macOS, Windows, or Linux desktop app, paste this endpoint to begin querying.
                         </p>
                     </div>
                 </div>
@@ -370,7 +370,7 @@ docker compose logs -f api</pre>
                         <div>Service</div>
                     </div>
                     <div class="grid grid-cols-3 gap-2 py-1.5 hairline-b text-inkSecondary">
-                        <div class="text-accent font-semibold">:8000</div>
+                        <div class="text-accent font-semibold">:28000</div>
                         <div>HTTP REST / WS</div>
                         <div>FastAPI Intelligence Core (Client Ingress)</div>
                     </div>
@@ -444,17 +444,17 @@ docker compose logs -f api</pre>
                 <div class="font-mono text-xs text-accent uppercase tracking-wider mb-2 font-semibold">5.1 Operations Runbook</div>
                 <h2 class="font-serif text-2xl sm:text-3xl text-ink tracking-tight mb-4">Troubleshooting &amp; Operations</h2>
 
-                <h3 class="font-serif text-lg text-ink mt-6 mb-2">Port 8000 Conflict Resolution</h3>
+                <h3 class="font-serif text-lg text-ink mt-6 mb-2">Port Conflict Resolution</h3>
                 <p class="text-sm text-inkSecondary leading-relaxed mb-4">
-                    If another service (e.g. an existing development server or internal proxy) binds to port 8000:
+                    If another service (e.g. an existing development server or internal proxy) binds to port 28000:
                 </p>
 
                 <div class="bg-terminalBg text-gray-200 p-4 rounded-[2px] font-mono text-xs mb-6">
 <pre class="text-gray-300"><span class="text-gray-500"># 1. Identify conflicting process</span>
-sudo lsof -i :8000
+sudo lsof -i :28000
 
 <span class="text-gray-500"># 2. Or rebind Unotusk port in .env</span>
-API_PORT=8080
+API_PORT=28050
 
 <span class="text-gray-500"># 3. Restart stack</span>
 docker compose up -d</pre>

@@ -41,7 +41,7 @@ class ServerRegistry {
         name: 'Legacy Server',
         composeProject: 'server',
         deploymentDir: legacy.path,
-        apiPort: 8000, // Legacy default
+        apiPort: 28000, // Legacy default
         createdAt: DateTime.now(),
       );
       _saveMetadata(legacy.path, instance);

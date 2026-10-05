@@ -1,14 +1,16 @@
-import socket
 import logging
+import socket
 import uuid
+
 import docker
+
 from apps.api.src.config.settings import settings
 
 logger = logging.getLogger("unotusk-orchestrator")
 
 class OrchestratorService:
     @staticmethod
-    def _find_available_port(start_port: int = 8100, max_port: int = 8999) -> int:
+    def _find_available_port(start_port: int = 28100, max_port: int = 28999) -> int:
         for port in range(start_port, max_port + 1):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 try:
@@ -27,15 +29,15 @@ class OrchestratorService:
         """
         port = OrchestratorService._find_available_port()
         logger.info(f"Spawning Data Plane for Project {project_id} on port {port}...")
-        
+
         try:
             client = docker.from_env()
         except Exception as e:
             logger.error(f"Failed to connect to docker daemon: {e}")
-            raise RuntimeError("Orchestration failed: Docker daemon not accessible.")
-        
+            raise RuntimeError("Orchestration failed: Docker daemon not accessible.") from e
+
         container_name = f"unotusk-project-{str(project_id)[:8]}"
-        
+
         # We reuse the same API image but without exposing control plane endpoints if we wanted to.
         # For MVP, we just spin up the API instance and tell it its PROJECT_ID.
         environment = {
@@ -48,14 +50,14 @@ class OrchestratorService:
             "DATA_PLANE_PROJECT_ID": str(project_id),
             "DATA_PLANE_ORG_ID": str(organization_id),
         }
-        
+
         try:
-            # We assume the image `ghcr.io/techteam-zephvion/unotusk-api:v1.0.1` is used, 
+            # We assume the image `ghcr.io/techteam-zephvion/unotusk-api:v1.0.1` is used,
             # or `unotusk-api:0.1.0` if running locally.
             # We will use the same image as the current container running this code.
             # To find it, we can inspect our own container, or hardcode it for MVP.
             image_name = "unotusk-api:0.1.0"
-            
+
             # Discover our own network if running inside docker
             hostname = socket.gethostname()
             network_name = "bridge"
@@ -81,4 +83,51 @@ class OrchestratorService:
             return port
         except docker.errors.APIError as e:
             logger.error(f"Docker API Error while spawning {container_name}: {e}")
-            raise RuntimeError(f"Failed to spawn project container: {e}")
+            raise RuntimeError(f"Failed to spawn project container: {e}") from e
+
+    @staticmethod
+    def get_project_data_plane_status(project_id: uuid.UUID) -> dict:
+        """
+        Inspects the status of a project Data Plane container.
+        """
+        container_name = f"unotusk-project-{str(project_id)[:8]}"
+        try:
+            client = docker.from_env()
+            container = client.containers.get(container_name)
+            port_bindings = container.attrs.get("NetworkSettings", {}).get("Ports", {})
+            assigned_port = None
+            if "8000/tcp" in port_bindings and port_bindings["8000/tcp"]:
+                assigned_port = int(port_bindings["8000/tcp"][0].get("HostPort"))
+
+            return {
+                "exists": True,
+                "container_id": container.short_id,
+                "status": container.status,
+                "port": assigned_port,
+                "is_running": container.status == "running",
+            }
+        except Exception:
+            return {
+                "exists": False,
+                "container_id": None,
+                "status": "not_found",
+                "port": None,
+                "is_running": False,
+            }
+
+    @staticmethod
+    def stop_project_container(project_id: uuid.UUID) -> bool:
+        """
+        Stops and removes the project Data Plane container if present.
+        """
+        container_name = f"unotusk-project-{str(project_id)[:8]}"
+        try:
+            client = docker.from_env()
+            container = client.containers.get(container_name)
+            container.stop(timeout=5)
+            container.remove()
+            logger.info(f"Stopped and removed data plane container {container_name}.")
+            return True
+        except Exception as e:
+            logger.warning(f"Could not stop data plane container {container_name}: {e}")
+            return False

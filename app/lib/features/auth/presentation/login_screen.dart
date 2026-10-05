@@ -37,10 +37,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _dotsCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _emailCtrl.addListener(_onTextChanged);
+    _passwordCtrl.addListener(_onTextChanged);
+    _nameCtrl.addListener(_onTextChanged);
+    _orgCtrl.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _quickFillDemoAdmin() {
+    setState(() {
+      _emailCtrl.text = 'lead@acme.com';
+      _passwordCtrl.text = 'adminpassword123';
+      _showPasswordField = true;
+      _screen = _AuthScreen.entry;
+    });
   }
 
   @override
   void dispose() {
+    _emailCtrl.removeListener(_onTextChanged);
+    _passwordCtrl.removeListener(_onTextChanged);
+    _nameCtrl.removeListener(_onTextChanged);
+    _orgCtrl.removeListener(_onTextChanged);
     _emailCtrl.dispose(); _passwordCtrl.dispose(); _nameCtrl.dispose(); _orgCtrl.dispose();
     _dotsCtrl.dispose(); _dotTimer?.cancel();
     super.dispose();
@@ -163,7 +184,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
   Widget _buildCard(dynamic connectionState, {required Key key}) {
     switch (_screen) {
-      case _AuthScreen.entry: return _EntryCard(key: key, emailCtrl: _emailCtrl, passwordCtrl: _passwordCtrl, showPasswordField: _showPasswordField, obscurePassword: _obscurePassword, onObscureToggle: () => setState(() => _obscurePassword = !_obscurePassword), isValidEmail: _isValidEmail, onContinue: _handleContinue, onPasswordSignIn: _handlePasswordSignIn, onGoogleProvider: () => _handleProviderButton('Google OIDC'), onMicrosoftProvider: () => _handleProviderButton('Microsoft Entra OIDC'), onCustomIssuer: () => setState(() => _screen = _AuthScreen.newOrg), connectionState: connectionState);
+      case _AuthScreen.entry:
+        return _EntryCard(
+          key: key,
+          emailCtrl: _emailCtrl,
+          passwordCtrl: _passwordCtrl,
+          showPasswordField: _showPasswordField,
+          obscurePassword: _obscurePassword,
+          onObscureToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+          isValidEmail: _isValidEmail,
+          onContinue: _handleContinue,
+          onPasswordSignIn: _handlePasswordSignIn,
+          onGoogleProvider: () => _handleProviderButton('Google OIDC'),
+          onMicrosoftProvider: () => _handleProviderButton('Microsoft Entra OIDC'),
+          onCustomIssuer: () => setState(() => _screen = _AuthScreen.newOrg),
+          onQuickFillDemo: _quickFillDemoAdmin,
+          connectionState: connectionState,
+        );
       case _AuthScreen.checking: return _CheckingCard(key: key, dotCount: _dotCount, email: _emailCtrl.text.trim());
       case _AuthScreen.existingOrg: return _ExistingOrgCard(key: key, orgName: _orgName, provider: _orgProvider, email: _emailCtrl.text.trim(), onContinue: _handleExistingOrgContinue, onBack: () => setState(() { _showPasswordField = false; _screen = _AuthScreen.entry; }));
       case _AuthScreen.newOrg: return _NewOrgCard(key: key, nameCtrl: _nameCtrl, orgCtrl: _orgCtrl, passwordCtrl: _passwordCtrl, email: _emailCtrl.text.trim(), role: _role, agreed: _agreed, onRoleChange: (v) => setState(() => _role = v), onAgreedChange: (v) => setState(() => _agreed = v), onRegister: _handleNewOrgRegister, onBack: () => setState(() => _screen = _AuthScreen.entry));
@@ -209,9 +246,24 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
 class _EntryCard extends StatelessWidget {
   final TextEditingController emailCtrl, passwordCtrl;
   final bool showPasswordField, obscurePassword, isValidEmail;
-  final VoidCallback onObscureToggle, onContinue, onPasswordSignIn, onGoogleProvider, onMicrosoftProvider, onCustomIssuer;
+  final VoidCallback onObscureToggle, onContinue, onPasswordSignIn, onGoogleProvider, onMicrosoftProvider, onCustomIssuer, onQuickFillDemo;
   final dynamic connectionState;
-  const _EntryCard({super.key, required this.emailCtrl, required this.passwordCtrl, required this.showPasswordField, required this.obscurePassword, required this.onObscureToggle, required this.isValidEmail, required this.onContinue, required this.onPasswordSignIn, required this.onGoogleProvider, required this.onMicrosoftProvider, required this.onCustomIssuer, required this.connectionState});
+  const _EntryCard({
+    super.key,
+    required this.emailCtrl,
+    required this.passwordCtrl,
+    required this.showPasswordField,
+    required this.obscurePassword,
+    required this.onObscureToggle,
+    required this.isValidEmail,
+    required this.onContinue,
+    required this.onPasswordSignIn,
+    required this.onGoogleProvider,
+    required this.onMicrosoftProvider,
+    required this.onCustomIssuer,
+    required this.onQuickFillDemo,
+    required this.connectionState,
+  });
   @override
   Widget build(BuildContext context) => _AuthCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
     Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppColors.accentMuted, border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(14)), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.shield_outlined, size: 12, color: AppColors.accent), const SizedBox(width: 6), Text('OIDC Authentication', style: AppTextStyles.mono(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textPrimary))]))),
@@ -231,15 +283,68 @@ class _EntryCard extends StatelessWidget {
     ],
     const SizedBox(height: 12),
     _OidcButton(label: showPasswordField ? 'Sign in' : 'Continue with OIDC Discovery', enabled: isValidEmail, filled: true, onPressed: showPasswordField ? onPasswordSignIn : onContinue),
+    const SizedBox(height: 8),
+    GestureDetector(
+      onTap: onQuickFillDemo,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppColors.accentMuted,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.bolt, size: 14, color: AppColors.accent),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                'Demo Admin (lead@acme.com)',
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    const SizedBox(height: 8),
+    Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text("Need a workspace? ", style: AppTextStyles.caption.copyWith(fontSize: 11)),
+        Flexible(
+          child: GestureDetector(
+            onTap: onCustomIssuer,
+            child: Text(
+              'Create Workspace',
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+                color: AppColors.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
     if (!showPasswordField) ...[
-      Padding(padding: const EdgeInsets.symmetric(vertical: 20), child: Row(children: [const Expanded(child: Divider(color: AppColors.divider)), Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('or sign in via OIDC provider', style: AppTextStyles.sectionLabel)), const Expanded(child: Divider(color: AppColors.divider))])),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Row(children: [const Expanded(child: Divider(color: AppColors.divider)), Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('or sign in via OIDC provider', style: AppTextStyles.sectionLabel)), const Expanded(child: Divider(color: AppColors.divider))])),
       _ProviderButton(label: 'Sign in with Google OIDC', icon: Icons.g_mobiledata_rounded, onPressed: onGoogleProvider),
       const SizedBox(height: 9),
       _ProviderButton(label: 'Sign in with Microsoft Entra OIDC', icon: Icons.window_rounded, onPressed: onMicrosoftProvider),
       const SizedBox(height: 9),
       _ProviderButton(label: 'Configure custom OIDC issuer', icon: Icons.settings_ethernet_rounded, onPressed: onCustomIssuer),
     ],
-    const SizedBox(height: 20),
+    const SizedBox(height: 16),
     const Divider(color: AppColors.divider),
     const SizedBox(height: 12),
     GestureDetector(
