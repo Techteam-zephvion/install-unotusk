@@ -23,6 +23,9 @@ class AuthState {
 
   bool get isAuthenticated => status == AuthStatus.authenticated && token != null;
   bool get isLoading => status == AuthStatus.loading;
+  bool get isAdmin => user?.isAdmin ?? false;
+  bool get isOwner => user?.isOwner ?? false;
+  String get userRole => user?.role ?? 'member';
 
   AuthState copyWith({
     AuthStatus? status,

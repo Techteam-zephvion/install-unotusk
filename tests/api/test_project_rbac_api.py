@@ -209,3 +209,37 @@ async def test_project_membership_validation_errors(
     )
     assert res_del_404.status_code == 404
     assert res_del_404.json()["error"]["code"] == "MEMBERSHIP_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_organization_members_list(
+    client: AsyncClient,
+    create_test_user,
+    create_test_org,
+    auth_headers,
+    db_session,
+):
+    owner = await create_test_user(email="org-owner@unotusk.io", name="Team Lead")
+    employee = await create_test_user(email="engineer@unotusk.io", name="Staff Engineer")
+    org, _ = await create_test_org(user=owner, name="Engineering Department")
+
+    from apps.api.src.models.membership import OrganizationMembership
+
+    mem = OrganizationMembership(
+        id=uuid.uuid4(),
+        organization_id=org.id,
+        user_id=employee.id,
+        role=MembershipRole.MEMBER,
+    )
+    db_session.add(mem)
+    await db_session.commit()
+
+    headers = auth_headers(owner)
+    res = await client.get(f"/api/v1/organizations/{org.id}/members", headers=headers)
+    assert res.status_code == 200
+    members = res.json()
+    assert len(members) == 2
+    emails = {m["user_email"] for m in members}
+    assert "org-owner@unotusk.io" in emails
+    assert "engineer@unotusk.io" in emails
+

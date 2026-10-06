@@ -36,9 +36,17 @@ class ApiEndpoints {
   static String projectKnowledgeArchive(String projectId, String knowledgeId) => '/projects/$projectId/knowledge/$knowledgeId/archive';
   static String projectKnowledgeRestore(String projectId, String knowledgeId) => '/projects/$projectId/knowledge/$knowledgeId/restore';
 
+  // Project Members & RBAC
+  static String projectMembers(String projectId) => '/projects/$projectId/members';
+  static String projectMemberDelete(String projectId, String userId) => '/projects/$projectId/members/$userId';
+
+  // Organizations & Team
+  static String organizationMembers(String orgId) => '/organizations/$orgId/members';
+
   // Grounded Ask & Intelligence
   static String projectAsk(String projectId) => '/projects/$projectId/ask';
   static String projectConversations(String projectId) => '/projects/$projectId/conversations';
   static String projectConversationDetail(String projectId, String conversationId) => '/projects/$projectId/conversations/$conversationId';
   static String projectConversationMessages(String projectId, String conversationId) => '/projects/$projectId/conversations/$conversationId/messages';
+
 }

@@ -6,7 +6,9 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/connection/presentation/server_connection_screen.dart';
 import '../features/projects/presentation/projects_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/workspace/presentation/team_management_screen.dart';
 import '../features/workspace/presentation/workspace_screen.dart';
+
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
@@ -59,6 +61,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
+      GoRoute(
+        path: '/team',
+        builder: (context, state) => const TeamManagementScreen(),
+      ),
     ],
   );
 });
+

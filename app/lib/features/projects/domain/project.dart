@@ -6,6 +6,7 @@ class Project {
   final String status;
   final DateTime? updatedAt;
   final String? repositoryName;
+  final String? role;
 
   const Project({
     required this.id,
@@ -15,7 +16,11 @@ class Project {
     required this.status,
     this.updatedAt,
     this.repositoryName,
+    this.role,
   });
+
+  bool get isProjectAdmin =>
+      role?.toLowerCase() == 'admin' || role?.toLowerCase() == 'owner';
 
   factory Project.fromJson(Map<String, dynamic> json) {
     return Project(
@@ -28,6 +33,8 @@ class Project {
           ? DateTime.tryParse(json['updated_at'].toString())
           : null,
       repositoryName: json['repository']?['full_name']?.toString(),
+      role: json['role']?.toString(),
     );
   }
 }
+

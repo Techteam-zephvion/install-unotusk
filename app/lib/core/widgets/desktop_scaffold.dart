@@ -88,6 +88,17 @@ class DesktopScaffold extends ConsumerWidget {
                   onTap: () => context.go('/settings'),
                   isDark: isDark,
                 ),
+                if (user?.isAdmin ?? false) ...[
+                  const SizedBox(width: 6),
+                  _NavItem(
+                    label: 'Team',
+                    icon: Icons.people_outline,
+                    isSelected: currentRoute.startsWith('/team'),
+                    onTap: () => context.go('/team'),
+                    isDark: isDark,
+                  ),
+                ],
+
 
                 const Spacer(),
 
@@ -215,6 +226,26 @@ class DesktopScaffold extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      if (user.isAdmin)
+                        PopupMenuItem(
+                          value: 'team',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 15,
+                                color: isDark ? AppColors.textSecondary : AppColors.textSecondaryLight,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Team Management',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: isDark ? AppColors.textPrimary : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       PopupMenuItem(
                         value: 'logout',
                         child: Row(
@@ -232,10 +263,13 @@ class DesktopScaffold extends ConsumerWidget {
                     onSelected: (value) {
                       if (value == 'settings') {
                         context.go('/settings');
+                      } else if (value == 'team') {
+                        context.go('/team');
                       } else if (value == 'logout') {
                         ref.read(authControllerProvider.notifier).logout();
                       }
                     },
+
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(

@@ -11,9 +11,12 @@ import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state_view.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../domain/project.dart';
 import 'create_project_dialog.dart';
+import 'manage_project_team_dialog.dart';
 import 'projects_controller.dart';
+
 
 class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
@@ -42,6 +45,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   @override
   Widget build(BuildContext context) {
     final projectsAsync = ref.watch(projectsProvider);
+    final authState = ref.watch(authControllerProvider);
 
     return DesktopScaffold(
       currentRoute: '/projects',
@@ -60,7 +64,9 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                     Text('Projects', style: AppTextStyles.h1),
                     const SizedBox(height: 4),
                     Text(
-                      'Software projects available in your workspace',
+                      authState.isAdmin
+                          ? 'All software projects across your organization workspace'
+                          : 'Software projects assigned to you in this workspace',
                       style: AppTextStyles.bodySmall,
                     ),
                   ],
@@ -73,13 +79,15 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       variant: AppButtonVariant.secondary,
                       onPressed: () => ref.refresh(projectsProvider),
                     ),
-                    const SizedBox(width: 10),
-                    AppButton(
-                      text: 'Connect Codebase',
-                      icon: Icons.add,
-                      variant: AppButtonVariant.primary,
-                      onPressed: () => _openCreateDialog(context),
-                    ),
+                    if (authState.isAdmin) ...[
+                      const SizedBox(width: 10),
+                      AppButton(
+                        text: 'Connect Codebase',
+                        icon: Icons.add,
+                        variant: AppButtonVariant.primary,
+                        onPressed: () => _openCreateDialog(context),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -123,10 +131,16 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       icon: Icons.folder_open_outlined,
                       title: _searchQuery.isEmpty ? 'No projects yet' : 'No matching projects',
                       description: _searchQuery.isEmpty
-                          ? 'No software repositories have been connected to this workspace yet. Link a codebase to begin exploring architecture and discoveries.'
+                          ? (authState.isAdmin
+                              ? 'No software repositories have been connected to this workspace yet. Link a codebase to begin exploring architecture and discoveries.'
+                              : 'You have not been assigned to any projects yet. Please contact your organization administrator.')
                           : 'Try changing your filter query.',
-                      actionLabel: _searchQuery.isEmpty ? 'Connect First Codebase' : null,
-                      onAction: _searchQuery.isEmpty ? () => _openCreateDialog(context) : null,
+                      actionLabel: _searchQuery.isEmpty && authState.isAdmin
+                          ? 'Connect First Codebase'
+                          : null,
+                      onAction: _searchQuery.isEmpty && authState.isAdmin
+                          ? () => _openCreateDialog(context)
+                          : null,
                     );
                   }
 
@@ -148,13 +162,16 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 }
 
-class _ProjectItemCard extends StatelessWidget {
+class _ProjectItemCard extends ConsumerWidget {
   final Project project;
 
   const _ProjectItemCard({required this.project});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    final canManageTeam = authState.isAdmin || project.isProjectAdmin;
+
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       onTap: () => context.go('/projects/${project.id}'),
@@ -185,6 +202,15 @@ class _ProjectItemCard extends StatelessWidget {
                           ? BadgeVariant.success
                           : BadgeVariant.neutral,
                     ),
+                    if (project.role != null) ...[
+                      const SizedBox(width: 6),
+                      StatusBadge(
+                        label: project.role!.toUpperCase(),
+                        variant: project.isProjectAdmin
+                            ? BadgeVariant.info
+                            : BadgeVariant.neutral,
+                      ),
+                    ],
                   ],
                 ),
                 if (project.description != null && project.description!.isNotEmpty) ...[
@@ -206,6 +232,24 @@ class _ProjectItemCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
+          if (canManageTeam) ...[
+            OutlinedButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => ManageProjectTeamDialog(project: project),
+                );
+              },
+              icon: const Icon(Icons.group_outlined, size: 14),
+              label: const Text('Team', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Row(
             children: [
               Text('Open', style: AppTextStyles.label.copyWith(color: AppColors.primary)),
@@ -218,3 +262,4 @@ class _ProjectItemCard extends StatelessWidget {
     );
   }
 }
+

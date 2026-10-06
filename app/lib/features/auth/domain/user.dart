@@ -15,6 +15,10 @@ class User {
 
   String get name => fullName.isNotEmpty ? fullName : email.split('@').first;
 
+  bool get isOwner => role.toLowerCase() == 'owner';
+  bool get isAdmin => role.toLowerCase() == 'admin' || isOwner;
+  bool get isMember => !isAdmin;
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id']?.toString() ?? '',

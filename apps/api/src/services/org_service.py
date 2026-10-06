@@ -11,7 +11,12 @@ from apps.api.src.api.exceptions import (
 from apps.api.src.models.enums import MembershipRole
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.organization import Organization
-from apps.api.src.schemas.organization import OrganizationCreate, OrganizationRead
+from apps.api.src.models.user import User
+from apps.api.src.schemas.organization import (
+    OrganizationCreate,
+    OrganizationMemberRead,
+    OrganizationRead,
+)
 from apps.api.src.services.slug import slugify
 
 
@@ -147,3 +152,34 @@ class OrgService:
                 message="User is not a member of the specified organization",
             )
         return membership
+
+    @staticmethod
+    async def list_organization_members(
+        session: AsyncSession,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> list[OrganizationMemberRead]:
+        await OrgService.verify_membership(session, org_id, user_id)
+
+        query = (
+            select(OrganizationMembership, User.name, User.email)
+            .join(User, OrganizationMembership.user_id == User.id)
+            .where(OrganizationMembership.organization_id == org_id)
+            .order_by(OrganizationMembership.created_at.asc())
+        )
+        result = await session.execute(query)
+        rows = result.all()
+
+        return [
+            OrganizationMemberRead(
+                id=mem.id,
+                organization_id=mem.organization_id,
+                user_id=mem.user_id,
+                user_name=name,
+                user_email=email,
+                role=mem.role,
+                created_at=mem.created_at,
+            )
+            for mem, name, email in rows
+        ]
+
