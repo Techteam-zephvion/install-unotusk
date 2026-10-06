@@ -52,6 +52,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.api
+    image: unotusk-api:0.1.0
     container_name: unotusk-api
     restart: unless-stopped
     depends_on:
@@ -78,6 +79,7 @@ services:
       - "${API_PORT:-28000}:8000"
     volumes:
       - ./apps/api:/app/apps/api
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s
@@ -90,6 +92,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.worker
+    image: unotusk-worker:0.1.0
     container_name: unotusk-worker
     restart: unless-stopped
     depends_on:

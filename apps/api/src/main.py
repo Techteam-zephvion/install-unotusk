@@ -154,8 +154,8 @@ async def handle_generic_exception(request: Request, exc: Exception):
 
 
 # Register Routers
-app.include_router(health.router)
 for r in [
+    health.router,
     auth.router,
     organizations.router,
     projects.router,
