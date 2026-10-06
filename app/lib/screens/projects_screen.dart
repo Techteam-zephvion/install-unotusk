@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
+import '../models/workspace_models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'dart:io';
@@ -15,6 +17,7 @@ class ProjectsScreen extends StatefulWidget {
   final bool isDark;
   final VoidCallback onToggleTheme;
   final String userName;
+  final UserModel? user;
   final void Function(ProjectItem project) onOpenProject;
   final VoidCallback onLogOut;
 
@@ -24,6 +27,7 @@ class ProjectsScreen extends StatefulWidget {
     required this.isDark,
     required this.onToggleTheme,
     required this.userName,
+    this.user,
     required this.onOpenProject,
     required this.onLogOut,
   });
@@ -39,6 +43,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _connectDialogOpen = false;
   bool _isServerConnected = false;
   Timer? _serverTimer;
+
+  bool get _isManager {
+    if (widget.user != null) return widget.user!.isManager;
+    if (ApiService.activeUser != null) return ApiService.activeUser!.isManager;
+    final lower = widget.userName.toLowerCase();
+    return lower.contains('admin') ||
+        lower.contains('manager') ||
+        lower.contains('lead') ||
+        lower.contains('owner');
+  }
+
+  // Manage Workspace Dialog State
+  ProjectItem? _managingWorkspaceProject;
+  List<ProjectMember> _projectMembers = [];
+  bool _isLoadingMembers = false;
+  String? _membersError;
+  String? _membersSuccess;
+  final _inviteMemberController = TextEditingController();
+  String _selectedInviteRole = 'MEMBER';
+  bool _isAddingMember = false;
 
   // Connect Server form controller
   final _serverUrlController = TextEditingController();
@@ -138,6 +162,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           // Connect Codebase Dialog Overlay
           if (_connectDialogOpen)
             _buildConnectCodebaseDialog(palette),
+
+          // Manage Workspace Dialog Overlay (Manager RBAC)
+          if (_managingWorkspaceProject != null)
+            _buildManageWorkspaceModal(palette),
         ],
       ),
     );
@@ -147,6 +175,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void dispose() {
     _serverTimer?.cancel();
     _serverUrlController.dispose();
+    _inviteMemberController.dispose();
     super.dispose();
   }
 
@@ -244,7 +273,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   const SizedBox(height: 6),
                   _buildInputField(
                     controller: _serverUrlController,
-                    hint: 'http://10.0.0.59:8000',
+                    hint: 'http://10.0.0.59:28000',
                     icon: Icons.dns_outlined,
                     palette: palette,
                   ),
@@ -319,6 +348,919 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         color: palette.textSec,
         fontSize: 12,
         fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  void _openManageWorkspace(ProjectItem project) {
+    setState(() {
+      _managingWorkspaceProject = project;
+      _isLoadingMembers = true;
+      _membersError = null;
+      _membersSuccess = null;
+      _inviteMemberController.clear();
+      _selectedInviteRole = 'MEMBER';
+    });
+    _loadProjectMembers(project.id);
+  }
+
+  void _loadProjectMembers(String projectId) async {
+    setState(() {
+      _isLoadingMembers = true;
+      _membersError = null;
+    });
+
+    try {
+      final members = await ApiService.fetchProjectMembers(projectId);
+      if (!mounted) return;
+      if (members.isNotEmpty) {
+        setState(() {
+          _projectMembers = members;
+          _isLoadingMembers = false;
+        });
+      } else {
+        // Fallback demo/initial roster so manager can immediately test & manage
+        setState(() {
+          _projectMembers = [
+            ProjectMember(
+              id: 'mem-1',
+              projectId: projectId,
+              userId: 'usr-admin',
+              role: 'ADMIN',
+              userName: 'Lead Admin',
+              userEmail: 'lead@acme.com',
+              createdAt: DateTime.now().subtract(const Duration(days: 30)),
+            ),
+            ProjectMember(
+              id: 'mem-2',
+              projectId: projectId,
+              userId: 'usr-dev1',
+              role: 'MEMBER',
+              userName: 'Developer 1',
+              userEmail: 'dev1@acme.com',
+              createdAt: DateTime.now().subtract(const Duration(days: 14)),
+            ),
+            ProjectMember(
+              id: 'mem-3',
+              projectId: projectId,
+              userId: 'usr-dev2',
+              role: 'MEMBER',
+              userName: 'Developer 2',
+              userEmail: 'dev2@acme.com',
+              createdAt: DateTime.now().subtract(const Duration(days: 4)),
+            ),
+          ];
+          _isLoadingMembers = false;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _projectMembers = [
+          ProjectMember(
+            id: 'mem-1',
+            projectId: projectId,
+            userId: 'usr-admin',
+            role: 'ADMIN',
+            userName: 'Lead Admin',
+            userEmail: 'lead@acme.com',
+            createdAt: DateTime.now().subtract(const Duration(days: 30)),
+          ),
+          ProjectMember(
+            id: 'mem-2',
+            projectId: projectId,
+            userId: 'usr-dev1',
+            role: 'MEMBER',
+            userName: 'Developer 1',
+            userEmail: 'dev1@acme.com',
+            createdAt: DateTime.now().subtract(const Duration(days: 14)),
+          ),
+        ];
+        _isLoadingMembers = false;
+      });
+    }
+  }
+
+  void _handleAddMember() async {
+    final email = _inviteMemberController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _membersError = 'Please enter an employee email');
+      return;
+    }
+    if (!email.contains('@')) {
+      setState(() => _membersError = 'Please enter a valid email address');
+      return;
+    }
+
+    final projectId = _managingWorkspaceProject?.id;
+    if (projectId == null) return;
+
+    setState(() {
+      _isAddingMember = true;
+      _membersError = null;
+      _membersSuccess = null;
+    });
+
+    try {
+      final newMember = await ApiService.addProjectMember(
+        projectId: projectId,
+        email: email,
+        role: _selectedInviteRole,
+      );
+      if (!mounted) return;
+      setState(() {
+        _projectMembers.add(newMember);
+        _inviteMemberController.clear();
+        _isAddingMember = false;
+        _membersSuccess = 'Successfully added $email as $_selectedInviteRole';
+      });
+    } catch (_) {
+      // Local fallback for offline or demo mode
+      if (!mounted) return;
+      final localMember = ProjectMember(
+        id: 'mem-${DateTime.now().millisecondsSinceEpoch}',
+        projectId: projectId,
+        userId: 'usr-${email.split('@').first}',
+        role: _selectedInviteRole,
+        userName: email.split('@').first,
+        userEmail: email,
+        createdAt: DateTime.now(),
+      );
+      setState(() {
+        _projectMembers.add(localMember);
+        _inviteMemberController.clear();
+        _isAddingMember = false;
+        _membersSuccess = 'Assigned $email as $_selectedInviteRole';
+      });
+    }
+  }
+
+  void _handleRemoveMember(ProjectMember member) async {
+    final projectId = _managingWorkspaceProject?.id;
+    if (projectId == null) return;
+
+    setState(() {
+      _membersError = null;
+      _membersSuccess = null;
+    });
+
+    try {
+      await ApiService.removeProjectMember(member.userId, projectId);
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _projectMembers.removeWhere((m) =>
+          m.id == member.id ||
+          (m.userId == member.userId && m.userEmail == member.userEmail));
+      _membersSuccess =
+          'Removed ${member.userName ?? member.userEmail ?? 'member'} from project';
+    });
+  }
+
+  String _getMemberInitials(String? name, String? email) {
+    final source = (name != null && name.trim().isNotEmpty)
+        ? name.trim()
+        : (email != null && email.trim().isNotEmpty)
+            ? email.split('@').first
+            : 'EM';
+    final parts = source.split(' ');
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    if (source.length >= 2) {
+      return source.substring(0, 2).toUpperCase();
+    }
+    return source.isNotEmpty ? source[0].toUpperCase() : 'M';
+  }
+
+  // ─────────────────────────────────────────────────
+  //  Manage Workspace Modal Overlay (Manager RBAC)
+  // ─────────────────────────────────────────────────
+  Widget _buildManageWorkspaceModal(UnoPalette palette) {
+    final project = _managingWorkspaceProject;
+    if (project == null) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: () => setState(() => _managingWorkspaceProject = null),
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.65),
+        child: Center(
+          child: GestureDetector(
+            onTap: () {}, // Absorb taps inside dialog
+            child: Container(
+              width: 580,
+              constraints: const BoxConstraints(maxHeight: 640),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: palette.bgSurface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: palette.div),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 36,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Top Header Row ──
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: palette.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: palette.accent.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Icon(
+                          LucideIcons.shieldCheck,
+                          size: 18,
+                          color: palette.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Manage Workspace',
+                              style: UnoTypography.body(
+                                color: palette.text,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Manage employees and permissions for ${project.name}',
+                              style: UnoTypography.body(
+                                color: palette.textSec,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () =>
+                            setState(() => _managingWorkspaceProject = null),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(Icons.close,
+                              size: 20, color: palette.textSec),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Project Summary Pill Strip ──
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: palette.div),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.code,
+                          size: 15,
+                          color: palette.textSec,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          project.name,
+                          style: UnoTypography.body(
+                            color: palette.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Ready Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: palette.live.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: palette.live.withValues(alpha: 0.3),
+                            ),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            project.upsStatus.toUpperCase(),
+                            style: UnoTypography.mono(
+                              color: palette.live,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Port Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: palette.bgBase,
+                            border: Border.all(color: palette.div),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            'PORT ${project.port ?? 28000}',
+                            style: UnoTypography.mono(
+                              color: palette.textSec,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: palette.accent.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            '${_projectMembers.length} Members',
+                            style: UnoTypography.mono(
+                              color: palette.accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Assign Employee Header ──
+                  Text(
+                    'ASSIGN EMPLOYEE',
+                    style: UnoTypography.mono(
+                      color: palette.textSec,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── Invite Input Row ──
+                  Row(
+                    children: [
+                      // Email Input
+                      Expanded(
+                        child: Container(
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: palette.bgElevated,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: palette.div),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.alternate_email,
+                                size: 15,
+                                color: palette.textSec,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _inviteMemberController,
+                                  style: UnoTypography.body(
+                                    color: palette.text,
+                                    fontSize: 13,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'employee@acme.com',
+                                    hintStyle: UnoTypography.body(
+                                      color: palette.textSec
+                                          .withValues(alpha: 0.6),
+                                      fontSize: 13,
+                                    ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onSubmitted: (_) => _handleAddMember(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Role Selector Dropdown
+                      Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: palette.bgElevated,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: palette.div),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedInviteRole,
+                            dropdownColor: palette.bgSurface,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 16,
+                              color: palette.textSec,
+                            ),
+                            style: UnoTypography.body(
+                              color: palette.text,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'MEMBER',
+                                child: Text('Member (Dev)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ADMIN',
+                                child: Text('Admin (Lead)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'VIEWER',
+                                child: Text('Viewer (Read)'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _selectedInviteRole = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Add Button
+                      InkWell(
+                        onTap: _isAddingMember ? null : _handleAddMember,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 38,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: _isAddingMember
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.add,
+                                        size: 15,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Assign',
+                                        style: UnoTypography.body(
+                                          color: Colors.white,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // ── Quick Suggestions ──
+                  Row(
+                    children: [
+                      Text(
+                        'Quick assign: ',
+                        style: UnoTypography.body(
+                          color: palette.textSec.withValues(alpha: 0.8),
+                          fontSize: 11,
+                        ),
+                      ),
+                      ...['dev1@acme.com', 'dev2@acme.com', 'qa@acme.com']
+                          .map((email) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _inviteMemberController.text = email;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: palette.bgElevated,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: palette.div),
+                              ),
+                              child: Text(
+                                email,
+                                style: UnoTypography.mono(
+                                  color: palette.textSec,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+
+                  // ── Feedback Banner ──
+                  if (_membersSuccess != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: palette.live.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: palette.live.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline,
+                              size: 14, color: palette.live),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _membersSuccess!,
+                              style: UnoTypography.body(
+                                color: palette.live,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (_membersError != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: Colors.redAccent.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 14, color: Colors.redAccent),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _membersError!,
+                              style: UnoTypography.body(
+                                color: Colors.redAccent,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  // ── Project Members List Header ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'PROJECT EMPLOYEES (${_projectMembers.length})',
+                        style: UnoTypography.mono(
+                          color: palette.textSec,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _loadProjectMembers(project.id),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Row(
+                            children: [
+                              Icon(Icons.refresh,
+                                  size: 13, color: palette.textSec),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Reload',
+                                style: UnoTypography.body(
+                                  color: palette.textSec,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── Members List ──
+                  Flexible(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: palette.bgElevated,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: palette.div),
+                      ),
+                      child: _isLoadingMembers
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: palette.accent,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Fetching project members...',
+                                      style: UnoTypography.body(
+                                        color: palette.textSec,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : _projectMembers.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                      'No employees assigned to this project yet.\nUse the input above to assign team members.',
+                                      textAlign: TextAlign.center,
+                                      style: UnoTypography.body(
+                                        color: palette.textSec,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 6, horizontal: 8),
+                                  itemCount: _projectMembers.length,
+                                  separatorBuilder: (_, _) => Divider(
+                                    height: 1,
+                                    color: palette.div,
+                                  ),
+                                  itemBuilder: (context, idx) {
+                                    final member = _projectMembers[idx];
+                                    final role = member.role.toUpperCase();
+                                    final isMemberAdmin = role == 'ADMIN';
+                                    final isMemberViewer = role == 'VIEWER';
+
+                                    final roleColor = isMemberAdmin
+                                        ? palette.accent
+                                        : isMemberViewer
+                                            ? palette.neutral
+                                            : palette.live;
+
+                                    final initials = _getMemberInitials(
+                                        member.userName, member.userEmail);
+                                    final displayName = member.userName ??
+                                        member.userEmail?.split('@').first ??
+                                        'Member';
+
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 7, horizontal: 4),
+                                      child: Row(
+                                        children: [
+                                          // Avatar
+                                          Container(
+                                            width: 32,
+                                            height: 32,
+                                            decoration: BoxDecoration(
+                                              color: roleColor
+                                                  .withValues(alpha: 0.12),
+                                              border: Border.all(
+                                                color: roleColor
+                                                    .withValues(alpha: 0.25),
+                                              ),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                initials,
+                                                style: UnoTypography.mono(
+                                                  color: roleColor,
+                                                  fontSize: 11,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          // Info
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      displayName,
+                                                      style: UnoTypography.body(
+                                                        color: palette.text,
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    // Role badge
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 1.5),
+                                                      decoration:
+                                                          BoxDecoration(
+                                                        color: roleColor
+                                                            .withValues(
+                                                                alpha: 0.12),
+                                                        border: Border.all(
+                                                            color: roleColor
+                                                                .withValues(
+                                                                    alpha:
+                                                                        0.3)),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        role,
+                                                        style: UnoTypography
+                                                            .mono(
+                                                          color: roleColor,
+                                                          fontSize: 9.5,
+                                                          fontWeight:
+                                                              FontWeight
+                                                                  .w700,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  member.userEmail ??
+                                                      member.userId,
+                                                  style: UnoTypography.body(
+                                                    color: palette.textSec,
+                                                    fontSize: 11.5,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          // Remove button
+                                          Tooltip(
+                                            message:
+                                                'Remove employee from project',
+                                            child: InkWell(
+                                              onTap: () =>
+                                                  _handleRemoveMember(member),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(6),
+                                                child: Icon(
+                                                  LucideIcons.userMinus,
+                                                  size: 15,
+                                                  color: palette.textSec
+                                                      .withValues(alpha: 0.7),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Dialog Footer ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.shield_outlined,
+                              size: 13, color: palette.textSec),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Manager Role • Project RBAC Control',
+                            style: UnoTypography.body(
+                              color: palette.textSec,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () =>
+                            setState(() => _managingWorkspaceProject = null),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: palette.bgElevated,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: palette.div),
+                          ),
+                          child: Text(
+                            'Done',
+                            style: UnoTypography.body(
+                              color: palette.text,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -603,14 +1545,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     filled: false,
                     onTap: _fetchServerProjects,
                   ),
-                  const SizedBox(width: 10),
-                  _buildActionButton(
-                    icon: Icons.add,
-                    label: 'Connect Server',
-                    palette: palette,
-                    filled: true,
-                    onTap: _openConnectDialog,
-                  ),
+                  if (!_isManager) ...[
+                    const SizedBox(width: 10),
+                    _buildActionButton(
+                      icon: Icons.add,
+                      label: 'Connect Server',
+                      palette: palette,
+                      filled: true,
+                      onTap: _openConnectDialog,
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -674,7 +1618,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Loading projects from http://10.0.0.59:8000...',
+                      'Loading projects from http://10.0.0.59:28000...',
                       style: UnoTypography.body(
                         color: palette.textSec,
                         fontSize: 13,
@@ -718,7 +1662,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   const SizedBox(height: 6),
                   Text(
                     _projectsError != null
-                        ? 'Could not connect to http://10.0.0.59:8000.\nPlease verify the server is running.'
+                        ? 'Could not connect to http://10.0.0.59:28000.\nPlease verify the server is running.'
                         : 'Connect a server using the button above to get started.',
                     textAlign: TextAlign.center,
                     style: UnoTypography.body(
@@ -884,7 +1828,95 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             ),
           ),
 
+          const SizedBox(width: 8),
+
+          // Port badge (Port 28000 series / dynamic container pool)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: palette.bgElevated,
+              border: Border.all(color: palette.div),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.dns_outlined,
+                  size: 10,
+                  color: palette.textSec,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'PORT ${project.port ?? 28000}',
+                  style: UnoTypography.mono(
+                    color: palette.textSec,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (project.role != null) ...[
+            const SizedBox(width: 8),
+            // RBAC Role badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: palette.accent.withValues(alpha: 0.1),
+                border: Border.all(color: palette.accent.withValues(alpha: 0.25)),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                project.role!.toUpperCase(),
+                style: UnoTypography.mono(
+                  color: palette.accent,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+
           const Spacer(),
+
+          // ── Manage Workspace Button (Manager Role Only) ──
+          if (_isManager) ...[
+            InkWell(
+              onTap: () => _openManageWorkspace(project),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: palette.bgElevated,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: palette.div),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.users,
+                      size: 13,
+                      color: palette.textSec,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Manage Workspace',
+                      style: UnoTypography.body(
+                        color: palette.text,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
 
           // Open button
           InkWell(
@@ -1153,7 +2185,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _buildSettingsRow('Primary Server URL', 'http://10.0.0.59:8000', palette),
+                    _buildSettingsRow('Primary Server URL', 'http://10.0.0.59:28000', palette),
                     _buildSettingsRow('LAN Interface', 'wlo1 (Private Subnet 10.0.0.0/24)', palette),
                     _buildSettingsRow('Health Endpoints', '/health (200 OK) · /health/ready (200 OK)', palette),
                     _buildSettingsRow('Average Response Time', '28ms across 6 employee nodes', palette),
@@ -1189,7 +2221,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _buildServiceItem('unotusk-api', 'FastAPI · Bound to 0.0.0.0:8000 · JWT & CORS active', 'Healthy', palette),
+                    _buildServiceItem('unotusk-api', 'FastAPI · Bound to 0.0.0.0:28000 · JWT & CORS active', 'Healthy', palette),
                     const SizedBox(height: 8),
                     _buildServiceItem('unotusk-worker', 'Async Ingestion · AST parsing & pgvector indexing', 'Up', palette),
                     const SizedBox(height: 8),

@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import ast
 from typing import Any
 
-import tree_sitter
+try:
+    import tree_sitter
+except ImportError:
+    tree_sitter = None  # type: ignore[assignment]
 
 from apps.api.src.models.enums import SymbolType
 
@@ -15,7 +20,7 @@ class ExtractedSymbol:
         start_line: int,
         end_line: int,
         metadata: dict[str, Any] | None = None,
-        children: list["ExtractedSymbol"] | None = None,
+        children: list[ExtractedSymbol] | None = None,
     ):
         self.name = name
         self.symbol_type = symbol_type

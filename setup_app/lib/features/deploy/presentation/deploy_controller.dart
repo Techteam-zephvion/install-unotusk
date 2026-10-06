@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/presentation/config_controller.dart';
 import '../../target/presentation/target_controller.dart';
+import '../../manager/data/server_registry.dart';
+import '../../manager/domain/server_instance.dart';
 import '../data/deployment_engine.dart';
 
 final deploymentEngineProvider = Provider<DeploymentEngine>((ref) {
@@ -54,6 +57,9 @@ class DeployController extends StateNotifier<DeployState> {
   Future<void> startDeployment() async {
     final target = ref.read(targetControllerProvider).config;
     final config = ref.read(configControllerProvider).config;
+    final serverRegistry = ServerRegistry();
+    final homeDir = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final deployDir = '$homeDir/.unotusk/servers/${config.serverName}';
 
     state = state.copyWith(
       isRunning: true,
@@ -65,12 +71,26 @@ class DeployController extends StateNotifier<DeployState> {
     final result = await deploymentEngine.deploy(
       target: target,
       config: config,
+      customDeploymentDir: deployDir,
       onStageChanged: (stage) {
         state = state.copyWith(currentStage: stage);
       },
     );
 
     if (result.isSuccess) {
+      // Save metadata
+      final instance = ServerInstance(
+        id: config.serverName,
+        name: config.serverName,
+        composeProject: config.serverName,
+        deploymentDir: deployDir,
+        apiPort: config.serverPort,
+        lanIp: config.lanIp,
+        createdAt: DateTime.now(),
+        lastKnownState: ServerState.running,
+      );
+      await serverRegistry.saveServer(instance);
+
       state = state.copyWith(
         isRunning: false,
         isSuccess: true,

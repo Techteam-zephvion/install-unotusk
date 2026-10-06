@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from apps.api.src.models.finding import Finding
     from apps.api.src.models.integration import Integration
     from apps.api.src.models.knowledge import ProjectKnowledge
+    from apps.api.src.models.membership import ProjectMembership
     from apps.api.src.models.organization import Organization
     from apps.api.src.models.report import ProjectIntelligenceReport
     from apps.api.src.models.repository import Repository
@@ -45,6 +46,9 @@ class Project(Base, UUIDMixin, TimestampMixin):
         Enum(ProjectStatus, name="project_status"),
         default=ProjectStatus.CREATED,
         nullable=False,
+    )
+    port: Mapped[int | None] = mapped_column(
+        nullable=True,
     )
 
     # Relationships
@@ -84,6 +88,11 @@ class Project(Base, UUIDMixin, TimestampMixin):
     )
     knowledge_items: Mapped[list["ProjectKnowledge"]] = relationship(
         "ProjectKnowledge",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    memberships: Mapped[list["ProjectMembership"]] = relationship(
+        "ProjectMembership",
         back_populates="project",
         cascade="all, delete-orphan",
     )

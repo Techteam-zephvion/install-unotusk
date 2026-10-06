@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from apps.api.src.db.base import Base, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
-    from apps.api.src.models.membership import OrganizationMembership
+    from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
 
 
 class User(Base, UUIDMixin, TimestampMixin):
@@ -30,6 +30,11 @@ class User(Base, UUIDMixin, TimestampMixin):
     # Relationships
     memberships: Mapped[list["OrganizationMembership"]] = relationship(
         "OrganizationMembership",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    project_memberships: Mapped[list["ProjectMembership"]] = relationship(
+        "ProjectMembership",
         back_populates="user",
         cascade="all, delete-orphan",
     )

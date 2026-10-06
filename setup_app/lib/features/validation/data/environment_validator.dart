@@ -253,6 +253,17 @@ class EnvironmentValidator {
     );
   }
 
+  Future<int> findAvailablePort(String host, {int startPort = 28000, int step = 100, int maxAttempts = 10}) async {
+    for (int i = 0; i < maxAttempts; i++) {
+      final port = startPort + (i * step);
+      final inspection = await inspectPort(host, port);
+      if (inspection.source.isFree) {
+        return port;
+      }
+    }
+    return startPort; // Fallback
+  }
+
   Future<PortConflictInspection> inspectPort(String host, int port) async {
     final isFree = await _socketTester(host, port);
     if (isFree) {
@@ -339,7 +350,7 @@ class EnvironmentValidator {
     );
   }
 
-  Future<CheckItem> checkPortsAvailable(TargetConfig config, {int apiPort = 8000}) async {
+  Future<CheckItem> checkPortsAvailable(TargetConfig config, {int apiPort = 28000}) async {
     if (!config.isLocal) {
       return const CheckItem(
         id: 'ports_available',

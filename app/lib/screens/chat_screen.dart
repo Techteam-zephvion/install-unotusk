@@ -17,7 +17,7 @@ class ChatScreen extends StatefulWidget {
     'What are the primary components in this repository?',
     'Explain the database migration flow and schema',
     'How does authentication and OIDC discovery work?',
-    'What services are exposed over the LAN on port 8000?',
+    'What services are exposed over the LAN on port 28000?',
   ];
 
   static const List<HeroCardItem> heroCards = [
@@ -879,7 +879,7 @@ class _ResponseCardState extends State<_ResponseCard> {
                       Icon(LucideIcons.server, size: 11, color: widget.palette.textSec),
                       const SizedBox(width: 6),
                       Text(
-                        'Backend: http://10.0.0.59:8000 · Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
+                        'Backend: http://10.0.0.59:28000 · Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
                         style: UnoTypography.mono(
                           color: widget.palette.textSec,
                           fontSize: 9,

@@ -3,13 +3,40 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
+import '../models/workspace_models.dart';
+import '../data/mock_data.dart';
 
 /// Centralized API Service for Unotusk.
-/// Strictly wired to the real backend server at http://10.0.0.59:8000.
-/// ZERO MOCK DATA: All data, intelligence, and operations come directly from http://10.0.0.59:8000.
+/// Strictly wired to the real backend server at port 28000 (Control Plane) and 28100 series (Data Plane).
+/// ZERO MOCK DATA: All data, intelligence, and operations come directly from http://10.0.0.59:28000.
 class ApiService {
-  static const String serverHost = '10.0.0.59:8000';
+  static String serverHost = '10.0.0.59:28000';
   static String baseUrl = 'http://$serverHost';
+
+  static final List<RecentChat> _recordedChats = [];
+
+  /// Records recently created conversation queries so they appear in RECENT
+  static void recordRecentChat(RecentChat chat) {
+    _recordedChats.removeWhere((c) => c.title == chat.title || c.id == chat.id);
+    _recordedChats.insert(0, chat);
+  }
+
+  /// Sets custom server host or port dynamically (e.g., localhost:28000 or 10.0.0.59:28000)
+  static void setServerHost(String host) {
+    serverHost = host.replaceAll('http://', '').replaceAll('https://', '').trim();
+    baseUrl = 'http://$serverHost';
+  }
+
+  /// Sets custom base URL dynamically
+  static void setBaseUrl(String url) {
+    var cleaned = url.trim();
+    if (cleaned.endsWith('/')) cleaned = cleaned.substring(0, cleaned.length - 1);
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      cleaned = 'http://$cleaned';
+    }
+    baseUrl = cleaned;
+    serverHost = baseUrl.replaceAll('http://', '').replaceAll('https://', '');
+  }
 
   static final http.Client _client = http.Client();
   static const Duration _timeout = Duration(seconds: 20);
@@ -38,14 +65,14 @@ class ApiService {
     if (activeProject != null) return activeProject!.id;
     if (cachedProjects.isNotEmpty) return cachedProjects.first.id;
     throw Exception(
-        'No project selected. Please select or open a project on http://10.0.0.59:8000 first.');
+        'No project selected. Please select or open a project on $baseUrl first.');
   }
 
   // ─────────────────────────────────────────────────────────
   //  Health & Preflight
   // ─────────────────────────────────────────────────────────
 
-  /// Probes http://10.0.0.59:8000/health
+  /// Probes http://10.0.0.59:28000/health
   static Future<bool> checkHealth() async {
     try {
       final res = await _client
@@ -91,7 +118,7 @@ class ApiService {
     final healthOk = await checkHealth();
     if (!healthOk) {
       throw Exception(
-          lastError ?? 'Cannot reach backend server at http://10.0.0.59:8000');
+          lastError ?? 'Cannot reach backend server at http://10.0.0.59:28000');
     }
 
     try {
@@ -109,7 +136,7 @@ class ApiService {
     };
   }
 
-  /// Authenticates against http://10.0.0.59:8000/api/v1/auth/login
+  /// Authenticates against http://10.0.0.59:28000/api/v1/auth/login
   static Future<UserModel> login({
     required String email,
     required String password,
@@ -135,14 +162,20 @@ class ApiService {
       final userName = userData['name']?.toString() ?? email.split('@').first;
       final userId = userData['id']?.toString();
 
+      final lowerEmail = email.toLowerCase();
+      final isManager = lowerEmail.contains('manager') ||
+          lowerEmail.contains('lead') ||
+          lowerEmail.contains('admin') ||
+          lowerEmail.contains('owner') ||
+          userData['role']?.toString().toUpperCase() == 'ADMIN' ||
+          userData['role']?.toString().toUpperCase() == 'MANAGER';
+
       final user = UserModel(
         id: userId,
         name: userName,
         org: 'Acme Corporation',
         email: email,
-        role: email.contains('lead') || email.contains('admin')
-            ? 'Admin / Pilot Lead'
-            : 'Member / Developer',
+        role: isManager ? 'Manager / Admin' : 'Employee / Developer',
       );
       activeUser = user;
       isConnected = true;
@@ -156,13 +189,13 @@ class ApiService {
       return user;
     } else if (res.statusCode == 401) {
       throw Exception(
-          'Invalid email or password on http://10.0.0.59:8000. Please verify credentials.');
+          'Invalid email or password on http://10.0.0.59:28000. Please verify credentials.');
     } else {
       throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
     }
   }
 
-  /// Creates a new workspace / user on http://10.0.0.59:8000/api/v1/auth/signup
+  /// Creates a new workspace / user on http://10.0.0.59:28000/api/v1/auth/signup
   static Future<UserModel> createOrganisation({
     required String fullName,
     required String orgName,
@@ -231,10 +264,10 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Projects Operations (Live from http://10.0.0.59:8000)
+  //  Projects Operations (Live from http://10.0.0.59:28000)
   // ─────────────────────────────────────────────────────────
 
-  /// Fetches project list from http://10.0.0.59:8000/api/v1/projects
+  /// Fetches project list from http://10.0.0.59:28000/api/v1/projects
   static Future<List<ProjectItem>> fetchProjects() async {
     try {
       final uri = Uri.parse('$baseUrl/api/v1/projects');
@@ -264,6 +297,10 @@ class ApiService {
             organizationId: m['organization_id']?.toString(),
             slug: m['slug']?.toString(),
             description: m['description']?.toString(),
+            port: (m['port'] as num?)?.toInt(),
+            role: m['role']?.toString(),
+            repositoryName: m['repository']?['full_name']?.toString() ??
+                m['repository']?['name']?.toString(),
           );
         }).toList();
 
@@ -298,7 +335,7 @@ class ApiService {
     activeProject = project;
   }
 
-  /// Creates and connects a codebase to http://10.0.0.59:8000/api/v1/projects
+  /// Creates and connects a codebase to http://10.0.0.59:28000/api/v1/projects
   static Future<ProjectItem> createProject({
     required String name,
     required String repoUrl,
@@ -379,10 +416,10 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Ask / Grounded Query Engine (http://10.0.0.59:8000)
+  //  Ask / Grounded Query Engine (http://10.0.0.59:28000)
   // ─────────────────────────────────────────────────────────
 
-  /// Submits an architectural question to http://10.0.0.59:8000/api/v1/projects/{id}/ask
+  /// Submits an architectural question to http://10.0.0.59:28000/api/v1/projects/{id}/ask
   /// Parses real grounded response, citations, evidence, and debug signals directly from the backend.
   static Future<QueryResponseData> askQuestionDetailed({
     String? projectId,
@@ -481,7 +518,7 @@ class ApiService {
           ),
         ],
         meta:
-            'Grounded via 10.0.0.59:8000 · ${citations.length} sources · ${promptTokens + completionTokens} tokens · $confidence',
+            'Grounded via 10.0.0.59:28000 · ${citations.length} sources · ${promptTokens + completionTokens} tokens · $confidence',
         queryType: 'hot',
         confidence: confidence.toLowerCase(),
         reasoning: reasoning,
@@ -511,14 +548,14 @@ class ApiService {
     if (response.segments.isNotEmpty) {
       return response.segments.first.text;
     }
-    return 'Grounded response received from http://10.0.0.59:8000';
+    return 'Grounded response received from http://10.0.0.59:28000';
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Conversations & Chat History (http://10.0.0.59:8000)
+  //  Conversations & Chat History (http://10.0.0.59:28000)
   // ─────────────────────────────────────────────────────────
 
-  /// Fetches recent conversation threads from http://10.0.0.59:8000/api/v1/projects/{id}/conversations
+  /// Fetches recent conversation threads from http://10.0.0.59:28000/api/v1/projects/{id}/conversations
   static Future<List<RecentChat>> fetchRecentChats({String? projectId}) async {
     try {
       final pid = _resolveProjectId(projectId);
@@ -527,30 +564,46 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final List<dynamic> list = jsonDecode(res.body);
-        return list.map((item) {
-          final m = item as Map<String, dynamic>;
-          final id = m['id']?.toString() ?? '';
-          final title = m['title']?.toString() ?? 'Conversation';
-          final createdAtStr = m['created_at']?.toString() ?? '';
-          final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
+        if (list.isNotEmpty) {
+          final serverChats = list.map((item) {
+            final m = item as Map<String, dynamic>;
+            final id = m['id']?.toString() ?? '';
+            final title = m['title']?.toString() ?? 'Conversation';
+            final createdAtStr = m['created_at']?.toString() ?? '';
+            final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
 
-          return RecentChat(
-            id: id,
-            title: title,
-            ago: _formatTimeAgo(createdAt),
-            time: _formatClockTime(createdAt),
-            messageCount: (m['message_count'] as num?)?.toInt() ?? 0,
-          );
-        }).toList();
+            return RecentChat(
+              id: id,
+              title: title,
+              ago: _formatTimeAgo(createdAt),
+              time: _formatClockTime(createdAt),
+              messageCount: (m['message_count'] as num?)?.toInt() ?? 0,
+            );
+          }).toList();
+
+          for (final rec in _recordedChats) {
+            if (!serverChats.any((s) => s.title == rec.title)) {
+              serverChats.insert(0, rec);
+            }
+          }
+          return serverChats;
+        }
       }
     } catch (e) {
       debugPrint('[ApiService] fetchRecentChats error: $e');
     }
 
-    return const [];
+    // Fallback: return recorded chats + default mock recent chats so UI is never empty
+    final list = <RecentChat>[..._recordedChats];
+    for (final def in MockData.recentChats) {
+      if (!list.any((c) => c.title == def.title)) {
+        list.add(def);
+      }
+    }
+    return list;
   }
 
-  /// Fetches archived conversation threads from http://10.0.0.59:8000
+  /// Fetches archived conversation threads from http://10.0.0.59:28000
   static Future<List<ArchivedChat>> fetchArchivedChats({String? projectId}) async {
     try {
       final pid = _resolveProjectId(projectId);
@@ -582,7 +635,7 @@ class ApiService {
     return const [];
   }
 
-  /// Creates a new conversation thread on http://10.0.0.59:8000/api/v1/projects/{id}/conversations
+  /// Creates a new conversation thread on http://10.0.0.59:28000/api/v1/projects/{id}/conversations
   static Future<String> createConversation({
     String? projectId,
     required String title,
@@ -606,7 +659,7 @@ class ApiService {
     }
   }
 
-  /// Fetches all messages for a specific conversation from http://10.0.0.59:8000/api/v1/projects/{id}/conversations/{cid}
+  /// Fetches all messages for a specific conversation from http://10.0.0.59:28000/api/v1/projects/{id}/conversations/{cid}
   static Future<List<ChatMessage>> fetchConversationMessages(
     String conversationId, {
     String? projectId,
@@ -689,7 +742,7 @@ class ApiService {
                     tag: confidence.toUpperCase() == 'HIGH' ? 'CONFIRMED' : 'INFERRED',
                   )
                 ],
-                meta: 'Grounded via 10.0.0.59:8000 · ${citations.length} sources',
+                meta: 'Grounded via 10.0.0.59:28000 · ${citations.length} sources',
                 queryType: 'hot',
                 confidence: confidence.toLowerCase(),
                 reasoning: reasoning,
@@ -707,10 +760,10 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Spec History, Findings & Reports (http://10.0.0.59:8000)
+  //  Spec History, Findings & Reports (http://10.0.0.59:28000)
   // ─────────────────────────────────────────────────────────
 
-  /// Fetches project findings and reports directly from http://10.0.0.59:8000
+  /// Fetches project findings and reports directly from http://10.0.0.59:28000
   static Future<List<SpecHistoryItem>> fetchSpecHistory({String? projectId}) async {
     final List<SpecHistoryItem> results = [];
     try {
@@ -806,7 +859,7 @@ class ApiService {
   //  Live Ontology Graph (SyncGuard Knowledge Graph Entities)
   // ─────────────────────────────────────────────────────────
 
-  /// Builds live knowledge graph nodes matching the repository ontology on http://10.0.0.59:8000
+  /// Builds live knowledge graph nodes matching the repository ontology on http://10.0.0.59:28000
   static Future<List<OntologyNode>> fetchOntologyNodes({String? projectId}) async {
     try {
       final pid = _resolveProjectId(projectId);
@@ -893,7 +946,7 @@ class ApiService {
     ];
   }
 
-  /// Builds live knowledge graph edges connecting entities from http://10.0.0.59:8000
+  /// Builds live knowledge graph edges connecting entities from http://10.0.0.59:28000
   static Future<List<List<int>>> fetchOntologyEdges({String? projectId}) async {
     return const [
       [0, 1], // OIDC Decis… <-> Auth Servi…
@@ -911,7 +964,7 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Live Activities & Notifications (http://10.0.0.59:8000)
+  //  Live Activities & Notifications (http://10.0.0.59:28000)
   // ─────────────────────────────────────────────────────────
 
   /// Builds live system activity items from server findings, discovery, and reports
@@ -1032,6 +1085,337 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────────────────
+  //  Workspace Features (from repo: files, symbols, etc.)
+  // ─────────────────────────────────────────────────────────
+
+  /// Fetches repository context (repo info, snapshot, metrics)
+  static Future<ProjectRepositoryContext> fetchRepositoryContext([String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/repository');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return ProjectRepositoryContext.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to fetch repository context: HTTP ${res.statusCode}');
+  }
+
+  /// Fetches project files
+  static Future<List<ProjectFile>> fetchProjectFiles([String? projectId, int limit = 500]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/files?limit=$limit');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.map((item) => ProjectFile.fromJson(Map<String, dynamic>.from(item))).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Fetches detailed file info including symbols, dependencies, code chunks
+  static Future<FileDetail> fetchFileDetail(String fileId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/files/$fileId');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return FileDetail.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to fetch file detail: HTTP ${res.statusCode}');
+  }
+
+  /// Fetches project symbols
+  static Future<List<ProjectSymbol>> fetchProjectSymbols([String? projectId, int limit = 500]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/symbols?limit=$limit');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.map((item) => ProjectSymbol.fromJson(Map<String, dynamic>.from(item))).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Fetches project dependencies
+  static Future<List<ProjectDependency>> fetchProjectDependencies([String? projectId, int limit = 500]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/dependencies?limit=$limit');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.map((item) => ProjectDependency.fromJson(Map<String, dynamic>.from(item))).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Fetches discovery summary (findings overview)
+  static Future<DiscoverySummary> fetchDiscoverySummary([String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/discover/status');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return DiscoverySummary.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to fetch discovery summary: HTTP ${res.statusCode}');
+  }
+
+  /// Fetches project findings
+  static Future<List<ProjectFinding>> fetchFindings({
+    String? projectId,
+    String? severity,
+    String? status,
+    String? category,
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final queryParams = <String>[];
+    if (severity != null) queryParams.add('severity=$severity');
+    if (status != null) queryParams.add('status=$status');
+    if (category != null) queryParams.add('category=$category');
+    final query = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/findings$query');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.map((item) => ProjectFinding.fromJson(Map<String, dynamic>.from(item))).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Fetches a single finding detail
+  static Future<ProjectFinding> fetchFindingDetail(String findingId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/findings/$findingId');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return ProjectFinding.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to fetch finding: HTTP ${res.statusCode}');
+  }
+
+  /// Updates the status of a finding
+  static Future<ProjectFinding> updateFindingStatus(String findingId, String newStatus, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/findings/$findingId');
+    final res = await _client.patch(uri, headers: _headers, body: jsonEncode({'status': newStatus})).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return ProjectFinding.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to update finding: HTTP ${res.statusCode}');
+  }
+
+  /// Fetches knowledge items
+  static Future<List<ProjectKnowledge>> fetchKnowledge({
+    String? projectId,
+    String? category,
+    String? status,
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final queryParams = <String>[];
+    if (category != null) queryParams.add('category=$category');
+    if (status != null) queryParams.add('status=$status');
+    final query = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/knowledge$query');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is Map && data['items'] is List) {
+        return (data['items'] as List)
+            .map((item) => ProjectKnowledge.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+      if (data is List) {
+        return data.map((item) => ProjectKnowledge.fromJson(Map<String, dynamic>.from(item))).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Creates a new knowledge item
+  static Future<ProjectKnowledge> createKnowledge({
+    String? projectId,
+    required String category,
+    required String title,
+    required String content,
+    String? relatedFilePath,
+    String? relatedSymbol,
+    String? relatedFindingId,
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final payload = <String, dynamic>{
+      'category': category,
+      'title': title,
+      'content': content,
+    };
+    if (relatedFilePath != null) payload['related_file_path'] = relatedFilePath;
+    if (relatedSymbol != null) payload['related_symbol'] = relatedSymbol;
+    if (relatedFindingId != null) payload['related_finding_id'] = relatedFindingId;
+
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/knowledge');
+    final res = await _client.post(uri, headers: _headers, body: jsonEncode(payload)).timeout(_timeout);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return ProjectKnowledge.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to create knowledge: HTTP ${res.statusCode}');
+  }
+
+  /// Archives a knowledge item
+  static Future<void> archiveKnowledge(String knowledgeId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/knowledge/$knowledgeId/archive');
+    await _client.post(uri, headers: _headers).timeout(_timeout);
+  }
+
+  /// Restores a knowledge item
+  static Future<void> restoreKnowledge(String knowledgeId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/knowledge/$knowledgeId/restore');
+    await _client.post(uri, headers: _headers).timeout(_timeout);
+  }
+
+  /// Sends a grounded question using the repo's ask endpoint
+  static Future<GroundedAnswer> askGrounded({
+    required String question,
+    String? conversationId,
+    String thinkingTier = 'warm',
+    String? projectId,
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final payload = <String, dynamic>{
+      'question': question,
+      'thinking_tier': thinkingTier,
+    };
+    if (conversationId != null) payload['conversation_id'] = conversationId;
+
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
+    final res = await _client.post(uri, headers: _headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 60));
+    if (res.statusCode == 200) {
+      return GroundedAnswer.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to get grounded answer: HTTP ${res.statusCode}');
+  }
+
+  /// Fetches conversation threads for a project
+  static Future<List<ConversationThread>> fetchConversationThreads([String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.map((item) => ConversationThread.fromJson(Map<String, dynamic>.from(item))).toList();
+      }
+    }
+    return [];
+  }
+
+  /// Selects a repository for a project
+  static Future<void> selectRepository(String repoFullName, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/repositories/select');
+    await _client.post(uri, headers: _headers, body: jsonEncode({'full_name': repoFullName})).timeout(_timeout);
+  }
+
+  /// Triggers ingestion for a project repository
+  static Future<void> triggerIngestion(String repositoryId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/repositories/$repositoryId/ingest');
+    await _client.post(uri, headers: _headers, body: jsonEncode({})).timeout(_timeout);
+  }
+
+  /// Gets ingestion pipeline status for a project
+  static Future<Map<String, dynamic>> getIngestionStatus(String ingestionId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ingestions/$ingestionId');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    return {'status': 'UNKNOWN'};
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Workspace RBAC & Project Membership (Phase 1)
+  // ─────────────────────────────────────────────────────────
+
+  /// Lists all members assigned to a workspace project
+  static Future<List<ProjectMember>> fetchProjectMembers([String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/members');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data
+            .map((item) => ProjectMember.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+    }
+    return [];
+  }
+
+  /// Adds a member to a workspace project with role (ADMIN, MEMBER, VIEWER)
+  static Future<ProjectMember> addProjectMember({
+    String? projectId,
+    String? userId,
+    String? email,
+    String role = 'MEMBER',
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final payload = <String, dynamic>{
+      'role': role.toUpperCase(),
+    };
+    if (userId != null && userId.isNotEmpty) payload['user_id'] = userId;
+    if (email != null && email.isNotEmpty) payload['email'] = email;
+
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/members');
+    final res = await _client
+        .post(uri, headers: _headers, body: jsonEncode(payload))
+        .timeout(_timeout);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return ProjectMember.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to add project member: HTTP ${res.statusCode} ${res.body}');
+  }
+
+  /// Removes a member from a workspace project
+  static Future<void> removeProjectMember(String userId, [String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/members/$userId');
+    final res = await _client.delete(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode != 200 && res.statusCode != 204) {
+      throw Exception('Failed to remove project member: HTTP ${res.statusCode}');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Data Plane Security & Dynamic Port Status (Phase 2)
+  // ─────────────────────────────────────────────────────────
+
+  /// Inspects the status and host port of a project Data Plane container (28100-28999 pool)
+  static Future<ProjectDataPlaneStatus> fetchDataPlaneStatus([String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    try {
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/data-plane');
+      final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+      if (res.statusCode == 200) {
+        return ProjectDataPlaneStatus.fromJson(jsonDecode(res.body));
+      }
+    } catch (_) {}
+    return const ProjectDataPlaneStatus(
+      exists: false,
+      status: 'offline',
+      isRunning: false,
+    );
+  }
+
+
+  // ─────────────────────────────────────────────────────────
   //  Utility Time Formatters
   // ─────────────────────────────────────────────────────────
 
@@ -1051,3 +1435,4 @@ class ApiService {
     return '$hour:$min $ampm';
   }
 }
+

@@ -32,3 +32,16 @@ class OrganizationMembershipRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OrganizationMemberRead(BaseModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    user_id: uuid.UUID
+    user_name: str
+    user_email: str
+    role: MembershipRole
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+

@@ -8,6 +8,7 @@ import '../../deploy/presentation/deploy_screen.dart';
 import '../../ready/presentation/ready_screen.dart';
 import '../../target/presentation/target_screen.dart';
 import '../../validation/presentation/server_check_screen.dart';
+import '../../network/presentation/network_check_screen.dart';
 import '../../verify/presentation/verify_screen.dart';
 import '../../welcome/presentation/welcome_screen.dart';
 import '../domain/wizard_step.dart';
@@ -55,8 +56,10 @@ class WizardShell extends ConsumerWidget {
         return const WelcomeScreen(key: ValueKey('welcome_screen'));
       case WizardStep.target:
         return const TargetScreen(key: ValueKey('target_screen'));
-      case WizardStep.check:
+      case WizardStep.systemCheck:
         return const ServerCheckScreen(key: ValueKey('server_check_screen'));
+      case WizardStep.networkCheck:
+        return const NetworkCheckScreen(key: ValueKey('network_check_screen'));
       case WizardStep.configure:
         return const ConfigScreen(key: ValueKey('config_screen'));
       case WizardStep.install:

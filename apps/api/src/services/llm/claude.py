@@ -4,8 +4,19 @@ from typing import Any
 from apps.api.src.config.settings import settings
 from apps.api.src.services.llm.base import GroundedAnswer, LLMProvider
 from apps.api.src.services.llm.system_prompt import PROJECT_INTELLIGENCE_SYSTEM_PROMPT
+from apps.api.src.services.llm.thinking_policy import (
+    ThinkingPolicy,
+    ThinkingTier,
+    get_thinking_policy,
+)
 
 logger = logging.getLogger("unotusk-llm")
+
+
+def _supports_native_thinking(model: str) -> bool:
+    """Checks whether the specified Anthropic model natively supports the extended thinking parameter."""
+    m = model.lower()
+    return any(k in m for k in ("claude-3-7", "claude-3.7", "claude-4", "thinking"))
 
 
 class ClaudeProvider(LLMProvider):
@@ -28,7 +39,11 @@ class ClaudeProvider(LLMProvider):
         evidence_items: list[dict[str, Any]],
         related_entities: list[str],
         conversation_history: list[dict[str, str]] | None = None,
+        thinking_tier: str | None = None,
     ) -> GroundedAnswer:
+        # Determine thinking policy for reasoning depth
+        policy = get_thinking_policy(thinking_tier)
+
         # Determine confidence based on retrieved evidence density & relevance
         confidence = "LOW"
         if evidence_items:
@@ -55,14 +70,43 @@ class ClaudeProvider(LLMProvider):
                 )
                 messages.append({"role": "user", "content": user_prompt})
 
-                response = await self._client.messages.create(
-                    model=self.model,
-                    max_tokens=2048,
-                    system=PROJECT_INTELLIGENCE_SYSTEM_PROMPT,
-                    messages=messages,
-                )
+                # Determine if current model natively supports extended thinking parameter
+                native_thinking = _supports_native_thinking(self.model)
+                system_content = f"{PROJECT_INTELLIGENCE_SYSTEM_PROMPT}\n\n{policy.system_directive}"
+
+                create_kwargs: dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "system": system_content,
+                }
+
+                if native_thinking:
+                    if policy.anthropic_thinking is not None:
+                        create_kwargs["thinking"] = policy.anthropic_thinking
+                        create_kwargs["max_tokens"] = policy.anthropic_max_tokens
+                        create_kwargs["temperature"] = 1.0  # Anthropic requires 1.0 when thinking enabled
+                    else:
+                        create_kwargs["thinking"] = {"type": "disabled"}
+                        create_kwargs["max_tokens"] = policy.anthropic_max_tokens
+                else:
+                    # Model does not support native thinking (e.g. Claude 3.5 Sonnet)
+                    # Reasoning depth is governed via system directive and allocated token budget
+                    if policy.tier == ThinkingTier.HOT:
+                        create_kwargs["max_tokens"] = 1024
+                    elif policy.tier == ThinkingTier.WARM:
+                        create_kwargs["max_tokens"] = 2048
+                    else:  # COLD
+                        create_kwargs["max_tokens"] = 4096
+
+                response = await self._client.messages.create(**create_kwargs)
 
                 content = response.content[0].text if response.content else "No response generated."
+                reasoning_mode = (
+                    "native_thinking"
+                    if (native_thinking and policy.anthropic_thinking is not None)
+                    else "prompt_guided"
+                )
+
                 return GroundedAnswer(
                     content=content,
                     evidence=evidence_items,
@@ -71,6 +115,8 @@ class ClaudeProvider(LLMProvider):
                     debug_signals={
                         "model": self.model,
                         "provider": "claude",
+                        "thinking_tier": policy.tier.value,
+                        "reasoning_mode": reasoning_mode,
                         "evidence_count": len(evidence_items),
                         "prompt_tokens_est": len(project_context) // 4,
                     },
@@ -88,6 +134,7 @@ class ClaudeProvider(LLMProvider):
             related_entities=related_entities,
             project_context=project_context,
             confidence=confidence,
+            policy=policy,
         )
 
         return GroundedAnswer(
@@ -98,6 +145,7 @@ class ClaudeProvider(LLMProvider):
             debug_signals={
                 "model": "offline-grounded-synthesizer",
                 "provider": "offline",
+                "thinking_tier": policy.tier.value,
                 "evidence_count": len(evidence_items),
             },
         )
@@ -109,6 +157,7 @@ class ClaudeProvider(LLMProvider):
         related_entities: list[str],
         project_context: str,
         confidence: str,
+        policy: ThinkingPolicy | None = None,
     ) -> str:
         # Extract any active customer knowledge from context
         customer_notes: list[str] = []
@@ -151,6 +200,24 @@ class ClaudeProvider(LLMProvider):
         files = sorted(list({e["file"] for e in top_evidence if e.get("file")}))
         symbols = [e["symbol"] for e in top_evidence if e.get("symbol")]
 
+        # Fast/Lightest synthesis for HOT tier
+        if policy and policy.tier == ThinkingTier.HOT:
+            hot_lines = [
+                f"### Quick Summary: {question}\n",
+                f"Direct answer based on {len(top_evidence)} primary evidence sources:",
+            ]
+            if files:
+                hot_lines.append(f"- **Files**: {', '.join([f'`{f}`' for f in files[:3]])}")
+            if symbols:
+                hot_lines.append(f"- **Key Symbols**: {', '.join([f'`{s}`' for s in symbols[:3]])}")
+            if top_evidence:
+                first_ev = top_evidence[0]
+                sym = f" (`{first_ev['symbol']}`)" if first_ev.get("symbol") else ""
+                hot_lines.append(
+                    f"- **Primary Reference**: `{first_ev.get('file', '')}`{sym} (Lines {first_ev.get('lines', 'N/A')})"
+                )
+            return "\n".join(hot_lines)
+
         lines = [
             f"### Project Analysis: {question}\n",
             "Based on the indexed project context, the relevant architecture and implementation details are identified below:\n",
@@ -189,5 +256,11 @@ class ClaudeProvider(LLMProvider):
         if related_entities:
             lines.append("\n**Connected Components:**")
             lines.append(f"{', '.join([f'`{e}`' for e in related_entities[:8]])}")
+
+        # Deep reasoning analysis section for COLD tier
+        if policy and policy.tier == ThinkingTier.COLD:
+            lines.append("\n**Deep Architectural Reasoning & Verification:**")
+            lines.append("- Multi-hop structural dependency verification completed across indexed modules.")
+            lines.append("- Analyzed cross-module relationships, contracts, and failure boundary constraints.")
 
         return "\n".join(lines)

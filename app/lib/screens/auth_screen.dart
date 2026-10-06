@@ -96,7 +96,7 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage =
-            'Cannot reach backend at http://10.0.0.59:8000.\nPlease verify the server is running and port 8000 is open.';
+            'Cannot reach backend at http://10.0.0.59:28000.\nPlease verify the server is running and port 28000 is open.';
         _state = 'entry';
       });
     }
@@ -125,7 +125,7 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage =
-            'Sign in failed on http://10.0.0.59:8000:\n$e';
+            'Sign in failed on http://10.0.0.59:28000:\n$e';
       });
     }
   }
@@ -319,7 +319,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'Server: http://10.0.0.59:8000',
+                    'Server: http://10.0.0.59:28000',
                     overflow: TextOverflow.ellipsis,
                     style: UnoTypography.mono(
                       color: widget.palette.textSec,
@@ -434,7 +434,112 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
+
+        // Role Demo Quick Fills (Manager vs Employee RBAC testing)
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  _emailController.text = 'lead@acme.com';
+                  _passwordController.text = 'demo1234';
+                  _verifyEmail();
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: widget.palette.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: widget.palette.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.shield_outlined, size: 13, color: widget.palette.accent),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          'Manager (lead@acme.com)',
+                          overflow: TextOverflow.ellipsis,
+                          style: UnoTypography.body(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: widget.palette.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () {
+                  _emailController.text = 'dev1@acme.com';
+                  _passwordController.text = 'demo1234';
+                  _verifyEmail();
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: widget.palette.bgElevated,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: widget.palette.div),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.badge_outlined, size: 13, color: widget.palette.textSec),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          'Employee (dev1@acme.com)',
+                          overflow: TextOverflow.ellipsis,
+                          style: UnoTypography.body(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: widget.palette.textSec,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 8),
+
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              "Need a workspace? ",
+              style: UnoTypography.body(fontSize: 11, color: widget.palette.textSec),
+            ),
+            InkWell(
+              onTap: () => setState(() => _state = 'register'),
+              child: Text(
+                'Create Workspace',
+                style: UnoTypography.body(
+                  fontSize: 11,
+                  color: widget.palette.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(child: Container(height: 1, color: widget.palette.div)),
@@ -735,7 +840,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       setState(() {
                         _isLoading = false;
                         _errorMessage =
-                            'Failed to create workspace on http://10.0.0.59:8000:\n$e';
+                            'Failed to create workspace on http://10.0.0.59:28000:\n$e';
                       });
                     }
                   },

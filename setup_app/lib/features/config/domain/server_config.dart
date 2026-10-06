@@ -8,7 +8,7 @@ enum LlmProviderType {
   String get label {
     switch (this) {
       case LlmProviderType.groq:
-        return 'Groq (Llama 3.3 70B)';
+        return 'Groq (Qwen 3.8 27B)';
       case LlmProviderType.claude:
         return 'Anthropic (Claude 3.5 Sonnet)';
     }
@@ -92,6 +92,7 @@ class ServerConfig {
     buffer.writeln('SYNC_DATABASE_URL=postgresql://$postgresUser:$postgresPassword@postgres:5432/$postgresDb');
     buffer.writeln('REDIS_URL=redis://redis:6379/0');
     buffer.writeln('AUTH_SECRET=$authSecret');
+    buffer.writeln('NEXT_PUBLIC_API_URL=$serverUrl');
     buffer.writeln('LLM_PROVIDER=${llmProvider == LlmProviderType.groq ? "groq" : "claude"}');
 
     if (llmProvider == LlmProviderType.groq) {

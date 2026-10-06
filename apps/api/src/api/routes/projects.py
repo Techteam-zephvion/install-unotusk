@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.src.api.dependencies.auth import get_current_user
 from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.models.user import User
-from apps.api.src.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
+from apps.api.src.schemas.project import (
+    ProjectCreate,
+    ProjectMemberAdd,
+    ProjectMemberRead,
+    ProjectRead,
+    ProjectUpdate,
+)
 from apps.api.src.services.org_service import OrgService
 from apps.api.src.services.project_service import ProjectService
 
@@ -37,7 +43,7 @@ async def list_projects(
             return []
         target_org_id = user_orgs[0].id
 
-    # Service verifies user membership in target_org_id
+    # Service verifies user membership in target_org_id and applies RBAC filtering
     return await ProjectService.list_projects(db, current_user.id, target_org_id)
 
 
@@ -47,7 +53,7 @@ async def get_project(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectRead:
-    # Service verifies project exists and caller belongs to project's organization
+    # Service verifies project exists and caller has access
     return await ProjectService.get_project(db, current_user.id, project_id)
 
 
@@ -68,3 +74,47 @@ async def delete_project(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await ProjectService.delete_project(db, current_user.id, project_id)
+
+
+@router.get("/{project_id}/members", response_model=list[ProjectMemberRead])
+async def list_project_members(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ProjectMemberRead]:
+    return await ProjectService.list_project_members(db, current_user.id, project_id)
+
+
+@router.post(
+    "/{project_id}/members",
+    response_model=ProjectMemberRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_project_member(
+    project_id: uuid.UUID,
+    data: ProjectMemberAdd,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProjectMemberRead:
+    return await ProjectService.add_project_member(db, current_user.id, project_id, data)
+
+
+@router.delete("/{project_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_project_member(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await ProjectService.remove_project_member(db, current_user.id, project_id, user_id)
+
+
+@router.get("/{project_id}/data-plane", response_model=dict)
+async def get_project_data_plane(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    await ProjectService.get_project(db, current_user.id, project_id)
+    from apps.api.src.services.orchestrator_service import OrchestratorService
+    return OrchestratorService.get_project_data_plane_status(project_id)

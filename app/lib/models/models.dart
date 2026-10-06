@@ -14,6 +14,20 @@ class UserModel {
     this.role = 'Admin / Pilot Lead',
     this.id,
   });
+
+  bool get isManager {
+    final lowerRole = role.toLowerCase();
+    final lowerEmail = email.toLowerCase();
+    return lowerRole.contains('manager') ||
+        lowerRole.contains('admin') ||
+        lowerRole.contains('lead') ||
+        lowerRole.contains('owner') ||
+        lowerEmail.contains('manager') ||
+        lowerEmail.contains('lead') ||
+        lowerEmail.contains('admin');
+  }
+
+  bool get isEmployee => !isManager;
 }
 
 class NotificationItem {
@@ -45,6 +59,9 @@ class ProjectItem {
   final String? organizationId;
   final String? slug;
   final String? description;
+  final int? port;
+  final String? role;
+  final String? repositoryName;
 
   const ProjectItem({
     required this.id,
@@ -57,6 +74,9 @@ class ProjectItem {
     this.organizationId,
     this.slug,
     this.description,
+    this.port,
+    this.role,
+    this.repositoryName,
   });
 }
 

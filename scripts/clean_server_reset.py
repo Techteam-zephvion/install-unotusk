@@ -40,21 +40,26 @@ UNOTUSK_CONTAINERS = {
     "unotusk-migration",
     "unotusk-postgres",
     "unotusk-redis",
+    "unotusk-web",
 }
 
 UNOTUSK_DATA_VOLUMES = {
     "unotusk_postgres_data",
     "unotusk_redis_data",
+    "unotusk-mvp_postgres_data",
+    "unotusk-mvp_redis_data",
     "server_unotusk_postgres_data",
     "server_unotusk_redis_data",
 }
 
 UNOTUSK_NETWORKS = {
     "unotusk-network",
+    "unotusk-mvp_unotusk-network",
     "server_unotusk-network",
 }
 
 DEPLOYMENT_DIR = Path.home() / ".unotusk" / "server"
+SERVERS_DIR = Path.home() / ".unotusk" / "servers"
 
 
 def print_step(title: str):
@@ -197,18 +202,28 @@ def perform_reset(
             print_warn("Data wipe cancelled by user. Aborting reset.")
             return False
 
-    # 2. Stop and Remove Containers via Compose if directory exists
+    # 2. Stop and Remove Containers via Compose if directories exist
     print_step("2. Stopping and Removing Unotusk Containers")
-    compose_file = DEPLOYMENT_DIR / "docker-compose.yml"
-    if compose_file.exists():
-        cmd = ["docker", "compose", "-f", str(compose_file), "down"]
+    compose_files: list[Path] = []
+    if (DEPLOYMENT_DIR / "docker-compose.yml").exists():
+        compose_files.append(DEPLOYMENT_DIR / "docker-compose.yml")
+    if SERVERS_DIR.exists():
+        for sdir in sorted(SERVERS_DIR.iterdir()):
+            if sdir.is_dir() and (sdir / "docker-compose.yml").exists():
+                compose_files.append(sdir / "docker-compose.yml")
+    repo_compose = Path(__file__).resolve().parent.parent / "docker-compose.yml"
+    if repo_compose.exists() and repo_compose not in compose_files:
+        compose_files.append(repo_compose)
+
+    for cfile in compose_files:
+        cmd = ["docker", "compose", "-f", str(cfile), "down"]
         if wipe_data:
             cmd.append("-v")
         print_info(f"Executing: {' '.join(cmd)}")
         if not dry_run:
             res = run_cmd(cmd)
             if res.returncode == 0:
-                print_pass("Docker Compose stack stopped successfully.")
+                print_pass(f"Docker Compose stack ({cfile.parent.name}) stopped successfully.")
             else:
                 print_warn(f"Compose down returned non-zero code ({res.returncode}): {res.stderr.strip()}")
 

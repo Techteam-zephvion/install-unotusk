@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../data/mock_data.dart';
 import 'unotusk_logo.dart';
 import 'user_menu_popup.dart';
 
@@ -41,7 +42,7 @@ class UnoSidebar extends StatefulWidget {
 
 class _UnoSidebarState extends State<UnoSidebar> {
   bool _userMenuOpen = false;
-  List<RecentChat> _recentChats = [];
+  List<RecentChat> _recentChats = List.from(MockData.recentChats);
 
   @override
   void initState() {
@@ -50,9 +51,21 @@ class _UnoSidebarState extends State<UnoSidebar> {
   }
 
   void _loadRecentChats() async {
-    final chats = await ApiService.fetchRecentChats();
-    if (mounted) {
-      setState(() => _recentChats = chats);
+    try {
+      final chats = await ApiService.fetchRecentChats();
+      if (mounted) {
+        setState(() {
+          if (chats.isNotEmpty) {
+            _recentChats = chats;
+          } else if (_recentChats.isEmpty) {
+            _recentChats = List.from(MockData.recentChats);
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted && _recentChats.isEmpty) {
+        setState(() => _recentChats = List.from(MockData.recentChats));
+      }
     }
   }
 
@@ -302,9 +315,15 @@ class _UnoSidebarState extends State<UnoSidebar> {
     );
   }
 
-  // Nav items: Projects above Spec History, below New Query
+  // Nav items: Projects and workspace tabs
   final List<Map<String, dynamic>> _navItems = const [
     {'id': 'projects', 'label': 'Projects', 'icon': LucideIcons.folder},
+    {'id': 'overview', 'label': 'Overview', 'icon': LucideIcons.layoutDashboard},
+    {'id': 'chat', 'label': 'Ask AI', 'icon': LucideIcons.sparkles},
+    {'id': 'files', 'label': 'Files', 'icon': LucideIcons.folderTree},
+    {'id': 'architecture', 'label': 'Architecture', 'icon': LucideIcons.boxes},
+    {'id': 'discoveries', 'label': 'Discoveries', 'icon': LucideIcons.radar},
+    {'id': 'knowledge', 'label': 'Knowledge', 'icon': LucideIcons.bookOpen},
     {'id': 'spec-history', 'label': 'Spec History', 'icon': LucideIcons.fileText},
     {'id': 'graph', 'label': 'Ontology Graph', 'icon': LucideIcons.gitFork},
     {'id': 'feed', 'label': 'Ingestion Feed', 'icon': LucideIcons.radio},
@@ -470,99 +489,127 @@ class _UnoSidebarState extends State<UnoSidebar> {
           ),
         ),
 
-        // Nav items — rounded pills, highlighted when active
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          child: Column(
-            children: _navItems.map((item) {
-              final active = widget.activeView == item['id'];
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: InkWell(
-                  onTap: () => widget.onViewChange(item['id']),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? (isDark
-                              ? const Color(0xFF2B2521)
-                              : widget.palette.bgElevated)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          item['icon'] as IconData,
-                          size: 15,
-                          color: active
-                              ? (isDark ? Colors.white : widget.palette.text)
-                              : widget.palette.textSec,
-                        ),
-                        const SizedBox(width: 11),
-                        Text(
-                          item['label'] as String,
-                          style: UnoTypography.body(
-                            color: active
-                                ? (isDark ? Colors.white : widget.palette.text)
-                                : widget.palette.textSec,
-                            fontSize: 13,
-                            fontWeight:
-                                active ? FontWeight.w600 : FontWeight.w400,
+        // ── Scrollable Navigation & Recent Chats ──
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Nav items — rounded pills, highlighted when active
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+                  child: Column(
+                    children: _navItems.map((item) {
+                      final active = widget.activeView == item['id'];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1.5),
+                        child: InkWell(
+                          onTap: () => widget.onViewChange(item['id']),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? (isDark
+                                      ? const Color(0xFF2B2521)
+                                      : widget.palette.bgElevated)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  item['icon'] as IconData,
+                                  size: 15,
+                                  color: active
+                                      ? (isDark ? Colors.white : widget.palette.text)
+                                      : widget.palette.textSec,
+                                ),
+                                const SizedBox(width: 11),
+                                Text(
+                                  item['label'] as String,
+                                  style: UnoTypography.body(
+                                    color: active
+                                        ? (isDark ? Colors.white : widget.palette.text)
+                                        : widget.palette.textSec,
+                                    fontSize: 13,
+                                    fontWeight:
+                                        active ? FontWeight.w600 : FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-
-        // Divider — web: height 1, margin "8px 0"
-        Container(
-          height: 1,
-          color: widget.palette.div,
-          margin: const EdgeInsets.symmetric(vertical: 8),
-        ),
-
-        // Recent Chats — web: padding "0 14px", flex 1, overflowY auto
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // web: Geist Mono 10px, uppercase, letterSpacing 0.06em
-                Text(
-                  'RECENT',
-                  style: UnoTypography.mono(
-                    color: widget.palette.textSec,
-                    fontSize: 10,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: _recentChats.length,
-                    itemBuilder: (context, index) {
-                      final chat = _recentChats[index];
-                      return _RecentChatTile(
-                        chat: chat,
-                        palette: widget.palette,
-                        onTap: () => widget.onLoadRecentChat(chat.id),
-                        onAction: (action) => _handleChatAction(action, chat),
                       );
-                    },
+                    }).toList(),
                   ),
                 ),
+
+                // Divider
+                Container(
+                  height: 1,
+                  color: widget.palette.div,
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                ),
+
+                // Recent Chats — with zero vertical clipping or overflow
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2, bottom: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'RECENT',
+                              style: UnoTypography.mono(
+                                color: widget.palette.textSec,
+                                fontSize: 10,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                            if (_recentChats.isNotEmpty)
+                              Text(
+                                '${_recentChats.length}',
+                                style: UnoTypography.mono(
+                                  color: widget.palette.textSec.withValues(alpha: 0.6),
+                                  fontSize: 9.5,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (_recentChats.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'No recent conversations',
+                            style: UnoTypography.body(
+                              color: widget.palette.textSec.withValues(alpha: 0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        )
+                      else
+                        ..._recentChats.map((chat) {
+                          return _RecentChatTile(
+                            chat: chat,
+                            palette: widget.palette,
+                            onTap: () => widget.onLoadRecentChat(chat.id),
+                            onAction: (action) => _handleChatAction(action, chat),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -723,22 +770,25 @@ class _UnoSidebarState extends State<UnoSidebar> {
           margin: const EdgeInsets.symmetric(vertical: 10),
         ),
 
-        // Nav items — web: hk component, 36×36, borderRadius 10
-        // gap 6 between items
-        ..._navItems.map((item) {
-          final active = widget.activeView == item['id'];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: _buildCollapsedNavItem(
-              icon: item['icon'] as IconData,
-              label: item['label'] as String,
-              active: active,
-              onTap: () => widget.onViewChange(item['id']),
+        // Nav items — scrollable when window is short
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: _navItems.map((item) {
+                final active = widget.activeView == item['id'];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: _buildCollapsedNavItem(
+                    icon: item['icon'] as IconData,
+                    label: item['label'] as String,
+                    active: active,
+                    onTap: () => widget.onViewChange(item['id']),
+                  ),
+                );
+              }).toList(),
             ),
-          );
-        }),
-
-        const Spacer(),
+          ),
+        ),
 
         // Archived chats — web: tc component
         _buildCollapsedButton(

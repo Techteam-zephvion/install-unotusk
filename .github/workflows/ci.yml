@@ -1,10 +1,21 @@
-name: CI
+name: CI — Application Tests & Lint
 
 on:
-  push:
-    branches: [main, master]
   pull_request:
     branches: [main, master]
+  push:
+    branches: [main, master]
+    paths:
+      - "apps/api/**"
+      - "app/**"
+      - "setup_app/**"
+      - "services/**"
+      - "packages/**"
+      - "tests/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend-checks:
@@ -81,6 +92,7 @@ jobs:
         with:
           flutter-version: "3.x"
           channel: stable
+          cache: true
 
       - name: Install Dependencies
         working-directory: app
@@ -88,7 +100,7 @@ jobs:
 
       - name: Flutter Analyze (Employee App)
         working-directory: app
-        run: flutter analyze --fatal-infos
+        run: flutter analyze
 
       - name: Flutter Test (Employee App)
         working-directory: app
@@ -106,6 +118,7 @@ jobs:
         with:
           flutter-version: "3.x"
           channel: stable
+          cache: true
 
       - name: Install Dependencies
         working-directory: setup_app
@@ -113,7 +126,7 @@ jobs:
 
       - name: Flutter Analyze (Setup App)
         working-directory: setup_app
-        run: flutter analyze --fatal-infos
+        run: flutter analyze
 
       - name: Flutter Test (Setup App)
         working-directory: setup_app

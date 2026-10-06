@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-unotusk}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-unotusk}"]
       interval: 5s
@@ -50,6 +52,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.api
+    image: unotusk-api:0.1.0
     container_name: unotusk-api
     restart: unless-stopped
     depends_on:
@@ -60,21 +63,23 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - APP_ENV=${APP_ENV:-development}
-      - DEBUG=${DEBUG:-true}
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=${AUTH_SECRET:-insecure-dev-secret-please-change-in-production-min-32-chars-long}
       - LLM_PROVIDER=${LLM_PROVIDER:-groq}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - CONTEXT_BUDGET_TOKENS=${CONTEXT_BUDGET_TOKENS:-3500}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-28000}:8000"
     volumes:
       - ./apps/api:/app/apps/api
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s
@@ -87,6 +92,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.worker
+    image: unotusk-worker:0.1.0
     container_name: unotusk-worker
     restart: unless-stopped
     depends_on:
@@ -95,23 +101,19 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
+      - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - REDIS_URL=redis://redis:6379/0
+      - AUTH_SECRET=${AUTH_SECRET:-insecure-dev-secret-please-change-in-production-min-32-chars-long}
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - CONTEXT_BUDGET_TOKENS=${CONTEXT_BUDGET_TOKENS:-3500}
       - QUEUE_NAME=unotusk_tasks
-    networks:
-      - unotusk-network
-
-  web:
-    build:
-      context: .
-      dockerfile: infrastructure/docker/Dockerfile.web
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-    container_name: unotusk-web
-    restart: unless-stopped
-    depends_on:
-      - api
-    ports:
-      - "${WEB_PORT:-3000}:3000"
     networks:
       - unotusk-network
 

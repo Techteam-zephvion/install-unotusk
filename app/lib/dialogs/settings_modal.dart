@@ -292,7 +292,7 @@ class _SettingsModalState extends State<SettingsModal> {
         const SizedBox(height: 14),
         _buildTextField('Role in Workspace', widget.user.role.isNotEmpty ? widget.user.role : 'Pilot Admin'),
         const SizedBox(height: 14),
-        _buildTextField('Connected Backend', 'http://10.0.0.59:8000'),
+        _buildTextField('Connected Backend', 'http://10.0.0.59:28000'),
       ],
     );
   }

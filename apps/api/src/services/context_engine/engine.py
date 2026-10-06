@@ -27,6 +27,7 @@ class ProjectContextEngine:
         conversation_history: list[dict[str, str]] | None = None,
         project_id: uuid.UUID | None = None,
         query_embedding: list[float] | None = None,
+        thinking_tier: str | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = analyze_query(question)
@@ -96,6 +97,7 @@ class ProjectContextEngine:
             evidence_items=assembled.evidence_items,
             related_entities=assembled.related_entities,
             conversation_history=conversation_history,
+            thinking_tier=thinking_tier,
         )
 
         # Attach retrieval debug signals

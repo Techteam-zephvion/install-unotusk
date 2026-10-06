@@ -53,7 +53,7 @@ void main() {
 
       final res = await validator.checkPortsAvailable(const TargetConfig(type: TargetType.local));
       expect(res.status.isPassed, true);
-      expect(res.description, contains('Port 8000 is open and available'));
+      expect(res.description, contains('Port 28000 is open and available'));
     });
 
     test('checkPortsAvailable detects occupied port and returns failed status with clear message', () async {

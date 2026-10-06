@@ -8,10 +8,15 @@ import 'dialogs/notifications_panel.dart';
 import 'dialogs/settings_modal.dart';
 import 'models/models.dart';
 import 'screens/admin_screen.dart';
+import 'screens/architecture_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/discoveries_screen.dart';
+import 'screens/files_screen.dart';
 import 'screens/ingestion_feed_screen.dart';
+import 'screens/knowledge_screen.dart';
 import 'screens/ontology_graph_screen.dart';
+import 'screens/overview_screen.dart';
 import 'screens/projects_screen.dart';
 import 'screens/spec_history_screen.dart';
 import 'services/api_service.dart';
@@ -174,7 +179,7 @@ class _AppShellState extends State<AppShell> {
       _openedProjectName = project.name;
       _messages.clear();
       _isGenerating = false;
-      _activeView = 'chat';
+      _activeView = 'overview';
       _appStage = 'workspace';
     });
     ApiService.setActiveProject(project);
@@ -232,6 +237,14 @@ class _AppShellState extends State<AppShell> {
     final queryId = 'q-${DateTime.now().millisecondsSinceEpoch}';
     final genId = 'g-${DateTime.now().millisecondsSinceEpoch + 1}';
 
+    ApiService.recordRecentChat(RecentChat(
+      id: queryId,
+      title: text.trim(),
+      ago: 'Just now',
+      time: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+      projectId: _openedProject?.id,
+    ));
+
     setState(() {
       _isGenerating = true;
       _messages.add(ChatMessage(
@@ -276,11 +289,11 @@ class _AppShellState extends State<AppShell> {
             data: QueryResponseData(
               segments: [
                 ResponseSegment(
-                  text: 'Server Response (http://10.0.0.59:8000):\n$e',
+                  text: 'Server Response (http://10.0.0.59:28000):\n$e',
                   tag: 'NOTICE',
                 ),
               ],
-              meta: 'http://10.0.0.59:8000 · verified response',
+              meta: 'http://10.0.0.59:28000 · verified response',
               queryType: 'hot',
               confidence: 'insufficient',
             ),
@@ -365,6 +378,7 @@ class _AppShellState extends State<AppShell> {
         palette: palette,
         isDark: widget.isDark,
         onToggleTheme: widget.onToggleTheme,
+        user: _user,
         userName: _user.name,
         onOpenProject: _handleOpenProject,
         onLogOut: _handleLogOut,
@@ -573,6 +587,31 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildCurrentScreen(UnoPalette palette) {
     switch (_activeView) {
+      case 'overview':
+        return OverviewScreen(
+          palette: palette,
+          onNavigateView: (v) => setState(() => _activeView = v),
+        );
+      case 'files':
+        return FilesScreen(palette: palette);
+      case 'architecture':
+        return ArchitectureScreen(
+          palette: palette,
+          onNavigateToFile: (path) => setState(() => _activeView = 'files'),
+        );
+      case 'discoveries':
+        return DiscoveriesScreen(
+          palette: palette,
+          onAskAboutFinding: (query) {
+            setState(() => _activeView = 'chat');
+            _handleSubmitQuery(query);
+          },
+        );
+      case 'knowledge':
+        return KnowledgeScreen(
+          palette: palette,
+          onNavigateToFile: (path) => setState(() => _activeView = 'files'),
+        );
       case 'spec-history':
         return SpecHistoryScreen(palette: palette);
       case 'graph':

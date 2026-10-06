@@ -54,7 +54,7 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Reindex initiated on backend http://10.0.0.59:8000'),
+            content: Text('Reindex initiated on backend http://10.0.0.59:28000'),
             backgroundColor: Color(0xFF1B5E20),
           ),
         );

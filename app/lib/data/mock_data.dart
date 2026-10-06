@@ -71,7 +71,7 @@ class MockData {
           id: 'n3',
           type: 'info',
           title: 'LAN Pilot Matrix signed off',
-          body: 'Topology verified: SRV-01 (10.0.0.59:8000) active across 6 employee nodes',
+          body: 'Topology verified: SRV-01 (10.0.0.59:28000) active across 6 employee nodes',
           time: '2h ago',
           read: false,
         ),
@@ -161,7 +161,7 @@ class MockData {
         ActivityItem(
           id: 'a3',
           icon: '↑',
-          text: 'LAN Server connected — 10.0.0.59:8000 (v0.1.0) latency 28ms across 6 nodes',
+          text: 'LAN Server connected — 10.0.0.59:28000 (v0.1.0) latency 28ms across 6 nodes',
           time: '2h ago',
           color: Color(0xFF6EC8B8),
         ),
@@ -189,7 +189,7 @@ class MockData {
       ];
 
   // ─── Recent Chats from LAN Pilot Runbook Step 9 & Matrix ───
-  static List<RecentChat> get recentChats => const [
+  static List<RecentChat> get recentChats => [
         RecentChat(
           id: 1,
           title: 'What are the primary components in this repository?',
@@ -329,7 +329,7 @@ class MockData {
           {
             'role': 'ai',
             'text':
-                '[CONFIRMED · score 0.96] Dynamic LAN IP resolver implemented via lan_detector.dart:\n- Automatically scans RFC 1918 private IPv4 ranges (10.x, 172.16-31.x, 192.168.x).\n- Automatically ignores virtual bridges (docker0, br-*, virbr*, tun*).\n- Displays active LAN URL: http://10.0.0.59:8000 with green "LAN REACHABLE" badge.'
+                '[CONFIRMED · score 0.96] Dynamic LAN IP resolver implemented via lan_detector.dart:\n- Automatically scans RFC 1918 private IPv4 ranges (10.x, 172.16-31.x, 192.168.x).\n- Automatically ignores virtual bridges (docker0, br-*, virbr*, tun*).\n- Displays active LAN URL: http://10.0.0.59:28000 with green "LAN REACHABLE" badge.'
           }
         ],
         'sh-004': [
@@ -350,7 +350,7 @@ class MockData {
         OntologyNode(
             id: 0, cx: 120, cy: 150, label: 'SRV-01 (10.0.0.59)', type: 'Service'),
         OntologyNode(
-            id: 1, cx: 280, cy: 80, label: 'unotusk-api (8000)', type: 'Service'),
+            id: 1, cx: 280, cy: 80, label: 'unotusk-api (28000)', type: 'Service'),
         OntologyNode(
             id: 2, cx: 280, cy: 220, label: 'unotusk-worker', type: 'Service'),
         OntologyNode(
@@ -418,11 +418,11 @@ class MockData {
         segments: [
           ResponseSegment(
             text:
-                'The Unotusk MVP comprises 4 Docker services on the Linux host (API on port 8000, Worker, pgvector Postgres on 5432, and Redis on 6379), connecting to native Employee Client apps over LAN (10.0.0.59:8000).',
+                'The Unotusk MVP comprises 4 Docker services on the Linux host (API on port 28000, Worker, pgvector Postgres on 5432, and Redis on 6379), connecting to native Employee Client apps over LAN (10.0.0.59:28000).',
             tag: 'CONFIRMED',
           ),
         ],
-        meta: 'LAN Pilot Telemetry · http://10.0.0.59:8000 · Verified',
+        meta: 'LAN Pilot Telemetry · http://10.0.0.59:28000 · Verified',
         queryType: 'warm',
         confidence: 'confirmed',
       );
@@ -435,7 +435,7 @@ class MockData {
             ResponseSegment(
               text:
                   'The Unotusk MVP repository comprises 4 core Docker backend services orchestrated via Docker Compose:\n\n'
-                  '1. unotusk-api (FastAPI): Bound to port 8000 on host (0.0.0.0:8000). Provides REST endpoints, JWT authentication (HS256), request correlation middleware (X-Request-ID), and LAN CORS validation.\n'
+                  '1. unotusk-api (FastAPI): Bound to port 28000 on host (0.0.0.0:28000). Provides REST endpoints, JWT authentication (HS256), request correlation middleware (X-Request-ID), and LAN CORS validation.\n'
                   '2. unotusk-worker: Background ingestion engine executing AST parsing, symbol extraction, git diff+commit pairing, and semantic embedding generation.\n'
                   '3. unotusk-postgres: PostgreSQL database with pgvector extension for high-dimensional code retrieval. Internal port 5432 only (strictly unmapped to host).\n'
                   '4. unotusk-redis: High-throughput task queue and caching layer. Internal port 6379 only (isolated from LAN).\n\n'
@@ -483,7 +483,7 @@ class MockData {
             ResponseSegment(
               text:
                   'The Unotusk MVP LAN deployment enforces strict zero-trust network boundaries:\n\n'
-                  '• Exposed Boundary: ONLY Port 8000 (unotusk-api) is bound to 0.0.0.0:8000 to serve employee desktop clients on the LAN.\n'
+                  '• Exposed Boundary: ONLY port 28000 (unotusk-api) is bound to 0.0.0.0:28000 to serve employee desktop clients on the LAN.\n'
                   '• Database & Redis Isolation: unotusk-postgres (5432) and unotusk-redis (6379) are attached solely to the private Docker bridge network ("unotusk-network"). Their host port bindings are null, rendering them completely unreachable from any laptop on the LAN.\n'
                   '• CORS LAN Whitelisting: The FastAPI backend enforces an allow_origin_regex strictly limiting traffic to RFC 1918 private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) and localhost.\n'
                   '• Zero-Secret Logging: Both the Python server and Flutter clients execute automatic regex sanitization across log streams, stripping JWTs, Bearer headers, API keys, and connection strings.',
@@ -534,7 +534,7 @@ class MockData {
                   '• Nodes 2-4: Windows 10/11 laptops (10.0.0.101-103) running unotusk-employee-windows-x64.zip for dev1@acme.com, dev2@acme.com, and qa1@acme.com.\n'
                   '• Node 5 (WIN-04): Windows 11 laptop (10.0.0.104) assigned to lead@acme.com (Admin) for codebase ingestion.\n'
                   '• Nodes 6-7 (MAC-01/02): macOS laptops (10.0.0.105-106) running unotusk-employee-macos.tar.gz for dev3@acme.com and dev4@acme.com.\n\n'
-                  'All 6 client nodes communicate directly with http://10.0.0.59:8000 with sub-100ms response times.',
+                  'All 6 client nodes communicate directly with http://10.0.0.59:28000 with sub-100ms response times.',
               tag: 'CONFIRMED',
             ),
           ],
@@ -617,14 +617,14 @@ class MockData {
   static const Map<String, Map<String, String>> knownOrganizations = {
     'acme.com': {
       'name': 'Acme Corp',
-      'provider': 'Acme Enterprise OIDC (10.0.0.59:8000)',
-      'issuer': 'http://10.0.0.59:8000/auth',
+      'provider': 'Acme Enterprise OIDC (10.0.0.59:28000)',
+      'issuer': 'http://10.0.0.59:28000/auth',
       'type': 'custom',
     },
     'unotusk.com': {
       'name': 'Unotusk Internal',
-      'provider': 'Unotusk Local LAN SSO (10.0.0.59:8000)',
-      'issuer': 'http://10.0.0.59:8000',
+      'provider': 'Unotusk Local LAN SSO (10.0.0.59:28000)',
+      'issuer': 'http://10.0.0.59:28000',
       'type': 'google',
     },
     'meta.com': {

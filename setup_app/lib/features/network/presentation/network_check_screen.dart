@@ -1,0 +1,188 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../wizard/presentation/wizard_controller.dart';
+import '../../validation/domain/check_item.dart';
+import '../../config/presentation/config_controller.dart';
+import 'network_check_controller.dart';
+
+class NetworkCheckScreen extends ConsumerWidget {
+  const NetworkCheckScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final checkState = ref.watch(networkCheckControllerProvider);
+    final checkNotifier = ref.read(networkCheckControllerProvider.notifier);
+    final wizardNotifier = ref.read(wizardControllerProvider.notifier);
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Network Check', style: AppTextStyles.h1),
+              const SizedBox(height: 6),
+              Text(
+                'Detecting LAN interface and verifying firewall rules.',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
+              ),
+              const SizedBox(height: 24),
+              AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  children: checkState.items.map((item) {
+                    return _buildCheckRow(context, item);
+                  }).toList(),
+                ),
+              ),
+              if (checkState.hasCriticalFailure) ...[
+                const SizedBox(height: 16),
+                _buildFailureBanner(context, checkState.items.firstWhere((i) => i.status.isFailed)),
+              ],
+              const SizedBox(height: 32),
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  if (checkState.hasCriticalFailure)
+                    AppButton(
+                      label: 'Retry',
+                      variant: AppButtonVariant.secondary,
+                      icon: Icons.refresh,
+                      onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
+                    ),
+                  AppButton(
+                    label: 'Continue',
+                    isLoading: checkState.isRunning,
+                    onPressed: checkState.isAllPassed
+                        ? () {
+                            if (checkState.detectedIp != null) {
+                              ref.read(configControllerProvider.notifier).updateLanIp(checkState.detectedIp!);
+                              if (checkState.availablePort != null) ref.read(configControllerProvider.notifier).updateServerPort(checkState.availablePort!.toString());
+                            }
+                            wizardNotifier.nextStep();
+                          }
+                        : null,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCheckRow(BuildContext context, CheckItem item) {
+    Widget statusIcon;
+
+    switch (item.status) {
+      case CheckStatus.pending:
+        statusIcon = Container(
+          width: 16,
+          height: 16,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.slate200,
+          ),
+        );
+        break;
+      case CheckStatus.checking:
+        statusIcon = const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+        );
+        break;
+      case CheckStatus.passed:
+        statusIcon = const Icon(Icons.check_circle, size: 18, color: AppColors.success);
+        break;
+      case CheckStatus.warning:
+        statusIcon = const Icon(Icons.info, size: 18, color: AppColors.warning);
+        break;
+      case CheckStatus.failed:
+        statusIcon = const Icon(Icons.cancel, size: 18, color: AppColors.error);
+        break;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          statusIcon,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: item.status.isFailed ? AppColors.error : AppColors.slate900,
+                  ),
+                ),
+                if (item.status.isFailed && item.failureMessage != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    item.failureMessage!,
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                  ),
+                ],
+                if (item.status.isPassed && item.description.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    item.description,
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate600),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFailureBanner(BuildContext context, CheckItem failedItem) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.errorBg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.errorBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+              const SizedBox(width: 8),
+              Text(
+                '${failedItem.title} Failed',
+                style: AppTextStyles.h3.copyWith(color: AppColors.error),
+              ),
+            ],
+          ),
+          if (failedItem.remediationHint != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              failedItem.remediationHint!,
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate800),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

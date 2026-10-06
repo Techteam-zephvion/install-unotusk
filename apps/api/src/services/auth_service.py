@@ -41,7 +41,7 @@ class AuthService:
         await session.flush()
 
         # Create default organization for new user
-        org_name = f"{user.name}'s Org"
+        org_name = data.organization_name.strip() if data.organization_name and data.organization_name.strip() else f"{user.name}'s Org"
         base_slug = slugify(org_name)
         org_slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
 

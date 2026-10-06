@@ -8,6 +8,7 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.core.security_vault import decrypt_secret, encrypt_secret
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
@@ -94,7 +95,7 @@ class RepositoryService:
                 external_id=str(user_profile.get("id")),
                 integration_metadata={
                     "username": user_profile.get("login"),
-                    "github_token": effective_token,
+                    "github_token": encrypt_secret(effective_token),
                 },
             )
             session.add(integration)
@@ -103,7 +104,7 @@ class RepositoryService:
             integration.external_id = str(user_profile.get("id"))
             integration.integration_metadata = {
                 "username": user_profile.get("login"),
-                "github_token": effective_token,
+                "github_token": encrypt_secret(effective_token),
             }
 
         await session.commit()
@@ -132,7 +133,8 @@ class RepositoryService:
 
         token = None
         if integration and integration.integration_metadata:
-            token = integration.integration_metadata.get("github_token")
+            encrypted_token = integration.integration_metadata.get("github_token")
+            token = decrypt_secret(encrypted_token) if encrypted_token else None
         if not token:
             token = os.getenv("GITHUB_TOKEN")
 
@@ -162,13 +164,13 @@ class RepositoryService:
                 provider=IntegrationProvider.GITHUB,
                 status=IntegrationStatus.CONNECTED,
                 external_id=data.external_id,
-                integration_metadata={"github_token": token} if token else {},
+                integration_metadata={"github_token": encrypt_secret(token)} if token else {},
             )
             session.add(integration)
             await session.flush()
         elif token and not (integration.integration_metadata or {}).get("github_token"):
             meta = dict(integration.integration_metadata or {})
-            meta["github_token"] = token
+            meta["github_token"] = encrypt_secret(token)
             integration.integration_metadata = meta
 
         # Check existing repository record
@@ -359,6 +361,29 @@ class RepositoryService:
         )
 
     @staticmethod
+    async def _get_latest_snapshot(
+        session: AsyncSession,
+        project_id: uuid.UUID,
+    ) -> RepositorySnapshot | None:
+        repo_query = (
+            select(Repository)
+            .where(Repository.project_id == project_id)
+            .order_by(Repository.created_at.desc())
+        )
+        repo_res = await session.execute(repo_query)
+        repo = repo_res.scalars().first()
+        if repo is None:
+            return None
+
+        snap_query = (
+            select(RepositorySnapshot)
+            .where(RepositorySnapshot.repository_id == repo.id)
+            .order_by(RepositorySnapshot.created_at.desc())
+        )
+        snap_res = await session.execute(snap_query)
+        return snap_res.scalars().first()
+
+    @staticmethod
     async def list_files(
         session: AsyncSession,
         user_id: uuid.UUID,
@@ -367,11 +392,18 @@ class RepositoryService:
     ) -> list[FileRead]:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return []
+
         query = (
             select(RepositoryFile)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
-            .where(Repository.project_id == project.id)
+            .where(
+                Repository.project_id == project.id,
+                RepositorySnapshot.id == snapshot.id,
+            )
             .order_by(RepositorySnapshot.created_at.desc(), RepositoryFile.path.asc())
             .limit(limit)
         )
@@ -388,12 +420,19 @@ class RepositoryService:
     ) -> list[SymbolRead]:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return []
+
         query = (
             select(CodeSymbol, RepositoryFile.path)
             .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
-            .where(Repository.project_id == project.id)
+            .where(
+                Repository.project_id == project.id,
+                RepositorySnapshot.id == snapshot.id,
+            )
             .order_by(RepositorySnapshot.created_at.desc(), CodeSymbol.qualified_name.asc())
             .limit(limit)
         )
@@ -414,12 +453,19 @@ class RepositoryService:
     ) -> list[DependencyRead]:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return []
+
         query = (
             select(CodeDependency, RepositoryFile.path)
             .join(RepositoryFile, RepositoryFile.id == CodeDependency.source_file_id)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
-            .where(Repository.project_id == project.id)
+            .where(
+                Repository.project_id == project.id,
+                RepositorySnapshot.id == snapshot.id,
+            )
             .order_by(RepositorySnapshot.created_at.desc(), CodeDependency.line_number.asc())
             .limit(limit)
         )

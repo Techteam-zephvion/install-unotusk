@@ -88,7 +88,7 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
                           flex: 1,
                           child: AppTextField(
                             label: 'Port',
-                            hintText: '8000',
+                            hintText: '28000',
                             controller: _portController,
                             errorText: configState.portError,
                             keyboardType: TextInputType.number,

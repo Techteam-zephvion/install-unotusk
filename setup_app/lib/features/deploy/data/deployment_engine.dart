@@ -98,14 +98,10 @@ class DeploymentEngine {
       }
 
       final envContent = effectiveConfig.generateEnvFileContent();
-      // Resolve the source root: the directory containing the setup_app executable
-      // (or the current working directory when run from source).
-      final sourceRoot = customDeploymentDir != null
-          ? null // Use relative '.' if deploying from a custom dir that contains the source
-          : _resolveSourceRoot();
-      final composeContent = ComposeGenerator.generateDockerCompose(
+      final serverVersion = Platform.environment['UNOTUSK_SERVER_VERSION'] ?? 'v1.0.1';
+      final composeContent = ComposeGenerator.generateProductionCompose(
         effectiveConfig,
-        projectRoot: sourceRoot,
+        imageVersion: serverVersion,
       );
 
       envFile.writeAsStringSync(envContent);
@@ -124,7 +120,7 @@ class DeploymentEngine {
         onStageChanged(DeployStage.startingServices);
         final startRes = await _processExecutor(
           'docker',
-          ['compose', '-f', composeFile.path, 'up', '-d'],
+          ['compose', '-p', config.serverName, '-f', composeFile.path, 'up', '-d'],
           workingDirectory: deployDir,
         );
 
@@ -154,7 +150,7 @@ class DeploymentEngine {
       } else {
         // Remote SSH Deployment
         onStageChanged(DeployStage.startingServices);
-        final remoteDir = '/tmp/unotusk-server';
+        final remoteDir = '.unotusk/servers/${config.serverName}';
         await _processExecutor('ssh', [
           '-p', target.port.toString(),
           '${target.username}@${target.host}',
@@ -177,7 +173,7 @@ class DeploymentEngine {
         final remoteStart = await _processExecutor('ssh', [
           '-p', target.port.toString(),
           '${target.username}@${target.host}',
-          'chmod 600 $remoteDir/.env && cd $remoteDir && docker compose up -d',
+          'chmod 600 $remoteDir/.env && cd $remoteDir && docker compose -p ${config.serverName} up -d',
         ]);
 
         if (remoteStart.exitCode != 0) {
@@ -201,22 +197,11 @@ class DeploymentEngine {
   }
 
   String _resolveDeploymentDir() {
-    final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
     return '$home/.unotusk/server';
   }
 
   /// Resolves the Unotusk source root directory for Docker build context.
   /// When running from source, this is the current working directory.
   /// When packaged, this is the directory containing the executable.
-  String? _resolveSourceRoot() {
-    final cwd = Directory.current.path;
-    if (File('$cwd/infrastructure/docker/Dockerfile.api').existsSync()) {
-      return cwd;
-    }
-    const devPath = '/home/devils/PRO/Unotusk-MVP';
-    if (File('$devPath/infrastructure/docker/Dockerfile.api').existsSync()) {
-      return devPath;
-    }
-    return null;
-  }
 }

@@ -11,6 +11,7 @@ from apps.api.src.models.enums import MembershipRole
 
 if TYPE_CHECKING:
     from apps.api.src.models.organization import Organization
+    from apps.api.src.models.project import Project
     from apps.api.src.models.user import User
 
 
@@ -55,3 +56,42 @@ class OrganizationMembership(Base, UUIDMixin):
     )
 
     __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_org_user"),)
+
+
+class ProjectMembership(Base, UUIDMixin):
+    __tablename__ = "project_memberships"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[MembershipRole] = mapped_column(
+        Enum(MembershipRole, name="membership_role"),
+        default=MembershipRole.MEMBER,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    # Relationships
+    project: Mapped["Project"] = relationship(
+        "Project",
+        back_populates="memberships",
+    )
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="project_memberships",
+    )
+
+    __table_args__ = (UniqueConstraint("project_id", "user_id", name="uq_project_user"),)

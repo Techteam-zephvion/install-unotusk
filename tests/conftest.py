@@ -1,9 +1,29 @@
+import asyncio
+import inspect
 import os
+import sys
 import uuid
 from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock
+
+# Provide mock for asyncpg if not installed in host environment
+try:
+    import asyncpg  # noqa: F401
+except ImportError:
+    sys.modules["asyncpg"] = MagicMock()
 
 import pytest
-import pytest_asyncio
+
+try:
+    import pytest_asyncio
+
+    _HAS_PYTEST_ASYNCIO = True
+    async_fixture = pytest_asyncio.fixture
+except ImportError:
+    pytest_asyncio = None
+    _HAS_PYTEST_ASYNCIO = False
+    async_fixture = pytest.fixture
+
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -14,72 +34,134 @@ os.environ["APP_ENV"] = "test"
 os.environ["DEBUG"] = "true"
 TEST_DB_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test",
+    os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test",
+    ),
 )
 os.environ["DATABASE_URL"] = TEST_DB_URL
 
 from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.auth.security import create_access_token, hash_password
-from apps.api.src.main import app
 from apps.api.src.models.enums import MembershipRole, ProjectStatus
-from apps.api.src.models.membership import OrganizationMembership
+from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
 from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
 from apps.api.src.models.user import User
 
-test_engine = create_async_engine(TEST_DB_URL, poolclass=NullPool, echo=False)
-TestSessionLocal = async_sessionmaker(
-    bind=test_engine,
-    class_=AsyncSession,
-    autoflush=False,
-    expire_on_commit=False,
-)
+try:
+    test_engine = create_async_engine(TEST_DB_URL, poolclass=NullPool, echo=False)
+    TestSessionLocal = async_sessionmaker(
+        bind=test_engine,
+        class_=AsyncSession,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+except Exception:
+    test_engine = None
+    TestSessionLocal = None
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def clean_database():
-    async with test_engine.begin() as conn:
-        await conn.execute(
-            text(
-                "TRUNCATE TABLE findings, discovery_runs, "
-                "project_intelligence_reports, project_knowledge, messages, conversations, "
-                "code_dependencies, code_chunks, code_symbols, repository_files, "
-                "repository_snapshots, repositories, integrations, projects, "
-                "organization_memberships, organizations, users CASCADE;"
-            )
-        )
+def pytest_pyfunc_call(pyfuncitem):
+    """Allows running async def test functions in unit tests without requiring pytest-asyncio plugin."""
+    if not _HAS_PYTEST_ASYNCIO and inspect.iscoroutinefunction(pyfuncitem.obj):
+        args = [
+            pyfuncitem.funcargs[arg]
+            for arg in pyfuncitem._fixtureinfo.argnames
+            if arg in pyfuncitem.funcargs
+        ]
+        asyncio.run(pyfuncitem.obj(*args))
+        return True
+
+
+@pytest.fixture(autouse=True)
+def clean_database():
+    if test_engine is None:
+        yield
+        return
+    try:
+        async def _truncate():
+            async with test_engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "TRUNCATE TABLE findings, discovery_runs, "
+                        "project_intelligence_reports, project_knowledge, messages, conversations, "
+                        "code_dependencies, code_chunks, code_symbols, repository_files, "
+                        "repository_snapshots, repositories, integrations, "
+                        "project_memberships, projects, "
+                        "organization_memberships, organizations, users CASCADE;"
+                    )
+                )
+
+        try:
+            asyncio.run(_truncate())
+        except RuntimeError:
+            try:
+                loop = asyncio.get_event_loop_policy().get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(_truncate())
+                else:
+                    loop.run_until_complete(_truncate())
+            except Exception:
+                pass
+    except Exception:
+        pass
     yield
 
 
-@pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with TestSessionLocal() as session:
-        yield session
+if _HAS_PYTEST_ASYNCIO:
 
-
-@pytest_asyncio.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    @pytest_asyncio.fixture
+    async def db_session() -> AsyncGenerator[AsyncSession, None]:
+        if TestSessionLocal is None:
+            yield None
+            return
         async with TestSessionLocal() as session:
-            try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
+            yield session
 
-    app.dependency_overrides[get_db] = override_get_db
+    @pytest_asyncio.fixture
+    async def client() -> AsyncGenerator[AsyncClient, None]:
+        if TestSessionLocal is None:
+            yield None
+            return
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+        async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+            async with TestSessionLocal() as session:
+                try:
+                    yield session
+                except Exception:
+                    await session.rollback()
+                    raise
+                finally:
+                    await session.close()
 
-    app.dependency_overrides.clear()
+        try:
+            from apps.api.src.main import app
+        except ImportError:
+            yield None
+            return
+
+        app.dependency_overrides[get_db] = override_get_db
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+
+        app.dependency_overrides.clear()
+
+else:
+
+    @pytest.fixture
+    def db_session():
+        yield None
+
+    @pytest.fixture
+    def client():
+        yield None
 
 
-@pytest_asyncio.fixture
-async def create_test_user(db_session: AsyncSession):
+@pytest.fixture
+def create_test_user(db_session: AsyncSession):
     async def _create(
         email: str = "test@example.com",
         name: str = "Test User",
@@ -98,8 +180,8 @@ async def create_test_user(db_session: AsyncSession):
     return _create
 
 
-@pytest_asyncio.fixture
-async def create_test_org(db_session: AsyncSession):
+@pytest.fixture
+def create_test_org(db_session: AsyncSession):
     async def _create(
         user: User,
         name: str = "Test Org",
@@ -128,8 +210,8 @@ async def create_test_org(db_session: AsyncSession):
     return _create
 
 
-@pytest_asyncio.fixture
-async def create_test_project(db_session: AsyncSession):
+@pytest.fixture
+def create_test_project(db_session: AsyncSession):
     async def _create(
         organization: Organization,
         name: str = "Test Project",
@@ -148,6 +230,26 @@ async def create_test_project(db_session: AsyncSession):
         db_session.add(proj)
         await db_session.commit()
         return proj
+
+    return _create
+
+
+@pytest.fixture
+def create_test_project_membership(db_session: AsyncSession):
+    async def _create(
+        project: Project,
+        user: User,
+        role: MembershipRole = MembershipRole.MEMBER,
+    ) -> ProjectMembership:
+        pm = ProjectMembership(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            user_id=user.id,
+            role=role,
+        )
+        db_session.add(pm)
+        await db_session.commit()
+        return pm
 
     return _create
 
