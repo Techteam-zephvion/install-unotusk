@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.file import RepositoryFile
+from apps.api.src.models.repository import Repository
+from apps.api.src.models.service import Service
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.schemas.graph import (
     GraphEdge,
@@ -32,18 +34,69 @@ class GraphService:
         # 1. Verify project authorization (preserves multi-tenant isolation)
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
-        # 2. Resolve the latest RepositorySnapshot
+        # 2. Retrieve services for this project
+        services_query = (
+            select(Service)
+            .where(Service.project_id == project.id)
+            .order_by(Service.name.asc())
+        )
+        services_res = await session.execute(services_query)
+        services = services_res.scalars().all()
+
+        # 3. Resolve the latest RepositorySnapshot
         snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
-        if snapshot is None:
-            return GraphResponse(
-                nodes=[],
-                edges=[],
-                snapshot_id=None,
-                total_nodes=0,
-                total_edges=0,
+
+        nodes: dict[str, GraphNode] = {}
+        edges: dict[tuple[str, str, GraphEdgeType], GraphEdge] = {}
+
+        # 4. Build service nodes
+        service_slug_map = {s.slug: str(s.id) for s in services}
+        for s in services:
+            s_id = str(s.id)
+            nodes[s_id] = GraphNode(
+                id=s_id,
+                type=GraphNodeType.SERVICE,
+                label=s.name,
+                metadata={
+                    "name": s.name,
+                    "slug": s.slug,
+                    "tier": s.tier,
+                    "description": s.description,
+                    **(s.service_metadata or {}),
+                },
             )
 
-        # 3. Retrieve files strictly for the latest snapshot (bulk query)
+        # 5. Build service-to-service dependency edges (if specified in metadata)
+        for s in services:
+            deps = (s.service_metadata or {}).get("depends_on")
+            if isinstance(deps, list):
+                for dep in deps:
+                    target_id = None
+                    if dep in service_slug_map:
+                        target_id = service_slug_map[dep]
+                    elif str(dep) in nodes:
+                        target_id = str(dep)
+                    if target_id and target_id != str(s.id):
+                        edge_key = (str(s.id), target_id, GraphEdgeType.DEPENDS_ON)
+                        edges[edge_key] = GraphEdge(
+                            id=f"{s.id}->{target_id}:{GraphEdgeType.DEPENDS_ON.value}",
+                            source=str(s.id),
+                            target=target_id,
+                            type=GraphEdgeType.DEPENDS_ON,
+                        )
+
+        if snapshot is None:
+            node_list = list(nodes.values())
+            edge_list = list(edges.values())
+            return GraphResponse(
+                nodes=node_list,
+                edges=edge_list,
+                snapshot_id=None,
+                total_nodes=len(node_list),
+                total_edges=len(edge_list),
+            )
+
+        # 6. Retrieve files strictly for the latest snapshot (bulk query)
         files_query = (
             select(RepositoryFile)
             .where(RepositoryFile.snapshot_id == snapshot.id)
@@ -53,7 +106,48 @@ class GraphService:
         files = files_res.scalars().all()
         file_map: dict[uuid.UUID, RepositoryFile] = {f.id: f for f in files}
 
-        # 4. Retrieve symbols strictly for the latest snapshot (bulk query)
+        if not files and not services:
+            return GraphResponse(
+                nodes=[],
+                edges=[],
+                snapshot_id=snapshot.id,
+                total_nodes=0,
+                total_edges=0,
+            )
+
+        # 7. Retrieve active repository for this snapshot
+        repo_query = select(Repository).where(Repository.id == snapshot.repository_id)
+        repo_res = await session.execute(repo_query)
+        repo = repo_res.scalar_one_or_none()
+
+        repo_node_id = None
+        if repo is not None and repo.service_id is not None:
+            s_id = str(repo.service_id)
+            if s_id in nodes:
+                repo_id = str(repo.id)
+                repo_node_id = repo_id
+                nodes[repo_id] = GraphNode(
+                    id=repo_id,
+                    type=GraphNodeType.REPOSITORY,
+                    label=repo.full_name or repo.name,
+                    metadata={
+                        "name": repo.name,
+                        "full_name": repo.full_name,
+                        "owner": repo.owner,
+                        "default_branch": repo.default_branch,
+                        "url": repo.url,
+                        "service_id": s_id,
+                    },
+                )
+                edge_key = (s_id, repo_id, GraphEdgeType.CONTAINS)
+                edges[edge_key] = GraphEdge(
+                    id=f"{s_id}->{repo_id}:{GraphEdgeType.CONTAINS.value}",
+                    source=s_id,
+                    target=repo_id,
+                    type=GraphEdgeType.CONTAINS,
+                )
+
+        # 8. Retrieve symbols strictly for the latest snapshot (bulk query)
         symbols_query = (
             select(CodeSymbol)
             .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
@@ -64,7 +158,7 @@ class GraphService:
         symbols = symbols_res.scalars().all()
         symbol_map: dict[uuid.UUID, CodeSymbol] = {s.id: s for s in symbols}
 
-        # 5. Retrieve dependencies strictly for the latest snapshot (bulk query)
+        # 9. Retrieve dependencies strictly for the latest snapshot (bulk query)
         deps_query = (
             select(CodeDependency)
             .join(RepositoryFile, RepositoryFile.id == CodeDependency.source_file_id)
@@ -74,10 +168,8 @@ class GraphService:
         deps_res = await session.execute(deps_query)
         dependencies = deps_res.scalars().all()
 
-        nodes: dict[str, GraphNode] = {}
-        edges: dict[tuple[str, str, GraphEdgeType], GraphEdge] = {}
-
-        # 6. Build file nodes
+        # 10. Build file nodes and link Repository -> File (CONTAINS)
+        repo_id_str = repo_node_id
         for f in files:
             node_id = str(f.id)
             nodes[node_id] = GraphNode(
@@ -93,6 +185,14 @@ class GraphService:
                     "size_bytes": f.size_bytes,
                 },
             )
+            if repo_id_str:
+                edge_key = (repo_id_str, node_id, GraphEdgeType.CONTAINS)
+                edges[edge_key] = GraphEdge(
+                    id=f"{repo_id_str}->{node_id}:{GraphEdgeType.CONTAINS.value}",
+                    source=repo_id_str,
+                    target=node_id,
+                    type=GraphEdgeType.CONTAINS,
+                )
 
         # 7. Build symbol nodes and hierarchy / definition edges
         for s in symbols:

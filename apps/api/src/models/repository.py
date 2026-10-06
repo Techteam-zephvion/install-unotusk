@@ -11,6 +11,7 @@ from apps.api.src.models.enums import IntegrationProvider
 if TYPE_CHECKING:
     from apps.api.src.models.integration import Integration
     from apps.api.src.models.project import Project
+    from apps.api.src.models.service import Service
     from apps.api.src.models.snapshot import RepositorySnapshot
 
 
@@ -70,10 +71,17 @@ class Repository(Base, UUIDMixin, TimestampMixin):
         default=dict,
         nullable=False,
     )
+    service_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("services.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="repositories")
     integration: Mapped["Integration"] = relationship("Integration")
+    service: Mapped["Service | None"] = relationship("Service", back_populates="repositories")
     snapshots: Mapped[list["RepositorySnapshot"]] = relationship(
         "RepositorySnapshot",
         back_populates="repository",

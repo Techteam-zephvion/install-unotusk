@@ -18,6 +18,7 @@ from apps.api.src.api.routes import (
     projects,
     reports,
     repository,
+    services,
     tasks,
 )
 from apps.api.src.config.settings import settings
@@ -164,6 +165,7 @@ for r in [
     discovery.router,
     reports.router,
     knowledge.router,
+    services.router,
     tasks.router,
 ]:
     app.include_router(r, prefix=settings.API_V1_PREFIX)

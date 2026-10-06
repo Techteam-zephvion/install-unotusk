@@ -49,4 +49,9 @@ class ApiEndpoints {
   static String projectConversationDetail(String projectId, String conversationId) => '/projects/$projectId/conversations/$conversationId';
   static String projectConversationMessages(String projectId, String conversationId) => '/projects/$projectId/conversations/$conversationId/messages';
 
+  // Knowledge Graph & Ontology
+  static String projectGraph(String projectId) => '/projects/$projectId/graph';
+  static String projectServices(String projectId) => '/projects/$projectId/services';
+  static String projectServiceDetail(String projectId, String serviceId) => '/projects/$projectId/services/$serviceId';
+
 }

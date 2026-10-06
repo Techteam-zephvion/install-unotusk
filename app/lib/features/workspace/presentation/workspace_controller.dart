@@ -6,6 +6,7 @@ import '../domain/grounded_answer.dart';
 import '../domain/project_dependency.dart';
 import '../domain/project_file.dart';
 import '../domain/project_finding.dart';
+import '../domain/project_graph.dart';
 import '../domain/project_knowledge.dart';
 import '../domain/project_symbol.dart';
 import '../domain/repository_context.dart';
@@ -72,4 +73,9 @@ final projectKnowledgeListProvider = FutureProvider.family<List<ProjectKnowledge
 final projectConversationsProvider = FutureProvider.family<List<ConversationThread>, String>((ref, projectId) async {
   final repository = ref.watch(workspaceRepositoryProvider);
   return repository.getConversations(projectId);
+});
+
+final projectGraphProvider = FutureProvider.family<ProjectGraph, String>((ref, projectId) async {
+  final repository = ref.watch(workspaceRepositoryProvider);
+  return repository.getProjectGraph(projectId);
 });

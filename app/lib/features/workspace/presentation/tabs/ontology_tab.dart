@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../domain/project_graph.dart';
+import '../workspace_controller.dart';
+import '../widgets/constellation_loader.dart';
 
-class GraphNode {
-  final int id;
+class PositionedNode {
+  final ProjectGraphNode node;
   final double x;
   final double y;
-  final String label;
-  final String type; // Service, Decision, Commit, Ticket, Thread, Person
 
-  const GraphNode({
-    required this.id,
+  const PositionedNode({
+    required this.node,
     required this.x,
     required this.y,
-    required this.label,
-    required this.type,
   });
 }
 
-class OntologyTab extends StatefulWidget {
+class OntologyTab extends ConsumerStatefulWidget {
   final String projectId;
 
   const OntologyTab({
@@ -27,70 +27,134 @@ class OntologyTab extends StatefulWidget {
   });
 
   @override
-  State<OntologyTab> createState() => _OntologyTabState();
+  ConsumerState<OntologyTab> createState() => _OntologyTabState();
 }
 
-class _OntologyTabState extends State<OntologyTab> {
-  int? _hoveredNodeId;
-
-  static const List<GraphNode> nodes = [
-    GraphNode(id: 0, x: 100, y: 200, label: 'Auth Service', type: 'Service'),
-    GraphNode(id: 1, x: 280, y: 100, label: 'OIDC Decision', type: 'Decision'),
-    GraphNode(id: 2, x: 280, y: 300, label: 'Postgres Decision', type: 'Decision'),
-    GraphNode(id: 3, x: 480, y: 80, label: 'GH #7210', type: 'Commit'),
-    GraphNode(id: 4, x: 480, y: 180, label: 'ENG-1042', type: 'Ticket'),
-    GraphNode(id: 5, x: 480, y: 300, label: 'ADR #7', type: 'Commit'),
-    GraphNode(id: 6, x: 480, y: 380, label: '#arch-decisions', type: 'Thread'),
-    GraphNode(id: 7, x: 680, y: 140, label: '@sam', type: 'Person'),
-    GraphNode(id: 8, x: 680, y: 300, label: 'Billing Service', type: 'Service'),
-  ];
-
-  static const List<List<int>> edges = [
-    [0, 1], [0, 2],
-    [1, 3], [1, 4],
-    [2, 5], [2, 6],
-    [3, 7], [5, 7],
-    [5, 8], [6, 8], [4, 8],
-  ];
+class _OntologyTabState extends ConsumerState<OntologyTab> {
+  String? _hoveredNodeId;
+  ProjectGraphNode? _selectedNode;
 
   static const Map<String, Color> nodeTypeColors = {
-    'Service': Color(0xFF6EC8B8),
-    'Decision': Color(0xFFE8A455),
-    'Commit': Color(0xFFD4A843),
-    'Ticket': Color(0xFFD4909A),
-    'Thread': Color(0xFFD4725A),
-    'Person': Color(0xFFA89070),
+    'SERVICE': Color(0xFF6EC8B8),
+    'REPOSITORY': Color(0xFF5B8FF9),
+    'FILE': Color(0xFFE8A455),
+    'CLASS': Color(0xFFD4A843),
+    'FUNCTION': Color(0xFFD4909A),
+    'METHOD': Color(0xFFD4909A),
+    'INTERFACE': Color(0xFFD4A843),
+    'EXTERNAL_PACKAGE': Color(0xFFA89070),
+    'TYPE': Color(0xFFA89070),
+    'MODULE': Color(0xFFE8A455),
   };
+
+  Color _getNodeColor(String type) {
+    return nodeTypeColors[type.toUpperCase()] ?? const Color(0xFF6EC8B8);
+  }
+
+  int _getTier(String type) {
+    switch (type.toUpperCase()) {
+      case 'SERVICE':
+        return 0;
+      case 'REPOSITORY':
+        return 1;
+      case 'FILE':
+      case 'MODULE':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  Map<String, PositionedNode> _calculateLayout(
+    List<ProjectGraphNode> nodes,
+    double width,
+    double height,
+  ) {
+    final Map<int, List<ProjectGraphNode>> tiers = {};
+    for (final node in nodes) {
+      final tier = _getTier(node.type);
+      tiers.setdefault(tier, []).add(node);
+    }
+
+    final activeTiers = tiers.keys.toList()..sort();
+    final Map<String, PositionedNode> positions = {};
+
+    if (activeTiers.isEmpty) return positions;
+
+    final double colSpacing = activeTiers.length > 1
+        ? (width - 160) / (activeTiers.length - 1)
+        : width / 2;
+
+    for (int tIdx = 0; tIdx < activeTiers.length; tIdx++) {
+      final tierKey = activeTiers[tIdx];
+      final tierNodes = tiers[tierKey]!;
+      final double colX = activeTiers.length > 1
+          ? 80 + (tIdx * colSpacing)
+          : width / 2;
+
+      final int count = tierNodes.length;
+      final double rowSpacing = count > 1 ? (height - 120) / (count - 1) : 0;
+
+      for (int i = 0; i < count; i++) {
+        final node = tierNodes[i];
+        final double nodeY = count > 1 ? 60 + (i * rowSpacing) : height / 2;
+        positions[node.id] = PositionedNode(
+          node: node,
+          x: colX,
+          y: nodeY,
+        );
+      }
+    }
+
+    return positions;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final graphAsync = ref.watch(projectGraphProvider(widget.projectId));
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
+            constraints: const BoxConstraints(maxWidth: 1040),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
-                Text('ONTOLOGY GRAPH', style: AppTextStyles.sectionLabel),
-                const SizedBox(height: 6),
-                Text(
-                  'Knowledge Graph',
-                  style: AppTextStyles.authHeading,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Entity relationships indexed across commits, tickets, threads, and decisions.',
-                  style: AppTextStyles.caption,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('ONTOLOGY GRAPH', style: AppTextStyles.sectionLabel),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Knowledge Graph',
+                          style: AppTextStyles.authHeading,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Live service & codebase ontology: Service → Repository → File → Symbol.',
+                          style: AppTextStyles.caption,
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      tooltip: 'Refresh Graph',
+                      icon: const Icon(Icons.refresh, size: 18, color: AppColors.textSecondary),
+                      onPressed: () => ref.refresh(projectGraphProvider(widget.projectId)),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
                 // Interactive Graph Canvas Container
                 Container(
-                  height: 480,
+                  height: 520,
                   decoration: BoxDecoration(
                     color: AppColors.bgSurface,
                     border: Border.all(color: AppColors.divider),
@@ -98,119 +162,206 @@ class _OntologyTabState extends State<OntologyTab> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      children: [
-                        // Custom Painter for Graph Edges & Background Grid
-                        CustomPaint(
-                          size: const Size(double.infinity, 480),
-                          painter: _OntologyGraphPainter(
-                            nodes: nodes,
-                            edges: edges,
-                            hoveredNodeId: _hoveredNodeId,
+                    child: graphAsync.when(
+                      loading: () => const Center(
+                        child: ConstellationLoader(
+                          phase: 'deepScoring',
+                        ),
+                      ),
+                      error: (err, _) => Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.error_outline, size: 36, color: AppColors.error),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Unable to load ontology graph',
+                                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                err.toString(),
+                                style: AppTextStyles.caption,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: () => ref.refresh(projectGraphProvider(widget.projectId)),
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
-
-                        // Interactive Nodes
-                        ...nodes.map((node) {
-                          final color = nodeTypeColors[node.type] ?? AppColors.accent;
-                          final isHovered = _hoveredNodeId == node.id;
-
-                          return Positioned(
-                            left: node.x - 40,
-                            top: node.y - 20,
-                            child: MouseRegion(
-                              onEnter: (_) => setState(() => _hoveredNodeId = node.id),
-                              onExit: (_) => setState(() => _hoveredNodeId = null),
-                              child: GestureDetector(
-                                onTap: () => setState(() => _hoveredNodeId = node.id),
-                                child: Container(
-                                  width: 80,
-                                  alignment: Alignment.center,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      AnimatedContainer(
-                                        duration: const Duration(milliseconds: 150),
-                                        width: isHovered ? 20 : 14,
-                                        height: isHovered ? 20 : 14,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: isHovered ? color : AppColors.bgElevated,
-                                          border: Border.all(
-                                            color: color,
-                                            width: isHovered ? 2.5 : 1.5,
-                                          ),
-                                          boxShadow: isHovered
-                                              ? [
-                                                  BoxShadow(
-                                                    color: color.withValues(alpha: 0.4),
-                                                    blurRadius: 10,
-                                                  ),
-                                                ]
-                                              : null,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: isHovered
-                                              ? AppColors.bgElevated
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          node.label,
-                                          style: AppTextStyles.mono(
-                                            fontSize: 10,
-                                            fontWeight: isHovered ? FontWeight.w600 : FontWeight.w400,
-                                            color: isHovered ? AppColors.textPrimary : AppColors.textSecondary,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
+                      ),
+                      data: (graph) {
+                        if (graph.nodes.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.hub_outlined, size: 48, color: AppColors.textMuted.withValues(alpha: 0.5)),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No Ontology Entities Indexed',
+                                    style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
                                   ),
-                                ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Define services or ingest a repository to populate the real knowledge graph.',
+                                    style: AppTextStyles.caption,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
                           );
-                        }),
-                      ],
+                        }
+
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final width = constraints.maxWidth;
+                            final height = constraints.maxHeight;
+                            final positionedNodes = _calculateLayout(graph.nodes, width, height);
+
+                            return Stack(
+                              children: [
+                                // Edges Custom Painter
+                                CustomPaint(
+                                  size: Size(width, height),
+                                  painter: _RealGraphPainter(
+                                    positionedNodes: positionedNodes,
+                                    edges: graph.edges,
+                                    hoveredNodeId: _hoveredNodeId,
+                                    selectedNodeId: _selectedNode?.id,
+                                  ),
+                                ),
+
+                                // Interactive Nodes
+                                ...positionedNodes.values.map((pNode) {
+                                  final node = pNode.node;
+                                  final color = _getNodeColor(node.type);
+                                  final isHovered = _hoveredNodeId == node.id;
+                                  final isSelected = _selectedNode?.id == node.id;
+                                  final isService = node.type.toUpperCase() == 'SERVICE';
+                                  final isRepo = node.type.toUpperCase() == 'REPOSITORY';
+
+                                  final double size = isService ? 28 : (isRepo ? 22 : 16);
+                                  final double activeSize = size + (isHovered || isSelected ? 6 : 0);
+
+                                  return Positioned(
+                                    left: pNode.x - 50,
+                                    top: pNode.y - (activeSize / 2),
+                                    child: MouseRegion(
+                                      onEnter: (_) => setState(() => _hoveredNodeId = node.id),
+                                      onExit: (_) => setState(() {
+                                        if (_hoveredNodeId == node.id) _hoveredNodeId = null;
+                                      }),
+                                      child: GestureDetector(
+                                        onTap: () => setState(() {
+                                          _selectedNode = _selectedNode?.id == node.id ? null : node;
+                                        }),
+                                        child: SizedBox(
+                                          width: 100,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              AnimatedContainer(
+                                                duration: const Duration(milliseconds: 150),
+                                                width: activeSize,
+                                                height: activeSize,
+                                                decoration: BoxDecoration(
+                                                  shape: isService ? BoxShape.rectangle : BoxShape.circle,
+                                                  borderRadius: isService ? BorderRadius.circular(8) : null,
+                                                  color: (isHovered || isSelected)
+                                                      ? color
+                                                      : (isService ? color.withValues(alpha: 0.25) : AppColors.bgElevated),
+                                                  border: Border.all(
+                                                    color: color,
+                                                    width: (isHovered || isSelected) ? 2.5 : 1.5,
+                                                  ),
+                                                  boxShadow: (isHovered || isSelected || isService)
+                                                      ? [
+                                                          BoxShadow(
+                                                            color: color.withValues(alpha: isService ? 0.35 : 0.4),
+                                                            blurRadius: isService ? 12 : 8,
+                                                          ),
+                                                        ]
+                                                      : null,
+                                                ),
+                                                child: isService
+                                                    ? Center(
+                                                        child: Icon(
+                                                          Icons.cloud_outlined,
+                                                          size: activeSize * 0.55,
+                                                          color: (isHovered || isSelected) ? AppColors.bgSurface : color,
+                                                        ),
+                                                      )
+                                                    : null,
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: (isHovered || isSelected)
+                                                      ? AppColors.bgElevated
+                                                      : Colors.transparent,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  node.label,
+                                                  style: AppTextStyles.mono(
+                                                    fontSize: isService ? 11 : 9.5,
+                                                    fontWeight: (isHovered || isSelected || isService)
+                                                        ? FontWeight.w600
+                                                        : FontWeight.w400,
+                                                    color: (isHovered || isSelected)
+                                                        ? AppColors.textPrimary
+                                                        : (isService ? AppColors.textPrimary : AppColors.textSecondary),
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            );
+                          },
+                        );
+                      },
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
+
+                // Selected Node Inspector Card (if a node is selected)
+                if (_selectedNode != null) ...[
+                  _buildNodeInspector(_selectedNode!),
+                  const SizedBox(height: 18),
+                ],
 
                 // Legend Bar
                 Wrap(
                   spacing: 18,
                   runSpacing: 10,
-                  children: nodeTypeColors.entries.map((entry) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: entry.value,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          entry.key.toUpperCase(),
-                          style: AppTextStyles.mono(
-                            fontSize: 10,
-                            letterSpacing: 0.6,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+                  children: [
+                    _legendItem('SERVICE', const Color(0xFF6EC8B8), isService: true),
+                    _legendItem('REPOSITORY', const Color(0xFF5B8FF9)),
+                    _legendItem('FILE', const Color(0xFFE8A455)),
+                    _legendItem('SYMBOL', const Color(0xFFD4A843)),
+                    _legendItem('EXT PACKAGE', const Color(0xFFA89070)),
+                  ],
                 ),
               ],
             ),
@@ -219,22 +370,142 @@ class _OntologyTabState extends State<OntologyTab> {
       ),
     );
   }
+
+  Widget _legendItem(String label, Color color, {bool isService = false}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            shape: isService ? BoxShape.rectangle : BoxShape.circle,
+            borderRadius: isService ? BorderRadius.circular(2) : null,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTextStyles.mono(
+            fontSize: 10,
+            letterSpacing: 0.6,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNodeInspector(ProjectGraphNode node) {
+    final color = _getNodeColor(node.type);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: color.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  node.type.toUpperCase(),
+                  style: AppTextStyles.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  node.label,
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                onPressed: () => setState(() => _selectedNode = null),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          if (node.metadata.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(color: AppColors.divider, height: 1),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: node.metadata.entries.map((entry) {
+                if (entry.value == null) return const SizedBox.shrink();
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${entry.key}: ',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    Text(
+                      '${entry.value}',
+                      style: AppTextStyles.mono(
+                        fontSize: 11,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
-class _OntologyGraphPainter extends CustomPainter {
-  final List<GraphNode> nodes;
-  final List<List<int>> edges;
-  final int? hoveredNodeId;
+extension _TiersMapExt on Map<int, List<ProjectGraphNode>> {
+  List<ProjectGraphNode> setdefault(int key, List<ProjectGraphNode> defaultValue) {
+    if (!containsKey(key)) {
+      this[key] = defaultValue;
+    }
+    return this[key]!;
+  }
+}
 
-  _OntologyGraphPainter({
-    required this.nodes,
+class _RealGraphPainter extends CustomPainter {
+  final Map<String, PositionedNode> positionedNodes;
+  final List<ProjectGraphEdge> edges;
+  final String? hoveredNodeId;
+  final String? selectedNodeId;
+
+  _RealGraphPainter({
+    required this.positionedNodes,
     required this.edges,
     this.hoveredNodeId,
+    this.selectedNodeId,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Subtle background grid dots
+    // Background dot grid
     final gridPaint = Paint()
       ..color = AppColors.divider.withValues(alpha: 0.35)
       ..strokeWidth = 1;
@@ -247,27 +518,60 @@ class _OntologyGraphPainter extends CustomPainter {
 
     // Edges
     for (final edge in edges) {
-      final na = nodes[edge[0]];
-      final nb = nodes[edge[1]];
+      final pSource = positionedNodes[edge.source];
+      final pTarget = positionedNodes[edge.target];
 
-      final bool isActive = hoveredNodeId == edge[0] || hoveredNodeId == edge[1];
+      if (pSource == null || pTarget == null) continue;
+
+      final bool isConnectedToHovered =
+          hoveredNodeId == edge.source || hoveredNodeId == edge.target;
+      final bool isConnectedToSelected =
+          selectedNodeId == edge.source || selectedNodeId == edge.target;
+      final bool isActive = isConnectedToHovered || isConnectedToSelected;
+
+      Color edgeColor;
+      if (isActive) {
+        edgeColor = AppColors.accent;
+      } else if (edge.type == 'CONTAINS') {
+        edgeColor = AppColors.divider.withValues(alpha: 0.55);
+      } else if (edge.type == 'DEPENDS_ON') {
+        edgeColor = const Color(0xFFE8A455).withValues(alpha: 0.4);
+      } else {
+        edgeColor = AppColors.divider.withValues(alpha: 0.35);
+      }
 
       final linePaint = Paint()
-        ..color = isActive
-            ? AppColors.accent.withValues(alpha: 0.85)
-            : AppColors.divider.withValues(alpha: 0.4)
-        ..strokeWidth = isActive ? 2.0 : 1.0
+        ..color = edgeColor
+        ..strokeWidth = isActive ? 2.2 : 1.2
         ..style = PaintingStyle.stroke;
 
-      canvas.drawLine(
-        Offset(na.x, na.y),
-        Offset(nb.x, nb.y),
-        linePaint,
+      // Draw subtle bezier curved path between columns
+      final path = Path();
+      path.moveTo(pSource.x, pSource.y);
+
+      final double midX = (pSource.x + pTarget.x) / 2;
+      path.cubicTo(
+        midX,
+        pSource.y,
+        midX,
+        pTarget.y,
+        pTarget.x,
+        pTarget.y,
       );
+
+      canvas.drawPath(path, linePaint);
+
+      // Draw directional dot at target
+      final dotPaint = Paint()
+        ..color = isActive ? AppColors.accent : edgeColor
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(pTarget.x, pTarget.y), isActive ? 3.0 : 2.0, dotPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _OntologyGraphPainter oldDelegate) =>
-      oldDelegate.hoveredNodeId != hoveredNodeId;
+  bool shouldRepaint(covariant _RealGraphPainter oldDelegate) =>
+      oldDelegate.hoveredNodeId != hoveredNodeId ||
+      oldDelegate.selectedNodeId != selectedNodeId ||
+      oldDelegate.edges.length != edges.length;
 }

@@ -7,6 +7,7 @@ import '../domain/grounded_answer.dart';
 import '../domain/project_dependency.dart';
 import '../domain/project_file.dart';
 import '../domain/project_finding.dart';
+import '../domain/project_graph.dart';
 import '../domain/project_knowledge.dart';
 import '../domain/project_symbol.dart';
 import '../domain/repository_context.dart';
@@ -237,5 +238,10 @@ class WorkspaceRepository {
       },
     );
     return ConversationThread.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<ProjectGraph> getProjectGraph(String projectId) async {
+    final response = await _apiClient.get(ApiEndpoints.projectGraph(projectId));
+    return ProjectGraph.fromJson(Map<String, dynamic>.from(response.data));
   }
 }

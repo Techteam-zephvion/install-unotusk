@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class GraphNodeType(str, enum.Enum):
+    SERVICE = "SERVICE"
+    REPOSITORY = "REPOSITORY"
     FILE = "FILE"
     CLASS = "CLASS"
     FUNCTION = "FUNCTION"

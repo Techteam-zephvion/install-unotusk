@@ -34,6 +34,7 @@ class RepositoryRead(BaseModel):
     default_branch: str
     url: str
     is_private: bool
+    service_id: uuid.UUID | None = None
     repo_metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
