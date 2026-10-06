@@ -361,6 +361,29 @@ class RepositoryService:
         )
 
     @staticmethod
+    async def _get_latest_snapshot(
+        session: AsyncSession,
+        project_id: uuid.UUID,
+    ) -> RepositorySnapshot | None:
+        repo_query = (
+            select(Repository)
+            .where(Repository.project_id == project_id)
+            .order_by(Repository.created_at.desc())
+        )
+        repo_res = await session.execute(repo_query)
+        repo = repo_res.scalars().first()
+        if repo is None:
+            return None
+
+        snap_query = (
+            select(RepositorySnapshot)
+            .where(RepositorySnapshot.repository_id == repo.id)
+            .order_by(RepositorySnapshot.created_at.desc())
+        )
+        snap_res = await session.execute(snap_query)
+        return snap_res.scalars().first()
+
+    @staticmethod
     async def list_files(
         session: AsyncSession,
         user_id: uuid.UUID,
@@ -369,11 +392,18 @@ class RepositoryService:
     ) -> list[FileRead]:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return []
+
         query = (
             select(RepositoryFile)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
-            .where(Repository.project_id == project.id)
+            .where(
+                Repository.project_id == project.id,
+                RepositorySnapshot.id == snapshot.id,
+            )
             .order_by(RepositorySnapshot.created_at.desc(), RepositoryFile.path.asc())
             .limit(limit)
         )
@@ -390,12 +420,19 @@ class RepositoryService:
     ) -> list[SymbolRead]:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return []
+
         query = (
             select(CodeSymbol, RepositoryFile.path)
             .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
-            .where(Repository.project_id == project.id)
+            .where(
+                Repository.project_id == project.id,
+                RepositorySnapshot.id == snapshot.id,
+            )
             .order_by(RepositorySnapshot.created_at.desc(), CodeSymbol.qualified_name.asc())
             .limit(limit)
         )
@@ -416,12 +453,19 @@ class RepositoryService:
     ) -> list[DependencyRead]:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return []
+
         query = (
             select(CodeDependency, RepositoryFile.path)
             .join(RepositoryFile, RepositoryFile.id == CodeDependency.source_file_id)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
-            .where(Repository.project_id == project.id)
+            .where(
+                Repository.project_id == project.id,
+                RepositorySnapshot.id == snapshot.id,
+            )
             .order_by(RepositorySnapshot.created_at.desc(), CodeDependency.line_number.asc())
             .limit(limit)
         )
