@@ -14,6 +14,7 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     organization_id: uuid.UUID
     slug: str | None = Field(default=None, min_length=2, max_length=100)
+    port: int | None = None
 
 
 class ProjectUpdate(BaseModel):

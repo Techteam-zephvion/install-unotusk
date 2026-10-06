@@ -4,6 +4,7 @@ class Project {
   final String slug;
   final String? description;
   final String status;
+  final int? port;
   final DateTime? updatedAt;
   final String? repositoryName;
   final String? role;
@@ -14,6 +15,7 @@ class Project {
     required this.slug,
     this.description,
     required this.status,
+    this.port,
     this.updatedAt,
     this.repositoryName,
     this.role,
@@ -29,6 +31,9 @@ class Project {
       slug: json['slug']?.toString() ?? '',
       description: json['description']?.toString(),
       status: json['status']?.toString() ?? 'CREATED',
+      port: json['port'] is int
+          ? json['port'] as int
+          : int.tryParse(json['port']?.toString() ?? ''),
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'].toString())
           : null,

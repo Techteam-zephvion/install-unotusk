@@ -82,7 +82,7 @@ class DeployController extends StateNotifier<DeployState> {
       final instance = ServerInstance(
         id: config.serverName,
         name: config.serverName,
-        composeProject: config.serverName,
+        composeProject: DeploymentEngine.toComposeProjectName(config.serverName),
         deploymentDir: deployDir,
         apiPort: config.serverPort,
         lanIp: config.lanIp,

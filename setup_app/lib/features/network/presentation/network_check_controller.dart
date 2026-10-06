@@ -138,7 +138,7 @@ class NetworkCheckController extends StateNotifier<NetworkCheckState> {
 }
 
 final networkCheckControllerProvider =
-    StateNotifierProvider.autoDispose<NetworkCheckController, NetworkCheckState>((ref) {
+    StateNotifierProvider<NetworkCheckController, NetworkCheckState>((ref) {
   final validator = ref.watch(networkValidatorProvider);
   final targetState = ref.watch(targetControllerProvider);
   return NetworkCheckController(

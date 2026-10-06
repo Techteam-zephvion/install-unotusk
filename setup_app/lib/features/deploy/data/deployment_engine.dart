@@ -51,6 +51,16 @@ class DeploymentEngine {
   DeploymentEngine({ProcessExecutor? processExecutor})
       : _processExecutor = processExecutor ?? Process.run;
 
+  static String toComposeProjectName(String serverName) {
+    final sanitized = serverName
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9_-]'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return sanitized.isEmpty ? 'unotusk-server' : sanitized;
+  }
+
   Future<DeployResult> deploy({
     required TargetConfig target,
     required ServerConfig config,
@@ -98,7 +108,7 @@ class DeploymentEngine {
       }
 
       final envContent = effectiveConfig.generateEnvFileContent();
-      final serverVersion = Platform.environment['UNOTUSK_SERVER_VERSION'] ?? 'v1.0.1';
+      final serverVersion = Platform.environment['UNOTUSK_SERVER_VERSION'] ?? '0.1.0';
       final composeContent = ComposeGenerator.generateProductionCompose(
         effectiveConfig,
         imageVersion: serverVersion,
@@ -115,12 +125,14 @@ class DeploymentEngine {
       final composeFile = File('$deployDir/docker-compose.yml');
       composeFile.writeAsStringSync(composeContent);
 
+      final projectName = toComposeProjectName(config.serverName);
+
       if (target.isLocal) {
         // 3. Starting Services
         onStageChanged(DeployStage.startingServices);
         final startRes = await _processExecutor(
           'docker',
-          ['compose', '-p', config.serverName, '-f', composeFile.path, 'up', '-d'],
+          ['compose', '-p', projectName, '-f', composeFile.path, 'up', '-d'],
           workingDirectory: deployDir,
         );
 
@@ -141,9 +153,9 @@ class DeploymentEngine {
         // 4. Migrating DB
         // Migration is handled by the declarative 'migration' service container
         // (condition: service_completed_successfully), so no manual exec needed.
-        // We wait for the API health check (in HealthVerifier) to confirm readiness.
+        // We give services time to complete initial schema migrations and launch API.
         onStageChanged(DeployStage.migratingDb);
-        await Future.delayed(const Duration(seconds: 3));
+        await Future.delayed(const Duration(seconds: 6));
 
         onStageChanged(DeployStage.completed);
         return const DeployResult(isSuccess: true);

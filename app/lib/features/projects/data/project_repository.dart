@@ -17,19 +17,29 @@ class ProjectRepository {
   Future<List<Project>> getProjects() async {
     final response = await _apiClient.get(ApiEndpoints.projects);
     final data = response.data;
+    List<Project> list = [];
     if (data is List) {
-      return data.map((item) => Project.fromJson(Map<String, dynamic>.from(item))).toList();
+      list = data.map((item) => Project.fromJson(Map<String, dynamic>.from(item))).toList();
     } else if (data is Map && data['items'] is List) {
-      return (data['items'] as List)
+      list = (data['items'] as List)
           .map((item) => Project.fromJson(Map<String, dynamic>.from(item)))
           .toList();
     }
-    return [];
+    for (final p in list) {
+      if (p.port != null) {
+        _apiClient.registerProjectPort(p.id, p.port!);
+      }
+    }
+    return list;
   }
 
   Future<Project> getProjectById(String id) async {
     final response = await _apiClient.get(ApiEndpoints.projectById(id));
-    return Project.fromJson(Map<String, dynamic>.from(response.data));
+    final proj = Project.fromJson(Map<String, dynamic>.from(response.data));
+    if (proj.port != null) {
+      _apiClient.registerProjectPort(proj.id, proj.port!);
+    }
+    return proj;
   }
 
   Future<Project> createProject({

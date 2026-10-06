@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/widgets/sidebar_scaffold.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../projects/presentation/projects_controller.dart';
@@ -26,6 +27,33 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
   int _activeTabIndex = 0;
   Key _askTabKey = UniqueKey();
   String? _pendingQuery;
+
+  ApiClient? _apiClient;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _apiClient = ref.read(apiClientProvider);
+        _apiClient?.setActiveProjectId(widget.projectId);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId) {
+      _apiClient?.setActiveProjectId(widget.projectId);
+    }
+  }
+
+  @override
+  void dispose() {
+    _apiClient?.setActiveProjectId(null);
+    super.dispose();
+  }
 
   void _handleNewQuery() {
     setState(() {

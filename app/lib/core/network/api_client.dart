@@ -13,6 +13,8 @@ class ApiClient {
   final StorageService _storage;
   late final Dio _dio;
   void Function()? onUnauthorized;
+  final Map<String, int> _projectPortMap = {};
+  String? _activeProjectId;
 
   ApiClient(this._storage) {
     _dio = Dio(
@@ -30,15 +32,35 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          // Dynamic baseUrl from storage
-          options.baseUrl = _storage.getServerUrl();
+          final baseServerUrl = _storage.getServerUrl();
+          options.baseUrl = baseServerUrl;
+
+          // Automatic port switching: check if path targets a specific project workspace
+          int? targetPort;
+          final match = RegExp(r'^/projects/([a-zA-Z0-9-]+)').firstMatch(options.path);
+          if (match != null) {
+            final pid = match.group(1);
+            if (pid != null && _projectPortMap.containsKey(pid)) {
+              targetPort = _projectPortMap[pid];
+            }
+          } else if (_activeProjectId != null && _projectPortMap.containsKey(_activeProjectId)) {
+            targetPort = _projectPortMap[_activeProjectId];
+          }
+
+          if (targetPort != null) {
+            final uri = Uri.tryParse(baseServerUrl);
+            if (uri != null && uri.hasPort && uri.port != targetPort) {
+              options.baseUrl = uri.replace(port: targetPort).toString().replaceAll(RegExp(r'/+$'), '');
+            }
+          }
+
           final token = _storage.getAuthToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
         },
-        onError: (DioException error, handler) {
+        onError: (DioException error, handler) async {
           if (error.response?.statusCode == 401) {
             onUnauthorized?.call();
           }
@@ -46,6 +68,18 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  void registerProjectPort(String projectId, int port) {
+    _projectPortMap[projectId] = port;
+  }
+
+  void registerProjectPorts(Map<String, int> ports) {
+    _projectPortMap.addAll(ports);
+  }
+
+  void setActiveProjectId(String? projectId) {
+    _activeProjectId = projectId;
   }
 
   void updateBaseUrl(String newUrl) {
