@@ -1,0 +1,214 @@
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from apps.api.src.models.dependency import CodeDependency
+from apps.api.src.models.file import RepositoryFile
+from apps.api.src.models.symbol import CodeSymbol
+from apps.api.src.schemas.graph import (
+    GraphEdge,
+    GraphEdgeType,
+    GraphNode,
+    GraphNodeType,
+    GraphResponse,
+)
+from apps.api.src.services.repository_service import RepositoryService
+
+
+class GraphService:
+    @staticmethod
+    async def get_project_graph(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> GraphResponse:
+        """Construct the code knowledge graph for the project's latest snapshot.
+
+        Retrieves files, symbols, and dependencies scoped strictly to the active
+        RepositorySnapshot. Deduplicates nodes and edges, preserving symbol hierarchy
+        and external package dependencies.
+        """
+        # 1. Verify project authorization (preserves multi-tenant isolation)
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+
+        # 2. Resolve the latest RepositorySnapshot
+        snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
+        if snapshot is None:
+            return GraphResponse(
+                nodes=[],
+                edges=[],
+                snapshot_id=None,
+                total_nodes=0,
+                total_edges=0,
+            )
+
+        # 3. Retrieve files strictly for the latest snapshot (bulk query)
+        files_query = (
+            select(RepositoryFile)
+            .where(RepositoryFile.snapshot_id == snapshot.id)
+            .order_by(RepositoryFile.path.asc())
+        )
+        files_res = await session.execute(files_query)
+        files = files_res.scalars().all()
+        file_map: dict[uuid.UUID, RepositoryFile] = {f.id: f for f in files}
+
+        # 4. Retrieve symbols strictly for the latest snapshot (bulk query)
+        symbols_query = (
+            select(CodeSymbol)
+            .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
+            .where(RepositoryFile.snapshot_id == snapshot.id)
+            .order_by(CodeSymbol.start_line.asc())
+        )
+        symbols_res = await session.execute(symbols_query)
+        symbols = symbols_res.scalars().all()
+        symbol_map: dict[uuid.UUID, CodeSymbol] = {s.id: s for s in symbols}
+
+        # 5. Retrieve dependencies strictly for the latest snapshot (bulk query)
+        deps_query = (
+            select(CodeDependency)
+            .join(RepositoryFile, RepositoryFile.id == CodeDependency.source_file_id)
+            .where(RepositoryFile.snapshot_id == snapshot.id)
+            .order_by(CodeDependency.line_number.asc())
+        )
+        deps_res = await session.execute(deps_query)
+        dependencies = deps_res.scalars().all()
+
+        nodes: dict[str, GraphNode] = {}
+        edges: dict[tuple[str, str, GraphEdgeType], GraphEdge] = {}
+
+        # 6. Build file nodes
+        for f in files:
+            node_id = str(f.id)
+            nodes[node_id] = GraphNode(
+                id=node_id,
+                type=GraphNodeType.FILE,
+                label=f.path,
+                metadata={
+                    "path": f.path,
+                    "filename": f.filename,
+                    "extension": f.extension,
+                    "language": f.language,
+                    "line_count": f.line_count,
+                    "size_bytes": f.size_bytes,
+                },
+            )
+
+        # 7. Build symbol nodes and hierarchy / definition edges
+        for s in symbols:
+            sym_id = str(s.id)
+            try:
+                node_type = GraphNodeType(s.symbol_type.value)
+            except (ValueError, KeyError):
+                node_type = GraphNodeType.TYPE
+
+            nodes[sym_id] = GraphNode(
+                id=sym_id,
+                type=node_type,
+                label=s.name,
+                metadata={
+                    "name": s.name,
+                    "qualified_name": s.qualified_name,
+                    "symbol_type": s.symbol_type.value,
+                    "start_line": s.start_line,
+                    "end_line": s.end_line,
+                    "file_id": str(s.file_id),
+                    "parent_symbol_id": str(s.parent_symbol_id) if s.parent_symbol_id else None,
+                    **(s.symbol_metadata or {}),
+                },
+            )
+
+            # Hierarchical containment: parent symbol -> child symbol
+            if s.parent_symbol_id and s.parent_symbol_id in symbol_map:
+                parent_id = str(s.parent_symbol_id)
+                edge_key = (parent_id, sym_id, GraphEdgeType.CONTAINS)
+                if edge_key not in edges:
+                    edges[edge_key] = GraphEdge(
+                        id=f"{parent_id}->{sym_id}:{GraphEdgeType.CONTAINS.value}",
+                        source=parent_id,
+                        target=sym_id,
+                        type=GraphEdgeType.CONTAINS,
+                        metadata={
+                            "start_line": s.start_line,
+                            "end_line": s.end_line,
+                        },
+                    )
+            # Definition: file -> top-level symbol (or fallback if parent not in snapshot)
+            elif s.file_id in file_map:
+                file_id = str(s.file_id)
+                edge_key = (file_id, sym_id, GraphEdgeType.DEFINES)
+                if edge_key not in edges:
+                    edges[edge_key] = GraphEdge(
+                        id=f"{file_id}->{sym_id}:{GraphEdgeType.DEFINES.value}",
+                        source=file_id,
+                        target=sym_id,
+                        type=GraphEdgeType.DEFINES,
+                        metadata={
+                            "start_line": s.start_line,
+                            "end_line": s.end_line,
+                        },
+                    )
+
+        # 8. Build dependency edges (internal and external)
+        for dep in dependencies:
+            if dep.source_file_id not in file_map:
+                continue
+
+            source_id = str(dep.source_file_id)
+
+            # Internal file-to-file dependency
+            if dep.target_file_id and dep.target_file_id in file_map:
+                target_id = str(dep.target_file_id)
+                edge_key = (source_id, target_id, GraphEdgeType.DEPENDS_ON)
+                if edge_key not in edges:
+                    edges[edge_key] = GraphEdge(
+                        id=f"{source_id}->{target_id}:{GraphEdgeType.DEPENDS_ON.value}",
+                        source=source_id,
+                        target=target_id,
+                        type=GraphEdgeType.DEPENDS_ON,
+                        metadata={
+                            "dependency_type": dep.dependency_type.value,
+                            "line_number": dep.line_number,
+                        },
+                    )
+
+            # External package dependency
+            elif dep.external_package and dep.external_package.strip():
+                pkg_name = dep.external_package.strip()
+                pkg_node_id = f"pkg:{pkg_name}"
+
+                # Deduplicate external package nodes
+                if pkg_node_id not in nodes:
+                    nodes[pkg_node_id] = GraphNode(
+                        id=pkg_node_id,
+                        type=GraphNodeType.EXTERNAL_PACKAGE,
+                        label=pkg_name,
+                        metadata={
+                            "package_name": pkg_name,
+                        },
+                    )
+
+                edge_key = (source_id, pkg_node_id, GraphEdgeType.DEPENDS_ON)
+                if edge_key not in edges:
+                    edges[edge_key] = GraphEdge(
+                        id=f"{source_id}->{pkg_node_id}:{GraphEdgeType.DEPENDS_ON.value}",
+                        source=source_id,
+                        target=pkg_node_id,
+                        type=GraphEdgeType.DEPENDS_ON,
+                        metadata={
+                            "dependency_type": dep.dependency_type.value,
+                            "line_number": dep.line_number,
+                            "external_package": pkg_name,
+                        },
+                    )
+
+        node_list = list(nodes.values())
+        edge_list = list(edges.values())
+
+        return GraphResponse(
+            nodes=node_list,
+            edges=edge_list,
+            snapshot_id=snapshot.id,
+            total_nodes=len(node_list),
+            total_edges=len(edge_list),
+        )

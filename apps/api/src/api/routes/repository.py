@@ -13,12 +13,14 @@ from apps.api.src.schemas.context import (
     ProjectRepositoryContext,
     SymbolRead,
 )
+from apps.api.src.schemas.graph import GraphResponse
 from apps.api.src.schemas.repository import (
     GitHubConnectRequest,
     RepositoryRead,
     RepositorySelectRequest,
 )
 from apps.api.src.schemas.snapshot import IngestTriggerResponse, SnapshotRead
+from apps.api.src.services.graph_service import GraphService
 from apps.api.src.services.repository_service import RepositoryService
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["Repository & Context"])
@@ -152,3 +154,12 @@ async def reindex_repository(
     return await RepositoryService.trigger_ingestion(
         db, current_user.id, project_id, ctx.repository.id
     )
+
+
+@router.get("/graph", response_model=GraphResponse)
+async def get_project_graph(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> GraphResponse:
+    return await GraphService.get_project_graph(db, current_user.id, project_id)
