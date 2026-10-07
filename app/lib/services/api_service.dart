@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import '../models/workspace_models.dart';
-import '../data/mock_data.dart';
 
 /// Centralized API Service for Unotusk.
 /// Strictly wired to the real backend server at port 28000 (Control Plane) and 28100 series (Data Plane).
@@ -53,6 +54,41 @@ class ApiService {
   static ProjectItem? activeProject;
   static List<ProjectItem> cachedProjects = [];
   static List<NotificationItem> cachedNotifications = [];
+
+  // Connected Workspace Projects (Selected by Admin)
+  static final Set<String> connectedProjectIds = {};
+  static final List<ProjectItem> connectedWorkspaceProjects = [];
+
+  static File? get _connectedProjectsFile {
+    if (kIsWeb) return null;
+    final email = activeUser?.email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_') ?? 'default';
+    return File('${Directory.systemTemp.path}/unotusk_connected_projects_$email.json');
+  }
+
+  static void loadPersistedConnectedProjects() {
+    try {
+      if (kIsWeb) return;
+      final file = _connectedProjectsFile;
+      if (file != null && file.existsSync()) {
+        final content = file.readAsStringSync();
+        final List<dynamic> list = jsonDecode(content);
+        connectedProjectIds.clear();
+        for (final id in list) {
+          connectedProjectIds.add(id.toString());
+        }
+      }
+    } catch (_) {}
+  }
+
+  static void savePersistedConnectedProjects() {
+    try {
+      if (kIsWeb) return;
+      final file = _connectedProjectsFile;
+      if (file != null) {
+        file.writeAsStringSync(jsonEncode(connectedProjectIds.toList()));
+      }
+    } catch (_) {}
+  }
 
   static Map<String, String> get _headers => {
         'Content-Type': 'application/json',
@@ -180,6 +216,7 @@ class ApiService {
       activeUser = user;
       isConnected = true;
       lastError = null;
+      loadPersistedConnectedProjects();
 
       // Prime projects list right after login
       try {
@@ -236,6 +273,7 @@ class ApiService {
       activeUser = user;
       isConnected = true;
       lastError = null;
+      loadPersistedConnectedProjects();
 
       try {
         await fetchProjects();
@@ -261,6 +299,8 @@ class ApiService {
     activeUser = null;
     activeProject = null;
     cachedProjects.clear();
+    connectedProjectIds.clear();
+    connectedWorkspaceProjects.clear();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -320,6 +360,18 @@ class ApiService {
         }).toList();
 
         cachedProjects = projects;
+        if (connectedProjectIds.isEmpty) {
+          loadPersistedConnectedProjects();
+        }
+        if (connectedProjectIds.isNotEmpty) {
+          connectedWorkspaceProjects.clear();
+          for (final p in projects) {
+            if (connectedProjectIds.contains(p.id) ||
+                connectedProjectIds.contains(p.name)) {
+              connectedWorkspaceProjects.add(p);
+            }
+          }
+        }
         if (activeProject == null && projects.isNotEmpty) {
           // Default to the first project or one with READY status
           activeProject = projects.firstWhere(
@@ -608,14 +660,8 @@ class ApiService {
       debugPrint('[ApiService] fetchRecentChats error: $e');
     }
 
-    // Fallback: return recorded chats + default mock recent chats so UI is never empty
-    final list = <RecentChat>[..._recordedChats];
-    for (final def in MockData.recentChats) {
-      if (!list.any((c) => c.title == def.title)) {
-        list.add(def);
-      }
-    }
-    return list;
+    // Fallback: return only chats recorded in this session (no mock data)
+    return <RecentChat>[..._recordedChats];
   }
 
   /// Fetches archived conversation threads from http://10.0.0.59:28000

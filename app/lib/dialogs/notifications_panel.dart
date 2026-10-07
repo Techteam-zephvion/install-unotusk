@@ -168,24 +168,30 @@ class NotificationsPanel extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        n.title,
-                                        style: UnoTypography.body(
-                                          color: palette.text,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
+                                      Expanded(
+                                        child: Text(
+                                          n.title,
+                                          style: UnoTypography.body(
+                                            color: palette.text,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      Text(
-                                        n.time,
-                                        style: UnoTypography.mono(
-                                          color: palette.textSec,
-                                          fontSize: 10,
+                                      if (n.time.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          n.time,
+                                          style: UnoTypography.mono(
+                                            color: palette.textSec,
+                                            fontSize: 10,
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                   const SizedBox(height: 3),
@@ -195,6 +201,8 @@ class NotificationsPanel extends StatelessWidget {
                                       color: palette.textSec,
                                       fontSize: 12,
                                     ),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),

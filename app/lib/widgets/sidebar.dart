@@ -4,7 +4,6 @@ import 'package:window_manager/window_manager.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
 import 'unotusk_logo.dart';
 import 'user_menu_popup.dart';
 
@@ -42,7 +41,7 @@ class UnoSidebar extends StatefulWidget {
 
 class _UnoSidebarState extends State<UnoSidebar> {
   bool _userMenuOpen = false;
-  List<RecentChat> _recentChats = List.from(MockData.recentChats);
+  List<RecentChat> _recentChats = [];
 
   @override
   void initState() {
@@ -57,15 +56,11 @@ class _UnoSidebarState extends State<UnoSidebar> {
         setState(() {
           if (chats.isNotEmpty) {
             _recentChats = chats;
-          } else if (_recentChats.isEmpty) {
-            _recentChats = List.from(MockData.recentChats);
           }
         });
       }
     } catch (_) {
-      if (mounted && _recentChats.isEmpty) {
-        setState(() => _recentChats = List.from(MockData.recentChats));
-      }
+      debugPrint('[UnoSidebar] Failed to load recent chats');
     }
   }
 
