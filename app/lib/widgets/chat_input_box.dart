@@ -25,12 +25,14 @@ class ChatInputBox extends StatefulWidget {
 }
 
 class _ChatInputBoxState extends State<ChatInputBox> {
-  bool _thinkingEnabled = false;
+  bool _thinkingEnabled = true;
   String _thinkingMode = 'warm'; // warm, cold, hot
   String? _activeSearchMode; // research, web
   bool _showSuggestions = false;
 
   final LayerLink _layerLink = LayerLink();
+  final LayerLink _thinkingButtonLink = LayerLink();
+  OverlayEntry? _thinkingMenuOverlay;
 
   @override
   void initState() {
@@ -40,8 +42,239 @@ class _ChatInputBoxState extends State<ChatInputBox> {
 
   @override
   void dispose() {
+    _closeThinkingMenu();
     widget.controller.removeListener(_onTextChanged);
     super.dispose();
+  }
+
+  void _toggleThinkingMenu() {
+    if (_thinkingMenuOverlay != null) {
+      _closeThinkingMenu();
+    } else {
+      _openThinkingMenu();
+    }
+  }
+
+  void _closeThinkingMenu() {
+    _thinkingMenuOverlay?.remove();
+    _thinkingMenuOverlay = null;
+  }
+
+  void _openThinkingMenu() {
+    _closeThinkingMenu();
+    final overlay = Overlay.of(context);
+    _thinkingMenuOverlay = OverlayEntry(
+      builder: (context) {
+        return Stack(
+          children: [
+            // Tap outside to dismiss
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _closeThinkingMenu,
+                child: const SizedBox.expand(),
+              ),
+            ),
+            // Floating menu positioned right above the button
+            CompositedTransformFollower(
+              link: _thinkingButtonLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.topLeft,
+              followerAnchor: Alignment.bottomLeft,
+              offset: const Offset(0, -10),
+              child: Material(
+                color: Colors.transparent,
+                child: StatefulBuilder(
+                  builder: (context, setMenuState) {
+                    return _buildThinkingMenuCard(setMenuState);
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    overlay.insert(_thinkingMenuOverlay!);
+  }
+
+  Widget _buildThinkingMenuCard(StateSetter setMenuState) {
+    return Container(
+      width: 210,
+      decoration: BoxDecoration(
+        color: const Color(0xFF232321),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF383835)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header: "Thinking" + Toggle Switch
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Thinking',
+                style: UnoTypography.body(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              // Custom iOS/pill style Switch matching Screenshot 2
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _thinkingEnabled = !_thinkingEnabled;
+                  });
+                  setMenuState(() {});
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 44,
+                  height: 24,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: _thinkingEnabled
+                        ? const Color(0xFFDA7756)
+                        : const Color(0xFF3F3F46),
+                  ),
+                  child: Align(
+                    alignment: _thinkingEnabled
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _thinkingEnabled
+                            ? const Color(0xFFFEF3C7)
+                            : const Color(0xFFA1A1AA),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Options: Hot, Warm, Cold
+          _buildTierOption(
+            tier: 'hot',
+            title: 'Hot',
+            subtitle: 'Quick answers',
+            dotColor: const Color(0xFFF87171),
+            accentColor: const Color(0xFFEF4444),
+            bgColor: const Color(0xFF4C2422),
+            setMenuState: setMenuState,
+          ),
+          const SizedBox(height: 4),
+          _buildTierOption(
+            tier: 'warm',
+            title: 'Warm',
+            subtitle: 'Balanced',
+            dotColor: const Color(0xFFFBBF24),
+            accentColor: const Color(0xFFEAB308),
+            bgColor: const Color(0xFF563F24),
+            setMenuState: setMenuState,
+          ),
+          const SizedBox(height: 4),
+          _buildTierOption(
+            tier: 'cold',
+            title: 'Cold',
+            subtitle: 'Deep reasoning',
+            dotColor: const Color(0xFF2DD4BF),
+            accentColor: const Color(0xFF14B8A6),
+            bgColor: const Color(0xFF1E3A37),
+            setMenuState: setMenuState,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTierOption({
+    required String tier,
+    required String title,
+    required String subtitle,
+    required Color dotColor,
+    required Color accentColor,
+    required Color bgColor,
+    required StateSetter setMenuState,
+  }) {
+    final isSelected = _thinkingMode == tier && _thinkingEnabled;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _thinkingMode = tier;
+          _thinkingEnabled = true;
+        });
+        setMenuState(() {});
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? bgColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(
+              color: isSelected ? accentColor : Colors.transparent,
+              width: 3.0,
+            ),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: UnoTypography.body(
+                    color: isSelected ? dotColor : const Color(0xFFE4E4E7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: UnoTypography.body(
+                    color: isSelected
+                        ? const Color(0xFFE4E4E7)
+                        : const Color(0xFFA1A1AA),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _onTextChanged() {
@@ -54,12 +287,12 @@ class _ChatInputBoxState extends State<ChatInputBox> {
   Color _tierColor() {
     switch (_thinkingMode) {
       case 'hot':
-        return UnoPalette.queryHot;
+        return const Color(0xFFF87171);
       case 'cold':
-        return UnoPalette.queryCold;
+        return const Color(0xFF2DD4BF);
       case 'warm':
       default:
-        return UnoPalette.queryWarm;
+        return const Color(0xFFE8A455);
     }
   }
 
@@ -294,136 +527,59 @@ class _ChatInputBoxState extends State<ChatInputBox> {
                         const SizedBox(width: 6),
 
                         // Thinking Tier Button
-                        PopupMenuButton<String>(
-                          tooltip: 'Select reasoning tier',
-                          offset: const Offset(0, -130),
-                          color: widget.palette.bgElevated,
-                          shape: RoundedRectangleBorder(
-                            side: BorderSide(color: widget.palette.div),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          onSelected: (tier) {
-                            setState(() {
-                              _thinkingMode = tier;
-                              _thinkingEnabled = true;
-                            });
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'warm',
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: UnoPalette.queryWarm,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Warm (Balanced reasoning)',
-                                    style: UnoTypography.body(
-                                      color: widget.palette.text,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'cold',
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: UnoPalette.queryCold,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Cold (Deep multi-hop proof)',
-                                    style: UnoTypography.body(
-                                      color: widget.palette.text,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'hot',
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: UnoPalette.queryHot,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Hot (Quick indexed answer)',
-                                    style: UnoTypography.body(
-                                      color: widget.palette.text,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          child: Container(
-                            height: 30,
-                            padding: const EdgeInsets.symmetric(horizontal: 11),
-                            decoration: BoxDecoration(
-                              color: _thinkingEnabled
-                                  ? tierColor.withValues(alpha: 0.10)
-                                  : Colors.transparent,
-                              border: Border.all(
+                        CompositedTransformTarget(
+                          link: _thinkingButtonLink,
+                          child: InkWell(
+                            onTap: _toggleThinkingMenu,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              height: 32,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
                                 color: _thinkingEnabled
-                                    ? tierColor.withValues(alpha: 0.5)
-                                    : widget.palette.div,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  LucideIcons.zap,
-                                  size: 12,
+                                    ? tierColor.withValues(alpha: 0.12)
+                                    : Colors.transparent,
+                                border: Border.all(
                                   color: _thinkingEnabled
                                       ? tierColor
-                                      : widget.palette.textSec,
+                                      : widget.palette.div,
+                                  width: 1.2,
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _thinkingEnabled
-                                      ? '$_thinkingMode tier'
-                                      : 'Thinking',
-                                  style: UnoTypography.body(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.zap,
+                                    size: 12,
                                     color: _thinkingEnabled
                                         ? tierColor
                                         : widget.palette.textSec,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  LucideIcons.chevronDown,
-                                  size: 11,
-                                  color: _thinkingEnabled
-                                      ? tierColor
-                                      : widget.palette.textSec,
-                                ),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _thinkingEnabled
+                                        ? '${_thinkingMode[0].toUpperCase()}${_thinkingMode.substring(1)} tier'
+                                        : 'Thinking',
+                                    style: UnoTypography.body(
+                                      color: _thinkingEnabled
+                                          ? tierColor
+                                          : widget.palette.textSec,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Icon(
+                                    LucideIcons.chevronDown,
+                                    size: 11,
+                                    color: _thinkingEnabled
+                                        ? tierColor
+                                        : widget.palette.textSec,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
