@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.src.api.exceptions import UnauthorizedException
+from apps.api.src.api.exceptions import ConflictException, UnauthorizedException
 from apps.api.src.auth.security import (
     create_access_token,
     hash_password,
@@ -27,6 +27,11 @@ class AuthService:
         result = await session.execute(select(User).where(User.email == normalized_email))
         existing_user = result.scalar_one_or_none()
         if existing_user is not None:
+            if existing_user.password_hash:
+                raise ConflictException(
+                    code="EMAIL_ALREADY_EXISTS",
+                    message="A user with this email already exists",
+                )
             # Activate invited / pre-provisioned user with chosen password
             if data.name and data.name.strip():
                 existing_user.name = data.name.strip()
