@@ -3,43 +3,35 @@ import '../domain/server_config.dart';
 
 class ConfigState {
   final ServerConfig config;
-  final String? emailError;
-  final String? passwordError;
+  final String? repoUrlError;
   final String? apiKeyError;
   final String? portError;
 
   const ConfigState({
     required this.config,
-    this.emailError,
-    this.passwordError,
+    this.repoUrlError,
     this.apiKeyError,
     this.portError,
   });
 
   bool get isValid =>
-      emailError == null &&
-      passwordError == null &&
+      repoUrlError == null &&
       apiKeyError == null &&
       portError == null &&
-      config.adminEmail.isNotEmpty &&
-      config.adminPassword.isNotEmpty &&
+      config.repoUrl.isNotEmpty &&
       config.llmApiKey.isNotEmpty;
 
   ConfigState copyWith({
     ServerConfig? config,
-    Object? emailError = _sentinel,
-    Object? passwordError = _sentinel,
+    Object? repoUrlError = _sentinel,
     Object? apiKeyError = _sentinel,
     Object? portError = _sentinel,
   }) {
     return ConfigState(
       config: config ?? this.config,
-      emailError: identical(emailError, _sentinel)
-          ? this.emailError
-          : emailError as String?,
-      passwordError: identical(passwordError, _sentinel)
-          ? this.passwordError
-          : passwordError as String?,
+      repoUrlError: identical(repoUrlError, _sentinel)
+          ? this.repoUrlError
+          : repoUrlError as String?,
       apiKeyError: identical(apiKeyError, _sentinel)
           ? this.apiKeyError
           : apiKeyError as String?,
@@ -75,36 +67,22 @@ class ConfigController extends StateNotifier<ConfigState> {
     }
   }
 
-  void updateAdminEmail(String email) {
-    final trimmed = email.trim();
-    if (trimmed.isEmpty || !trimmed.contains('@') || !trimmed.contains('.')) {
+  
+  void updateRepoUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
       state = state.copyWith(
-        config: state.config.copyWith(adminEmail: trimmed),
-        emailError: 'Please enter a valid admin email address.',
+        config: state.config.copyWith(repoUrl: trimmed),
+        repoUrlError: 'Repository URL is required',
       );
     } else {
       state = state.copyWith(
-        config: state.config.copyWith(adminEmail: trimmed),
-        emailError: null,
+        config: state.config.copyWith(repoUrl: trimmed),
+        repoUrlError: null,
       );
     }
   }
-
-  void updateAdminPassword(String password) {
-    if (password.length < 8) {
-      state = state.copyWith(
-        config: state.config.copyWith(adminPassword: password),
-        passwordError: 'Password must be at least 8 characters.',
-      );
-    } else {
-      state = state.copyWith(
-        config: state.config.copyWith(adminPassword: password),
-        passwordError: null,
-      );
-    }
-  }
-
-  void updateLlmProvider(LlmProviderType provider) {
+void updateLlmProvider(LlmProviderType provider) {
     state = state.copyWith(
       config: state.config.copyWith(llmProvider: provider),
     );
@@ -132,8 +110,7 @@ class ConfigController extends StateNotifier<ConfigState> {
   }
 
   bool validateAll() {
-    updateAdminEmail(state.config.adminEmail);
-    updateAdminPassword(state.config.adminPassword);
+    updateRepoUrl(state.config.repoUrl);
     updateLlmApiKey(state.config.llmApiKey);
     return state.isValid;
   }

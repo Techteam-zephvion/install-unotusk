@@ -7,7 +7,6 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../config/presentation/config_controller.dart';
-import '../../projects/presentation/server_projects_panel.dart';
 import '../data/app_launcher.dart';
 
 final appLauncherProvider = Provider<AppLauncher>((ref) {
@@ -247,12 +246,6 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
               const SizedBox(height: 24),
               const Divider(),
               const SizedBox(height: 20),
-              ServerProjectsPanel(
-                serverUrl: serverUrl,
-                adminEmail: serverConfig.adminEmail,
-                adminPassword: serverConfig.adminPassword,
-              ),
-              const SizedBox(height: 28),
               Row(
                 children: [
                   Expanded(

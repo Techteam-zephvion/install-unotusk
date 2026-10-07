@@ -23,8 +23,8 @@ void main() {
         target: const TargetConfig(type: TargetType.local),
         config: ServerConfig(
           serverName: 'Test Server',
-          adminEmail: 'admin@test.local',
-          adminPassword: 'password123',
+          repoUrl: 'admin@test.local',
+          
           llmApiKey: 'gsk_test_123',
         ),
         customDeploymentDir: tempDir.path,

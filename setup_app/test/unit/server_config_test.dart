@@ -8,8 +8,7 @@ void main() {
       final config = ServerConfig(
         serverName: 'Production Unotusk',
         serverPort: 8080,
-        adminEmail: 'admin@unotusk.internal',
-        adminPassword: 'SuperSecretPassword123',
+        repoUrl: 'https://github.com/org/repo',
         llmProvider: LlmProviderType.groq,
         llmApiKey: 'gsk_mock_api_key_123',
       );
@@ -21,26 +20,21 @@ void main() {
       final env = config.generateEnvFileContent();
       expect(env, contains('APP_NAME="Production Unotusk"'));
       expect(env, contains('PORT=8080'));
+      expect(env, contains('TARGET_REPO_URL=https://github.com/org/repo'));
       expect(env, contains('GROQ_API_KEY=gsk_mock_api_key_123'));
       expect(env, contains('AUTH_SECRET=${config.authSecret}'));
       expect(env, contains('DATABASE_URL=postgresql+asyncpg://'));
     });
 
-    test('ConfigController validates admin email, password and API key', () {
+    test('ConfigController validates repo url and API key', () {
       final controller = ConfigController();
       expect(controller.validateAll(), false);
 
-      controller.updateAdminEmail('invalid-email');
-      expect(controller.state.emailError, isNotNull);
+      controller.updateRepoUrl('');
+      expect(controller.state.repoUrlError, isNotNull);
 
-      controller.updateAdminEmail('admin@company.com');
-      expect(controller.state.emailError, isNull);
-
-      controller.updateAdminPassword('short');
-      expect(controller.state.passwordError, isNotNull);
-
-      controller.updateAdminPassword('strong_password_123');
-      expect(controller.state.passwordError, isNull);
+      controller.updateRepoUrl('https://github.com/org/repo');
+      expect(controller.state.repoUrlError, isNull);
 
       controller.updateLlmApiKey('gsk_valid_key');
       expect(controller.state.apiKeyError, isNull);
