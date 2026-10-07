@@ -9,7 +9,6 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
-from apps.api.src.auth.security import hash_password
 from apps.api.src.config.settings import settings
 from apps.api.src.models.enums import (
     IntegrationProvider,
