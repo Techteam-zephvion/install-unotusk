@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
@@ -1881,7 +1882,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   //  Top Navigation Bar
   // ─────────────────────────────────────────────────
   Widget _buildTopBar(UnoPalette palette, bool isNarrow) {
-    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
     return Container(
       height: 52,
