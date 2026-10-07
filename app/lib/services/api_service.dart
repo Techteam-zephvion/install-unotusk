@@ -274,9 +274,22 @@ class ApiService {
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
 
       if (res.statusCode == 200) {
-        final List<dynamic> list = jsonDecode(res.body);
+        final decoded = jsonDecode(res.body);
+        List<dynamic> list;
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map && decoded['projects'] is List) {
+          list = decoded['projects'];
+        } else if (decoded is Map && decoded['items'] is List) {
+          list = decoded['items'];
+        } else if (decoded is Map && decoded['data'] is List) {
+          list = decoded['data'];
+        } else {
+          list = [];
+        }
+
         final projects = list.map((item) {
-          final m = item as Map<String, dynamic>;
+          final m = Map<String, dynamic>.from(item as Map);
           final id = m['id']?.toString() ?? '';
           final name = m['name']?.toString() ?? 'Project';
           final status = m['status']?.toString() ?? 'READY';
@@ -299,8 +312,10 @@ class ApiService {
             description: m['description']?.toString(),
             port: (m['port'] as num?)?.toInt(),
             role: m['role']?.toString(),
-            repositoryName: m['repository']?['full_name']?.toString() ??
-                m['repository']?['name']?.toString(),
+            repositoryName: m['repository'] is Map
+                ? (m['repository']['full_name']?.toString() ??
+                    m['repository']['name']?.toString())
+                : null,
           );
         }).toList();
 
@@ -321,13 +336,13 @@ class ApiService {
         return projects;
       } else {
         lastError = 'HTTP ${res.statusCode}: ${res.body}';
+        throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
       }
     } catch (e) {
       debugPrint('[ApiService] /api/v1/projects fetch error: $e');
       lastError = e.toString();
+      rethrow;
     }
-
-    return cachedProjects;
   }
 
   /// Sets the currently active project
@@ -1343,20 +1358,32 @@ class ApiService {
   //  Workspace RBAC & Project Membership (Phase 1)
   // ─────────────────────────────────────────────────────────
 
-  /// Lists all members assigned to a workspace project
+  /// Lists all members assigned to a workspace project from http://10.0.0.59:28000
   static Future<List<ProjectMember>> fetchProjectMembers([String? projectId]) async {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/members');
     final res = await _client.get(uri, headers: _headers).timeout(_timeout);
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-      if (data is List) {
-        return data
-            .map((item) => ProjectMember.fromJson(Map<String, dynamic>.from(item)))
-            .toList();
+      final decoded = jsonDecode(res.body);
+      List<dynamic> list;
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map && decoded['members'] is List) {
+        list = decoded['members'];
+      } else if (decoded is Map && decoded['items'] is List) {
+        list = decoded['items'];
+      } else if (decoded is Map && decoded['users'] is List) {
+        list = decoded['users'];
+      } else if (decoded is Map && decoded['data'] is List) {
+        list = decoded['data'];
+      } else {
+        list = [];
       }
+      return list
+          .map((item) => ProjectMember.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
     }
-    return [];
+    throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
   }
 
   /// Adds a member to a workspace project with role (ADMIN, MEMBER, VIEWER)
@@ -1378,9 +1405,15 @@ class ApiService {
         .post(uri, headers: _headers, body: jsonEncode(payload))
         .timeout(_timeout);
     if (res.statusCode == 200 || res.statusCode == 201) {
-      return ProjectMember.fromJson(jsonDecode(res.body));
+      final decoded = jsonDecode(res.body);
+      final memberMap = decoded is Map<String, dynamic>
+          ? (decoded['member'] is Map<String, dynamic>
+              ? decoded['member'] as Map<String, dynamic>
+              : decoded)
+          : <String, dynamic>{};
+      return ProjectMember.fromJson(memberMap);
     }
-    throw Exception('Failed to add project member: HTTP ${res.statusCode} ${res.body}');
+    throw Exception('Failed to add project member (HTTP ${res.statusCode}): ${res.body}');
   }
 
   /// Removes a member from a workspace project
@@ -1388,8 +1421,8 @@ class ApiService {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/members/$userId');
     final res = await _client.delete(uri, headers: _headers).timeout(_timeout);
-    if (res.statusCode != 200 && res.statusCode != 204) {
-      throw Exception('Failed to remove project member: HTTP ${res.statusCode}');
+    if (res.statusCode != 200 && res.statusCode != 204 && res.statusCode != 202) {
+      throw Exception('Failed to remove project member (HTTP ${res.statusCode}): ${res.body}');
     }
   }
 
