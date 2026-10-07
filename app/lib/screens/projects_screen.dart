@@ -58,6 +58,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   ProjectItem? _managingWorkspaceProject;
   List<ProjectMember> _projectMembers = [];
   bool _isLoadingMembers = false;
+  bool _isReloadingMembers = false;
   String? _membersError;
   String? _membersSuccess;
   final _inviteMemberController = TextEditingController();
@@ -69,17 +70,35 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _connectWorkspaceDialogOpen = false;
   List<ProjectItem> _availableBackendProjects = [];
   bool _isLoadingWorkspaceProjects = false;
+  bool _isRefreshingWorkspaceProjects = false;
 
   final List<ProjectItem> _projects = [];
-  bool _isLoadingProjects = true;
-  String? _projectsError;
+  bool _isLoadingProjects = false;
+  bool _isRefreshingProjects = false;
 
   @override
   void initState() {
     super.initState();
+    // Restore any previously connected projects so they remain in workspace
+    if (ApiService.connectedWorkspaceProjects.isNotEmpty) {
+      _projects.addAll(ApiService.connectedWorkspaceProjects);
+    } else {
+      if (ApiService.connectedProjectIds.isEmpty) {
+        ApiService.loadPersistedConnectedProjects();
+      }
+      for (final p in ApiService.cachedProjects) {
+        if (ApiService.connectedProjectIds.contains(p.id) ||
+            ApiService.connectedProjectIds.contains(p.name)) {
+          _projects.add(p);
+        }
+      }
+      ApiService.connectedWorkspaceProjects
+        ..clear()
+        ..addAll(_projects);
+    }
     _checkServer();
-    _fetchServerProjects();
-    _fetchAvailableWorkspaceProjects();
+    _fetchServerProjects(isSilent: true);
+    _fetchAvailableWorkspaceProjects(isSilent: true);
     _serverTimer =
         Timer.periodic(const Duration(seconds: 4), (_) => _checkServer());
   }
@@ -89,43 +108,50 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   void _fetchServerProjects({bool isSilent = false}) async {
-    if (_projects.isEmpty && !isSilent) {
-      setState(() {
-        _isLoadingProjects = true;
-        _projectsError = null;
-      });
-    }
+    if (_isRefreshingProjects) return;
+    setState(() {
+      _isRefreshingProjects = true;
+    });
 
+    final stopwatch = Stopwatch()..start();
     try {
       final serverProjects = await ApiService.fetchProjects();
+      final elapsed = stopwatch.elapsedMilliseconds;
+      if (elapsed < 450) {
+        await Future.delayed(Duration(milliseconds: 450 - elapsed));
+      }
       if (!mounted) return;
       setState(() {
         _isLoadingProjects = false;
-        if (_projects.isEmpty) {
-          _projects.addAll(serverProjects);
-        } else {
-          for (final sp in serverProjects) {
-            final idx = _projects.indexWhere((p) =>
-                p.id.toLowerCase() == sp.id.toLowerCase() ||
-                p.name.toLowerCase() == sp.name.toLowerCase());
-            if (idx >= 0) {
-              _projects[idx] = sp;
-            } else {
-              _projects.add(sp);
-            }
+        _isRefreshingProjects = false;
+        _availableBackendProjects = serverProjects;
+        // Only update status and attributes for projects explicitly connected to workspace
+        for (final sp in serverProjects) {
+          final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
+              ApiService.connectedProjectIds.contains(sp.name);
+          final idx = _projects.indexWhere((p) =>
+              p.id.toLowerCase() == sp.id.toLowerCase() ||
+              p.name.toLowerCase() == sp.name.toLowerCase());
+          if (idx >= 0) {
+            _projects[idx] = sp;
+          } else if (isConnected) {
+            _projects.add(sp);
           }
         }
-        if (serverProjects.isEmpty && ApiService.lastError != null) {
-          _projectsError = ApiService.lastError;
+        if (ApiService.connectedProjectIds.isNotEmpty) {
+          _projects.removeWhere((p) =>
+              !ApiService.connectedProjectIds.contains(p.id) &&
+              !ApiService.connectedProjectIds.contains(p.name));
         }
+        ApiService.connectedWorkspaceProjects
+          ..clear()
+          ..addAll(_projects);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoadingProjects = false;
-        if (_projects.isEmpty) {
-          _projectsError = e.toString().replaceAll('Exception: ', '');
-        }
+        _isRefreshingProjects = false;
       });
     }
   }
@@ -187,6 +213,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     super.dispose();
   }
 
+  // ignore: unused_element
   void _openConnectDialog() {
     _serverUrlController.text = ApiService.baseUrl;
     setState(() => _connectDialogOpen = true);
@@ -197,32 +224,38 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     _fetchAvailableWorkspaceProjects();
   }
 
-  void _fetchAvailableWorkspaceProjects({bool isSilent = false}) async {
-    if (_availableBackendProjects.isEmpty && !isSilent) {
-      setState(() {
+  void _fetchAvailableWorkspaceProjects({bool isSilent = false, bool isUserAction = false}) async {
+    setState(() {
+      _isRefreshingWorkspaceProjects = true;
+      if (_availableBackendProjects.isEmpty && !isSilent) {
         _isLoadingWorkspaceProjects = true;
-      });
-    }
+      }
+    });
 
     try {
       final serverProjects = await ApiService.fetchProjects();
-      if (mounted) {
-        setState(() {
-          final updated = List<ProjectItem>.from(_availableBackendProjects);
-          for (final sp in serverProjects) {
-            final idx = updated.indexWhere((p) =>
-                p.id.toLowerCase() == sp.id.toLowerCase() ||
-                p.name.toLowerCase() == sp.name.toLowerCase());
-            if (idx >= 0) {
-              updated[idx] = sp;
-            } else {
-              updated.add(sp);
-            }
+      if (!mounted) return;
+      setState(() {
+        _availableBackendProjects = serverProjects;
+        // Keep any existing connected projects synchronized
+        for (final sp in serverProjects) {
+          final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
+              ApiService.connectedProjectIds.contains(sp.name);
+          final idx = _projects.indexWhere((p) =>
+              p.id.toLowerCase() == sp.id.toLowerCase() ||
+              p.name.toLowerCase() == sp.name.toLowerCase());
+          if (idx >= 0) {
+            _projects[idx] = sp;
+          } else if (isConnected) {
+            _projects.add(sp);
           }
-          _availableBackendProjects = updated.isEmpty ? serverProjects : updated;
-          _isLoadingWorkspaceProjects = false;
-        });
-      }
+        }
+        ApiService.connectedWorkspaceProjects
+          ..clear()
+          ..addAll(_projects);
+        _isLoadingWorkspaceProjects = false;
+        _isRefreshingWorkspaceProjects = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -230,6 +263,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             _availableBackendProjects = ApiService.cachedProjects;
           }
           _isLoadingWorkspaceProjects = false;
+          _isRefreshingWorkspaceProjects = false;
         });
       }
     }
@@ -242,10 +276,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           p.name.toLowerCase() == project.name.toLowerCase());
       if (idx >= 0) {
         _projects.removeAt(idx);
+        ApiService.connectedProjectIds.remove(project.id);
+        ApiService.connectedProjectIds.remove(project.name);
       } else {
         _projects.add(project);
+        ApiService.connectedProjectIds.add(project.id);
+        ApiService.connectedProjectIds.add(project.name);
       }
+      ApiService.connectedWorkspaceProjects
+        ..clear()
+        ..addAll(_projects);
     });
+    ApiService.savePersistedConnectedProjects();
   }
 
   void _connectAllWorkspaceProjects() {
@@ -257,8 +299,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         if (!exists) {
           _projects.add(p);
         }
+        ApiService.connectedProjectIds.add(p.id);
+        ApiService.connectedProjectIds.add(p.name);
       }
+      ApiService.connectedWorkspaceProjects
+        ..clear()
+        ..addAll(_projects);
     });
+    ApiService.savePersistedConnectedProjects();
   }
 
   void _handleConnectServer() async {
@@ -273,7 +321,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     setState(() {
       _connectDialogOpen = false;
       _isLoadingProjects = true;
-      _projectsError = null;
     });
 
     _checkServer();
@@ -608,12 +655,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           ),
                           const SizedBox(width: 8),
                           InkWell(
-                            onTap: _fetchAvailableWorkspaceProjects,
+                            onTap: _isRefreshingWorkspaceProjects
+                                ? null
+                                : () => _fetchAvailableWorkspaceProjects(isUserAction: true),
                             borderRadius: BorderRadius.circular(6),
                             child: Padding(
                               padding: const EdgeInsets.all(4),
-                              child: Icon(Icons.refresh,
-                                  size: 15, color: palette.textSec),
+                              child: _isRefreshingWorkspaceProjects
+                                  ? SizedBox(
+                                      width: 15,
+                                      height: 15,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(palette.accent),
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.refresh,
+                                      size: 15,
+                                      color: palette.textSec,
+                                    ),
                             ),
                           ),
                         ],
@@ -963,6 +1024,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     setState(() {
       _managingWorkspaceProject = project;
       _isLoadingMembers = true;
+      _isReloadingMembers = false;
       _membersError = null;
       _membersSuccess = null;
       _inviteMemberController.clear();
@@ -971,24 +1033,35 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     _loadProjectMembers(project.id);
   }
 
-  void _loadProjectMembers(String projectId) async {
+  void _loadProjectMembers(String projectId, {bool isReload = false}) async {
+    if (_isReloadingMembers) return;
     setState(() {
-      _isLoadingMembers = true;
+      if (isReload || _projectMembers.isNotEmpty) {
+        _isReloadingMembers = true;
+      } else {
+        _isLoadingMembers = true;
+      }
       _membersError = null;
     });
 
+    final stopwatch = Stopwatch()..start();
     try {
       final members = await ApiService.fetchProjectMembers(projectId);
+      final elapsed = stopwatch.elapsedMilliseconds;
+      if (isReload && elapsed < 400) {
+        await Future.delayed(Duration(milliseconds: 400 - elapsed));
+      }
       if (!mounted) return;
       setState(() {
         _projectMembers = members;
         _isLoadingMembers = false;
+        _isReloadingMembers = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _projectMembers = [];
         _isLoadingMembers = false;
+        _isReloadingMembers = false;
         _membersError = e.toString().replaceAll('Exception: ', '');
       });
     }
@@ -1552,14 +1625,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () => _loadProjectMembers(project.id),
+                        onTap: _isReloadingMembers
+                            ? () {}
+                            : () => _loadProjectMembers(project.id, isReload: true),
                         borderRadius: BorderRadius.circular(4),
                         child: Padding(
                           padding: const EdgeInsets.all(2),
                           child: Row(
                             children: [
-                              Icon(Icons.refresh,
-                                  size: 13, color: palette.textSec),
+                              SizedBox(
+                                width: 13,
+                                height: 13,
+                                child: _isReloadingMembers
+                                    ? CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                            palette.accent),
+                                      )
+                                    : Icon(Icons.refresh,
+                                        size: 13, color: palette.textSec),
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 'Reload',
@@ -1584,7 +1669,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: palette.div),
                       ),
-                      child: _isLoadingMembers
+                      child: _isLoadingMembers && _projectMembers.isEmpty
                           ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(24),
@@ -1625,7 +1710,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     ),
                                   ),
                                 )
-                              : ListView.separated(
+                              : AnimatedOpacity(
+                                  opacity: _isReloadingMembers ? 0.75 : 1.0,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: ListView.separated(
                                   shrinkWrap: true,
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 6, horizontal: 8),
@@ -1778,6 +1866,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     );
                                   },
                                 ),
+                              ),
                     ),
                   ),
 
@@ -2000,25 +2089,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     label: 'Refresh',
                     palette: palette,
                     filled: false,
-                    onTap: _fetchServerProjects,
+                    isLoading: _isRefreshingProjects,
+                    onTap: () => _fetchServerProjects(isSilent: false),
                   ),
-                  const SizedBox(width: 10),
-                  if (_isManager)
+                  if (_isManager) ...[
+                    const SizedBox(width: 10),
                     _buildActionButton(
                       icon: Icons.hub_outlined,
                       label: 'Connect Workspace',
                       palette: palette,
                       filled: true,
                       onTap: _openConnectWorkspaceDialog,
-                    )
-                  else
-                    _buildActionButton(
-                      icon: Icons.add,
-                      label: 'Connect Server',
-                      palette: palette,
-                      filled: true,
-                      onTap: _openConnectDialog,
                     ),
+                  ],
                 ],
               ),
             ],
@@ -2082,7 +2165,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Loading projects from http://10.0.0.59:28000...',
+                      'Loading workspace...',
                       style: UnoTypography.body(
                         color: palette.textSec,
                         fontSize: 13,
@@ -2104,19 +2187,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               child: Column(
                 children: [
                   Icon(
-                    _projectsError != null
-                        ? Icons.cloud_off_rounded
+                    _filterText.isNotEmpty
+                        ? Icons.search_off_rounded
                         : Icons.folder_open_rounded,
                     size: 36,
-                    color: _projectsError != null
-                        ? const Color(0xFFD4725A)
-                        : palette.textSec,
+                    color: palette.textSec,
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    _projectsError != null
-                        ? 'Backend Server Unreachable'
-                        : 'No projects found in workspace',
+                    _filterText.isNotEmpty
+                        ? 'No matching projects found'
+                        : 'No projects in workspace',
                     style: UnoTypography.body(
                       color: palette.text,
                       fontSize: 16,
@@ -2125,26 +2206,35 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _projectsError != null
-                        ? 'Could not connect to http://10.0.0.59:28000.\nPlease verify the server is running.'
-                        : 'Connect a server using the button above to get started.',
+                    _filterText.isNotEmpty
+                        ? 'Try adjusting your search filter.'
+                        : (_isManager
+                            ? 'Connect backend projects to display them in your workspace.'
+                            : 'No projects have been connected to this workspace yet.'),
                     textAlign: TextAlign.center,
                     style: UnoTypography.body(
                       color: palette.textSec,
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _fetchServerProjects,
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Retry Connection'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
+                  if (_isManager && _filterText.isEmpty) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _openConnectWorkspaceDialog,
+                      icon: const Icon(Icons.hub_outlined, size: 16),
+                      label: const Text('Connect Workspace'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             )
@@ -2162,9 +2252,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     required UnoPalette palette,
     required bool filled,
     required VoidCallback onTap,
+    bool isLoading = false,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: isLoading ? () {} : onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
@@ -2178,10 +2269,27 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 15,
-              color: filled ? Colors.white : palette.textSec,
+            SizedBox(
+              width: 15,
+              height: 15,
+              child: isLoading
+                  ? Center(
+                      child: SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            filled ? Colors.white : palette.accent,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      icon,
+                      size: 15,
+                      color: filled ? Colors.white : palette.textSec,
+                    ),
             ),
             const SizedBox(width: 8),
             Text(

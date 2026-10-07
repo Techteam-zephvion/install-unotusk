@@ -136,33 +136,42 @@ class _NotificationPanelState extends State<NotificationPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: item.type == 'success' ? AppColors.live : AppColors.info,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: item.type == 'success' ? AppColors.live : AppColors.info,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              item.title,
-                              style: AppTextStyles.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item.title,
+                                  style: AppTextStyles.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        Text(
-                          item.timestamp,
-                          style: AppTextStyles.mono(fontSize: 10, color: AppColors.textSecondary),
-                        ),
+                        if (item.timestamp.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            item.timestamp,
+                            style: AppTextStyles.mono(fontSize: 10, color: AppColors.textSecondary),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),

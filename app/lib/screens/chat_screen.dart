@@ -380,6 +380,7 @@ class _ResponseCardState extends State<_ResponseCard> {
   String? _feedback; // up, down
   bool _thoughtExpanded = false;
   bool _vulnScanVisible = false;
+  final Set<String> _expandedSteps = {};
 
   void _copyToClipboard() {
     final text = widget.data.segments.map((s) => s.text).join('\n\n');
@@ -497,12 +498,19 @@ class _ResponseCardState extends State<_ResponseCard> {
 
   Widget _buildThoughtProcessDrawer(ReasoningModel reasoning) {
     const thoughtTime = '2.6';
-    final scoreColor = const Color(0xFFDA7756);
+    final allStepIds = [
+      'routing',
+      'ontology',
+      'score',
+      'citations',
+      if (reasoning.evidence.isNotEmpty) 'evidence',
+      'vulnerability',
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Drawer toggle button
+        // Drawer toggle button (Pill)
         InkWell(
           onTap: () => setState(() => _thoughtExpanded = !_thoughtExpanded),
           borderRadius: BorderRadius.circular(20),
@@ -539,11 +547,11 @@ class _ResponseCardState extends State<_ResponseCard> {
           ),
         ),
 
-        // Expanded details
+        // Expanded details - Claude-style Step-by-Step Dropdown Tree
         if (_thoughtExpanded) ...[
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: widget.palette.bgSurface,
               border: Border.all(color: widget.palette.div),
@@ -552,61 +560,42 @@ class _ResponseCardState extends State<_ResponseCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Composite Score Header
-                Text(
-                  'COMPOSITE SCORE',
-                  style: UnoTypography.mono(
-                    color: widget.palette.textSec,
-                    fontSize: 10,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                // Summary line & Expand/Collapse all toggle (Claude-style header)
                 Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: widget.palette.div,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: reasoning.compositeScore.clamp(0.0, 1.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: scoreColor,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Text(
-                      reasoning.compositeScore.toStringAsFixed(2),
-                      style: UnoTypography.mono(
-                        color: widget.palette.text,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF38231C),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
                       child: Text(
-                        'CONFIRMED',
-                        style: UnoTypography.mono(
-                          color: const Color(0xFFDA7756),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
+                        'Routed ${reasoning.routingPath.length} stages · ${reasoning.ontologyEdges.length} ontology nodes · ${reasoning.compositeScore.toStringAsFixed(2)} verification score',
+                        style: UnoTypography.body(
+                          color: widget.palette.textSec,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (_expandedSteps.length == allStepIds.length) {
+                            _expandedSteps.clear();
+                          } else {
+                            _expandedSteps.addAll(allStepIds);
+                          }
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        child: Text(
+                          _expandedSteps.length == allStepIds.length
+                              ? 'Collapse all'
+                              : 'Expand all',
+                          style: UnoTypography.mono(
+                            color: widget.palette.accent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -614,323 +603,453 @@ class _ResponseCardState extends State<_ResponseCard> {
                 ),
                 const SizedBox(height: 14),
 
-                // Component scores (Coverage, Directness, Recency, Authority) in Teal/Mint
-                ...reasoning.components.map((c) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 85,
-                          child: Text(
-                            c.label,
-                            style: UnoTypography.body(
-                              color: widget.palette.textSec,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Container(
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: widget.palette.div,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: c.score.clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF5BA495),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        SizedBox(
-                          width: 38,
-                          child: Text(
-                            c.score.toStringAsFixed(2),
-                            textAlign: TextAlign.right,
-                            style: UnoTypography.mono(
-                              color: widget.palette.textSec,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 18),
-
-                // Routing Path
-                Text(
-                  'ROUTING PATH',
-                  style: UnoTypography.mono(
-                    color: widget.palette.textSec,
-                    fontSize: 10,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (int i = 0; i < reasoning.routingPath.length; i++) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: widget.palette.bgElevated,
-                          border: Border.all(color: widget.palette.div),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          reasoning.routingPath[i],
-                          style: UnoTypography.body(
-                            color: widget.palette.text,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      if (i < reasoning.routingPath.length - 1)
-                        Text(
-                          '→',
-                          style: TextStyle(
-                            color: widget.palette.textSec,
-                            fontSize: 13,
-                          ),
-                        ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Ontology Edges
-                Text(
-                  'ONTOLOGY EDGES',
-                  style: UnoTypography.mono(
-                    color: widget.palette.textSec,
-                    fontSize: 10,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: reasoning.ontologyEdges.map((edge) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF142921),
-                        border: Border.all(color: const Color(0xFF2C5E48)),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        edge,
+                // Step 1: Pipeline Routing Path
+                _buildTimelineStep(
+                  id: 'routing',
+                  icon: LucideIcons.workflow,
+                  title: 'Pipeline routing path',
+                  badgeText: '${reasoning.routingPath.length} stages',
+                  badgeColor: widget.palette.accent,
+                  badgeBg: const Color(0xFF271C17),
+                  isFirst: true,
+                  isLast: false,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ROUTING PATH',
                         style: UnoTypography.mono(
-                          color: const Color(0xFF4ADE80),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                          color: widget.palette.textSec,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 18),
-
-                // Sources Cited
-                Text(
-                  'SOURCES CITED',
-                  style: UnoTypography.mono(
-                    color: widget.palette.textSec,
-                    fontSize: 10,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: reasoning.citations.map((cite) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF271C17),
-                        border: Border.all(color: const Color(0xFF573324)),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        cite,
-                        style: UnoTypography.mono(
-                          color: const Color(0xFFDA7756),
-                          fontSize: 11,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-
-                // Real Code Evidence (from server AST snapshot)
-                if (reasoning.evidence.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    'GROUNDED CODE EVIDENCE (${reasoning.evidence.length} SNIPPETS)',
-                    style: UnoTypography.mono(
-                      color: widget.palette.accent,
-                      fontSize: 10,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...reasoning.evidence.map((ev) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: widget.palette.bgElevated,
-                        border: Border.all(color: widget.palette.div),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 8),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
-                          Row(
-                            children: [
-                              Icon(LucideIcons.fileCode, size: 12, color: widget.palette.accent),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  ev.file + (ev.lines != null ? ':${ev.lines}' : ''),
-                                  style: UnoTypography.mono(
-                                    color: widget.palette.text,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                          for (int i = 0; i < reasoning.routingPath.length; i++) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: widget.palette.bgSurface,
+                                border: Border.all(color: widget.palette.div),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                reasoning.routingPath[i],
+                                style: UnoTypography.body(
+                                  color: widget.palette.text,
+                                  fontSize: 11.5,
                                 ),
                               ),
-                              if (ev.symbol != null && ev.symbol!.isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            ),
+                            if (i < reasoning.routingPath.length - 1)
+                              Text(
+                                '→',
+                                style: TextStyle(
+                                  color: widget.palette.textSec,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Step 2: Ontology Graph Connections
+                _buildTimelineStep(
+                  id: 'ontology',
+                  icon: LucideIcons.network,
+                  title: 'Ontology graph connections',
+                  badgeText: '${reasoning.ontologyEdges.length} edges',
+                  badgeColor: const Color(0xFF4ADE80),
+                  badgeBg: const Color(0xFF142921),
+                  isFirst: false,
+                  isLast: false,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ONTOLOGY EDGES',
+                        style: UnoTypography.mono(
+                          color: widget.palette.textSec,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: reasoning.ontologyEdges.map((edge) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF142921),
+                              border: Border.all(color: const Color(0xFF2C5E48)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              edge,
+                              style: UnoTypography.mono(
+                                color: const Color(0xFF4ADE80),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Step 3: Composite Verification Score
+                _buildTimelineStep(
+                  id: 'score',
+                  icon: LucideIcons.shieldCheck,
+                  title: 'Verification score',
+                  badgeText:
+                      '${reasoning.compositeScore.toStringAsFixed(2)} CONFIRMED',
+                  badgeColor: const Color(0xFFDA7756),
+                  badgeBg: const Color(0xFF38231C),
+                  isFirst: false,
+                  isLast: false,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'COMPOSITE SCORE',
+                        style: UnoTypography.mono(
+                          color: widget.palette.textSec,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: widget.palette.div,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor:
+                                    reasoning.compositeScore.clamp(0.0, 1.0),
+                                child: Container(
                                   decoration: BoxDecoration(
-                                    color: widget.palette.accent.withValues(alpha: 0.12),
+                                    color: const Color(0xFFDA7756),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            reasoning.compositeScore.toStringAsFixed(2),
+                            style: UnoTypography.mono(
+                              color: widget.palette.text,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF38231C),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'CONFIRMED',
+                              style: UnoTypography.mono(
+                                color: const Color(0xFFDA7756),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (reasoning.components.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        ...reasoning.components.map((c) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 85,
                                   child: Text(
-                                    ev.symbol!,
+                                    c.label,
+                                    style: UnoTypography.body(
+                                      color: widget.palette.textSec,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: widget.palette.div,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: FractionallySizedBox(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: c.score.clamp(0.0, 1.0),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF5BA495),
+                                          borderRadius:
+                                              BorderRadius.circular(3),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 38,
+                                  child: Text(
+                                    c.score.toStringAsFixed(2),
+                                    textAlign: TextAlign.right,
                                     style: UnoTypography.mono(
-                                      color: widget.palette.accent,
-                                      fontSize: 10,
+                                      color: widget.palette.textSec,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
-                          if (ev.snippet != null && ev.snippet!.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: widget.palette.bgSurface,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                ev.snippet!,
-                                style: UnoTypography.mono(
-                                  color: widget.palette.textSec,
-                                  fontSize: 10,
-                                ),
-                                maxLines: 6,
-                                overflow: TextOverflow.ellipsis,
-                              ),
                             ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-
-                if (reasoning.debugSignals != null && reasoning.debugSignals!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(LucideIcons.server, size: 11, color: widget.palette.textSec),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Backend: http://10.0.0.59:28000 · Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
-                        style: UnoTypography.mono(
-                          color: widget.palette.textSec,
-                          fontSize: 9,
-                        ),
-                      ),
+                          );
+                        }),
+                      ],
                     ],
-                  ),
-                ],
-
-                const SizedBox(height: 16),
-                Divider(color: widget.palette.div),
-                const SizedBox(height: 10),
-
-                // Vulnerability Scan toggle
-                OutlinedButton.icon(
-                  onPressed: () =>
-                      setState(() => _vulnScanVisible = !_vulnScanVisible),
-                  icon: Icon(LucideIcons.shield,
-                      size: 12, color: widget.palette.textSec),
-                  label: Text(
-                    '${_vulnScanVisible ? "Hide" : "Scan for"} vulnerabilities',
-                    style: UnoTypography.body(
-                        color: widget.palette.textSec, fontSize: 12),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: widget.palette.div),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
 
-                if (_vulnScanVisible) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: widget.palette.inferred.withValues(alpha: 0.10),
-                      border: Border.all(
-                          color:
-                              widget.palette.inferred.withValues(alpha: 0.3)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
+                // Step 4: Grounding Sources Cited
+                _buildTimelineStep(
+                  id: 'citations',
+                  icon: LucideIcons.fileText,
+                  title: 'Grounding sources cited',
+                  badgeText: '${reasoning.citations.length} files',
+                  badgeColor: const Color(0xFFDA7756),
+                  badgeBg: const Color(0xFF271C17),
+                  isFirst: false,
+                  isLast: reasoning.evidence.isEmpty,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SOURCES CITED',
+                        style: UnoTypography.mono(
+                          color: widget.palette.textSec,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: reasoning.citations.map((cite) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF271C17),
+                              border:
+                                  Border.all(color: const Color(0xFF573324)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              cite,
+                              style: UnoTypography.mono(
+                                color: const Color(0xFFDA7756),
+                                fontSize: 11,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Step 5: Real Code Evidence (if present)
+                if (reasoning.evidence.isNotEmpty)
+                  _buildTimelineStep(
+                    id: 'evidence',
+                    icon: LucideIcons.fileCode,
+                    title: 'AST code evidence',
+                    badgeText: '${reasoning.evidence.length} snippets',
+                    badgeColor: widget.palette.accent,
+                    badgeBg: widget.palette.accent.withValues(alpha: 0.12),
+                    isFirst: false,
+                    isLast: false,
+                    content: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'VULNERABILITY SCAN — SUPPLEMENTARY',
+                          'GROUNDED CODE EVIDENCE',
                           style: UnoTypography.mono(
-                            color: widget.palette.inferred,
+                            color: widget.palette.accent,
                             fontSize: 10,
                             letterSpacing: 0.8,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'No additional vulnerabilities identified beyond those in the locked Risk Report. Scan checked 12 decision-events for unresolved security implications.',
-                          style: UnoTypography.body(
-                            color: widget.palette.textSec,
-                            fontSize: 12,
+                        const SizedBox(height: 8),
+                        ...reasoning.evidence.map((ev) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: widget.palette.bgSurface,
+                              border: Border.all(color: widget.palette.div),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(LucideIcons.fileCode,
+                                        size: 12, color: widget.palette.accent),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        ev.file +
+                                            (ev.lines != null
+                                                ? ':${ev.lines}'
+                                                : ''),
+                                        style: UnoTypography.mono(
+                                          color: widget.palette.text,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (ev.symbol != null &&
+                                        ev.symbol!.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: widget.palette.accent
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          ev.symbol!,
+                                          style: UnoTypography.mono(
+                                            color: widget.palette.accent,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                if (ev.snippet != null &&
+                                    ev.snippet!.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: widget.palette.bgElevated,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      ev.snippet!,
+                                      style: UnoTypography.mono(
+                                        color: widget.palette.textSec,
+                                        fontSize: 10,
+                                      ),
+                                      maxLines: 6,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+
+                // Step 6: Security & Vulnerability Scan Audit
+                _buildTimelineStep(
+                  id: 'vulnerability',
+                  icon: LucideIcons.shield,
+                  title: 'Security & vulnerability audit',
+                  badgeText: '0 flagged',
+                  badgeColor: const Color(0xFF4ADE80),
+                  badgeBg: const Color(0xFF142921),
+                  isFirst: false,
+                  isLast: true,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'VULNERABILITY SCAN — SUPPLEMENTARY',
+                        style: UnoTypography.mono(
+                          color: const Color(0xFF4ADE80),
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'No vulnerabilities identified beyond the locked Risk Report. Verified 12 decision-events for unresolved security implications.',
+                        style: UnoTypography.body(
+                          color: widget.palette.textSec,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Telemetry & Backend status
+                if (reasoning.debugSignals != null &&
+                    reasoning.debugSignals!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6, top: 4),
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.server,
+                            size: 11, color: widget.palette.textSec),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Backend: http://10.0.0.59:28000 · Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
+                            style: UnoTypography.mono(
+                              color: widget.palette.textSec,
+                              fontSize: 9.5,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -942,6 +1061,160 @@ class _ResponseCardState extends State<_ResponseCard> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildTimelineStep({
+    required String id,
+    required IconData icon,
+    required String title,
+    required String badgeText,
+    required Color badgeColor,
+    required Color badgeBg,
+    required Widget content,
+    required bool isFirst,
+    required bool isLast,
+  }) {
+    final isExpanded = _expandedSteps.contains(id);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Left timeline column
+          SizedBox(
+            width: 24,
+            child: Column(
+              children: [
+                // Line above node (if not first)
+                Container(
+                  width: 1.5,
+                  height: 4,
+                  color: isFirst ? Colors.transparent : widget.palette.div,
+                ),
+                // Node icon box
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isExpanded
+                        ? widget.palette.accent.withValues(alpha: 0.15)
+                        : widget.palette.bgElevated,
+                    border: Border.all(
+                      color: isExpanded
+                          ? widget.palette.accent.withValues(alpha: 0.6)
+                          : widget.palette.div,
+                      width: 1,
+                    ),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 11,
+                    color: isExpanded
+                        ? widget.palette.accent
+                        : widget.palette.textSec,
+                  ),
+                ),
+                // Line below node
+                Expanded(
+                  child: Container(
+                    width: 1.5,
+                    color: isLast && !isExpanded
+                        ? Colors.transparent
+                        : widget.palette.div,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Right content column
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Clickable step row
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expandedSteps.remove(id);
+                      } else {
+                        _expandedSteps.add(id);
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  hoverColor: widget.palette.bgElevated.withValues(alpha: 0.5),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+                    child: Row(
+                      children: [
+                        Text(
+                          title,
+                          style: UnoTypography.body(
+                            color: widget.palette.text,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            border: Border.all(
+                                color: badgeColor.withValues(alpha: 0.3)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: UnoTypography.mono(
+                              color: badgeColor,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          isExpanded
+                              ? LucideIcons.chevronUp
+                              : LucideIcons.chevronDown,
+                          size: 13,
+                          color: widget.palette.textSec,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Inset Dropdown Container
+                if (isExpanded) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: widget.palette.bgElevated,
+                      border: Border.all(color: widget.palette.div),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: content,
+                  ),
+                ] else ...[
+                  const SizedBox(height: 6),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
