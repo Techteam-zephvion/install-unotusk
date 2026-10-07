@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/badges.dart';
 import '../widgets/chat_input_box.dart';
+import '../widgets/markdown_text.dart';
 import '../widgets/thinking_scanner.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -325,9 +326,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                msg.text ?? '',
-                style: UnoTypography.body(
+              MarkdownText(
+                text: msg.text ?? '',
+                palette: widget.palette,
+                baseStyle: UnoTypography.body(
                   color: widget.palette.text,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
@@ -409,25 +411,15 @@ class _ResponseCardState extends State<_ResponseCard> {
         if (widget.data.bdd == null) ...[
           ...widget.data.segments.map((seg) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
-                child: RichText(
-                  text: TextSpan(
-                    style: UnoTypography.body(
-                      color: widget.palette.text,
-                      fontSize: 15,
-                      height: 1.7,
-                    ),
-                    children: [
-                      TextSpan(text: seg.text),
-                      if (seg.tag != null)
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: TagBadge(
-                            tag: seg.tag!,
-                            palette: widget.palette,
-                          ),
-                        ),
-                    ],
-                  ),
+                child: MarkdownText(
+                  text: seg.text,
+                  palette: widget.palette,
+                  trailing: seg.tag != null
+                      ? TagBadge(
+                          tag: seg.tag!,
+                          palette: widget.palette,
+                        )
+                      : null,
                 ),
               )),
         ],

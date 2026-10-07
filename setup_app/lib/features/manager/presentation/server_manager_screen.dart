@@ -1,4 +1,5 @@
-import 'repository_manager_screen.dart';
+import '../../ready/data/app_launcher.dart';
+import '../../projects/presentation/server_projects_panel.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -201,25 +202,26 @@ class ServerManagerScreen extends ConsumerWidget {
               runSpacing: 8,
               children: [
                 AppButton(
+                  label: 'Projects & Ports',
+                  icon: Icons.hub_outlined,
+                  onPressed: () => _openProjectsModal(server, context),
+                ),
+                AppButton(
                   label: 'Copy URL',
                   icon: Icons.copy,
                   onPressed: () => _copyUrl(server, context),
+                ),
+                AppButton(
+                  label: 'Open Client',
+                  variant: AppButtonVariant.secondary,
+                  icon: Icons.launch,
+                  onPressed: () => _openClient(server, context),
                 ),
                 AppButton(
                   label: 'Restart',
                   variant: AppButtonVariant.secondary,
                   icon: Icons.refresh,
                   onPressed: () => notifier.restartServer(server),
-                ),
-                AppButton(
-                  label: 'Manage Repos',
-                  variant: AppButtonVariant.secondary,
-                  icon: Icons.folder,
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => RepositoryManagerScreen(server: server)
-                    ));
-                  },
                 ),
                 AppButton(
                   label: 'Stop',
@@ -255,12 +257,62 @@ class ServerManagerScreen extends ConsumerWidget {
   Future<void> _copyUrl(ServerInstance server, BuildContext context) async {
     final url = server.lanUrl;
     if (url.isNotEmpty) {
-      // You need `import 'package:flutter/services.dart';` for Clipboard.
-      // We assume it's imported, or we will add it.
       await Clipboard.setData(ClipboardData(text: url));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied $url to clipboard')));
       }
+    }
+  }
+
+  Future<void> _openProjectsModal(ServerInstance server, BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720, maxHeight: 600),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Server: ${server.name}', style: AppTextStyles.h2),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ServerProjectsPanel(
+                      serverUrl: server.lanUrl,
+                      adminEmail: '',
+                      adminPassword: '',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openClient(ServerInstance server, BuildContext context) async {
+    final launched = await AppLauncher().launchEmployeeApp(serverUrl: server.lanUrl);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Employee Client not found in local build. Connect manually using ${server.lanUrl}'),
+          backgroundColor: AppColors.slate800,
+        ),
+      );
     }
   }
 

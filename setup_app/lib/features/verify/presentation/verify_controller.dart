@@ -65,15 +65,15 @@ class VerifyController extends StateNotifier<VerifyState> {
   }
 
   Future<void> verifyServer() async {
-    final serverUrl = ref.read(configControllerProvider).config.serverUrl;
-    
-    // Import dynamically or pass IP via provider
-    final networkState = ref.read(networkCheckControllerProvider);
-    String? lanUrl;
-    if (networkState.detectedIp != null && networkState.detectedIp!.isNotEmpty) {
-      final port = ref.read(configControllerProvider).config.serverPort;
-      lanUrl = 'http://${networkState.detectedIp}:$port';
-    }
+    final config = ref.read(configControllerProvider).config;
+    final localUrl = 'http://localhost:${config.serverPort}';
+    final detectedLanIp = config.lanIp ?? ref.read(networkCheckControllerProvider).detectedIp;
+    final String? lanUrl = (detectedLanIp != null &&
+            detectedLanIp.isNotEmpty &&
+            detectedLanIp != '127.0.0.1' &&
+            detectedLanIp != 'localhost')
+        ? 'http://$detectedLanIp:${config.serverPort}'
+        : null;
 
     state = state.copyWith(
       isVerifying: true,
@@ -88,46 +88,50 @@ class VerifyController extends StateNotifier<VerifyState> {
     HealthStatus? lastStatus;
     bool localOk = false;
     bool lanOk = false;
-    
-    for (int attempt = 1; attempt <= 30; attempt++) {
+
+    // Up to 45 attempts (allows ample time for initial postgres initdb + alembic migrations)
+    for (int attempt = 1; attempt <= 45; attempt++) {
       if (!localOk) {
-        final localStatus = await healthVerifier.checkHealth(serverUrl);
+        final localStatus = await healthVerifier.checkHealth(localUrl);
         localOk = localStatus.isReady;
         lastStatus = localStatus;
       }
-      
+
       if (lanUrl != null && !lanOk) {
         final lanStatus = await healthVerifier.checkHealth(lanUrl);
         lanOk = lanStatus.isReady;
       } else if (lanUrl == null) {
-        lanOk = true; // Skip if no LAN IP detected
+        lanOk = true; // Skip if no LAN IP
       }
-      
+
       state = state.copyWith(
         attemptCount: attempt,
         healthStatus: lastStatus,
         isLocalHealthy: localOk,
         isLanHealthy: lanOk,
       );
-      
-      if (localOk && lanOk) {
+
+      // Once local health check succeeds and (LAN check succeeds OR attempted at least 15 times)
+      if (localOk && (lanOk || attempt >= 15)) {
         break;
       }
       await Future.delayed(const Duration(seconds: 1));
     }
 
-    if (localOk && lanOk) {
+    if (localOk) {
       state = state.copyWith(
         isVerifying: false,
         isSuccess: true,
         healthStatus: lastStatus,
+        errorMessage: null,
       );
     } else {
       state = state.copyWith(
         isVerifying: false,
         isSuccess: false,
         healthStatus: lastStatus,
-        errorMessage: lastStatus?.errorMessage ?? 'Server startup timed out or LAN blocked.',
+        errorMessage: lastStatus?.errorMessage ??
+            'Server startup timed out after waiting for database and API to become ready.',
       );
     }
   }

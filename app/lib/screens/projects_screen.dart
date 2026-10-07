@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
@@ -68,7 +69,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _connectWorkspaceDialogOpen = false;
   List<ProjectItem> _availableBackendProjects = [];
   bool _isLoadingWorkspaceProjects = false;
-  bool _isRefreshingWorkspaceProjects = false;
 
   final List<ProjectItem> _projects = [];
   bool _isLoadingProjects = true;
@@ -202,10 +202,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       setState(() {
         _isLoadingWorkspaceProjects = true;
       });
-    } else {
-      setState(() {
-        _isRefreshingWorkspaceProjects = true;
-      });
     }
 
     try {
@@ -225,7 +221,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           }
           _availableBackendProjects = updated.isEmpty ? serverProjects : updated;
           _isLoadingWorkspaceProjects = false;
-          _isRefreshingWorkspaceProjects = false;
         });
       }
     } catch (e) {
@@ -235,7 +230,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             _availableBackendProjects = ApiService.cachedProjects;
           }
           _isLoadingWorkspaceProjects = false;
-          _isRefreshingWorkspaceProjects = false;
         });
       }
     }
@@ -1888,7 +1882,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   //  Top Navigation Bar
   // ─────────────────────────────────────────────────
   Widget _buildTopBar(UnoPalette palette, bool isNarrow) {
-    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
     return Container(
       height: 52,

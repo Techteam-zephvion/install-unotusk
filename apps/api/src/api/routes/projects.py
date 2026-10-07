@@ -35,16 +35,26 @@ async def list_projects(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectRead]:
-    # If organization_id is not specified, use user's first organization
-    target_org_id = organization_id
-    if target_org_id is None:
-        user_orgs = await OrgService.list_user_organizations(db, current_user.id)
-        if not user_orgs:
-            return []
-        target_org_id = user_orgs[0].id
+    if organization_id is not None:
+        return await ProjectService.list_projects(db, current_user.id, organization_id)
 
-    # Service verifies user membership in target_org_id and applies RBAC filtering
-    return await ProjectService.list_projects(db, current_user.id, target_org_id)
+    user_orgs = await OrgService.list_user_organizations(db, current_user.id)
+    if not user_orgs:
+        return []
+
+    all_projects: list[ProjectRead] = []
+    seen_ids: set[uuid.UUID] = set()
+    for org in user_orgs:
+        try:
+            org_projects = await ProjectService.list_projects(db, current_user.id, org.id)
+            for p in org_projects:
+                if p.id not in seen_ids:
+                    seen_ids.add(p.id)
+                    all_projects.append(p)
+        except Exception:
+            continue
+
+    return all_projects
 
 
 @router.get("/{project_id}", response_model=ProjectRead)

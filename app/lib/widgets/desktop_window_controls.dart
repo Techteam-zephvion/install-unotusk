@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
@@ -26,7 +27,7 @@ class _DesktopWindowControlsState extends State<DesktopWindowControls>
   @override
   void initState() {
     super.initState();
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       windowManager.addListener(this);
       _checkMaximized();
     }
@@ -41,7 +42,7 @@ class _DesktopWindowControlsState extends State<DesktopWindowControls>
 
   @override
   void dispose() {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       windowManager.removeListener(this);
     }
     super.dispose();
@@ -64,7 +65,7 @@ class _DesktopWindowControlsState extends State<DesktopWindowControls>
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+    if (kIsWeb || (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS)) {
       return const SizedBox.shrink();
     }
 

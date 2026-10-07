@@ -25,10 +25,37 @@ class AuthService:
 
         # Check existing user
         result = await session.execute(select(User).where(User.email == normalized_email))
-        if result.scalar_one_or_none() is not None:
-            raise ConflictException(
-                code="EMAIL_ALREADY_EXISTS",
-                message="A user with this email already exists",
+        existing_user = result.scalar_one_or_none()
+        if existing_user is not None:
+            if existing_user.password_hash:
+                raise ConflictException(
+                    code="EMAIL_ALREADY_EXISTS",
+                    message="A user with this email already exists",
+                )
+            # Activate invited / pre-provisioned user with chosen password
+            if data.name and data.name.strip():
+                existing_user.name = data.name.strip()
+            existing_user.password_hash = hash_password(data.password)
+            session.add(existing_user)
+            await session.commit()
+            await session.refresh(existing_user)
+
+            mem_result = await session.execute(
+                select(OrganizationMembership.organization_id)
+                .where(OrganizationMembership.user_id == existing_user.id)
+                .limit(1)
+            )
+            default_org_id = mem_result.scalar_one_or_none()
+
+            token = create_access_token(
+                subject=str(existing_user.id),
+                extra_claims={"email": existing_user.email},
+            )
+            return TokenResponse(
+                access_token=token,
+                token_type="bearer",
+                user=UserRead.model_validate(existing_user),
+                default_organization_id=default_org_id,
             )
 
         # Create user

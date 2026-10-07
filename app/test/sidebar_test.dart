@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:unotusk_flutter_app/models/models.dart';
-import 'package:unotusk_flutter_app/theme/app_theme.dart';
-import 'package:unotusk_flutter_app/widgets/sidebar.dart';
+import 'package:app/models/models.dart';
+import 'package:app/theme/app_theme.dart';
+import 'package:app/widgets/sidebar.dart';
 
 void main() {
   testWidgets('UnoSidebar collapsed layout is centered and not shifted left',

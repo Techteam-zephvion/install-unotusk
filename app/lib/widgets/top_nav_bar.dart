@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
@@ -42,7 +43,8 @@ class TopNavBar extends StatelessWidget {
             ? 'Kushall-07/$projectName'
             : 'Kushall-07/SyncGuard');
     final displayBranch = branchName ?? 'main';
-    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
     return Container(
       height: 52,

@@ -16,7 +16,8 @@ class VerifyScreen extends ConsumerWidget {
     final verifyState = ref.watch(verifyControllerProvider);
     final verifyNotifier = ref.read(verifyControllerProvider.notifier);
     final wizardNotifier = ref.read(wizardControllerProvider.notifier);
-    final serverUrl = ref.watch(configControllerProvider).config.serverUrl;
+    final serverConfig = ref.watch(configControllerProvider).config;
+    final localUrl = 'http://localhost:${serverConfig.serverPort}';
     final lanUrl = verifyState.lanServerUrl;
 
     return Center(
@@ -48,12 +49,12 @@ class VerifyScreen extends ConsumerWidget {
                             child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                           ),
                           const SizedBox(width: 12),
-                          Text('Waiting for services...', style: AppTextStyles.bodyMedium),
+                          Text('Waiting for services to start...', style: AppTextStyles.bodyMedium),
                         ] else if (verifyState.isSuccess) ...[
                           const Icon(Icons.check_circle, size: 20, color: AppColors.success),
                           const SizedBox(width: 10),
                           Text(
-                            'Services Running',
+                            'Services Running & Healthy',
                             style: AppTextStyles.h2.copyWith(color: AppColors.success),
                           ),
                         ] else ...[
@@ -69,22 +70,42 @@ class VerifyScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 16),
-                    _buildMetricRow('Local Health Check', serverUrl, isSuccess: verifyState.isLocalHealthy),
+                    _buildMetricRow(
+                      'Local Health Check',
+                      localUrl,
+                      isSuccess: verifyState.isLocalHealthy ? true : (verifyState.isVerifying ? null : false),
+                      isChecking: verifyState.isVerifying && !verifyState.isLocalHealthy,
+                    ),
                     if (lanUrl != null) ...[
                       const SizedBox(height: 10),
-                      _buildMetricRow('LAN Health Check', lanUrl, isSuccess: verifyState.isLanHealthy),
+                      _buildMetricRow(
+                        'LAN Health Check',
+                        lanUrl,
+                        isSuccess: verifyState.isLanHealthy ? true : (verifyState.isVerifying ? null : false),
+                        isChecking: verifyState.isVerifying && !verifyState.isLanHealthy,
+                      ),
                     ],
                     const SizedBox(height: 10),
                     _buildMetricRow(
                       'Database',
-                      verifyState.healthStatus?.databaseStatus ?? (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
-                      isSuccess: verifyState.healthStatus?.databaseStatus == 'connected',
+                      verifyState.healthStatus?.databaseStatus ??
+                          (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
+                      isSuccess: verifyState.healthStatus?.databaseStatus == 'connected'
+                          ? true
+                          : (verifyState.isVerifying ? null : false),
+                      isChecking: verifyState.isVerifying &&
+                          verifyState.healthStatus?.databaseStatus != 'connected',
                     ),
                     const SizedBox(height: 10),
                     _buildMetricRow(
                       'Redis Cache & Queue',
-                      verifyState.healthStatus?.redisStatus ?? (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
-                      isSuccess: verifyState.healthStatus?.redisStatus == 'connected',
+                      verifyState.healthStatus?.redisStatus ??
+                          (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
+                      isSuccess: verifyState.healthStatus?.redisStatus == 'connected'
+                          ? true
+                          : (verifyState.isVerifying ? null : false),
+                      isChecking: verifyState.isVerifying &&
+                          verifyState.healthStatus?.redisStatus != 'connected',
                     ),
                   ],
                 ),
@@ -146,7 +167,7 @@ class VerifyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMetricRow(String label, String value, {bool? isSuccess}) {
+  Widget _buildMetricRow(String label, String value, {bool? isSuccess, bool isChecking = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -154,7 +175,14 @@ class VerifyScreen extends ConsumerWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isSuccess != null) ...[
+            if (isChecking) ...[
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+            ] else if (isSuccess != null) ...[
               Icon(
                 isSuccess ? Icons.check_circle_outline : Icons.cancel_outlined,
                 size: 14,
@@ -166,11 +194,13 @@ class VerifyScreen extends ConsumerWidget {
               value,
               style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w600,
-                color: isSuccess == true
-                    ? AppColors.success
-                    : isSuccess == false
-                        ? AppColors.error
-                        : AppColors.slate900,
+                color: isChecking
+                    ? AppColors.slate600
+                    : isSuccess == true
+                        ? AppColors.success
+                        : isSuccess == false
+                            ? AppColors.error
+                            : AppColors.slate900,
               ),
             ),
           ],

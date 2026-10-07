@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
@@ -24,7 +25,7 @@ class WindowTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+    if (kIsWeb || (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS)) {
       return const SizedBox.shrink();
     }
 

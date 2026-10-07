@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from apps.api.src.models.organization import Organization
     from apps.api.src.models.report import ProjectIntelligenceReport
     from apps.api.src.models.repository import Repository
+    from apps.api.src.models.service import Service
 
 
 class Project(Base, UUIDMixin, TimestampMixin):
@@ -63,6 +64,11 @@ class Project(Base, UUIDMixin, TimestampMixin):
     )
     repositories: Mapped[list["Repository"]] = relationship(
         "Repository",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+    services: Mapped[list["Service"]] = relationship(
+        "Service",
         back_populates="project",
         cascade="all, delete-orphan",
     )

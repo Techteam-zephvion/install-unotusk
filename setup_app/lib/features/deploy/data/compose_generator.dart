@@ -6,8 +6,15 @@ class ComposeGenerator {
     final apiKeyVar = config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY";
     final modelVar = config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL";
 
-    final apiImage = "ghcr.io/techteam-zephvion/unotusk-api:$imageVersion";
-    final workerImage = "ghcr.io/techteam-zephvion/unotusk-worker:$imageVersion";
+    final String apiImage;
+    final String workerImage;
+    if (imageVersion == '0.1.0' || imageVersion == 'local') {
+      apiImage = "unotusk-api:0.1.0";
+      workerImage = "unotusk-worker:0.1.0";
+    } else {
+      apiImage = "ghcr.io/techteam-zephvion/unotusk-api:$imageVersion";
+      workerImage = "ghcr.io/techteam-zephvion/unotusk-worker:$imageVersion";
+    }
 
     return '''
 services:
@@ -73,6 +80,7 @@ services:
       - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
       - $apiKeyVar=\${$apiKeyVar}
       - $modelVar=\${$modelVar}
+      - SERVER_PORT=${config.serverPort}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:

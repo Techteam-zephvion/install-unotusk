@@ -30,6 +30,7 @@ from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
 from apps.api.src.models.report import ProjectIntelligenceReport
 from apps.api.src.models.repository import Repository
+from apps.api.src.models.service import Service
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.models.user import User
@@ -66,6 +67,7 @@ __all__ = [
     "Repository",
     "RepositoryFile",
     "RepositorySnapshot",
+    "Service",
     "SnapshotStatus",
     "SymbolType",
     "User",

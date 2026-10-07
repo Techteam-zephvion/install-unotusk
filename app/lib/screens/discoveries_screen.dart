@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/workspace_models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/markdown_text.dart';
 
 /// Discoveries Screen — Lists architecture & security findings, allows filtering,
 /// status updates, detail inspection, and triggering proactive discovery scans.
@@ -570,9 +571,10 @@ class _DiscoveriesScreenState extends State<DiscoveriesScreen> {
             style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
-          Text(
-            finding.description,
-            style: UnoTypography.body(color: p.textSec, fontSize: 12, height: 1.5),
+          MarkdownText(
+            text: finding.description,
+            palette: p,
+            baseStyle: UnoTypography.body(color: p.textSec, fontSize: 13, height: 1.5),
           ),
           const SizedBox(height: 16),
 
@@ -620,9 +622,10 @@ class _DiscoveriesScreenState extends State<DiscoveriesScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: p.div),
               ),
-              child: Text(
-                finding.recommendation,
-                style: UnoTypography.body(color: p.text, fontSize: 12, height: 1.4),
+              child: MarkdownText(
+                text: finding.recommendation,
+                palette: p,
+                baseStyle: UnoTypography.body(color: p.text, fontSize: 13, height: 1.45),
               ),
             ),
             const SizedBox(height: 20),

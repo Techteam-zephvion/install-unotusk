@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dialogs/archived_modal.dart';
@@ -28,7 +29,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize window_manager for desktop platforms
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     await windowManager.ensureInitialized();
 
     const windowOptions = WindowOptions(

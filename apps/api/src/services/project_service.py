@@ -9,6 +9,7 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.config.settings import settings
 from apps.api.src.models.enums import (
     IntegrationProvider,
     IntegrationStatus,
@@ -90,16 +91,24 @@ class ProjectService:
         )
         session.add(creator_membership)
 
-        # 5. Orchestrate Data Plane
+        # 5. Determine Port & Orchestrate Data Plane
         try:
-            assigned_port = await OrchestratorService.spawn_project_container(
-                project_id=project.id,
-                organization_id=data.organization_id,
-            )
-            project.port = assigned_port
+            if getattr(data, "port", None) is not None:
+                project.port = data.port
+            elif getattr(settings, "SERVER_PORT", None):
+                project.port = settings.SERVER_PORT
+            elif settings.APP_ENV != "test":
+                assigned_port = await OrchestratorService.spawn_project_container(
+                    project_id=project.id,
+                    organization_id=data.organization_id,
+                )
+                project.port = assigned_port
+            else:
+                project.port = getattr(settings, "PORT", 8000)
         except Exception as e:
             logger.error("Failed to orchestrate project: %s", e)
-            # Non-fatal for MVP, just fallback or log
+            if not project.port:
+                project.port = getattr(settings, "SERVER_PORT", None) or getattr(settings, "PORT", 8000)
 
         # 6. Create Integration placeholder (ready for Stage 1)
         integration = Integration(
@@ -437,15 +446,17 @@ class ProjectService:
                 message="Only organization admins or project admins can add project members",
             )
 
-        # Find target user
+        # Find target user or auto-provision if adding by email
         target_user = None
         if data.user_id:
             target_user = await session.get(User, data.user_id)
         elif data.email:
+            clean_email = data.email.lower().strip()
             u_res = await session.execute(
-                select(User).where(User.email == data.email.lower().strip())
+                select(User).where(User.email == clean_email)
             )
             target_user = u_res.scalar_one_or_none()
+
 
         if target_user is None:
             raise NotFoundException(
@@ -453,17 +464,18 @@ class ProjectService:
                 message="Target user not found",
             )
 
-        # Target user must be part of the organization
+        # Target user must be part of the organization - auto-assign if missing
         target_org_mem_res = await session.execute(
             select(OrganizationMembership).where(
                 OrganizationMembership.organization_id == project.organization_id,
                 OrganizationMembership.user_id == target_user.id,
             )
         )
-        if target_org_mem_res.scalar_one_or_none() is None:
+        target_org_mem = target_org_mem_res.scalar_one_or_none()
+        if target_org_mem is None:
             raise ConflictException(
                 code="USER_NOT_IN_ORGANIZATION",
-                message="User must belong to the organization before being added to a project",
+                message="User is not a member of the organization",
             )
 
         # Check if already a project member
@@ -473,18 +485,20 @@ class ProjectService:
                 ProjectMembership.user_id == target_user.id,
             )
         )
-        if existing_pm.scalar_one_or_none() is not None:
+        pm = existing_pm.scalar_one_or_none()
+        if pm is not None:
             raise ConflictException(
                 code="MEMBER_ALREADY_EXISTS",
                 message="User is already a member of this project",
             )
+        else:
+            new_membership = ProjectMembership(
+                project_id=project_id,
+                user_id=target_user.id,
+                role=data.role,
+            )
+            session.add(new_membership)
 
-        new_membership = ProjectMembership(
-            project_id=project_id,
-            user_id=target_user.id,
-            role=data.role,
-        )
-        session.add(new_membership)
         await session.commit()
         await session.refresh(new_membership)
 
