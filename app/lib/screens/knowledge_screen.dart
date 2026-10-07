@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/workspace_models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/markdown_text.dart';
 
 /// Knowledge Screen — Project knowledge base, ADRs, business rules, and technical debt notes.
 /// Ported from repo's knowledge_tab using UnoPalette styling.
@@ -557,7 +558,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
           const SizedBox(height: 6),
           Expanded(
             child: Text(
-              item.content,
+              MarkdownText.clean(item.content),
               style: UnoTypography.body(color: p.textSec, fontSize: 12, height: 1.4),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,

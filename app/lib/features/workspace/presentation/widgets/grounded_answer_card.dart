@@ -3,6 +3,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../domain/grounded_answer.dart';
 import 'evidence_citation_chip.dart';
+import '../../../../widgets/markdown_text.dart';
 
 class GroundedAnswerCard extends StatelessWidget {
   final String question;
@@ -83,9 +84,9 @@ class GroundedAnswerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Text Explanation
-                Text(
-                  answer.content,
-                  style: AppTextStyles.bodyMedium.copyWith(
+                MarkdownText(
+                  text: answer.content,
+                  baseStyle: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                     height: 1.55,
                   ),

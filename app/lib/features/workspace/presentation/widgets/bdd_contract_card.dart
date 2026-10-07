@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../../../widgets/markdown_text.dart';
 
 class BDDTestCase {
   final int id;
@@ -169,7 +170,7 @@ class BDDContractCard extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                tc.desc,
+                                MarkdownText.clean(tc.desc),
                                 style: AppTextStyles.inter(fontSize: 13, height: 1.5),
                               ),
                             ),
@@ -212,7 +213,7 @@ class BDDContractCard extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                r.text,
+                                MarkdownText.clean(r.text),
                                 style: AppTextStyles.inter(fontSize: 13, height: 1.5),
                               ),
                             ),
@@ -239,7 +240,7 @@ class BDDContractCard extends StatelessWidget {
         children: [
           Text(label, style: _labelStyle),
           const SizedBox(height: 6),
-          Text(content, style: AppTextStyles.body),
+          Text(MarkdownText.clean(content), style: AppTextStyles.body),
         ],
       ),
     );
