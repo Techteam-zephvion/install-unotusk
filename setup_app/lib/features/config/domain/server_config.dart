@@ -36,8 +36,7 @@ enum LlmProviderType {
 class ServerConfig {
   final String serverName;
   final int serverPort;
-  final String adminEmail;
-  final String adminPassword;
+  final String repoUrl;
   final LlmProviderType llmProvider;
   final String llmApiKey;
   final String authSecret;
@@ -51,8 +50,7 @@ class ServerConfig {
   ServerConfig({
     this.serverName = AppConstants.defaultServerName,
     this.serverPort = AppConstants.defaultPort,
-    this.adminEmail = '',
-    this.adminPassword = '',
+    this.repoUrl = '',
     this.llmProvider = LlmProviderType.groq,
     this.llmApiKey = '',
     String? authSecret,
@@ -93,6 +91,7 @@ class ServerConfig {
     buffer.writeln('REDIS_URL=redis://redis:6379/0');
     buffer.writeln('AUTH_SECRET=$authSecret');
     buffer.writeln('NEXT_PUBLIC_API_URL=$serverUrl');
+    if (repoUrl.isNotEmpty) buffer.writeln('TARGET_REPO_URL=$repoUrl');
     buffer.writeln('LLM_PROVIDER=${llmProvider == LlmProviderType.groq ? "groq" : "claude"}');
 
     if (llmProvider == LlmProviderType.groq) {
@@ -109,8 +108,7 @@ class ServerConfig {
   ServerConfig copyWith({
     String? serverName,
     int? serverPort,
-    String? adminEmail,
-    String? adminPassword,
+    String? repoUrl,
     LlmProviderType? llmProvider,
     String? llmApiKey,
     String? authSecret,
@@ -124,8 +122,7 @@ class ServerConfig {
     return ServerConfig(
       serverName: serverName ?? this.serverName,
       serverPort: serverPort ?? this.serverPort,
-      adminEmail: adminEmail ?? this.adminEmail,
-      adminPassword: adminPassword ?? this.adminPassword,
+      repoUrl: repoUrl ?? this.repoUrl,
       llmProvider: llmProvider ?? this.llmProvider,
       llmApiKey: llmApiKey ?? this.llmApiKey,
       authSecret: authSecret ?? this.authSecret,

@@ -19,8 +19,7 @@ class ConfigScreen extends ConsumerStatefulWidget {
 class _ConfigScreenState extends ConsumerState<ConfigScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _portController;
-  late final TextEditingController _emailController;
-  late final TextEditingController _passwordController;
+  late final TextEditingController _repoUrlController;
   late final TextEditingController _apiKeyController;
 
   @override
@@ -29,8 +28,7 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
     final config = ref.read(configControllerProvider).config;
     _nameController = TextEditingController(text: config.serverName);
     _portController = TextEditingController(text: config.serverPort.toString());
-    _emailController = TextEditingController(text: config.adminEmail);
-    _passwordController = TextEditingController(text: config.adminPassword);
+    _repoUrlController = TextEditingController(text: config.repoUrl);
     _apiKeyController = TextEditingController(text: config.llmApiKey);
   }
 
@@ -38,8 +36,7 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
   void dispose() {
     _nameController.dispose();
     _portController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
+    _repoUrlController.dispose();
     _apiKeyController.dispose();
     super.dispose();
   }
@@ -98,28 +95,20 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    
                     const Divider(),
                     const SizedBox(height: 16),
-                    Text('Initial Admin User', style: AppTextStyles.h3),
+                    Text('Repository Configuration', style: AppTextStyles.h3),
                     const SizedBox(height: 12),
                     AppTextField(
-                      label: 'Admin Email',
-                      hintText: 'admin@company.com',
-                      controller: _emailController,
-                      errorText: configState.emailError,
-                      keyboardType: TextInputType.emailAddress,
-                      onChanged: configNotifier.updateAdminEmail,
-                    ),
-                    const SizedBox(height: 12),
-                    AppTextField(
-                      label: 'Admin Password',
-                      hintText: 'Minimum 8 characters',
-                      obscureText: true,
-                      controller: _passwordController,
-                      errorText: configState.passwordError,
-                      onChanged: configNotifier.updateAdminPassword,
+                      label: 'Target Repository URL',
+                      hintText: 'https://github.com/org/repo',
+                      controller: _repoUrlController,
+                      errorText: configState.repoUrlError,
+                      onChanged: configNotifier.updateRepoUrl,
                     ),
                     const SizedBox(height: 16),
+
                     const Divider(),
                     const SizedBox(height: 16),
                     Text('Intelligence & LLM Engine', style: AppTextStyles.h3),

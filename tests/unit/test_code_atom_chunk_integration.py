@@ -12,7 +12,6 @@ from apps.api.src.models.enums import SymbolType
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.schemas.code_atom import (
-    CodeChangeType,
     GitCommitArtifact,
 )
 from apps.api.src.services.code_atom import (

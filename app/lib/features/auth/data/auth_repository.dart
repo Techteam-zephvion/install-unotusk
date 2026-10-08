@@ -62,6 +62,8 @@ class AuthRepository {
 
     await _storage.setAuthToken(token);
     await _storage.setUserData(jsonEncode(user.toJson()));
+    await _storage.setSavedEmail(email);
+    await _storage.setSavedPassword(password);
 
     return (token: token, user: user);
   }
@@ -102,6 +104,8 @@ class AuthRepository {
 
     await _storage.setAuthToken(token);
     await _storage.setUserData(jsonEncode(user.toJson()));
+    await _storage.setSavedEmail(email);
+    await _storage.setSavedPassword(password);
 
     return (token: token, user: user);
   }

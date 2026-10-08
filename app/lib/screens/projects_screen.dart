@@ -755,7 +755,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                 shrinkWrap: true,
                                 padding: const EdgeInsets.all(8),
                                 itemCount: _availableBackendProjects.length,
-                                separatorBuilder: (_, _) =>
+                                separatorBuilder: (_, unused) =>
                                     const SizedBox(height: 6),
                                 itemBuilder: (context, idx) {
                                   final project =
@@ -1718,7 +1718,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 6, horizontal: 8),
                                   itemCount: _projectMembers.length,
-                                  separatorBuilder: (_, _) => Divider(
+                                  separatorBuilder: (_, unused) => Divider(
                                     height: 1,
                                     color: palette.div,
                                   ),

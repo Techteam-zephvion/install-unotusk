@@ -1,5 +1,4 @@
 import '../../ready/data/app_launcher.dart';
-import '../../projects/presentation/server_projects_panel.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -289,12 +288,7 @@ class ServerManagerScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    ServerProjectsPanel(
-                      serverUrl: server.lanUrl,
-                      adminEmail: '',
-                      adminPassword: '',
-                    ),
-                  ],
+                                      ],
                 ),
               ),
             ),

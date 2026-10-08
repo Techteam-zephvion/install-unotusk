@@ -32,8 +32,8 @@ void main() {
 
     test('generateEnvFileContent generates strong random secrets and masks values safely', () {
       final config = ServerConfig(
-        adminEmail: 'admin@company.com',
-        adminPassword: 'SuperSecurePassword123!',
+        repoUrl: 'admin@company.com',
+        
         llmApiKey: 'gsk_supersecretapikeyforgroq123456',
       );
 

@@ -62,7 +62,10 @@ class ApiClient {
         },
         onError: (DioException error, handler) async {
           if (error.response?.statusCode == 401) {
-            onUnauthorized?.call();
+            final path = error.requestOptions.path;
+            if (!path.contains('/auth/login') && !path.contains('/auth/signup')) {
+              onUnauthorized?.call();
+            }
           }
           return handler.next(error);
         },

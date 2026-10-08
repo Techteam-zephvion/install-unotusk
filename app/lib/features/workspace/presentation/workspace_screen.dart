@@ -5,6 +5,9 @@ import '../../../core/network/api_client.dart';
 import '../../../core/widgets/sidebar_scaffold.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../projects/presentation/projects_controller.dart';
+import '../../projects/data/project_repository.dart';
+import '../../connection/data/local_registry_service.dart';
+import '../../../core/storage/storage_service.dart';
 import 'workspace_controller.dart';
 import 'tabs/ask_tab.dart';
 import 'tabs/spec_history_tab.dart';
@@ -78,28 +81,80 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
     }
   }
 
-  void _handleSelectProject(String newProjectId) {
-    context.go('/projects/$newProjectId');
+  void _handleSelectServer(String targetServerId, List<LocalServer> servers) async {
+    final server = servers.firstWhere((s) => s.id == targetServerId);
+    
+    final storage = ref.read(storageServiceProvider);
+    final email = storage.getSavedEmail();
+    final password = storage.getSavedPassword();
+
+    if (email == null || password == null) {
+      _handleLogOut();
+      return;
+    }
+
+    final newUrl = 'http://127.0.0.1:${server.apiPort}';
+    storage.setServerUrl(newUrl);
+    _apiClient?.updateBaseUrl(newUrl);
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final authController = ref.read(authControllerProvider.notifier);
+    bool success = await authController.login(email: email, password: password);
+    if (!success) {
+      success = await authController.signup(
+        name: 'Admin',
+        email: email,
+        password: password,
+      );
+    }
+
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop(); // hide loading
+      if (success) {
+        final projectRepo = ref.read(projectRepositoryProvider);
+        try {
+          final projs = await projectRepo.getProjects();
+          if (mounted) {
+            if (projs.isNotEmpty) {
+              context.go('/projects/${projs.first.id}');
+            } else {
+              ref.invalidate(projectsProvider);
+              context.go('/'); 
+            }
+          }
+        } catch (_) {
+          if (mounted) context.go('/');
+        }
+      } else {
+        _handleLogOut();
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
-    final userName = authState.user?.name ?? 'Naren D';
+    final userName = authState.user?.name ?? 'Admin';
     final userOrg = 'Unotusk Corp';
 
     // Watch project context and available projects
     final contextAsync = ref.watch(projectContextProvider(widget.projectId));
-    final projectsAsync = ref.watch(projectsProvider);
+    final serversAsync = ref.watch(localServersProvider);
     final conversationsAsync = ref.watch(projectConversationsProvider(widget.projectId));
 
     final projectName = contextAsync.whenOrNull(data: (ctx) => ctx.repository?.fullName ?? ctx.repository?.name) ??
-        'Unotusk Core API';
+        'Unotusk Project';
     final projectBranch = contextAsync.whenOrNull(data: (ctx) => ctx.repository?.defaultBranch ?? ctx.activeSnapshot?.branch ?? 'main');
 
-    final availableProjects = projectsAsync.whenOrNull(
-      data: (projects) => projects.map((p) => (id: p.id, name: p.name)).toList(),
-    );
+    final serverList = serversAsync.whenOrNull(data: (servers) => servers) ?? [];
+    final availableServers = serverList.map((s) => (id: s.id, name: s.name, port: s.apiPort)).toList();
 
     final recentChats = conversationsAsync.whenOrNull(
       data: (threads) => threads.map((t) => t.title.isNotEmpty ? t.title : 'Investigation').toList(),
@@ -113,8 +168,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
       recentChats: recentChats,
       projectName: projectName,
       projectBranch: projectBranch,
-      availableProjects: availableProjects,
-      onSelectProject: _handleSelectProject,
+      availableServers: availableServers,
+      onSelectServer: (id) => _handleSelectServer(id, serverList),
       userName: userName,
       userOrg: userOrg,
       onLogOut: _handleLogOut,
