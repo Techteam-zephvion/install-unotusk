@@ -701,43 +701,51 @@ class _ClaudeCallout extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: bgCol,
         borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: borderCol, width: 4),
-          top: BorderSide(color: p.div, width: 0.6),
-          right: BorderSide(color: p.div, width: 0.6),
-          bottom: BorderSide(color: p.div, width: 0.6),
-        ),
+        border: Border.all(color: p.div, width: 0.8),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: borderCol),
-              const SizedBox(width: 8),
-              Text(
-                node.kind.toUpperCase(),
-                style: UnoTypography.mono(
-                  color: borderCol,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 4, color: borderCol),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(icon, size: 14, color: borderCol),
+                        const SizedBox(width: 8),
+                        Text(
+                          node.kind.toUpperCase(),
+                          style: UnoTypography.mono(
+                            color: borderCol,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    _InlineRichText(
+                      text: node.text,
+                      palette: p,
+                      style: baseStyle.copyWith(fontSize: 14, height: 1.5),
+                      onLinkTap: onLinkTap,
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          _InlineRichText(
-            text: node.text,
-            palette: p,
-            style: baseStyle.copyWith(fontSize: 14, height: 1.5),
-            onLinkTap: onLinkTap,
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
