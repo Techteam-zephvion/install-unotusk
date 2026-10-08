@@ -158,7 +158,7 @@ class _TeamManagementScreenState extends ConsumerState<TeamManagementScreen> {
 
                   return ListView.separated(
                     itemCount: filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    separatorBuilder: (_, unused) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final member = filtered[index];
                       final isCurrentUser = member.userId == authState.user?.id;

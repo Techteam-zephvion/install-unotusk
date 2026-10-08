@@ -259,7 +259,7 @@ class _ManageProjectTeamDialogState
 
                     return ListView.separated(
                       itemCount: members.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      separatorBuilder: (_, unused) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final member = members[index];
                         final initial = (member.displayName.isNotEmpty
