@@ -8,6 +8,7 @@ import '../../app/theme/theme_controller.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/connection/presentation/connection_controller.dart';
 import '../../features/connection/presentation/server_switcher.dart';
+import '../update/update_banner.dart';
 import 'status_badge.dart';
 import 'unotusk_mark.dart';
 
@@ -318,6 +319,9 @@ class DesktopScaffold extends ConsumerWidget {
               ],
             ),
           ),
+
+          // Release Update Banner (shown when a newer version is available)
+          const UpdateBanner(),
 
           // Main Content Area
           Expanded(child: body),
