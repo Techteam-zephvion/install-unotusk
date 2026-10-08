@@ -76,6 +76,10 @@ class CodeChunkRead(BaseModel):
     content: str
     start_line: int
     end_line: int
+    commit_sha: str | None = None
+    commit_message: str | None = None
+    fingerprint: str | None = None
+    provenance: dict[str, Any] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

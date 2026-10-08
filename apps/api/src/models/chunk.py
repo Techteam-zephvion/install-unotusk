@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -117,6 +117,24 @@ class CodeChunk(Base, UUIDMixin):
     )
     embedding: Mapped[list[float] | None] = mapped_column(
         CompatibleVector,
+        nullable=True,
+    )
+    commit_sha: Mapped[str | None] = mapped_column(
+        String(40),
+        nullable=True,
+        index=True,
+    )
+    commit_message: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    fingerprint: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+    )
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
