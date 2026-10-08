@@ -6,6 +6,7 @@ from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.schemas.code_atom import AtomicCodeChange
+from apps.api.src.services.code_atom.embedding import generate_atom_code_embedding
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,7 @@ def map_atomic_code_change_to_code_chunk(
     snapshot_id: uuid.UUID,
     file_id: uuid.UUID,
     symbol_id: uuid.UUID | None = None,
+    compute_embedding: bool = True,
 ) -> CodeChunk:
     """
     Maps a canonical AtomicCodeChange into an existing CodeChunk model instance.
@@ -29,7 +31,7 @@ def map_atomic_code_change_to_code_chunk(
     - Reuses existing CodeChunk schema without divergence.
     - Preserves deterministic fingerprint, parent commit SHA, message, and full provenance.
     - Resolves start/end line bounds appropriately.
-    - Does NOT compute or set vector embeddings (deferred per specification).
+    - Generates and populates 1536-dim vector embedding when compute_embedding is True.
     """
     # Calculate line boundaries
     start_line = (
@@ -62,6 +64,19 @@ def map_atomic_code_change_to_code_chunk(
     prov_data["atom_id"] = change.id
     prov_data["fingerprint"] = change.fingerprint
 
+    # Generate embedding if requested
+    embedding_vec: list[float] | None = None
+    if compute_embedding:
+        try:
+            embedding_vec = generate_atom_code_embedding(
+                commit_message=change.commit_message,
+                content=change.raw_content,
+                file_path=change.file_path,
+                symbol_name=change.symbol_name,
+            )
+        except Exception:
+            embedding_vec = None
+
     return CodeChunk(
         id=chunk_id,
         snapshot_id=snapshot_id,
@@ -77,7 +92,7 @@ def map_atomic_code_change_to_code_chunk(
         commit_message=change.commit_message,
         fingerprint=change.fingerprint,
         provenance=prov_data,
-        embedding=None,
+        embedding=embedding_vec,
     )
 
 
@@ -87,6 +102,8 @@ def resolve_and_map_atomic_changes(
     files_map: dict[str, RepositoryFile],
     symbols_map: dict[str, CodeSymbol] | None = None,
     session: "AsyncSession | None" = None,
+    compute_embedding: bool = True,
+    existing_chunks_by_fingerprint: dict[str, CodeChunk] | None = None,
 ) -> list[CodeChunk]:
     """
     Resolves entity links (Snapshot, RepositoryFile, CodeSymbol) and maps AtomicCodeChange units
@@ -96,6 +113,8 @@ def resolve_and_map_atomic_changes(
     - Never creates duplicate RepositoryFile entities.
     - If a symbol cannot be resolved, leaves symbol_id=None.
     - Preserves all provenance, fingerprint, and commit context.
+    - Computes and populates 1536-dim embeddings when compute_embedding is True.
+    - Reuses existing chunks by fingerprint when provided to avoid re-embedding.
     """
     mapped_chunks: list[CodeChunk] = []
     # Build a normalized path lookup map for fast resolution: normalized_path -> RepositoryFile
@@ -104,6 +123,11 @@ def resolve_and_map_atomic_changes(
         norm_files[p.replace("\\", "/").strip().lstrip("/")] = rf
 
     for change in changes:
+        # Avoid re-embedding or creating duplicate chunks if already present
+        if existing_chunks_by_fingerprint and change.fingerprint in existing_chunks_by_fingerprint:
+            mapped_chunks.append(existing_chunks_by_fingerprint[change.fingerprint])
+            continue
+
         clean_path = change.file_path.replace("\\", "/").strip().lstrip("/")
         repo_file = norm_files.get(clean_path)
 
@@ -148,6 +172,7 @@ def resolve_and_map_atomic_changes(
             snapshot_id=snapshot_id,
             file_id=repo_file.id,
             symbol_id=resolved_symbol_id,
+            compute_embedding=compute_embedding,
         )
         mapped_chunks.append(chunk)
 

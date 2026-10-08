@@ -140,7 +140,8 @@ def test_commit_to_atomic_changes_and_code_chunks():
     assert chunk.fingerprint == atomic_change.fingerprint
     assert chunk.chunk_type == "ATOM_MODIFY"
     assert "test_" in chunk.content
-    assert chunk.embedding is None
+    assert chunk.embedding is not None
+    assert len(chunk.embedding) == 1536
 
 
 def test_atomic_change_to_code_chunk_mapping():
@@ -187,7 +188,8 @@ def test_atomic_change_to_code_chunk_mapping():
     assert chunk.fingerprint == change.fingerprint
     assert chunk.provenance["symbol_name"] == "authenticate_token"
     assert chunk.provenance["atom_id"] == change.id
-    assert chunk.embedding is None
+    assert chunk.embedding is not None
+    assert len(chunk.embedding) == 1536
 
 
 def test_commit_message_preservation():
@@ -648,7 +650,11 @@ async def test_ingestion_service_ingest_commit_atom_changes():
     mock_sym_res = MagicMock()
     mock_sym_res.all.return_value = [(code_sym, "apps/api/src/auth.py")]
 
-    mock_session.execute.side_effect = [mock_file_res, mock_sym_res]
+    # Mock existing chunks query response
+    mock_chunks_res = MagicMock()
+    mock_chunks_res.scalars.return_value.all.return_value = []
+
+    mock_session.execute.side_effect = [mock_file_res, mock_sym_res, mock_chunks_res]
 
     commit = GitCommitArtifact(
         commit_sha="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
@@ -666,5 +672,7 @@ async def test_ingestion_service_ingest_commit_atom_changes():
     assert chunks[0].chunk_type == "ATOM_MODIFY"
     assert chunks[0].commit_sha == "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
     assert chunks[0].symbol_id == sym_id
+    assert chunks[0].embedding is not None
+    assert len(chunks[0].embedding) == 1536
     mock_session.add.assert_called_once()
     mock_session.flush.assert_awaited_once()

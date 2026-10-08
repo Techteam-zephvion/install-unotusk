@@ -2,6 +2,7 @@ import hashlib
 import re
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +70,22 @@ class RetrievedCandidate:
     file_id: uuid.UUID
     symbol_id: uuid.UUID | None = None
     signals: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
+    meta: dict[str, Any] = {}
+    if getattr(chunk, "commit_sha", None):
+        meta["commit_sha"] = chunk.commit_sha
+    if getattr(chunk, "commit_message", None):
+        meta["commit_message"] = chunk.commit_message
+    if getattr(chunk, "fingerprint", None):
+        meta["fingerprint"] = chunk.fingerprint
+    if getattr(chunk, "provenance", None):
+        meta["provenance"] = chunk.provenance
+    if getattr(chunk, "chunk_type", None):
+        meta["chunk_type"] = chunk.chunk_type
+    return meta
 
 
 DEFINITION_PATTERN = re.compile(
@@ -260,10 +277,13 @@ class MultiSignalRetriever:
                 else:
                     content_score = 0.6
 
+                chunk_meta = _extract_chunk_metadata(chunk)
                 if cid in candidates:
                     candidates[cid].signals["content_match"] = max(
                         candidates[cid].signals.get("content_match", 0.0), content_score
                     )
+                    if chunk_meta:
+                        candidates[cid].metadata.update(chunk_meta)
                 else:
                     candidates[cid] = RetrievedCandidate(
                         candidate_id=cid,
@@ -276,6 +296,7 @@ class MultiSignalRetriever:
                         file_id=chunk.file_id,
                         symbol_id=chunk.symbol_id,
                         signals={"content_match": content_score},
+                        metadata=chunk_meta,
                     )
 
         # 4. DEPENDENCY SEARCH: Match packages and imported modules
@@ -320,7 +341,15 @@ class MultiSignalRetriever:
             if analyzed_query.concept_keywords:
                 query_parts.extend(analyzed_query.concept_keywords)
             if query_parts:
-                effective_query_embedding = generate_text_embedding(" ".join(query_parts))
+                query_text = " ".join(query_parts)
+                try:
+                    from apps.api.src.services.code_atom.embedding import generate_code_embedding
+
+                    effective_query_embedding = generate_code_embedding(
+                        query_text, input_type="query"
+                    )
+                except Exception:
+                    effective_query_embedding = generate_text_embedding(query_text)
 
         if effective_query_embedding is not None:
             vec_stmt = (
@@ -342,11 +371,14 @@ class MultiSignalRetriever:
             scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)
             for sim, chunk in scored_vector_chunks[:limit_per_signal]:
                 cid = f"chunk:{chunk.id}"
+                chunk_meta = _extract_chunk_metadata(chunk)
                 if cid in candidates:
                     candidates[cid].signals["vector_similarity"] = sim
                     candidates[cid].signals["semantic_match"] = max(
                         candidates[cid].signals.get("semantic_match", 0.0), sim
                     )
+                    if chunk_meta:
+                        candidates[cid].metadata.update(chunk_meta)
                 else:
                     candidates[cid] = RetrievedCandidate(
                         candidate_id=cid,
@@ -359,6 +391,7 @@ class MultiSignalRetriever:
                         file_id=chunk.file_id,
                         symbol_id=chunk.symbol_id,
                         signals={"vector_similarity": sim, "semantic_match": sim},
+                        metadata=chunk_meta,
                     )
 
         # 6. SEMANTIC / CONCEPT SEARCH: Match domain concept synonyms across chunks and symbols
@@ -381,10 +414,13 @@ class MultiSignalRetriever:
                 concept_chunk_res = await session.execute(concept_chunk_stmt)
                 for chunk in concept_chunk_res.scalars().all():
                     cid = f"chunk:{chunk.id}"
+                    chunk_meta = _extract_chunk_metadata(chunk)
                     if cid in candidates:
                         candidates[cid].signals["semantic_match"] = max(
                             candidates[cid].signals.get("semantic_match", 0.0), 0.85
                         )
+                        if chunk_meta:
+                            candidates[cid].metadata.update(chunk_meta)
                     else:
                         candidates[cid] = RetrievedCandidate(
                             candidate_id=cid,
@@ -397,6 +433,7 @@ class MultiSignalRetriever:
                             file_id=chunk.file_id,
                             symbol_id=chunk.symbol_id,
                             signals={"semantic_match": 0.85},
+                            metadata=chunk_meta,
                         )
 
             # Match concept keywords in symbols

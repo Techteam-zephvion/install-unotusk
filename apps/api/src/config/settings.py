@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # Context Budget
     CONTEXT_BUDGET_TOKENS: int = Field(default=3500)
 
+    # Code-Lane Embedding Settings ('voyage' or 'development')
+    EMBEDDING_PROVIDER: str = Field(default="development")
+    VOYAGE_API_KEY: str | None = Field(default=None)
+    VOYAGE_MODEL: str = Field(default="voyage-code-2")
+    EMBEDDING_DIMENSION: int = Field(default=1536)
+
     # Data Plane Isolation (set when running as dedicated project container)
     DATA_PLANE_PROJECT_ID: str | None = Field(default=None)
     DATA_PLANE_ORG_ID: str | None = Field(default=None)

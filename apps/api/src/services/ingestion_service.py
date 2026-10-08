@@ -540,17 +540,33 @@ class IngestionService:
         decomposer = CodeAtomDecomposer()
         decomp_result = decomposer.decompose(commit_artifact, symbol_catalog=symbol_catalog)
 
-        # 4. Map into CodeChunk instances with entity resolution
+        # 3.5 Check for existing chunks by fingerprint to avoid redundant re-embedding
+        fingerprints = [c.fingerprint for c in decomp_result.changes if c.fingerprint]
+        existing_chunks_by_fingerprint: dict[str, CodeChunk] = {}
+        if fingerprints:
+            existing_stmt = select(CodeChunk).where(
+                CodeChunk.snapshot_id == snapshot_id,
+                CodeChunk.fingerprint.in_(fingerprints),
+            )
+            existing_res = await session.execute(existing_stmt)
+            for ec in existing_res.scalars().all():
+                if ec.fingerprint:
+                    existing_chunks_by_fingerprint[ec.fingerprint] = ec
+
+        # 4. Map into CodeChunk instances with entity resolution and embedding generation
         atom_chunks = resolve_and_map_atomic_changes(
             changes=decomp_result.changes,
             snapshot_id=snapshot_id,
             files_map=files_map,
             symbols_map=symbols_map,
             session=session,
+            compute_embedding=True,
+            existing_chunks_by_fingerprint=existing_chunks_by_fingerprint,
         )
 
         for chunk in atom_chunks:
-            session.add(chunk)
+            if chunk.fingerprint not in existing_chunks_by_fingerprint:
+                session.add(chunk)
 
         await session.flush()
         return atom_chunks
