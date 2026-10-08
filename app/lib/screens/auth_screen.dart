@@ -239,6 +239,8 @@ class _AuthScreenState extends State<AuthScreen> {
         return _buildSignIn();
       case 'create-org':
         return _buildCreateOrg();
+      case 'server-list':
+        return _buildServerList();
       case 'entry':
       default:
         return _buildEntry();
@@ -496,16 +498,16 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         const SizedBox(height: 9),
 
-        // 3. Configure custom OIDC issuer (matches Image 2, opens Image 3)
+        // 3. Select workspace/server (matches Image 2, opens server list)
         _buildProviderButton(
           icon: Icon(
             LucideIcons.arrowLeftRight,
             size: 15,
             color: widget.palette.textSec,
           ),
-          label: 'Configure custom OIDC issuer',
+          label: 'Create workspace',
           onTap: () {
-            setState(() => _state = 'create-org');
+            setState(() => _state = 'server-list');
           },
         ),
 
@@ -760,6 +762,141 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 8),
 
         // Back button
+        TextButton(
+          onPressed: () => setState(() => _state = 'entry'),
+          child: Text(
+            'Back',
+            style: UnoTypography.body(
+              color: widget.palette.textSec,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────
+  //  Screen 2B: Server List
+  // ─────────────────────────────────────────────────
+  Widget _buildServerList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Select project server',
+          style: UnoTypography.brandSerif(
+            palette: widget.palette,
+            fontSize: 24,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Choose a running workspace instance to connect to.',
+          style: UnoTypography.body(
+            color: widget.palette.textSec,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        FutureBuilder<List<ProjectItem>>(
+          future: ApiService.fetchProjects(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 100,
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Could not connect to registry: ${snapshot.error}',
+                  style: UnoTypography.body(color: Colors.red.shade300, fontSize: 13),
+                ),
+              );
+            }
+
+            final servers = snapshot.data ?? [];
+            if (servers.isEmpty) {
+              return Text(
+                'No running servers found.',
+                style: UnoTypography.body(color: widget.palette.textSec, fontSize: 13),
+              );
+            }
+
+            return Column(
+              children: servers.map((project) {
+                final port = project.port ?? 28000;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    onTap: () {
+                      final uri = Uri.parse(ApiService.baseUrl);
+                      ApiService.serverHost = '${uri.host}:$port';
+                      ApiService.baseUrl = 'http://${ApiService.serverHost}';
+                      setState(() => _state = 'entry');
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: widget.palette.bgElevated,
+                        border: Border.all(color: widget.palette.div),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.storage, color: widget.palette.textSec, size: 18),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  project.name,
+                                  style: UnoTypography.body(
+                                    color: widget.palette.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Port: $port',
+                                  style: UnoTypography.mono(
+                                    color: widget.palette.textSec,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: widget.palette.textSec, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+
         TextButton(
           onPressed: () => setState(() => _state = 'entry'),
           child: Text(
