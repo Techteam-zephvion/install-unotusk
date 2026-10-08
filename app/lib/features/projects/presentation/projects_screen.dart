@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
@@ -12,11 +13,12 @@ import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state_view.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../domain/project.dart';
 import 'create_project_dialog.dart';
-import 'manage_project_team_dialog.dart';
 import 'projects_controller.dart';
-
+import '../../connection/data/local_registry_service.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/storage/storage_service.dart';
+import '../../projects/data/project_repository.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
@@ -44,7 +46,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final projectsAsync = ref.watch(projectsProvider);
+    final serversAsync = ref.watch(localServersProvider);
     final authState = ref.watch(authControllerProvider);
 
     return DesktopScaffold(
@@ -61,12 +63,12 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Projects', style: AppTextStyles.h1),
+                    Text('Project Servers', style: AppTextStyles.h1),
                     const SizedBox(height: 4),
                     Text(
                       authState.isAdmin
-                          ? 'All software projects across your organization workspace'
-                          : 'Software projects assigned to you in this workspace',
+                          ? 'All unotusk project servers on this machine'
+                          : 'Unotusk servers assigned to you',
                       style: AppTextStyles.bodySmall,
                     ),
                   ],
@@ -77,7 +79,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       text: 'Refresh',
                       icon: Icons.refresh,
                       variant: AppButtonVariant.secondary,
-                      onPressed: () => ref.refresh(projectsProvider),
+                      onPressed: () => ref.refresh(localServersProvider),
                     ),
                     if (authState.isAdmin) ...[
                       const SizedBox(width: 10),
@@ -112,44 +114,38 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
             // Project List Area
             Expanded(
-              child: projectsAsync.when(
-                loading: () => const LoadingStateView(message: 'Loading projects...'),
+              child: serversAsync.when(
+                loading: () =>
+                    const LoadingStateView(message: 'Loading servers...'),
                 error: (err, stack) => ErrorStateView(
                   message: err.toString(),
-                  onRetry: () => ref.refresh(projectsProvider),
+                  onRetry: () => ref.refresh(localServersProvider),
                 ),
-                data: (projects) {
-                  final filtered = projects.where((p) {
+                data: (servers) {
+                  final filtered = servers.where((s) {
                     if (_searchQuery.isEmpty) return true;
-                    return p.name.toLowerCase().contains(_searchQuery) ||
-                        (p.description?.toLowerCase().contains(_searchQuery) ?? false) ||
-                        (p.repositoryName?.toLowerCase().contains(_searchQuery) ?? false);
+                    return s.name.toLowerCase().contains(_searchQuery);
                   }).toList();
 
                   if (filtered.isEmpty) {
                     return EmptyStateView(
-                      icon: Icons.folder_open_outlined,
-                      title: _searchQuery.isEmpty ? 'No projects yet' : 'No matching projects',
+                      icon: Icons.dns_outlined,
+                      title: _searchQuery.isEmpty
+                          ? 'No project servers yet'
+                          : 'No matching servers',
                       description: _searchQuery.isEmpty
-                          ? (authState.isAdmin
-                              ? 'No software repositories have been connected to this workspace yet. Link a codebase to begin exploring architecture and discoveries.'
-                              : 'You have not been assigned to any projects yet. Please contact your organization administrator.')
+                          ? 'Use the Unotusk Setup Wizard to create and deploy a new project server.'
                           : 'Try changing your filter query.',
-                      actionLabel: _searchQuery.isEmpty && authState.isAdmin
-                          ? 'Connect First Codebase'
-                          : null,
-                      onAction: _searchQuery.isEmpty && authState.isAdmin
-                          ? () => _openCreateDialog(context)
-                          : null,
                     );
                   }
 
                   return ListView.separated(
                     itemCount: filtered.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 8),
                     itemBuilder: (context, index) {
-                      final project = filtered[index];
-                      return _ProjectItemCard(project: project);
+                      final server = filtered[index];
+                      return _ServerItemCard(server: server);
                     },
                   );
                 },
@@ -162,19 +158,78 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 }
 
-class _ProjectItemCard extends ConsumerWidget {
-  final Project project;
+class _ServerItemCard extends ConsumerWidget {
+  final LocalServer server;
 
-  const _ProjectItemCard({required this.project});
+  const _ServerItemCard({required this.server});
+
+  void _handleSelectServer(BuildContext context, WidgetRef ref) async {
+    final storage = ref.read(storageServiceProvider);
+    final email = storage.getSavedEmail();
+    final password = storage.getSavedPassword();
+
+    if (email == null || password == null) {
+      ref.read(authControllerProvider.notifier).logout();
+      context.go('/login');
+      return;
+    }
+
+    final newUrl = 'http://127.0.0.1:${server.apiPort}';
+    storage.setServerUrl(newUrl);
+    ref.read(apiClientProvider).updateBaseUrl(newUrl);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final authController = ref.read(authControllerProvider.notifier);
+    bool success = await authController.login(email: email, password: password);
+    if (!success) {
+      success = await authController.signup(
+        name: 'Admin',
+        email: email,
+        password: password,
+      );
+    }
+
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop(); // hide loading
+      if (success) {
+        final projectRepo = ref.read(projectRepositoryProvider);
+        try {
+          final projs = await projectRepo.getProjects();
+          if (context.mounted) {
+            if (projs.isNotEmpty) {
+              context.go('/projects/${projs.first.id}');
+            } else {
+              ref.invalidate(projectsProvider);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Auto-provisioning in progress, please wait...',
+                  ),
+                ),
+              );
+              // Might need to wait for worker
+            }
+          }
+        } catch (_) {
+          // ignore
+        }
+      } else {
+        ref.read(authControllerProvider.notifier).logout();
+        context.go('/login');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authControllerProvider);
-    final canManageTeam = authState.isAdmin || project.isProjectAdmin;
-
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      onTap: () => context.go('/projects/${project.id}'),
+      onTap: () => _handleSelectServer(context, ref),
       child: Row(
         children: [
           Container(
@@ -185,7 +240,11 @@ class _ProjectItemCard extends ConsumerWidget {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: AppColors.slate200),
             ),
-            child: const Icon(Icons.code_outlined, size: 18, color: AppColors.slate700),
+            child: const Icon(
+              Icons.dns_outlined,
+              size: 18,
+              color: AppColors.slate700,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -194,67 +253,37 @@ class _ProjectItemCard extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Text(project.name, style: AppTextStyles.h3),
+                    Text(server.name, style: AppTextStyles.h3),
                     const SizedBox(width: 10),
-                    StatusBadge(
-                      label: project.status,
-                      variant: project.status == 'READY'
-                          ? BadgeVariant.success
-                          : BadgeVariant.neutral,
+                    const StatusBadge(
+                      label: 'RUNNING',
+                      variant: BadgeVariant.success,
                     ),
-                    if (project.role != null) ...[
-                      const SizedBox(width: 6),
-                      StatusBadge(
-                        label: project.role!.toUpperCase(),
-                        variant: project.isProjectAdmin
-                            ? BadgeVariant.info
-                            : BadgeVariant.neutral,
-                      ),
-                    ],
                   ],
                 ),
-                if (project.description != null && project.description!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    project.description!,
-                    style: AppTextStyles.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 4),
+                Text(
+                  'Port: ${server.apiPort}',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.slate400,
                   ),
-                ] else if (project.repositoryName != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    project.repositoryName!,
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate400),
-                  ),
-                ],
+                ),
               ],
             ),
           ),
           const SizedBox(width: 16),
-          if (canManageTeam) ...[
-            OutlinedButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => ManageProjectTeamDialog(project: project),
-                );
-              },
-              icon: const Icon(Icons.group_outlined, size: 14),
-              label: const Text('Team', style: TextStyle(fontSize: 12)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
           Row(
             children: [
-              Text('Open', style: AppTextStyles.label.copyWith(color: AppColors.primary)),
+              Text(
+                'Connect',
+                style: AppTextStyles.label.copyWith(color: AppColors.primary),
+              ),
               const SizedBox(width: 4),
-              const Icon(Icons.arrow_forward, size: 14, color: AppColors.primary),
+              const Icon(
+                Icons.arrow_forward,
+                size: 14,
+                color: AppColors.primary,
+              ),
             ],
           ),
         ],
@@ -262,4 +291,3 @@ class _ProjectItemCard extends ConsumerWidget {
     );
   }
 }
-

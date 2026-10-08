@@ -48,8 +48,17 @@ class StorageService {
     return _prefs.remove(AppConfig.keyUserData);
   }
 
+  String? getSavedEmail() => _prefs.getString('saved_email');
+  Future<bool> setSavedEmail(String email) => _prefs.setString('saved_email', email);
+  
+  String? getSavedPassword() => _prefs.getString('saved_password');
+  Future<bool> setSavedPassword(String password) => _prefs.setString('saved_password', password);
+
   Future<void> clearSession() async {
     await removeAuthToken();
     await removeUserData();
+    await _prefs.remove('saved_email');
+    await _prefs.remove('saved_password');
+    await _prefs.remove(AppConfig.keyServerUrl);
   }
 }

@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     DATA_PLANE_PROJECT_ID: str | None = Field(default=None)
     DATA_PLANE_ORG_ID: str | None = Field(default=None)
     SERVER_PORT: int | None = Field(default=None)
+    TARGET_REPO_URL: str | None = Field(default=None)
 
     @property
     def is_data_plane(self) -> bool:

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import '../domain/server_instance.dart';
@@ -67,17 +68,33 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
           return server.copyWith(lastKnownState: ServerState.stopped);
         }
         
-        // docker compose ps --format json sometimes returns multiple JSON objects (one per line)
-        // or a single array depending on docker version.
         bool hasRunning = false;
         bool hasExited = false;
         
         final lines = out.split('\n');
         for (var line in lines) {
-          if (line.isNotEmpty) {
-            if (line.contains('"State":"running"') || line.contains('"State": "running"')) {
+          if (line.trim().isEmpty) continue;
+          try {
+            final json = jsonDecode(line);
+            if (json is Map) {
+              final state = json['State']?.toString().toLowerCase();
+              final exitCode = json['ExitCode'];
+              final serviceName = json['Service']?.toString() ?? '';
+              
+              if (state == 'running' || state == 'starting' || state == 'created') {
+                hasRunning = true;
+              } else if (serviceName == 'migration' && exitCode == 0) {
+                // Ignore successful migration container
+                continue;
+              } else if (state == 'exited' || state == 'dead' || state == 'failed') {
+                hasExited = true;
+              }
+            }
+          } catch (_) {
+             // Fallback
+            if (line.contains('"State":"running"') || line.contains('"State": "running"') || line.contains('"State":"starting"') || line.contains('"State":"created"')) {
               hasRunning = true;
-            } else {
+            } else if (!line.contains('"Service":"migration"') && !line.contains('"Service": "migration"')) {
               hasExited = true;
             }
           }

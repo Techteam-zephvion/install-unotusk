@@ -7,6 +7,7 @@ import '../../app/theme/app_text_styles.dart';
 import '../../app/theme/theme_controller.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/connection/presentation/connection_controller.dart';
+import '../../features/connection/presentation/server_switcher.dart';
 import 'status_badge.dart';
 import 'unotusk_mark.dart';
 
@@ -70,8 +71,9 @@ class DesktopScaffold extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 28),
-
+                const SizedBox(width: 16),
+                ServerSwitcherButton(isDark: isDark),
+                const SizedBox(width: 16),
                 // Primary Navigation Items (Pill Styled)
                 _NavItem(
                   label: 'Projects',

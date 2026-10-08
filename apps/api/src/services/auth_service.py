@@ -51,6 +51,9 @@ class AuthService:
                 subject=str(existing_user.id),
                 extra_claims={"email": existing_user.email},
             )
+            
+            await AuthService._auto_provision_if_needed(session, existing_user.id, default_org_id)
+            
             return TokenResponse(
                 access_token=token,
                 token_type="bearer",
@@ -89,12 +92,17 @@ class AuthService:
         await session.commit()
         await session.refresh(user)
 
+        await AuthService._auto_provision_if_needed(session, user.id, organization.id)
+
         # Issue token
         token = create_access_token(
             subject=str(user.id),
             extra_claims={"email": user.email},
         )
-
+        
+        if default_org_id:
+            await AuthService._auto_provision_if_needed(session, user.id, default_org_id)
+            
         return TokenResponse(
             access_token=token,
             token_type="bearer",
@@ -126,10 +134,66 @@ class AuthService:
             subject=str(user.id),
             extra_claims={"email": user.email},
         )
-
+        
+        if default_org_id:
+            await AuthService._auto_provision_if_needed(session, user.id, default_org_id)
+            
         return TokenResponse(
             access_token=token,
             token_type="bearer",
             user=UserRead.model_validate(user),
             default_organization_id=default_org_id,
         )
+
+
+    @staticmethod
+    async def _auto_provision_if_needed(session: AsyncSession, user_id: uuid.UUID, organization_id: uuid.UUID) -> None:
+        from apps.api.src.config.settings import settings
+        if settings.TARGET_REPO_URL and settings.TARGET_REPO_URL.strip():
+            # Check if project already exists
+            from apps.api.src.models.project import Project
+            from sqlalchemy import select
+            
+            # Simple check to see if user has any projects
+            result = await session.execute(select(Project).where(Project.organization_id == organization_id))
+            if result.scalars().first() is not None:
+                return # Already provisioned
+                
+            import urllib.parse
+            from apps.api.src.schemas.project import ProjectCreate
+            from apps.api.src.schemas.repository import RepositorySelectRequest
+            from apps.api.src.services.project_service import ProjectService
+            from apps.api.src.services.repository_service import RepositoryService
+            from apps.api.src.services.ingestion_service import IngestionService
+            
+            repo_url = settings.TARGET_REPO_URL.strip()
+            path_parts = urllib.parse.urlparse(repo_url).path.strip("/").split("/")
+            if len(path_parts) >= 2:
+                owner = path_parts[-2]
+                name = path_parts[-1]
+                if name.endswith(".git"):
+                    name = name[:-4]
+            else:
+                owner, name = "default", "repository"
+                
+            try:
+                project_data = ProjectCreate(
+                    name=name,
+                    organization_id=organization_id,
+                    description=f"Auto-provisioned project for {repo_url}",
+                )
+                project = await ProjectService.create_project(session, user_id, project_data)
+                
+                repo_req = RepositorySelectRequest(
+                    external_id=f"{owner}_{name}_{uuid.uuid4().hex[:6]}",
+                    owner=owner,
+                    name=name,
+                    full_name=f"{owner}/{name}",
+                    url=repo_url,
+                )
+                repo = await RepositoryService.select_repository(session, user_id, project.id, repo_req)
+                await IngestionService.trigger_ingestion(session, user.id, project.id, repo.id)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger("unotusk-api")
+                logger.error(f"Failed to auto-provision project from TARGET_REPO_URL: {e}")

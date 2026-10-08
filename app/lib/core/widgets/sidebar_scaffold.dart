@@ -13,8 +13,8 @@ class SidebarScaffold extends StatefulWidget {
   final List<String>? recentChats;
   final String? projectName;
   final String? projectBranch;
-  final List<({String id, String name})>? availableProjects;
-  final ValueChanged<String>? onSelectProject;
+  final List<({String id, String name, int port})>? availableServers;
+  final ValueChanged<String>? onSelectServer;
   final String userName;
   final String userOrg;
   final VoidCallback onLogOut;
@@ -29,8 +29,8 @@ class SidebarScaffold extends StatefulWidget {
     this.recentChats,
     this.projectName,
     this.projectBranch,
-    this.availableProjects,
-    this.onSelectProject,
+    this.availableServers,
+    this.onSelectServer,
     this.userName = 'Naren D',
     this.userOrg = 'Unotusk Corp',
     required this.onLogOut,
@@ -428,7 +428,7 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                           if (widget.projectName != null)
                             Row(
                               children: [
-                                if (widget.availableProjects != null && widget.availableProjects!.length > 1)
+                                if (widget.availableServers != null && widget.availableServers!.isNotEmpty)
                                   PopupMenuButton<String>(
                                     color: AppColors.bgElevated,
                                     offset: const Offset(0, 36),
@@ -436,11 +436,11 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                                       borderRadius: BorderRadius.circular(10),
                                       side: const BorderSide(color: AppColors.divider),
                                     ),
-                                    onSelected: (id) => widget.onSelectProject?.call(id),
-                                    itemBuilder: (context) => widget.availableProjects!.map((p) {
+                                    onSelected: (id) => widget.onSelectServer?.call(id),
+                                    itemBuilder: (context) => widget.availableServers!.map((p) {
                                       return PopupMenuItem(
                                         value: p.id,
-                                        child: Text(p.name, style: AppTextStyles.inter(fontSize: 13)),
+                                        child: Text('${p.name} (Port: ${p.port})', style: AppTextStyles.inter(fontSize: 13)),
                                       );
                                     }).toList(),
                                     child: Container(
