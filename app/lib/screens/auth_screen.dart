@@ -33,7 +33,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _emailController =
       TextEditingController(text: 'lead@acme.com');
   final TextEditingController _passwordController =
-      TextEditingController(text: 'adminpassword123');
+      TextEditingController(text: 'password123');
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _orgController = TextEditingController();
 
