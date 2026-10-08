@@ -415,18 +415,25 @@ class _UnoSidebarState extends State<UnoSidebar> {
             children: [
               Expanded(
                 child: DragToMoveArea(
-                  child: Row(
-                    children: [
-                      UnotuskLogo(size: 22, onDark: isDark),
-                      const SizedBox(width: 9),
-                      Text(
-                        'Unotusk',
-                        style: UnoTypography.brandSerif(
-                          palette: widget.palette,
-                          fontSize: 17,
-                        ),
+                  child: InkWell(
+                    onTap: () => widget.onViewChange('projects'),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      child: Row(
+                        children: [
+                          UnotuskLogo(size: 22, onDark: isDark),
+                          const SizedBox(width: 9),
+                          Text(
+                            'Unotusk',
+                            style: UnoTypography.brandSerif(
+                              palette: widget.palette,
+                              fontSize: 17,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -729,7 +736,14 @@ class _UnoSidebarState extends State<UnoSidebar> {
         const SizedBox(height: 12),
         // Logo
         DragToMoveArea(
-          child: UnotuskLogo(size: 22, onDark: isDark),
+          child: InkWell(
+            onTap: () => widget.onViewChange('projects'),
+            borderRadius: BorderRadius.circular(6),
+            child: Tooltip(
+              message: 'Projects',
+              child: UnotuskLogo(size: 22, onDark: isDark),
+            ),
+          ),
         ),
         const SizedBox(height: 12),
 

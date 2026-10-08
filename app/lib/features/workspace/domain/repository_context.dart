@@ -1,15 +1,19 @@
 class ProjectContextMetrics {
   final int totalFiles;
+  final int totalSloc;
   final int languagesCount;
   final int symbolsCount;
   final int dependenciesCount;
+  final int totalFindings;
   final Map<String, int> languageDistribution;
 
   const ProjectContextMetrics({
     this.totalFiles = 0,
+    this.totalSloc = 0,
     this.languagesCount = 0,
     this.symbolsCount = 0,
     this.dependenciesCount = 0,
+    this.totalFindings = 0,
     this.languageDistribution = const {},
   });
 
@@ -24,9 +28,11 @@ class ProjectContextMetrics {
 
     return ProjectContextMetrics(
       totalFiles: (json['total_files'] as num?)?.toInt() ?? 0,
+      totalSloc: (json['total_sloc'] as num?)?.toInt() ?? 0,
       languagesCount: (json['languages_count'] as num?)?.toInt() ?? 0,
       symbolsCount: (json['symbols_count'] as num?)?.toInt() ?? 0,
       dependenciesCount: (json['dependencies_count'] as num?)?.toInt() ?? 0,
+      totalFindings: (json['total_findings'] as num?)?.toInt() ?? 0,
       languageDistribution: dist,
     );
   }

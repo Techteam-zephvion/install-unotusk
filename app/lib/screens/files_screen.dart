@@ -103,13 +103,16 @@ class _FilesScreenState extends State<FilesScreen> {
                     border: Border.all(color: p.div),
                   ),
                   child: TextField(
+                    textAlignVertical: TextAlignVertical.center,
                     style: TextStyle(color: p.text, fontSize: 12),
                     decoration: InputDecoration(
+                      isDense: true,
                       hintText: 'Search files…',
                       hintStyle: TextStyle(color: p.textSec, fontSize: 12),
                       prefixIcon: Icon(LucideIcons.search, size: 14, color: p.textSec),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 32),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      contentPadding: const EdgeInsets.only(right: 8),
                     ),
                     onChanged: (v) => setState(() => _searchQuery = v),
                   ),

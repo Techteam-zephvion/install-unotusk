@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
@@ -29,6 +30,26 @@ class _ChatInputBoxState extends State<ChatInputBox> {
   String _thinkingMode = 'warm'; // warm, cold, hot
   String? _activeSearchMode; // research, web
   bool _showSuggestions = false;
+  final List<String> _attachedFileNames = [];
+
+  Future<void> _handlePickFiles() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.any,
+      );
+      if (result.isNotEmpty) {
+        setState(() {
+          for (final f in result) {
+            if (f.name.isNotEmpty && !_attachedFileNames.contains(f.name)) {
+              _attachedFileNames.add(f.name);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('File picker error: $e');
+    }
+  }
 
   final LayerLink _layerLink = LayerLink();
   final LayerLink _thinkingButtonLink = LayerLink();
@@ -395,10 +416,51 @@ class _ChatInputBoxState extends State<ChatInputBox> {
                   onSubmitted: (_) {
                     if (canSubmit) {
                       widget.onSubmit();
-                      setState(() => _showSuggestions = false);
+                      setState(() {
+                        _showSuggestions = false;
+                        _attachedFileNames.clear();
+                      });
                     }
                   },
                 ),
+
+                if (_attachedFileNames.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _attachedFileNames.map((name) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: widget.palette.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: widget.palette.accent.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(LucideIcons.paperclip, size: 12, color: widget.palette.accent),
+                            const SizedBox(width: 4),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 160),
+                              child: Text(
+                                name,
+                                style: UnoTypography.mono(fontSize: 11, color: widget.palette.text),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => setState(() => _attachedFileNames.remove(name)),
+                              child: Icon(LucideIcons.x, size: 12, color: widget.palette.textSec),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
 
                 const SizedBox(height: 8),
                 Divider(
@@ -430,20 +492,6 @@ class _ChatInputBoxState extends State<ChatInputBox> {
                             }
                           },
                           itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'files',
-                              child: Row(
-                                children: [
-                                  Icon(LucideIcons.paperclip,
-                                      size: 13, color: widget.palette.textSec),
-                                  const SizedBox(width: 8),
-                                  Text('Upload files',
-                                      style: UnoTypography.body(
-                                          color: widget.palette.text,
-                                          fontSize: 13)),
-                                ],
-                              ),
-                            ),
                             PopupMenuItem(
                               value: 'project',
                               child: Row(
@@ -507,7 +555,7 @@ class _ChatInputBoxState extends State<ChatInputBox> {
                         Tooltip(
                           message: 'Attach context file or ticket',
                           child: InkWell(
-                            onTap: () {},
+                            onTap: _handlePickFiles,
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
                               width: 32,

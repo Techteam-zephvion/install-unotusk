@@ -28,8 +28,10 @@ class FileSearchBar extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
+        textAlignVertical: TextAlignVertical.center,
         style: AppTextStyles.bodyMedium.copyWith(fontSize: 13),
         decoration: InputDecoration(
+          isDense: true,
           hintText: hintText,
           hintStyle: AppTextStyles.bodySmall.copyWith(
             color: AppColors.slate400,
@@ -40,6 +42,7 @@ class FileSearchBar extends StatelessWidget {
             size: 18,
             color: AppColors.slate400,
           ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 38),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.close, size: 16, color: AppColors.slate500),
@@ -49,9 +52,9 @@ class FileSearchBar extends StatelessWidget {
                   },
                 )
               : null,
+          suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 38),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          isDense: true,
+          contentPadding: const EdgeInsets.only(right: 12),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
@@ -40,6 +41,26 @@ class _AskInputBarState extends State<AskInputBar> {
   String? _activeSearchMode; // 'research' | 'web' | null
   bool _piEnabled = false;
   bool _showSuggestions = false;
+  final List<String> _attachedFileNames = [];
+
+  Future<void> _handlePickFiles() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.any,
+      );
+      if (result.isNotEmpty) {
+        setState(() {
+          for (final f in result) {
+            if (f.name.isNotEmpty && !_attachedFileNames.contains(f.name)) {
+              _attachedFileNames.add(f.name);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('File picker error: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -79,7 +100,10 @@ class _AskInputBarState extends State<AskInputBar> {
 
   void _submit(String text) {
     if (widget.controller.text.trim().isEmpty || widget.isGenerating) return;
-    setState(() => _showSuggestions = false);
+    setState(() {
+      _showSuggestions = false;
+      _attachedFileNames.clear();
+    });
     final effectiveTier = _thinkingEnabled ? _thinkingTier : ThinkingTier.warm;
     if (widget.onSubmittedWithTier != null) {
       widget.onSubmittedWithTier!(text, effectiveTier);
@@ -217,6 +241,46 @@ class _AskInputBarState extends State<AskInputBar> {
                     ),
                   ),
 
+                  // Attached files chips
+                  if (_attachedFileNames.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _attachedFileNames.map((name) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentMuted,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.attach_file, size: 12, color: AppColors.accent),
+                                const SizedBox(width: 4),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 160),
+                                  child: Text(
+                                    name,
+                                    style: AppTextStyles.mono(fontSize: 11, color: AppColors.textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () => setState(() => _attachedFileNames.remove(name)),
+                                  child: const Icon(Icons.close, size: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
                   // Bottom Toolbar inside container
                   Container(
                     padding: const EdgeInsets.only(top: 6),
@@ -245,7 +309,7 @@ class _AskInputBarState extends State<AskInputBar> {
                             // Paperclip
                             _buildIconBtn(
                               icon: Icons.attach_file,
-                              onTap: () {},
+                              onTap: _handlePickFiles,
                               tooltip: 'Attach context file or ticket',
                             ),
                             const SizedBox(width: 8),
@@ -394,11 +458,6 @@ class _AskInputBarState extends State<AskInputBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildDropdownItem(
-            icon: Icons.attach_file,
-            title: 'Upload files',
-            onTap: () => setState(() => _plusOpen = false),
-          ),
           _buildDropdownItem(
             icon: Icons.create_new_folder_outlined,
             title: 'Add to project',

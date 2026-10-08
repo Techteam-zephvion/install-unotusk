@@ -147,40 +147,52 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
                 child: Row(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Architecture & Components',
-                          style: UnoTypography.body(color: p.text, fontSize: 18, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${_allComponents.length} detected architecture modules across clean layers',
-                          style: UnoTypography.body(color: p.textSec, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    // Search box
-                    Container(
-                      width: 240,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: p.bgSurface,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: p.div),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Architecture & Components',
+                            style: UnoTypography.body(color: p.text, fontSize: 18, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_allComponents.length} detected architecture modules across clean layers',
+                            style: UnoTypography.body(color: p.textSec, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      child: TextField(
-                        style: UnoTypography.body(color: p.text, fontSize: 12),
-                        decoration: InputDecoration(
-                          hintText: 'Search modules…',
-                          hintStyle: UnoTypography.body(color: p.textSec, fontSize: 12),
-                          prefixIcon: Icon(LucideIcons.search, size: 14, color: p.textSec),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                    ),
+                    const SizedBox(width: 12),
+                    // Search box
+                    Flexible(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 240),
+                        child: Container(
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: p.bgSurface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: p.div),
+                          ),
+                          child: TextField(
+                            textAlignVertical: TextAlignVertical.center,
+                            style: UnoTypography.body(color: p.text, fontSize: 12),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              hintText: 'Search modules…',
+                              hintStyle: UnoTypography.body(color: p.textSec, fontSize: 12),
+                              prefixIcon: Icon(LucideIcons.search, size: 14, color: p.textSec),
+                              prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 36),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.only(right: 8),
+                            ),
+                            onChanged: (v) => setState(() => _searchQuery = v),
+                          ),
                         ),
-                        onChanged: (v) => setState(() => _searchQuery = v),
                       ),
                     ),
                   ],

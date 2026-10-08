@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text_styles.dart';
 import 'unotusk_mark.dart';
@@ -101,17 +102,31 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                             ? MainAxisAlignment.spaceBetween
                             : MainAxisAlignment.center,
                         children: [
-                          Row(
-                            children: [
-                              const UnotuskMark(size: 26),
-                              if (_isSidebarOpen) ...[
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Unotusk',
-                                  style: AppTextStyles.logoWordmark,
-                                ),
-                              ],
-                            ],
+                          InkWell(
+                            onTap: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/projects');
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const UnotuskMark(size: 26),
+                                  if (_isSidebarOpen) ...[
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Unotusk',
+                                      style: AppTextStyles.logoWordmark,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                           ),
                           if (_isSidebarOpen)
                             InkWell(
@@ -425,9 +440,42 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Left side: Project Context & Switcher
-                          if (widget.projectName != null)
-                            Row(
-                              children: [
+                          Row(
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  if (context.canPop()) {
+                                    context.pop();
+                                  } else {
+                                    context.go('/projects');
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.arrow_back_rounded, size: 14, color: AppColors.textSecondary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Projects',
+                                        style: AppTextStyles.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text('/', style: TextStyle(color: AppColors.divider, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              if (widget.projectName != null)
+                                Row(
+                                  children: [
                                 if (widget.availableServers != null && widget.availableServers!.isNotEmpty)
                                   PopupMenuButton<String>(
                                     color: AppColors.bgElevated,
@@ -498,9 +546,9 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                                     ),
                                   ),
                               ],
-                            )
-                          else
-                            const SizedBox.shrink(),
+                            ),
+                        ],
+                      ),
 
                           // Right side: Notifications & Theme toggle
                           Row(

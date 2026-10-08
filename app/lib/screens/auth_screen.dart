@@ -30,10 +30,8 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isServerConnected = false;
   Timer? _healthTimer;
 
-  final TextEditingController _emailController =
-      TextEditingController(text: 'lead@acme.com');
-  final TextEditingController _passwordController =
-      TextEditingController(text: 'adminpassword123');
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _orgController = TextEditingController();
 
@@ -72,10 +70,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _verifyEmail() async {
-    String email = _emailController.text.trim();
+    final email = _emailController.text.trim();
     if (email.isEmpty) {
-      email = 'dev1@acme.com';
-      _emailController.text = email;
+      setState(() {
+        _errorMessage = 'Please enter your work email.';
+      });
+      return;
     }
 
     setState(() {
@@ -103,10 +103,14 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _finishAuthentication() async {
-    final email = _emailController.text.trim().isNotEmpty
-        ? _emailController.text.trim()
-        : 'lead@acme.com';
+    final email = _emailController.text.trim();
     final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter both your email and password.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -475,7 +479,10 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           label: 'Sign in with Google OIDC',
           onTap: () {
-            _emailController.text = 'dev1@acme.com';
+            if (_emailController.text.trim().isEmpty) {
+              setState(() => _errorMessage = 'Please enter your work email first.');
+              return;
+            }
             _verifyEmail();
           },
         ),
@@ -490,7 +497,10 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           label: 'Sign in with Microsoft Entra OIDC',
           onTap: () {
-            _emailController.text = 'lead@acme.com';
+            if (_emailController.text.trim().isEmpty) {
+              setState(() => _errorMessage = 'Please enter your work email first.');
+              return;
+            }
             _verifyEmail();
           },
         ),
@@ -801,9 +811,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          _emailController.text.isNotEmpty
-              ? _emailController.text
-              : 'dev1@acme.com',
+          _emailController.text,
           style: UnoTypography.mono(
             color: const Color(0xFFD4725A),
             fontSize: 12.5,

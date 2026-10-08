@@ -106,6 +106,7 @@ class _SpecHistoryScreenState extends State<SpecHistoryScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
+                                  textAlignVertical: TextAlignVertical.center,
                                   onChanged: (val) =>
                                       setState(() => _search = val),
                                   style: UnoTypography.body(
@@ -117,8 +118,7 @@ class _SpecHistoryScreenState extends State<SpecHistoryScreen> {
                                         fontSize: 13),
                                     border: InputBorder.none,
                                     isDense: true,
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(vertical: 10),
+                                    contentPadding: EdgeInsets.zero,
                                   ),
                                 ),
                               ),

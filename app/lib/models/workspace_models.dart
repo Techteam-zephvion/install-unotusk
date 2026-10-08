@@ -691,8 +691,9 @@ class ProjectContextMetrics {
     }
     return ProjectContextMetrics(
       totalFiles: (json['total_files'] as num?)?.toInt() ?? 0,
-      totalSloc: (json['total_sloc'] as num?)?.toInt() ??
-          ((json['total_files'] as num?)?.toInt() ?? 0) * 85,
+      totalSloc: json['total_sloc'] != null
+          ? (json['total_sloc'] as num).toInt()
+          : ((json['total_files'] as num?)?.toInt() ?? 0) * 85,
       languagesCount: (json['languages_count'] as num?)?.toInt() ?? 0,
       symbolsCount: (json['symbols_count'] as num?)?.toInt() ?? 0,
       dependenciesCount:

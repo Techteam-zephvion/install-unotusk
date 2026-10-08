@@ -174,6 +174,7 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
                             Expanded(
                               child: TextField(
                                 controller: _searchController,
+                                textAlignVertical: TextAlignVertical.center,
                                 onChanged: (_) => setState(() {}),
                                 style: AppTextStyles.inter(fontSize: 13),
                                 decoration: const InputDecoration(
@@ -181,7 +182,7 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
                                   hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                  contentPadding: EdgeInsets.zero,
                                 ),
                               ),
                             ),

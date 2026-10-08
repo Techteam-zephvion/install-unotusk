@@ -18,6 +18,7 @@ from apps.api.src.models.enums import (
     SnapshotStatus,
 )
 from apps.api.src.models.file import RepositoryFile
+from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.project import Project
@@ -327,6 +328,14 @@ class RepositoryService:
             )
             metrics.total_files = f_count.scalar() or 0
 
+            # Total SLOC
+            sloc_count = await session.execute(
+                select(func.coalesce(func.sum(RepositoryFile.line_count), 0)).where(
+                    RepositoryFile.snapshot_id == snapshot.id
+                )
+            )
+            metrics.total_sloc = int(sloc_count.scalar() or 0)
+
             # Language breakdown
             lang_query = (
                 select(RepositoryFile.language, func.count(RepositoryFile.id))
@@ -353,6 +362,14 @@ class RepositoryService:
                 .where(RepositoryFile.snapshot_id == snapshot.id)
             )
             metrics.dependencies_count = dep_count.scalar() or 0
+
+            # Findings count
+            find_count = await session.execute(
+                select(func.count(Finding.id)).where(
+                    Finding.project_id == project.id
+                )
+            )
+            metrics.total_findings = find_count.scalar() or 0
 
         return ProjectRepositoryContext(
             repository=RepositoryRead.model_validate(repo) if repo else None,

@@ -421,26 +421,34 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
                   ),
                 );
               }),
+              const SizedBox(width: 16),
               const Spacer(),
               // Search input
-              Container(
-                width: 220,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: p.bgElevated,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: p.div),
-                ),
-                child: TextField(
-                  style: UnoTypography.body(color: p.text, fontSize: 12),
-                  decoration: InputDecoration(
-                    hintText: 'Search knowledge…',
-                    hintStyle: UnoTypography.body(color: p.textSec, fontSize: 12),
-                    prefixIcon: Icon(LucideIcons.search, size: 14, color: p.textSec),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 260, maxWidth: 360),
+                  child: Container(
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: p.bgElevated,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: p.div),
+                    ),
+                    child: TextField(
+                      textAlignVertical: TextAlignVertical.center,
+                      style: UnoTypography.body(color: p.text, fontSize: 12),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Search knowledge…',
+                        hintStyle: UnoTypography.body(color: p.textSec, fontSize: 12),
+                        prefixIcon: Icon(LucideIcons.search, size: 14, color: p.textSec),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 32),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.only(right: 8),
+                      ),
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                    ),
                   ),
-                  onChanged: (v) => setState(() => _searchQuery = v),
                 ),
               ),
             ],

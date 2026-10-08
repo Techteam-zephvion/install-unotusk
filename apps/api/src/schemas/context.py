@@ -56,9 +56,11 @@ class DependencyRead(BaseModel):
 
 class ProjectContextMetrics(BaseModel):
     total_files: int = 0
+    total_sloc: int = 0
     languages_count: int = 0
     symbols_count: int = 0
     dependencies_count: int = 0
+    total_findings: int = 0
     language_distribution: dict[str, int] = Field(default_factory=dict)
 
 
