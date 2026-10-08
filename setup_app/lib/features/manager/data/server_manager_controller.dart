@@ -73,9 +73,16 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
         
         final lines = out.split('\n');
         for (var line in lines) {
-          if (line.trim().isEmpty) continue;
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+          
+          if (!trimmed.startsWith('{')) {
+            // Ignore Docker warnings or non-JSON output
+            continue;
+          }
+          
           try {
-            final json = jsonDecode(line);
+            final json = jsonDecode(trimmed);
             if (json is Map) {
               final state = json['State']?.toString().toLowerCase();
               final exitCode = json['ExitCode'];
@@ -92,9 +99,10 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
             }
           } catch (_) {
              // Fallback
-            if (line.contains('"State":"running"') || line.contains('"State": "running"') || line.contains('"State":"starting"') || line.contains('"State":"created"')) {
+            if (trimmed.contains('"State":"running"') || trimmed.contains('"State": "running"') || trimmed.contains('"State":"starting"') || trimmed.contains('"State":"created"')) {
               hasRunning = true;
-            } else if (!line.contains('"Service":"migration"') && !line.contains('"Service": "migration"')) {
+            } else if ((trimmed.contains('"State":"exited"') || trimmed.contains('"State": "exited"') || trimmed.contains('"State":"dead"') || trimmed.contains('"State":"failed"')) && 
+                       (!trimmed.contains('"Service":"migration"') && !trimmed.contains('"Service": "migration"'))) {
               hasExited = true;
             }
           }

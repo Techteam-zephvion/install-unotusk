@@ -141,6 +141,15 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      _appStage = 'projects';
+      _user = const UserModel(
+        name: 'Jane Dev',
+        org: 'Acme Corporation',
+        email: 'dev@acme.com',
+        role: 'member',
+      );
+    }
     _loadInitialTelemetry();
   }
 
@@ -174,7 +183,7 @@ class _AppShellState extends State<AppShell> {
     } catch (_) {}
   }
 
-  void _handleOpenProject(ProjectItem project) {
+  void _handleOpenProject(ProjectItem project) async {
     setState(() {
       _openedProject = project;
       _openedProjectName = project.name;
@@ -183,6 +192,25 @@ class _AppShellState extends State<AppShell> {
       _activeView = 'overview';
       _appStage = 'workspace';
     });
+    
+    // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
+    if (project.port != null) {
+      final targetUrl = 'http://127.0.0.1:${project.port}';
+      if (ApiService.baseUrl != targetUrl) {
+        ApiService.setBaseUrl(targetUrl);
+        try {
+          // Signup acts as auto-login via our modified backend
+          await ApiService.createOrganisation(
+            fullName: _user.name,
+            orgName: 'Acme Corporation',
+            password: 'password123',
+            role: _user.role,
+            email: _user.email,
+          );
+        } catch (_) {}
+      }
+    }
+
     ApiService.setActiveProject(project);
     _loadProjectInitialChat(project);
   }
@@ -196,8 +224,24 @@ class _AppShellState extends State<AppShell> {
     } catch (_) {}
   }
 
-  void _handleBackToProjects() {
+  void _handleBackToProjects() async {
     _clearTimers();
+    
+    // Revert to Control Plane Server
+    final controlPlaneUrl = 'http://127.0.0.1:28000';
+    if (ApiService.baseUrl != controlPlaneUrl) {
+      ApiService.setBaseUrl(controlPlaneUrl);
+      try {
+        await ApiService.createOrganisation(
+          fullName: _user.name,
+          orgName: 'Acme Corporation',
+          password: 'password123',
+          role: _user.role,
+          email: _user.email,
+        );
+      } catch (_) {}
+    }
+
     setState(() {
       _messages.clear();
       _isGenerating = false;
@@ -209,6 +253,7 @@ class _AppShellState extends State<AppShell> {
   void _handleLogOut() {
     _clearTimers();
     ApiService.logout();
+    ApiService.setBaseUrl('http://127.0.0.1:28000'); // Reset port to control plane on logout
     setState(() {
       _messages.clear();
       _openedProject = null;

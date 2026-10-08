@@ -15,18 +15,27 @@ class LocalServer {
   final String id;
   final String name;
   final int apiPort;
+  final String? deploymentDir;
+  final String? repoUrl;
+  final String? groqApiKey;
 
   LocalServer({
     required this.id,
     required this.name,
     required this.apiPort,
+    this.deploymentDir,
+    this.repoUrl,
+    this.groqApiKey,
   });
 
-  factory LocalServer.fromJson(Map<String, dynamic> json) {
+  factory LocalServer.fromJson(Map<String, dynamic> json, {String? repoUrl, String? groqApiKey}) {
     return LocalServer(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       apiPort: json['apiPort'] ?? 28000,
+      deploymentDir: json['deploymentDir'],
+      repoUrl: repoUrl,
+      groqApiKey: groqApiKey,
     );
   }
 }
@@ -54,7 +63,27 @@ class LocalRegistryService {
             final state = json['lastKnownState']?.toString().toLowerCase();
             
             if (state == 'running') {
-              servers.add(LocalServer.fromJson(json));
+              String? repoUrl;
+              String? groqApiKey;
+              
+              final deploymentDir = json['deploymentDir']?.toString();
+              if (deploymentDir != null) {
+                final envFile = File('$deploymentDir/.env');
+                if (envFile.existsSync()) {
+                  try {
+                    final lines = envFile.readAsLinesSync();
+                    for (final line in lines) {
+                      if (line.startsWith('TARGET_REPO_URL=')) {
+                        repoUrl = line.substring('TARGET_REPO_URL='.length).trim();
+                      } else if (line.startsWith('GROQ_API_KEY=')) {
+                        groqApiKey = line.substring('GROQ_API_KEY='.length).trim();
+                      }
+                    }
+                  } catch (_) {}
+                }
+              }
+              
+              servers.add(LocalServer.fromJson(json, repoUrl: repoUrl, groqApiKey: groqApiKey));
             }
           } catch (_) {}
         }

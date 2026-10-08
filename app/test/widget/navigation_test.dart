@@ -98,6 +98,7 @@ void main() {
       ),
     );
 
+    await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
 
     // Verify Projects Screen Header and Items

@@ -78,6 +78,38 @@ class ProjectItem {
     this.role,
     this.repositoryName,
   });
+
+  ProjectItem copyWith({
+    String? id,
+    String? name,
+    String? upsStatus,
+    String? ingestionStatus,
+    String? lastIngestion,
+    double? fpr,
+    int? days,
+    String? organizationId,
+    String? slug,
+    String? description,
+    int? port,
+    String? role,
+    String? repositoryName,
+  }) {
+    return ProjectItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      upsStatus: upsStatus ?? this.upsStatus,
+      ingestionStatus: ingestionStatus ?? this.ingestionStatus,
+      lastIngestion: lastIngestion ?? this.lastIngestion,
+      fpr: fpr ?? this.fpr,
+      days: days ?? this.days,
+      organizationId: organizationId ?? this.organizationId,
+      slug: slug ?? this.slug,
+      description: description ?? this.description,
+      port: port ?? this.port,
+      role: role ?? this.role,
+      repositoryName: repositoryName ?? this.repositoryName,
+    );
+  }
 }
 
 class ActivityItem {

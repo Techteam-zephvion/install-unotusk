@@ -117,7 +117,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final serverProjects = await ApiService.fetchProjects();
       final elapsed = stopwatch.elapsedMilliseconds;
-      if (elapsed < 450) {
+      if (elapsed < 450 && !Platform.environment.containsKey('FLUTTER_TEST')) {
         await Future.delayed(Duration(milliseconds: 450 - elapsed));
       }
       if (!mounted) return;
@@ -125,24 +125,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _isLoadingProjects = false;
         _isRefreshingProjects = false;
         _availableBackendProjects = serverProjects;
-        // Only update status and attributes for projects explicitly connected to workspace
-        for (final sp in serverProjects) {
-          final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
-              ApiService.connectedProjectIds.contains(sp.name);
-          final idx = _projects.indexWhere((p) =>
-              p.id.toLowerCase() == sp.id.toLowerCase() ||
-              p.name.toLowerCase() == sp.name.toLowerCase());
-          if (idx >= 0) {
-            _projects[idx] = sp;
-          } else if (isConnected) {
-            _projects.add(sp);
-          }
+        
+        // Auto-connect all backend/local servers for MVP single-tenant visibility
+        _projects.clear();
+        _projects.addAll(serverProjects);
+
+        for (final p in serverProjects) {
+          ApiService.connectedProjectIds.add(p.id);
+          ApiService.connectedProjectIds.add(p.name);
         }
-        if (ApiService.connectedProjectIds.isNotEmpty) {
-          _projects.removeWhere((p) =>
-              !ApiService.connectedProjectIds.contains(p.id) &&
-              !ApiService.connectedProjectIds.contains(p.name));
-        }
+        
         ApiService.connectedWorkspaceProjects
           ..clear()
           ..addAll(_projects);
@@ -239,16 +231,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _availableBackendProjects = serverProjects;
         // Keep any existing connected projects synchronized
         for (final sp in serverProjects) {
-          final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
-              ApiService.connectedProjectIds.contains(sp.name);
           final idx = _projects.indexWhere((p) =>
               p.id.toLowerCase() == sp.id.toLowerCase() ||
               p.name.toLowerCase() == sp.name.toLowerCase());
           if (idx >= 0) {
             _projects[idx] = sp;
-          } else if (isConnected) {
+          } else {
             _projects.add(sp);
           }
+          ApiService.connectedProjectIds.add(sp.id);
+          ApiService.connectedProjectIds.add(sp.name);
         }
         ApiService.connectedWorkspaceProjects
           ..clear()
@@ -2360,16 +2352,33 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (project.description != null && project.description!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  project.description!,
-                  style: UnoTypography.mono(
-                    color: palette.textSec,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+              Row(
+                children: [
+                  if (project.description != null && project.description!.isNotEmpty) ...[
+                    Text(
+                      project.description!,
+                      style: UnoTypography.mono(
+                        color: palette.textSec,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                  if (project.port != null) ...[
+                    if (project.description != null && project.description!.isNotEmpty)
+                      Text(
+                        ' • ',
+                        style: UnoTypography.mono(color: palette.textSec, fontSize: 11),
+                      ),
+                    Text(
+                      'Port ${project.port}',
+                      style: UnoTypography.mono(
+                        color: palette.accent,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
 
