@@ -47,9 +47,7 @@ jobs:
 
       - name: Build Windows release
         working-directory: app
-        shell: pwsh
-        run: |
-          flutter build windows --release
+        run: flutter build windows --release
 
       - name: Package Standalone Zip
         shell: pwsh
@@ -62,72 +60,20 @@ jobs:
           Write-Host "Zipping from $src"
           Compress-Archive -Path "$src\*" -DestinationPath "unotusk-employee-windows-x64.zip" -Force
 
-      - name: Locate or Install WiX Toolset
-        id: wix
-        shell: pwsh
-        run: |
-          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
-                 Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $dir) {
-            choco install wixtoolset -y --no-progress | Out-Null
-            $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
-                   Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          }
-          if ($dir) {
-            echo "WIX_BIN=$dir\bin" >> $env:GITHUB_OUTPUT
-            Write-Host "WiX found at: $dir\bin"
-          }
-
       - name: Build MSI Installer
-        if: steps.wix.outputs.WIX_BIN != ''
         shell: pwsh
-        env:
-          WIX_BIN: ${{ steps.wix.outputs.WIX_BIN }}
         run: |
           $src = @(
             "app\build\windows\x64\runner\Release",
             "app\build\windows\runner\Release"
           ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          $src = (Resolve-Path $src).Path
-
-          & "$env:WIX_BIN\heat.exe" dir $src -gg -scom -sreg -srd -dr INSTALLFOLDER -cg AppComponents -var var.SourceDir -nologo -o Components.wxs
-          Set-Content License.rtf '{\rtf1\ansi Unotusk Employee App - Internal Use Only.}' -Encoding ascii
-          
-          $wxsContent = @"
-<?xml version='1.0' encoding='UTF-8'?>
-<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-  <Product Id='*' Name='Unotusk Employee' Language='1033' Version='1.0.1.0' Manufacturer='Unotusk Pvt. Ltd.' UpgradeCode='7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D'>
-    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>
-    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>
-    <MediaTemplate EmbedCab='yes'/>
-    <Feature Id='ProductFeature' Title='Unotusk Employee' Level='1'>
-      <ComponentGroupRef Id='AppComponents'/>
-      <ComponentRef Id='DesktopShortcutComp'/>
-    </Feature>
-    <UIRef Id='WixUI_Minimal'/>
-    <WixVariable Id='WixUILicenseRtf' Value='License.rtf'/>
-  </Product>
-  <Fragment>
-    <Directory Id='TARGETDIR' Name='SourceDir'>
-      <Directory Id='ProgramFiles64Folder'>
-        <Directory Id='INSTALLFOLDER' Name='Unotusk Employee'/>
-      </Directory>
-      <Directory Id='DesktopFolder'/>
-    </Directory>
-  </Fragment>
-  <Fragment>
-    <DirectoryRef Id='DesktopFolder'>
-      <Component Id='DesktopShortcutComp' Guid='A1B2C3D4-E5F6-7890-ABCD-111111111111' Win64='yes'>
-        <Shortcut Id='DesktopShortcut' Name='Unotusk Employee' Target='[INSTALLFOLDER]app.exe' WorkingDirectory='INSTALLFOLDER'/>
-        <RegistryValue Root='HKMU' Key='Software\Unotusk\Employee' Name='DesktopShortcut' Type='integer' Value='1' KeyPath='yes'/>
-      </Component>
-    </DirectoryRef>
-  </Fragment>
-</Wix>
-"@
-          [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'Product.wxs'), $wxsContent)
-          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
-          & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension -sval Product.wixobj Components.wixobj -o unotusk-employee-windows-x64.msi || true
+          powershell -ExecutionPolicy Bypass -File scripts/package_windows_msi.ps1 `
+            -AppName "Unotusk Employee" `
+            -ExeName "app.exe" `
+            -SourceDir "$src" `
+            -OutputFile "unotusk-employee-windows-x64.msi" `
+            -UpgradeCode "7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D" `
+            -Version "1.0.1.0"
 
       - name: Upload Employee App Artifacts
         uses: actions/upload-artifact@v4
@@ -165,9 +111,7 @@ jobs:
 
       - name: Build Windows release
         working-directory: setup_app
-        shell: pwsh
-        run: |
-          flutter build windows --release
+        run: flutter build windows --release
 
       - name: Package Standalone Zip
         shell: pwsh
@@ -180,72 +124,20 @@ jobs:
           Write-Host "Zipping from $src"
           Compress-Archive -Path "$src\*" -DestinationPath "unotusk-server-setup-windows-x64.zip" -Force
 
-      - name: Locate or Install WiX Toolset
-        id: wix
-        shell: pwsh
-        run: |
-          $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
-                 Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $dir) {
-            choco install wixtoolset -y --no-progress | Out-Null
-            $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
-                   Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          }
-          if ($dir) {
-            echo "WIX_BIN=$dir\bin" >> $env:GITHUB_OUTPUT
-            Write-Host "WiX found at: $dir\bin"
-          }
-
       - name: Build Server Setup MSI Installer
-        if: steps.wix.outputs.WIX_BIN != ''
         shell: pwsh
-        env:
-          WIX_BIN: ${{ steps.wix.outputs.WIX_BIN }}
         run: |
           $src = @(
             "setup_app\build\windows\x64\runner\Release",
             "setup_app\build\windows\runner\Release"
           ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          $src = (Resolve-Path $src).Path
-
-          & "$env:WIX_BIN\heat.exe" dir $src -gg -scom -sreg -srd -dr INSTALLFOLDER -cg AppComponents -var var.SourceDir -nologo -o Components.wxs
-          Set-Content License.rtf '{\rtf1\ansi Unotusk Server Setup - Internal Use Only.}' -Encoding ascii
-          
-          $wxsContent = @"
-<?xml version='1.0' encoding='UTF-8'?>
-<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-  <Product Id='*' Name='Unotusk Server Setup' Language='1033' Version='1.0.1.0' Manufacturer='Unotusk Pvt. Ltd.' UpgradeCode='9E4C5D6F-7A8B-9C0D-E1F2-3A4B5C6D7E8F'>
-    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>
-    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>
-    <MediaTemplate EmbedCab='yes'/>
-    <Feature Id='ProductFeature' Title='Unotusk Server Setup' Level='1'>
-      <ComponentGroupRef Id='AppComponents'/>
-      <ComponentRef Id='DesktopShortcutComp'/>
-    </Feature>
-    <UIRef Id='WixUI_Minimal'/>
-    <WixVariable Id='WixUILicenseRtf' Value='License.rtf'/>
-  </Product>
-  <Fragment>
-    <Directory Id='TARGETDIR' Name='SourceDir'>
-      <Directory Id='ProgramFiles64Folder'>
-        <Directory Id='INSTALLFOLDER' Name='Unotusk Server Setup'/>
-      </Directory>
-      <Directory Id='DesktopFolder'/>
-    </Directory>
-  </Fragment>
-  <Fragment>
-    <DirectoryRef Id='DesktopFolder'>
-      <Component Id='DesktopShortcutComp' Guid='C3D4E5F6-A7B8-9012-CDEF-333333333333' Win64='yes'>
-        <Shortcut Id='DesktopShortcut' Name='Unotusk Server Setup' Target='[INSTALLFOLDER]setup_app.exe' WorkingDirectory='INSTALLFOLDER'/>
-        <RegistryValue Root='HKMU' Key='Software\Unotusk\ServerSetup' Name='DesktopShortcut' Type='integer' Value='1' KeyPath='yes'/>
-      </Component>
-    </DirectoryRef>
-  </Fragment>
-</Wix>
-"@
-          [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'Product.wxs'), $wxsContent)
-          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 -dSourceDir="$src" Product.wxs Components.wxs
-          & "$env:WIX_BIN\light.exe" -nologo -ext WixUIExtension -sval Product.wixobj Components.wixobj -o unotusk-server-setup-windows-x64.msi || true
+          powershell -ExecutionPolicy Bypass -File scripts/package_windows_msi.ps1 `
+            -AppName "Unotusk Server Setup" `
+            -ExeName "setup_app.exe" `
+            -SourceDir "$src" `
+            -OutputFile "unotusk-server-setup-windows-x64.msi" `
+            -UpgradeCode "9E4C5D6F-7A8B-9C0D-E1F2-3A4B5C6D7E8F" `
+            -Version "1.0.1.0"
 
       - name: Upload Server Setup App Artifacts
         uses: actions/upload-artifact@v4
