@@ -98,6 +98,34 @@ def check_host_resources() -> bool:
     return success
 
 
+def attempt_start_docker() -> bool:
+    import platform
+    current_os = platform.system()
+    try:
+        if current_os == "Windows":
+            local_app_data = os.environ.get("LOCALAPPDATA", "")
+            prog_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+            candidates = [
+                os.path.join(local_app_data, "Programs", "DockerDesktop", "Docker Desktop.exe"),
+                os.path.join(prog_files, "Docker", "Docker", "Docker Desktop.exe"),
+            ]
+            for exe in candidates:
+                if os.path.exists(exe):
+                    subprocess.Popen([exe], shell=False)
+                    return True
+            subprocess.Popen(["cmd.exe", "/c", "start", "", "Docker Desktop"], shell=True)
+            return True
+        elif current_os == "Darwin":
+            subprocess.Popen(["open", "-a", "Docker"])
+            return True
+        elif current_os == "Linux":
+            res = subprocess.run(["sudo", "systemctl", "start", "docker"], capture_output=True)
+            return res.returncode == 0
+    except Exception:
+        return False
+    return False
+
+
 def check_docker_prerequisites() -> bool:
     print_step("Checking Docker Engine & Compose Availability")
     success = True
@@ -113,8 +141,24 @@ def check_docker_prerequisites() -> bool:
         if res.returncode == 0:
             print_pass("Docker Engine is installed and daemon is responding.")
         else:
-            print_fail("Docker daemon is not running or accessible without root.")
-            success = False
+            print_warn("Docker is installed, but daemon is idle / stopped. Attempting to start Docker daemon...")
+            started = attempt_start_docker()
+            if started:
+                import time
+                daemon_ready = False
+                for attempt in range(1, 16):
+                    time.sleep(2)
+                    poll = subprocess.run(["docker", "info"], capture_output=True, text=True, timeout=5)
+                    if poll.returncode == 0:
+                        daemon_ready = True
+                        print_pass(f"Docker daemon initialized and responding ({attempt * 2}s).")
+                        break
+                if not daemon_ready:
+                    print_fail("Docker daemon is not running (timed out waiting for engine startup).")
+                    success = False
+            else:
+                print_fail("Docker daemon is not running or accessible without root.")
+                success = False
     except Exception as e:
         print_fail(f"Failed to communicate with Docker: {e}")
         success = False

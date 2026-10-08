@@ -108,7 +108,10 @@ class ServerCheckController extends StateNotifier<ServerCheckState> {
 
     // 2. Docker Runtime
     _setItemStatus('docker_runtime', CheckStatus.checking);
-    final docker = await validator.checkDockerRuntime(targetConfig);
+    final docker = await validator.checkDockerRuntime(
+      targetConfig,
+      onProgress: (msg) => _updateItemDescription('docker_runtime', msg),
+    );
     _updateItem(docker);
     if (docker.status.isFailed) {
       state = state.copyWith(isRunning: false, hasCriticalFailure: true);
@@ -145,6 +148,17 @@ class ServerCheckController extends StateNotifier<ServerCheckState> {
       items: state.items.map((item) {
         if (item.id == id) {
           return item.copyWith(status: status);
+        }
+        return item;
+      }).toList(),
+    );
+  }
+
+  void _updateItemDescription(String id, String description) {
+    state = state.copyWith(
+      items: state.items.map((item) {
+        if (item.id == id) {
+          return item.copyWith(description: description);
         }
         return item;
       }).toList(),

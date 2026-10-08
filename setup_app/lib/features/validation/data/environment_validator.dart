@@ -144,9 +144,106 @@ class EnvironmentValidator {
     }
   }
 
-  Future<CheckItem> checkDockerRuntime(TargetConfig config) async {
+  bool get _isMocked => _processExecutor != Process.run;
+
+  Future<bool> isDockerInstalled(TargetConfig config) async {
     try {
-      final res = config.isLocal
+      if (config.isLocal) {
+        final res = await _processExecutor('docker', ['--version']);
+        if (res.exitCode == 0) return true;
+
+        if (!_isMocked && Platform.isWindows) {
+          final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
+          final progFiles = Platform.environment['ProgramFiles'] ?? r'C:\Program Files';
+          final candidates = [
+            '$localAppData\\Programs\\DockerDesktop\\Docker Desktop.exe',
+            '$progFiles\\Docker\\Docker\\Docker Desktop.exe',
+          ];
+          for (final path in candidates) {
+            if (path.isNotEmpty && File(path).existsSync()) {
+              return true;
+            }
+          }
+        }
+        return false;
+      } else {
+        final res = await _processExecutor('ssh', [
+          '-p', config.port.toString(),
+          '${config.username}@${config.host}',
+          'which docker',
+        ]);
+        return res.exitCode == 0;
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> attemptStartDocker(TargetConfig config) async {
+    try {
+      if (config.isLocal) {
+        if (!_isMocked && Platform.isWindows) {
+          final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
+          final progFiles = Platform.environment['ProgramFiles'] ?? r'C:\Program Files';
+          final candidates = [
+            '$localAppData\\Programs\\DockerDesktop\\Docker Desktop.exe',
+            '$progFiles\\Docker\\Docker\\Docker Desktop.exe',
+          ];
+          String? foundExe;
+          for (final path in candidates) {
+            if (path.isNotEmpty && File(path).existsSync()) {
+              foundExe = path;
+              break;
+            }
+          }
+
+          if (foundExe != null) {
+            try {
+              await Process.start(foundExe, [], mode: ProcessStartMode.detached);
+              return true;
+            } catch (_) {
+              await _processExecutor('cmd.exe', ['/c', 'start', '""', foundExe]);
+              return true;
+            }
+          } else {
+            await _processExecutor('cmd.exe', ['/c', 'start', '""', 'Docker Desktop']);
+            return true;
+          }
+        } else if (!_isMocked && Platform.isMacOS) {
+          await _processExecutor('open', ['-a', 'Docker']);
+          return true;
+        } else if (!_isMocked && Platform.isLinux) {
+          await _processExecutor('systemctl', ['--user', 'start', 'docker']);
+          return true;
+        } else {
+          await _processExecutor('docker', ['start']);
+          return true;
+        }
+      } else {
+        await _processExecutor('ssh', [
+          '-p', config.port.toString(),
+          '${config.username}@${config.host}',
+          'sudo systemctl start docker || sudo service docker start',
+        ]);
+        return true;
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<CheckItem> checkDockerRuntime(
+    TargetConfig config, {
+    void Function(String message)? onProgress,
+    int? maxPollAttempts,
+    Duration? pollInterval,
+  }) async {
+    final effectiveMaxPoll = maxPollAttempts ?? (_isMocked ? 5 : 15);
+    final effectiveInterval = pollInterval ?? (_isMocked ? const Duration(milliseconds: 10) : const Duration(seconds: 2));
+
+    ProcessResult? initialRes;
+    try {
+      initialRes = config.isLocal
           ? await _processExecutor('docker', ['info'])
           : await _processExecutor('ssh', [
               '-p', config.port.toString(),
@@ -154,34 +251,67 @@ class EnvironmentValidator {
               'docker info',
             ]);
 
-      if (res.exitCode == 0) {
+      if (initialRes.exitCode == 0) {
         return const CheckItem(
           id: 'docker_runtime',
           title: 'Required runtime available',
           description: 'Docker daemon is active and responsive.',
           status: CheckStatus.passed,
         );
-      } else {
-        return CheckItem(
-          id: 'docker_runtime',
-          title: 'Required runtime available',
-          description: 'Docker daemon is not running or not installed.',
-          status: CheckStatus.failed,
-          failureMessage: 'Docker is not running on this machine.',
-          remediationHint: 'Install or start Docker Engine / Docker Desktop and try again.',
-          technicalDetails: 'Exit Code: ${res.exitCode}\nOutput: ${res.stderr}',
-        );
       }
-    } catch (e) {
+    } catch (_) {}
+
+    // Check existence: is Docker installed on the target machine?
+    final isInstalled = await isDockerInstalled(config);
+    if (!isInstalled) {
       return CheckItem(
         id: 'docker_runtime',
         title: 'Required runtime available',
-        description: 'Docker executable could not be found.',
+        description: 'Docker daemon is not running or not installed.',
         status: CheckStatus.failed,
-        failureMessage: 'Docker command not found.',
-        remediationHint: 'Please install Docker (https://docs.docker.com/get-docker/).',
+        failureMessage: 'Docker is not running on this machine.',
+        remediationHint: 'Install or start Docker Engine / Docker Desktop and try again.',
+        technicalDetails: initialRes != null ? 'Exit Code: ${initialRes.exitCode}\nOutput: ${initialRes.stderr}' : null,
       );
     }
+
+    // Docker is installed, but daemon is in an IDLE / STOPPED state. Attempt auto-start!
+    onProgress?.call('Docker is idle. Starting Docker service...');
+    final started = await attemptStartDocker(config);
+
+    if (started) {
+      for (int attempt = 1; attempt <= effectiveMaxPoll; attempt++) {
+        onProgress?.call('Waiting for Docker engine to become responsive (${attempt * effectiveInterval.inSeconds}s)...');
+        await Future.delayed(effectiveInterval);
+        try {
+          final pollRes = config.isLocal
+              ? await _processExecutor('docker', ['info'])
+              : await _processExecutor('ssh', [
+                  '-p', config.port.toString(),
+                  '${config.username}@${config.host}',
+                  'docker info',
+                ]);
+          if (pollRes.exitCode == 0) {
+            return const CheckItem(
+              id: 'docker_runtime',
+              title: 'Required runtime available',
+              description: 'Docker daemon was idle and has been started successfully.',
+              status: CheckStatus.passed,
+            );
+          }
+        } catch (_) {}
+      }
+    }
+
+    return CheckItem(
+      id: 'docker_runtime',
+      title: 'Required runtime available',
+      description: 'Docker daemon is not running or responsive.',
+      status: CheckStatus.failed,
+      failureMessage: 'Docker is not running on this machine.',
+      remediationHint: 'Install or start Docker Engine / Docker Desktop and try again.',
+      technicalDetails: initialRes != null ? 'Exit Code: ${initialRes.exitCode}\nOutput: ${initialRes.stderr}' : null,
+    );
   }
 
   Future<CheckItem> checkDockerCompose(TargetConfig config) async {

@@ -35,6 +35,32 @@ void main() {
       expect(res.remediationHint, contains('Docker Engine / Docker Desktop'));
     });
 
+    test('checkDockerRuntime detects idle state, starts docker and passes after polling', () async {
+      int infoCalls = 0;
+      final validator = EnvironmentValidator(
+        processExecutor: (exec, args, {workingDirectory, environment}) async {
+          if (args.contains('--version')) {
+            return ProcessResult(1234, 0, 'Docker version 29.0.0', '');
+          }
+          if (args.contains('info')) {
+            infoCalls++;
+            if (infoCalls == 1) {
+              return ProcessResult(1234, 1, '', 'daemon not running');
+            }
+            return ProcessResult(1234, 0, 'Server Version: 29.0.0', '');
+          }
+          return ProcessResult(1234, 0, '', '');
+        },
+      );
+
+      final res = await validator.checkDockerRuntime(
+        const TargetConfig(type: TargetType.local),
+        pollInterval: const Duration(milliseconds: 5),
+      );
+      expect(res.status.isPassed, true);
+      expect(res.description, contains('idle'));
+    });
+
     test('checkDockerCompose passes when compose version returns 0', () async {
       final validator = EnvironmentValidator(
         processExecutor: (exec, args, {workingDirectory, environment}) async {
