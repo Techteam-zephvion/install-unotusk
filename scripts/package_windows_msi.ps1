@@ -17,24 +17,39 @@ param (
     [string]$Version = "1.0.1.0"
 )
 
+$ErrorActionPreference = "Stop"
+
 # 1. Locate WiX Toolset
-$dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
-       Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-if (-not $dir) {
-    choco install wixtoolset -y --no-progress | Out-Null
-    $dir = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" |
-           Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $dir) {
-    Write-Warning "WiX Toolset not found; skipping MSI compilation."
-    exit 0
+$wixBin = $null
+$candleCmd = Get-Command candle.exe -ErrorAction SilentlyContinue
+if ($candleCmd) {
+    $wixBin = Split-Path $candleCmd.Source
 }
 
-$wixBin = "$dir\bin"
-Write-Host "WiX found at: $wixBin"
+if (-not $wixBin) {
+    $found = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
+             Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if ($found) { $wixBin = "$found\bin" }
+}
+
+if (-not $wixBin) {
+    Write-Host "Installing WiX Toolset via Chocolatey..."
+    choco install wixtoolset -y --no-progress
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    $found = Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" -EA SilentlyContinue |
+             Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if ($found) { $wixBin = "$found\bin" }
+}
+
+if (-not $wixBin -or -not (Test-Path "$wixBin\candle.exe")) {
+    Write-Error "CRITICAL: WiX Toolset could not be located or installed. Cannot build MSI!"
+    exit 1
+}
+
+Write-Host "WiX Toolset binary directory: $wixBin"
 
 $absSource = (Resolve-Path $SourceDir).Path
-Write-Host "Harvesting from: $absSource"
+Write-Host "Harvesting files from: $absSource"
 
 # 2. Harvest files
 & "$wixBin\heat.exe" dir $absSource -gg -scom -sreg -srd -dr INSTALLFOLDER -cg AppComponents -var var.SourceDir -nologo -o Components.wxs
@@ -76,12 +91,20 @@ $wxsContent = @"
 "@
 
 [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'Product.wxs'), $wxsContent)
+
+Write-Host "Compiling WXS with candle..."
 & "$wixBin\candle.exe" -nologo -arch x64 -dSourceDir="$absSource" Product.wxs Components.wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "Linking MSI with light..."
 & "$wixBin\light.exe" -nologo -ext WixUIExtension -sval Product.wixobj Components.wixobj -o $OutputFile
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+if (-not (Test-Path $OutputFile)) {
+    Write-Error "MSI output file was not produced: $OutputFile"
+    exit 1
+}
+
 $hash = (Get-FileHash $OutputFile -Algorithm SHA256).Hash
 "$hash  $OutputFile" | Out-File "$OutputFile.sha256" -Encoding ascii
-Write-Host "Successfully compiled $OutputFile (SHA256: $hash)"
+Write-Host "Successfully compiled MSI: $OutputFile (SHA256: $hash)"

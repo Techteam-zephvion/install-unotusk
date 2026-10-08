@@ -22,10 +22,10 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # 1. Employee Desktop App: Windows x64 Build & Package
+  # 1. Employee Desktop App: Windows x64 MSI Installer
   # ─────────────────────────────────────────────────────────────
   build-employee-windows:
-    name: "Employee App: Windows x64"
+    name: "Employee App: Windows x64 (.msi)"
     runs-on: windows-latest
     steps:
       - name: Checkout Code
@@ -48,17 +48,6 @@ jobs:
       - name: Build Windows release
         working-directory: app
         run: flutter build windows --release
-
-      - name: Package Standalone Zip
-        shell: pwsh
-        run: |
-          $src = @(
-            "app\build\windows\x64\runner\Release",
-            "app\build\windows\runner\Release"
-          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $src) { Write-Error "Release folder not found"; exit 1 }
-          Write-Host "Zipping from $src"
-          Compress-Archive -Path "$src\*" -DestinationPath "unotusk-employee-windows-x64.zip" -Force
 
       - name: Build MSI Installer
         shell: pwsh
@@ -67,7 +56,9 @@ jobs:
             "app\build\windows\x64\runner\Release",
             "app\build\windows\runner\Release"
           ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          powershell -ExecutionPolicy Bypass -File scripts/package_windows_msi.ps1 `
+          if (-not $src) { Write-Error "Release directory not found"; exit 1 }
+
+          pwsh -ExecutionPolicy Bypass -File scripts/package_windows_msi.ps1 `
             -AppName "Unotusk Employee" `
             -ExeName "app.exe" `
             -SourceDir "$src" `
@@ -75,21 +66,18 @@ jobs:
             -UpgradeCode "7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D" `
             -Version "1.0.1.0"
 
-      - name: Upload Employee App Artifacts
+      - name: Upload Employee App MSI
         uses: actions/upload-artifact@v4
         with:
-          name: unotusk-employee-windows-x64
-          path: |
-            unotusk-employee-windows-x64.zip
-            unotusk-employee-windows-x64.msi
-          if-no-files-found: warn
+          name: unotusk-employee-windows-x64.msi
+          path: unotusk-employee-windows-x64.msi
           retention-days: 14
 
   # ─────────────────────────────────────────────────────────────
-  # 2. Server Setup App: Windows x64 Build & Package
+  # 2. Server Setup App: Windows x64 MSI Installer
   # ─────────────────────────────────────────────────────────────
   build-server-windows:
-    name: "Server Setup App: Windows x64"
+    name: "Server Setup App: Windows x64 (.msi)"
     runs-on: windows-latest
     steps:
       - name: Checkout Code
@@ -113,17 +101,6 @@ jobs:
         working-directory: setup_app
         run: flutter build windows --release
 
-      - name: Package Standalone Zip
-        shell: pwsh
-        run: |
-          $src = @(
-            "setup_app\build\windows\x64\runner\Release",
-            "setup_app\build\windows\runner\Release"
-          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $src) { Write-Error "Release folder not found"; exit 1 }
-          Write-Host "Zipping from $src"
-          Compress-Archive -Path "$src\*" -DestinationPath "unotusk-server-setup-windows-x64.zip" -Force
-
       - name: Build Server Setup MSI Installer
         shell: pwsh
         run: |
@@ -131,7 +108,9 @@ jobs:
             "setup_app\build\windows\x64\runner\Release",
             "setup_app\build\windows\runner\Release"
           ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          powershell -ExecutionPolicy Bypass -File scripts/package_windows_msi.ps1 `
+          if (-not $src) { Write-Error "Release directory not found"; exit 1 }
+
+          pwsh -ExecutionPolicy Bypass -File scripts/package_windows_msi.ps1 `
             -AppName "Unotusk Server Setup" `
             -ExeName "setup_app.exe" `
             -SourceDir "$src" `
@@ -139,12 +118,9 @@ jobs:
             -UpgradeCode "9E4C5D6F-7A8B-9C0D-E1F2-3A4B5C6D7E8F" `
             -Version "1.0.1.0"
 
-      - name: Upload Server Setup App Artifacts
+      - name: Upload Server Setup App MSI
         uses: actions/upload-artifact@v4
         with:
-          name: unotusk-server-setup-windows-x64
-          path: |
-            unotusk-server-setup-windows-x64.zip
-            unotusk-server-setup-windows-x64.msi
-          if-no-files-found: warn
+          name: unotusk-server-setup-windows-x64.msi
+          path: unotusk-server-setup-windows-x64.msi
           retention-days: 14

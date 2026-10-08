@@ -128,6 +128,12 @@ class DeploymentEngine {
       final projectName = toComposeProjectName(config.serverName);
 
       if (target.isLocal) {
+        // Ensure local pre-built images are mapped to the expected version tags
+        try {
+          await _processExecutor('docker', ['tag', 'install-unotusk-api:latest', 'unotusk-api:0.1.0']);
+          await _processExecutor('docker', ['tag', 'install-unotusk-worker:latest', 'unotusk-worker:0.1.0']);
+        } catch (_) {}
+
         // 3. Starting Services
         onStageChanged(DeployStage.startingServices);
         final startRes = await _processExecutor(
