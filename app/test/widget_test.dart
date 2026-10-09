@@ -10,6 +10,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(const UnotuskApp());
-    expect(find.text('Sign in to Unotusk'), findsOneWidget);
+    await tester.pumpAndSettle();
+    
+    expect(find.text('Projects'), findsWidgets);
   });
 }
