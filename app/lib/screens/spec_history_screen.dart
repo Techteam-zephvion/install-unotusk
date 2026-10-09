@@ -93,36 +93,31 @@ class _SpecHistoryScreenState extends State<SpecHistoryScreen> {
                       // Search input
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          height: 36,
                           decoration: BoxDecoration(
                             color: widget.palette.bgElevated,
                             border: Border.all(color: widget.palette.div),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(LucideIcons.search,
-                                  size: 13, color: widget.palette.textSec),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  textAlignVertical: TextAlignVertical.center,
-                                  onChanged: (val) =>
-                                      setState(() => _search = val),
-                                  style: UnoTypography.body(
-                                      color: widget.palette.text, fontSize: 13),
-                                  decoration: InputDecoration(
-                                    hintText: 'Search specs…',
-                                    hintStyle: UnoTypography.body(
-                                        color: widget.palette.textSec,
-                                        fontSize: 13),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: TextField(
+                            textAlignVertical: TextAlignVertical.center,
+                            onChanged: (val) =>
+                                setState(() => _search = val),
+                            style: UnoTypography.body(
+                                color: widget.palette.text, fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'Search specs…',
+                              hintStyle: UnoTypography.body(
+                                  color: widget.palette.textSec,
+                                  fontSize: 13),
+                              prefixIcon: Icon(LucideIcons.search,
+                                  size: 14, color: widget.palette.textSec),
+                              prefixIconConstraints:
+                                  const BoxConstraints(minWidth: 32, minHeight: 36),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.only(right: 10),
+                            ),
                           ),
                         ),
                       ),

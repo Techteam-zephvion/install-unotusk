@@ -127,6 +127,7 @@ class _AppShellState extends State<AppShell> {
   String _activeView = 'chat'; // chat, spec-history, graph, feed, admin
   String _defaultSettingsTab = 'general';
 
+  String? _activeConversationId;
   final List<ChatMessage> _messages = [];
   bool _isGenerating = false;
   final List<Timer> _generationTimers = [];
@@ -178,27 +179,19 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _openedProject = project;
       _openedProjectName = project.name;
+      _activeConversationId = null;
       _messages.clear();
       _isGenerating = false;
-      _activeView = 'overview';
+      _activeView = 'chat';
       _appStage = 'workspace';
     });
     ApiService.setActiveProject(project);
-    _loadProjectInitialChat(project);
-  }
-
-  void _loadProjectInitialChat(ProjectItem project) async {
-    try {
-      final chats = await ApiService.fetchRecentChats(projectId: project.id);
-      if (chats.isNotEmpty && mounted) {
-        _loadRecentChat(chats.first.id);
-      }
-    } catch (_) {}
   }
 
   void _handleBackToProjects() {
     _clearTimers();
     setState(() {
+      _activeConversationId = null;
       _messages.clear();
       _isGenerating = false;
       _activeView = 'chat';
@@ -210,6 +203,7 @@ class _AppShellState extends State<AppShell> {
     _clearTimers();
     ApiService.logout();
     setState(() {
+      _activeConversationId = null;
       _messages.clear();
       _openedProject = null;
       _openedProjectName = '';
@@ -226,6 +220,7 @@ class _AppShellState extends State<AppShell> {
   void _handleNewQuery() {
     _clearTimers();
     setState(() {
+      _activeConversationId = null;
       _messages.clear();
       _isGenerating = false;
       _activeView = 'chat';
@@ -238,13 +233,18 @@ class _AppShellState extends State<AppShell> {
     final queryId = 'q-${DateTime.now().millisecondsSinceEpoch}';
     final genId = 'g-${DateTime.now().millisecondsSinceEpoch + 1}';
 
-    ApiService.recordRecentChat(RecentChat(
-      id: queryId,
-      title: text.trim(),
-      ago: 'Just now',
-      time: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-      projectId: _openedProject?.id,
-    ));
+    // Only create a new recent chat record on the first query of a conversation thread
+    final isFirstMessage = _activeConversationId == null;
+    if (isFirstMessage) {
+      _activeConversationId = 'conv-${DateTime.now().millisecondsSinceEpoch}';
+      ApiService.recordRecentChat(RecentChat(
+        id: _activeConversationId!,
+        title: text.trim(),
+        ago: 'Just now',
+        time: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+        projectId: _openedProject?.id,
+      ));
+    }
 
     setState(() {
       _isGenerating = true;
@@ -264,6 +264,7 @@ class _AppShellState extends State<AppShell> {
       final responseData = await ApiService.askQuestionDetailed(
         projectId: _openedProject?.id,
         question: text.trim(),
+        conversationId: _activeConversationId,
       );
 
       if (!mounted) return;
@@ -308,6 +309,7 @@ class _AppShellState extends State<AppShell> {
     final convId = id.toString();
     _clearTimers();
     setState(() {
+      _activeConversationId = convId;
       _isGenerating = true;
       _messages.clear();
       _activeView = 'chat';

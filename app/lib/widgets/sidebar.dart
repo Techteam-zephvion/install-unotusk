@@ -49,6 +49,12 @@ class _UnoSidebarState extends State<UnoSidebar> {
     _loadRecentChats();
   }
 
+  @override
+  void didUpdateWidget(covariant UnoSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _loadRecentChats();
+  }
+
   void _loadRecentChats() async {
     try {
       final chats = await ApiService.fetchRecentChats();

@@ -161,40 +161,36 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
                   children: [
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        height: 42,
                         decoration: BoxDecoration(
                           color: AppColors.bgElevated,
                           border: Border.all(color: AppColors.divider),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, size: 16, color: AppColors.textSecondary),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                textAlignVertical: TextAlignVertical.center,
-                                onChanged: (_) => setState(() {}),
-                                style: AppTextStyles.inter(fontSize: 13),
-                                decoration: const InputDecoration(
-                                  hintText: 'Search specs…',
-                                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ),
-                            if (_searchController.text.isNotEmpty)
-                              InkWell(
-                                onTap: () {
-                                  _searchController.clear();
-                                  setState(() {});
-                                },
-                                child: const Icon(Icons.close, size: 14, color: AppColors.textSecondary),
-                              ),
-                          ],
+                        child: TextField(
+                          controller: _searchController,
+                          textAlignVertical: TextAlignVertical.center,
+                          onChanged: (_) => setState(() {}),
+                          style: AppTextStyles.inter(fontSize: 13),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Search specs…',
+                            hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.textSecondary),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 42),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 14, color: AppColors.textSecondary),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                  )
+                                : null,
+                            suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 42),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.only(right: 12),
+                          ),
                         ),
                       ),
                     ),
