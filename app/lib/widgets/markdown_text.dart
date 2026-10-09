@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 
-/// 10/10 Claude-Style Markdown & Artifact Compiler.
+/// Editorial Markdown & Artifact Compiler.
 ///
 /// Parses full CommonMark and GitHub Flavored Markdown into native Flutter widgets:
 /// - Fenced code blocks with language pills, file titles, line numbers, and instant copy button.
-/// - Claude-style interactive file and artifact cards (`<artifact ...>` / ```filename).
+/// - Interactive file and artifact cards (`<artifact ...>` / ```filename).
 /// - GFM tables with custom headers, cell alignment, zebra striping, and border dividers.
 /// - Callout / Alert banners (> [!NOTE], > [!TIP], > [!WARNING], > [!IMPORTANT]).
 /// - Rich headings (H1-H6) and comfortable paragraph typography (line height 1.65).
@@ -82,26 +82,26 @@ class MarkdownText extends StatelessWidget {
 
       Widget blockWidget;
       if (block is _CodeBlockNode) {
-        blockWidget = _ClaudeCodeBlock(
+        blockWidget = _UnoCodeBlock(
           node: block,
           palette: effectivePalette,
           onFileTap: onFileTap,
         );
       } else if (block is _ArtifactNode) {
-        blockWidget = _ClaudeArtifactCard(
+        blockWidget = _UnoArtifactCard(
           node: block,
           palette: effectivePalette,
           onFileTap: onFileTap,
         );
       } else if (block is _TableNode) {
-        blockWidget = _ClaudeTable(
+        blockWidget = _UnoTable(
           node: block,
           palette: effectivePalette,
           baseStyle: effectiveBaseStyle,
           onLinkTap: onLinkTap,
         );
       } else if (block is _CalloutNode) {
-        blockWidget = _ClaudeCallout(
+        blockWidget = _UnoCallout(
           node: block,
           palette: effectivePalette,
           baseStyle: effectiveBaseStyle,
@@ -296,25 +296,25 @@ class MarkdownText extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Claude-Style Fenced Code Block with Header Bar, Language Pill, and Copy
+// Fenced Code Block with Header Bar, Language Pill, and Copy
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ClaudeCodeBlock extends StatefulWidget {
+class _UnoCodeBlock extends StatefulWidget {
   final _CodeBlockNode node;
   final UnoPalette palette;
   final void Function(String filePath)? onFileTap;
 
-  const _ClaudeCodeBlock({
+  const _UnoCodeBlock({
     required this.node,
     required this.palette,
     this.onFileTap,
   });
 
   @override
-  State<_ClaudeCodeBlock> createState() => _ClaudeCodeBlockState();
+  State<_UnoCodeBlock> createState() => _UnoCodeBlockState();
 }
 
-class _ClaudeCodeBlockState extends State<_ClaudeCodeBlock> {
+class _UnoCodeBlockState extends State<_UnoCodeBlock> {
   bool _copied = false;
 
   void _copyCode() {
@@ -342,7 +342,7 @@ class _ClaudeCodeBlockState extends State<_ClaudeCodeBlock> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Claude-Style Top Bar ──
+          // ── Header Top Bar ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
@@ -432,25 +432,25 @@ class _ClaudeCodeBlockState extends State<_ClaudeCodeBlock> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Claude-Style Interactive Artifact / File Card
+// Uno Interactive Artifact / File Card
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ClaudeArtifactCard extends StatefulWidget {
+class _UnoArtifactCard extends StatefulWidget {
   final _ArtifactNode node;
   final UnoPalette palette;
   final void Function(String filePath)? onFileTap;
 
-  const _ClaudeArtifactCard({
+  const _UnoArtifactCard({
     required this.node,
     required this.palette,
     this.onFileTap,
   });
 
   @override
-  State<_ClaudeArtifactCard> createState() => _ClaudeArtifactCardState();
+  State<_UnoArtifactCard> createState() => _UnoArtifactCardState();
 }
 
-class _ClaudeArtifactCardState extends State<_ClaudeArtifactCard> {
+class _UnoArtifactCardState extends State<_UnoArtifactCard> {
   bool _expanded = true;
   bool _copied = false;
 
@@ -558,16 +558,16 @@ class _ClaudeArtifactCardState extends State<_ClaudeArtifactCard> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Claude-Style Table Renderer
+// Uno Table Renderer
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ClaudeTable extends StatelessWidget {
+class _UnoTable extends StatelessWidget {
   final _TableNode node;
   final UnoPalette palette;
   final TextStyle baseStyle;
   final void Function(String url)? onLinkTap;
 
-  const _ClaudeTable({
+  const _UnoTable({
     required this.node,
     required this.palette,
     required this.baseStyle,
@@ -651,16 +651,16 @@ class _ClaudeTable extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Claude-Style Callout / Alert Box
+// Uno Callout / Alert Box
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ClaudeCallout extends StatelessWidget {
+class _UnoCallout extends StatelessWidget {
   final _CalloutNode node;
   final UnoPalette palette;
   final TextStyle baseStyle;
   final void Function(String url)? onLinkTap;
 
-  const _ClaudeCallout({
+  const _UnoCallout({
     required this.node,
     required this.palette,
     required this.baseStyle,
@@ -1084,7 +1084,7 @@ class _MarkdownParser {
         continue;
       }
 
-      // ── Claude Artifact Tag: <artifact ...> or <antArtifact ...> ──
+      // ── Uno Artifact Tag: <artifact ...> or <antArtifact ...> ──
       if (trimmed.startsWith('<artifact') || trimmed.startsWith('<antArtifact')) {
         final artifactMatch = RegExp(r'<(?:antA|a)rtifact(?:\s+identifier="([^"]*)")?(?:\s+type="([^"]*)")?(?:\s+title="([^"]*)")?[^>]*>').firstMatch(trimmed);
         final id = artifactMatch?.group(1) ?? '';

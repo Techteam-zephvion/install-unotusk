@@ -9,6 +9,8 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/logging/diagnostic_logs_modal.dart';
+import '../../../core/update/update_dialog.dart';
+import '../../../core/update/update_service.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../connection/presentation/connection_controller.dart';
 
@@ -19,6 +21,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
     final connectionState = ref.watch(connectionControllerProvider);
+    final updateState = ref.watch(updateStateProvider);
     final user = authState.user;
 
     return DesktopScaffold(
@@ -169,10 +172,68 @@ class SettingsScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        StatusBadge(
-                          label: 'DESKTOP-FIRST',
-                          variant: BadgeVariant.info,
+                        Row(
+                          children: [
+                            const StatusBadge(
+                              label: 'DESKTOP-FIRST',
+                              variant: BadgeVariant.info,
+                            ),
+                            const SizedBox(width: 8),
+                            if (updateState.value?.hasUpdate ?? false)
+                              const StatusBadge(
+                                label: 'UPDATE AVAILABLE',
+                                variant: BadgeVariant.success,
+                              )
+                            else
+                              const StatusBadge(
+                                label: 'UP TO DATE',
+                                variant: BadgeVariant.neutral,
+                              ),
+                          ],
                         ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Software Updates', style: AppTextStyles.label),
+                            const SizedBox(height: 2),
+                            if (updateState.isLoading)
+                              Text(
+                                'Checking for latest releases...',
+                                style: AppTextStyles.bodySmall,
+                              )
+                            else if (updateState.value?.hasUpdate ?? false)
+                              Text(
+                                'v${updateState.value!.latestVersion} (${updateState.value!.codename}) available',
+                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.success),
+                              )
+                            else
+                              Text(
+                                'You are running the latest version (v${AppConfig.appVersion})',
+                                style: AppTextStyles.bodySmall,
+                              ),
+                          ],
+                        ),
+                        if (updateState.value?.hasUpdate ?? false)
+                          AppButton(
+                            text: 'Update Now',
+                            icon: Icons.system_update_alt_rounded,
+                            variant: AppButtonVariant.primary,
+                            onPressed: () => UpdateDialog.show(context, updateState.value!),
+                          )
+                        else
+                          AppButton(
+                            text: 'Check for Updates',
+                            icon: Icons.refresh,
+                            variant: AppButtonVariant.secondary,
+                            isLoading: updateState.isLoading,
+                            onPressed: () => ref.read(updateStateProvider.notifier).check(force: true),
+                          ),
                       ],
                     ),
                     const Divider(height: 24),

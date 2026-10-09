@@ -407,7 +407,7 @@ class _AskTabState extends ConsumerState<AskTab> {
       body: Stack(
         children: [
           if (!hasMessages)
-            // ── Hero State (Claude AI Warm Serif Hero) ──
+            // ── Hero State (Warm Serif Hero) ──
             Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
@@ -422,6 +422,17 @@ class _AskTabState extends ConsumerState<AskTab> {
                         child: Text(
                           'Investigate your project?',
                           style: AppTextStyles.heroHeading,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          'Investigate your project, architecture, or code decisions',
+                          style: AppTextStyles.inter(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),

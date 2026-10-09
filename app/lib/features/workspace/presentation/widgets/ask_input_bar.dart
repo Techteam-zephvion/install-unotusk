@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 
@@ -40,6 +42,26 @@ class _AskInputBarState extends State<AskInputBar> {
   String? _activeSearchMode; // 'research' | 'web' | null
   bool _piEnabled = false;
   bool _showSuggestions = false;
+  final List<String> _attachedFileNames = [];
+
+  Future<void> _handlePickFiles() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.any,
+      );
+      if (result.isNotEmpty) {
+        setState(() {
+          for (final f in result) {
+            if (f.name.isNotEmpty && !_attachedFileNames.contains(f.name)) {
+              _attachedFileNames.add(f.name);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('File picker error: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -79,7 +101,10 @@ class _AskInputBarState extends State<AskInputBar> {
 
   void _submit(String text) {
     if (widget.controller.text.trim().isEmpty || widget.isGenerating) return;
-    setState(() => _showSuggestions = false);
+    setState(() {
+      _showSuggestions = false;
+      _attachedFileNames.clear();
+    });
     final effectiveTier = _thinkingEnabled ? _thinkingTier : ThinkingTier.warm;
     if (widget.onSubmittedWithTier != null) {
       widget.onSubmittedWithTier!(text, effectiveTier);
@@ -187,35 +212,95 @@ class _AskInputBarState extends State<AskInputBar> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Text input field
-                  TextField(
-                    controller: widget.controller,
-                    onChanged: (text) {
-                      setState(() {
-                        _showSuggestions = text.trim().isNotEmpty && widget.suggestions.isNotEmpty;
-                      });
+                  // Text input field with Enter submission and Shift+Enter for newline
+                  Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent) {
+                        final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+                            event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                        if (isEnter) {
+                          if (HardwareKeyboard.instance.isShiftPressed) {
+                            return KeyEventResult.ignored;
+                          } else {
+                            if (canSubmit) {
+                              _submit(widget.controller.text);
+                            }
+                            return KeyEventResult.handled;
+                          }
+                        }
+                      }
+                      return KeyEventResult.ignored;
                     },
-                    onSubmitted: (text) {
-                      if (canSubmit) _submit(text);
-                    },
-                    style: AppTextStyles.inter(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                      height: 1.5,
-                    ),
-                    maxLines: null,
-                    decoration: InputDecoration(
-                      hintText: widget.placeholder ??
-                          'Ask about a merge, a ticket, or a decision on your project…',
-                      hintStyle: AppTextStyles.inter(
-                        fontSize: 14,
-                        color: AppColors.textSecondary.withValues(alpha: 0.8),
+                    child: TextField(
+                      controller: widget.controller,
+                      onChanged: (text) {
+                        setState(() {
+                          _showSuggestions = text.trim().isNotEmpty && widget.suggestions.isNotEmpty;
+                        });
+                      },
+                      onSubmitted: (text) {
+                        if (canSubmit) _submit(text);
+                      },
+                      textInputAction: TextInputAction.send,
+                      style: AppTextStyles.inter(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                        height: 1.5,
                       ),
-                      isDense: true,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.only(bottom: 12),
+                      maxLines: null,
+                      decoration: InputDecoration(
+                        hintText: widget.placeholder ??
+                            'Ask about a merge, a ticket, or a decision on your project…',
+                        hintStyle: AppTextStyles.inter(
+                          fontSize: 14,
+                          color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        ),
+                        isDense: true,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.only(bottom: 12),
+                      ),
                     ),
                   ),
+
+                  // Attached files chips
+                  if (_attachedFileNames.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _attachedFileNames.map((name) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentMuted,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.attach_file, size: 12, color: AppColors.accent),
+                                const SizedBox(width: 4),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 160),
+                                  child: Text(
+                                    name,
+                                    style: AppTextStyles.mono(fontSize: 11, color: AppColors.textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () => setState(() => _attachedFileNames.remove(name)),
+                                  child: const Icon(Icons.close, size: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
 
                   // Bottom Toolbar inside container
                   Container(
@@ -245,7 +330,7 @@ class _AskInputBarState extends State<AskInputBar> {
                             // Paperclip
                             _buildIconBtn(
                               icon: Icons.attach_file,
-                              onTap: () {},
+                              onTap: _handlePickFiles,
                               tooltip: 'Attach context file or ticket',
                             ),
                             const SizedBox(width: 8),
@@ -394,11 +479,6 @@ class _AskInputBarState extends State<AskInputBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildDropdownItem(
-            icon: Icons.attach_file,
-            title: 'Upload files',
-            onTap: () => setState(() => _plusOpen = false),
-          ),
           _buildDropdownItem(
             icon: Icons.create_new_folder_outlined,
             title: 'Add to project',

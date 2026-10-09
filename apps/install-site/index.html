@@ -289,6 +289,28 @@
                 </div>
             </div>
 
+            <div class="mt-6 p-5 hairline-all bg-surface rounded-[2px]">
+                <div class="flex items-start gap-3.5">
+                    <svg class="w-5 h-5 text-accent shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="space-y-2 text-sm text-inkSecondary leading-relaxed">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-ink font-mono text-xs uppercase tracking-wider">macOS Installation Notice</span>
+                            <span class="text-xs text-inkMuted">&bull; Gatekeeper Bypass</span>
+                        </div>
+                        <p class="text-xs sm:text-sm">
+                            Because Unotusk is distributed directly via disk image (.dmg), macOS Gatekeeper may show <em>"Unotusk is damaged and can't be opened"</em> or <em>"cannot be opened because developer cannot be verified"</em>. This is default macOS quarantine for downloaded software without an enterprise Apple Developer ID.
+                        </p>
+                        <div class="bg-paper hairline-all p-3 rounded-[2px] font-mono text-xs text-ink flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <code class="text-accent select-all">xattr -cr /Applications/Unotusk.app</code>
+                            <span class="text-[11px] text-inkMuted">Run in Terminal after moving to Applications folder</span>
+                        </div>
+                        <p class="text-[11px] sm:text-xs text-inkMuted">
+                            Alternatively: Open <strong>System Settings &rarr; Privacy &amp; Security</strong>, scroll to the <strong>Security</strong> section, and click <strong>"Open Anyway"</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-4 text-sm text-inkMuted font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span>All client distributions connect over HTTP REST to your designated server IP on port 28000.</span>
                 <span class="hidden sm:inline-block">SHA-256 verified signatures in release manifest</span>

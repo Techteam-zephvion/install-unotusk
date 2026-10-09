@@ -52,7 +52,8 @@ class AuthService:
                 extra_claims={"email": existing_user.email},
             )
 
-            await AuthService._auto_provision_if_needed(session, existing_user.id, default_org_id)
+            if default_org_id:
+                await AuthService._auto_provision_if_needed(session, existing_user.id, default_org_id)
 
             return TokenResponse(
                 access_token=token,
@@ -142,7 +143,6 @@ class AuthService:
             default_organization_id=default_org_id,
         )
 
-
     @staticmethod
     async def _auto_provision_if_needed(session: AsyncSession, user_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         from apps.api.src.config.settings import settings
@@ -155,7 +155,7 @@ class AuthService:
             # Simple check to see if user has any projects
             result = await session.execute(select(Project).where(Project.organization_id == organization_id))
             if result.scalars().first() is not None:
-                return # Already provisioned
+                return  # Already provisioned
 
             import urllib.parse
 

@@ -44,12 +44,17 @@ class ChatScreen extends StatefulWidget {
     ),
   ];
 
+  final String? userName;
+  final String? projectName;
+
   const ChatScreen({
     super.key,
     required this.palette,
     required this.messages,
     required this.isGenerating,
     required this.onSubmitQuery,
+    this.userName,
+    this.projectName,
   });
 
   @override
@@ -59,6 +64,13 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 
   void _handleSubmit() {
     final text = _inputController.text.trim();
@@ -86,6 +98,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildHero() {
+    final name = widget.userName != null && widget.userName!.isNotEmpty
+        ? widget.userName!
+        : 'Developer';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -100,11 +116,22 @@ class _ChatScreenState extends State<ChatScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      'Investigate your project?',
+                      '${_getGreeting()}, $name',
                       textAlign: TextAlign.center,
                       style: UnoTypography.displaySerif(
                         palette: widget.palette,
-                        fontSize: 26,
+                        fontSize: 30,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.projectName != null && widget.projectName!.isNotEmpty
+                          ? 'Investigate ${widget.projectName}, architecture, or code decisions'
+                          : 'Investigate your project, architecture, or code decisions',
+                      textAlign: TextAlign.center,
+                      style: UnoTypography.body(
+                        color: widget.palette.textSec,
+                        fontSize: 14,
                       ),
                     ),
                     const SizedBox(height: 24),

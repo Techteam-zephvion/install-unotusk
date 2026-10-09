@@ -1,8 +1,19 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from apps.api.src.config.settings import settings
 from apps.api.src.services.context_engine.ranker import RankedCandidate
+
+
+def _json_safe(val: Any) -> Any:
+    if isinstance(val, uuid.UUID):
+        return str(val)
+    if isinstance(val, dict):
+        return {str(k): _json_safe(v) for k, v in val.items()}
+    if isinstance(val, list | tuple | set):
+        return [_json_safe(v) for v in val]
+    return val
 
 
 @dataclass
@@ -39,9 +50,21 @@ class ContextAssembler:
             if len(cand.content) > 1500:
                 truncated_content += "\n... [truncated]"
 
+            commit_info = ""
+            if cand.metadata.get("commit_message"):
+                commit_sha_short = (
+                    cand.metadata.get("commit_sha", "")[:8]
+                    if cand.metadata.get("commit_sha")
+                    else "HEAD"
+                )
+                commit_info = f"- Commit: {commit_sha_short} — {cand.metadata['commit_message']}\n"
+            elif cand.metadata.get("commit_sha"):
+                commit_info = f"- Commit: {cand.metadata['commit_sha'][:8]}\n"
+
             candidate_section = (
                 f"### [{cand.entity_type}] {cand.path}\n"
                 f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
+                f"{commit_info}"
                 f"- Relevance Score: {r.score}\n"
                 f"- Code / Evidence Snippet:\n"
                 f"```\n{truncated_content}\n```\n"
@@ -57,16 +80,27 @@ class ContextAssembler:
             used_count += 1
 
             # Prepare structured evidence item
-            evidence_items.append(
-                {
-                    "type": cand.entity_type.lower(),
-                    "file": cand.path,
-                    "symbol": cand.name if cand.entity_type in ("SYMBOL", "CHUNK") else None,
-                    "lines": f"{cand.start_line}-{cand.end_line}",
-                    "relevance": r.score,
-                    "snippet": cand.content[:200],
-                }
-            )
+            evidence_item: dict[str, Any] = {
+                "type": cand.entity_type.lower(),
+                "file": cand.path,
+                "symbol": cand.name if cand.entity_type in ("SYMBOL", "CHUNK") else None,
+                "lines": f"{cand.start_line}-{cand.end_line}",
+                "relevance": r.score,
+                "snippet": cand.content[:200],
+            }
+            if cand.metadata:
+                for k in (
+                    "commit_sha",
+                    "commit_message",
+                    "fingerprint",
+                    "provenance",
+                    "snapshot_id",
+                    "chunk_type",
+                ):
+                    if k in cand.metadata and cand.metadata[k] is not None:
+                        evidence_item[k] = _json_safe(cand.metadata[k])
+
+            evidence_items.append(evidence_item)
 
             if cand.name and cand.name not in ("dependency", "import"):
                 related_entities.add(cand.name)

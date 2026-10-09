@@ -107,35 +107,42 @@ class _FilesTabState extends ConsumerState<FilesTab> {
             // Header Bar & Search Controls
             Row(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Project Files',
-                      style: AppTextStyles.h2.copyWith(fontSize: 16, color: AppColors.slate900),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${files.length} files tracked in current snapshot',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Project Files',
+                        style: AppTextStyles.h2.copyWith(fontSize: 16, color: AppColors.slate900),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${files.length} files tracked in current snapshot',
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-                const Spacer(),
-                SizedBox(
-                  width: 320,
-                  child: FileSearchBar(
-                    controller: _searchController,
-                    onChanged: (query) {
-                      setState(() {
-                        _searchQuery = query;
-                      });
-                    },
-                    onClear: () {
-                      setState(() {
-                        _searchQuery = '';
-                      });
-                    },
+                const SizedBox(width: 16),
+                Flexible(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: FileSearchBar(
+                      controller: _searchController,
+                      onChanged: (query) {
+                        setState(() {
+                          _searchQuery = query;
+                        });
+                      },
+                      onClear: () {
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                    ),
                   ),
                 ),
               ],

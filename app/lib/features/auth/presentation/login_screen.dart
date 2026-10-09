@@ -47,15 +47,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     if (mounted) setState(() {});
   }
 
-  void _quickFillDemoAdmin() {
-    setState(() {
-      _emailCtrl.text = 'lead@acme.com';
-      _passwordCtrl.text = 'adminpassword123';
-      _showPasswordField = true;
-      _screen = _AuthScreen.entry;
-    });
-  }
-
   @override
   void dispose() {
     _emailCtrl.removeListener(_onTextChanged);
@@ -198,7 +189,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
           onGoogleProvider: () => _handleProviderButton('Google OIDC'),
           onMicrosoftProvider: () => _handleProviderButton('Microsoft Entra OIDC'),
           onCustomIssuer: () => setState(() => _screen = _AuthScreen.newOrg),
-          onQuickFillDemo: _quickFillDemoAdmin,
           connectionState: connectionState,
         );
       case _AuthScreen.checking: return _CheckingCard(key: key, dotCount: _dotCount, email: _emailCtrl.text.trim());
@@ -246,7 +236,7 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
 class _EntryCard extends StatelessWidget {
   final TextEditingController emailCtrl, passwordCtrl;
   final bool showPasswordField, obscurePassword, isValidEmail;
-  final VoidCallback onObscureToggle, onContinue, onPasswordSignIn, onGoogleProvider, onMicrosoftProvider, onCustomIssuer, onQuickFillDemo;
+  final VoidCallback onObscureToggle, onContinue, onPasswordSignIn, onGoogleProvider, onMicrosoftProvider, onCustomIssuer;
   final dynamic connectionState;
   const _EntryCard({
     super.key,
@@ -261,7 +251,6 @@ class _EntryCard extends StatelessWidget {
     required this.onGoogleProvider,
     required this.onMicrosoftProvider,
     required this.onCustomIssuer,
-    required this.onQuickFillDemo,
     required this.connectionState,
   });
   @override
@@ -283,38 +272,7 @@ class _EntryCard extends StatelessWidget {
     ],
     const SizedBox(height: 12),
     _OidcButton(label: showPasswordField ? 'Sign in' : 'Continue with OIDC Discovery', enabled: isValidEmail, filled: true, onPressed: showPasswordField ? onPasswordSignIn : onContinue),
-    const SizedBox(height: 8),
-    GestureDetector(
-      onTap: onQuickFillDemo,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppColors.accentMuted,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.bolt, size: 14, color: AppColors.accent),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                'Demo Admin (lead@acme.com)',
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.accent,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-    const SizedBox(height: 8),
+    const SizedBox(height: 12),
     Row(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,

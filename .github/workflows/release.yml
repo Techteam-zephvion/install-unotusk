@@ -153,7 +153,7 @@ jobs:
             "           Version='$ver' Manufacturer='Unotusk Pvt. Ltd.'"
             "           UpgradeCode='7D2A3F4E-8B9C-4D5E-A6F7-1C2B3A495E6D'>"
             "    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>"
-            "    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>"
+            "    <MajorUpgrade Schedule='afterInstallInitialize' AllowSameVersionUpgrades='yes' DowngradeErrorMessage='A newer version is already installed.'/>"
             "    <MediaTemplate EmbedCab='yes'/>"
             "    <Feature Id='ProductFeature' Title='Unotusk Employee' Level='1'>"
             "      <ComponentGroupRef Id='AppComponents'/>"
@@ -252,7 +252,9 @@ jobs:
         working-directory: app/build/macos/Build/Products/Release
         run: |
           APP=$(ls -d *.app 2>/dev/null | head -1)
-          if [ -z "$APP" ]; then echo "No .app found"; ls -la; exit 1; fi
+          # Clean extended attributes and apply valid ad-hoc deep code signing
+          xattr -cr "$APP" || true
+          codesign --force --deep --sign - "$APP" || true
 
           create-dmg \
             --volname "Unotusk Employee" \
@@ -413,7 +415,7 @@ jobs:
             "           Version='$ver' Manufacturer='Unotusk Pvt. Ltd.'"
             "           UpgradeCode='9E4C5D6F-7A8B-9C0D-E1F2-3A4B5C6D7E8F'>"
             "    <Package InstallerVersion='500' Compressed='yes' InstallScope='perMachine' Platform='x64'/>"
-            "    <MajorUpgrade DowngradeErrorMessage='A newer version is already installed.'/>"
+            "    <MajorUpgrade Schedule='afterInstallInitialize' AllowSameVersionUpgrades='yes' DowngradeErrorMessage='A newer version is already installed.'/>"
             "    <MediaTemplate EmbedCab='yes'/>"
             "    <Feature Id='ProductFeature' Title='Unotusk Server Setup' Level='1'>"
             "      <ComponentGroupRef Id='AppComponents'/>"

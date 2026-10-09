@@ -76,28 +76,35 @@ class _ArchitectureTabState extends ConsumerState<ArchitectureTab> {
         // Header & Search
         Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Component Relationships',
-                  style: AppTextStyles.h2.copyWith(fontSize: 16, color: AppColors.slate900),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${allComponents.length} components • ${deps.length} dependency edges',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Component Relationships',
+                    style: AppTextStyles.h2.copyWith(fontSize: 16, color: AppColors.slate900),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${allComponents.length} components • ${deps.length} dependency edges',
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.slate500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            const Spacer(),
-            SizedBox(
-              width: 320,
-              child: FileSearchBar(
-                controller: _searchController,
-                hintText: 'Filter components by name...',
-                onChanged: (q) => setState(() => _searchQuery = q),
-                onClear: () => setState(() => _searchQuery = ''),
+            const SizedBox(width: 16),
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: FileSearchBar(
+                  controller: _searchController,
+                  hintText: 'Filter components by name...',
+                  onChanged: (q) => setState(() => _searchQuery = q),
+                  onClear: () => setState(() => _searchQuery = ''),
+                ),
               ),
             ),
           ],

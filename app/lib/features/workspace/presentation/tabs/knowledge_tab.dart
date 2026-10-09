@@ -130,11 +130,14 @@ class _KnowledgeTabState extends ConsumerState<KnowledgeTab> {
                 height: 38,
                 child: TextField(
                   controller: _searchController,
+                  textAlignVertical: TextAlignVertical.center,
                   style: AppTextStyles.bodySmall,
                   decoration: InputDecoration(
+                    isDense: true,
                     hintText: 'Search knowledge context...',
                     hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.slate400),
                     prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.slate400),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 38),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 14, color: AppColors.slate500),
@@ -146,7 +149,8 @@ class _KnowledgeTabState extends ConsumerState<KnowledgeTab> {
                             },
                           )
                         : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    suffixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 38),
+                    contentPadding: const EdgeInsets.only(right: 10),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.slate200)),

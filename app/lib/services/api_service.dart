@@ -16,11 +16,89 @@ class ApiService {
   static String baseUrl = 'http://$serverHost';
 
   static final List<RecentChat> _recordedChats = [];
+  static final List<RecentChat> _allRecentChats = [];
+  static final ValueNotifier<List<RecentChat>> recentChatsNotifier =
+      ValueNotifier<List<RecentChat>>([]);
+
+  static List<RecentChat> get recordedChats => List.unmodifiable(_recordedChats);
+  static List<RecentChat> get allRecentChats => List.unmodifiable(_allRecentChats);
 
   /// Records recently created conversation queries so they appear in RECENT
   static void recordRecentChat(RecentChat chat) {
     _recordedChats.removeWhere((c) => c.title == chat.title || c.id == chat.id);
     _recordedChats.insert(0, chat);
+
+    // Keep all existing chats (server chats and previous chats) and prepend the new chat at the top!
+    _allRecentChats.removeWhere((c) => c.title == chat.title || c.id == chat.id);
+    _allRecentChats.insert(0, chat);
+    recentChatsNotifier.value = List.of(_allRecentChats);
+  }
+
+  /// Updates a recorded recent chat ID once the server assigns a permanent UUID
+  static void updateRecentChatId(String oldId, String newId, {String? newTitle}) {
+    final idxRecorded = _recordedChats.indexWhere((c) => c.id == oldId);
+    if (idxRecorded != -1) {
+      final old = _recordedChats[idxRecorded];
+      _recordedChats[idxRecorded] = RecentChat(
+        id: newId,
+        title: newTitle ?? old.title,
+        ago: old.ago,
+        time: old.time,
+        projectId: old.projectId,
+        messageCount: old.messageCount,
+      );
+    }
+
+    final idxAll = _allRecentChats.indexWhere((c) => c.id == oldId);
+    if (idxAll != -1) {
+      final old = _allRecentChats[idxAll];
+      _allRecentChats[idxAll] = RecentChat(
+        id: newId,
+        title: newTitle ?? old.title,
+        ago: old.ago,
+        time: old.time,
+        projectId: old.projectId,
+        messageCount: old.messageCount,
+      );
+      recentChatsNotifier.value = List.of(_allRecentChats);
+    }
+  }
+
+  /// Removes a chat from recent history
+  static void removeRecentChat(dynamic id) {
+    final strId = id.toString();
+    _recordedChats.removeWhere((c) => c.id == strId);
+    _allRecentChats.removeWhere((c) => c.id == strId);
+    recentChatsNotifier.value = List.of(_allRecentChats);
+  }
+
+  /// Renames a chat in recent history
+  static void renameRecentChat(dynamic id, String newTitle) {
+    final strId = id.toString();
+    for (var list in [_recordedChats, _allRecentChats]) {
+      final idx = list.indexWhere((c) => c.id == strId);
+      if (idx != -1) {
+        list[idx].title = newTitle;
+      }
+    }
+    recentChatsNotifier.value = List.of(_allRecentChats);
+  }
+
+  /// Toggles pin state of a chat
+  static void togglePinRecentChat(dynamic id) {
+    final strId = id.toString();
+    for (var list in [_recordedChats, _allRecentChats]) {
+      final idx = list.indexWhere((c) => c.id == strId);
+      if (idx != -1) {
+        list[idx].isPinned = !list[idx].isPinned;
+      }
+    }
+    _allRecentChats.sort((a, b) {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0;
+    });
+    recentChatsNotifier.value = List.of(_allRecentChats);
   }
 
   /// Sets custom server host or port dynamically (e.g., localhost:28000 or 10.0.0.59:28000)
@@ -618,10 +696,15 @@ class ApiService {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
 
-    final bodyPayload = {
+    final bodyPayload = <String, dynamic>{
       'question': question,
-      'conversation_id': ?conversationId,
     };
+    if (conversationId != null &&
+        conversationId.isNotEmpty &&
+        !conversationId.startsWith('temp-') &&
+        !conversationId.startsWith('conv-')) {
+      bodyPayload['conversation_id'] = conversationId;
+    }
 
     final res = await _client
         .post(
@@ -633,6 +716,7 @@ class ApiService {
 
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final returnedConvId = data['conversation_id']?.toString();
       final content = data['content']?.toString() ?? 'No response content.';
       final confidence = data['confidence']?.toString().toUpperCase() ?? 'HIGH';
       final debugSignals = data['debug_signals'] as Map<String, dynamic>? ?? {};
@@ -700,6 +784,7 @@ class ApiService {
       );
 
       return QueryResponseData(
+        conversationId: returnedConvId,
         segments: [
           ResponseSegment(
             text: content,
@@ -749,41 +834,53 @@ class ApiService {
     try {
       final pid = _resolveProjectId(projectId);
       final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations');
-      final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+      final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
 
       if (res.statusCode == 200) {
         final List<dynamic> list = jsonDecode(res.body);
-        if (list.isNotEmpty) {
-          final serverChats = list.map((item) {
-            final m = item as Map<String, dynamic>;
-            final id = m['id']?.toString() ?? '';
-            final title = m['title']?.toString() ?? 'Conversation';
-            final createdAtStr = m['created_at']?.toString() ?? '';
-            final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
+        final serverChats = list.map((item) {
+          final m = item as Map<String, dynamic>;
+          final id = m['id']?.toString() ?? '';
+          final title = m['title']?.toString() ?? 'Conversation';
+          final createdAtStr = m['created_at']?.toString() ?? '';
+          final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
 
-            return RecentChat(
-              id: id,
-              title: title,
-              ago: _formatTimeAgo(createdAt),
-              time: _formatClockTime(createdAt),
-              messageCount: (m['message_count'] as num?)?.toInt() ?? 0,
-            );
-          }).toList();
+          return RecentChat(
+            id: id,
+            title: title,
+            ago: _formatTimeAgo(createdAt),
+            time: _formatClockTime(createdAt),
+            messageCount: (m['message_count'] as num?)?.toInt() ?? 0,
+          );
+        }).toList();
 
-          for (final rec in _recordedChats) {
-            if (!serverChats.any((s) => s.title == rec.title)) {
-              serverChats.insert(0, rec);
-            }
+        // Merge newly recorded chats that may not yet be returned from the server
+        final merged = <RecentChat>[...serverChats];
+        for (final rec in _recordedChats) {
+          if (!merged.any((s) => s.id == rec.id || s.title == rec.title)) {
+            merged.insert(0, rec);
           }
-          return serverChats;
         }
+        _allRecentChats.clear();
+        _allRecentChats.addAll(merged);
+        recentChatsNotifier.value = List.of(_allRecentChats);
+        return List.of(_allRecentChats);
       }
     } catch (e) {
       debugPrint('[ApiService] fetchRecentChats error: $e');
     }
 
+    if (_allRecentChats.isNotEmpty) {
+      recentChatsNotifier.value = List.of(_allRecentChats);
+      return List.of(_allRecentChats);
+    }
+
     // Fallback: return only chats recorded in this session (no mock data)
-    return <RecentChat>[..._recordedChats];
+    final fallback = <RecentChat>[..._recordedChats];
+    _allRecentChats.clear();
+    _allRecentChats.addAll(fallback);
+    recentChatsNotifier.value = List.of(_allRecentChats);
+    return fallback;
   }
 
   /// Fetches archived conversation threads from http://10.0.0.59:28000

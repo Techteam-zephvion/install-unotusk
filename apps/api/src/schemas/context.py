@@ -56,9 +56,11 @@ class DependencyRead(BaseModel):
 
 class ProjectContextMetrics(BaseModel):
     total_files: int = 0
+    total_sloc: int = 0
     languages_count: int = 0
     symbols_count: int = 0
     dependencies_count: int = 0
+    total_findings: int = 0
     language_distribution: dict[str, int] = Field(default_factory=dict)
 
 
@@ -76,6 +78,10 @@ class CodeChunkRead(BaseModel):
     content: str
     start_line: int
     end_line: int
+    commit_sha: str | None = None
+    commit_message: str | None = None
+    fingerprint: str | None = None
+    provenance: dict[str, Any] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

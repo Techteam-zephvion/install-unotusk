@@ -1,128 +1,167 @@
-# Unotusk MVP — Stage 0 Foundation
+# Unotusk — Codebase Intelligence & Project Insights
 
-A clean-slate, production-oriented technical foundation for the **Unotusk Project Intelligence** product.
-
-This repository establishes the authoritative baseline for tenant isolation, project boundaries, pgvector-ready persistence, background task plumbing, and Next.js frontend workflows.
+**Unotusk** is an evidence-grounded codebase intelligence platform designed for engineering teams. It analyzes repositories through multi-language AST parsing, extracts architectural ontology graphs, proactively discovers systemic risks, and provides a conversational interface backed strictly by verified code evidence and Architectural Decision Records (ADRs).
 
 ---
 
 ## 1. System Architecture
 
 ```
-Unotusk-MVP/
+                               ┌──────────────────────────────────────────────┐
+                               │       Unotusk Desktop Client (app/)          │
+                               │   Figma Warm Dark Design System (#181816)    │
+                               │      Native macOS (.dmg) | Windows (.msi)    │
+                               └──────────────────────┬───────────────────────┘
+                                                      │ HTTP REST (:28000 / :8000)
+                                                      ▼
+┌──────────────────────────────┐       ┌──────────────────────────────────────┐
+│  Server Setup App            │       │      FastAPI Async Backend           │
+│  (setup_app/)                ├──────►│      (apps/api/)                     │
+│  Single-command host deploy  │       │  ├── Tree-sitter Parser Engine       │
+│  & pre-flight diagnostics    │       │  ├── 9 Proactive Risk Analyzers      │
+└──────────────────────────────┘       │  ├── Grounded Context Engine         │
+                                       │  ├── Project Intelligence Reports    │
+                                       │  └── Knowledge Base Service (ADRs)   │
+                                       └──────────────┬──────────────────┬────┘
+                                                      │                  │
+                                                      ▼                  ▼
+                                           PostgreSQL 16 + pgvector    Redis 7 + Worker
+                                           (Relational Context, AST,  (services/workers/)
+                                            Embeddings, Findings)     (Async Ingestion)
+```
+
+---
+
+## 2. Core Capabilities Built to Date
+
+### 💬 Grounded Ask & Chat Engine
+* **Evidence-Anchored Responses**: Every answer is synthesized with code citations, file paths, line ranges, and relevance scoring.
+* **Full Multi-Turn History**: Persistent conversation threads with sidebar navigation, preserving historical queries across new and resumed sessions.
+* **Productive Desktop UX**: Natural `Enter` submission, `Shift+Enter` multi-line insertion, personalized time-of-day greetings, and responsive search filtering.
+
+### 🔍 Tree-sitter Code Parser Engine
+* Deep syntactic parsing for **Python**, **TypeScript / JavaScript**, and **Go**.
+* Extracts symbol tables, class hierarchies, import dependencies, function call graphs, and structural AST chunks.
+
+### 🛡️ 9 Proactive Risk Analyzers
+Identifies architectural degradation and codebase vulnerabilities without requiring manual rules:
+1. **God Module / Component Detector**: Flags monoliths exceeding complexity thresholds.
+2. **Circular Dependency Analyzer**: Maps dependency cycles across packages and files.
+3. **Dead / Orphaned Code Analyzer**: Detects unreachable modules and unreferenced exports.
+4. **Architectural Boundary Drift**: Flags cross-domain leakage violating system conventions.
+5. **High-Churn Fragility Analyzer**: Correlates commit frequency with error-prone files.
+6. **Security & Secrets Scanner**: Identifies hardcoded tokens and unsafe patterns.
+7. **Performance Bottleneck Detector**: Catches blocking synchronous operations on critical paths.
+8. **Test Coverage Disparity Analyzer**: Identifies mission-critical modules missing tests.
+9. **ADR Drift Analyzer**: Verifies whether active implementation aligns with documented ADRs.
+
+### 📊 9-Tab Workspace Experience (`app/`)
+* **Ask**: Conversational code intelligence with thinking tier controls (`Warm`, `Deep`).
+* **Spec History**: Versioned requirements, BDD specifications, and architectural diffs.
+* **Ontology Graph**: Interactive entity-relationship visualizer mapping files, symbols, and dependencies.
+* **Ingestion Feed**: Real-time parser feed showing file indexing progress and chunk metrics.
+* **Discoveries**: Severity-ranked findings feed with remediation suggestions.
+* **Architecture**: System-level topology, module boundaries, and dependency tiers.
+* **Files**: Centered search and exploration for ingested repository files.
+* **Knowledge**: ADR collection and engineering guidelines repository.
+* **Overview**: Project health dashboard, repository summary, and quick metrics.
+
+### 📦 Multi-Platform Packaging & Distribution
+* **macOS Disk Image (`.dmg`)**: Built for Apple Silicon & Intel, with Apple Sandbox network and user-selected file entitlements, deep ad-hoc code signing in CI, and Gatekeeper quarantine resolution.
+* **Windows MSI (`.msi`)**: Automated WiX Toolset compilation producing clean native installers.
+* **Linux Archive (`.tar.gz`)**: Standalone portable runtime bundles.
+* **Auto-Update System**: In-app version checker, dismissible update banners, and GitHub Releases asset downloads.
+
+---
+
+## 3. Repository Layout
+
+```
+install-unotusk/
+├── app/                  # Employee Desktop Client (Flutter, Warm Dark UI)
+│   ├── lib/              # UI screens, workspace tabs, controllers, API services
+│   ├── macos/            # macOS Runner & Sandbox Entitlements
+│   ├── windows/          # Windows native runner
+│   ├── linux/            # Linux GTK runner
+│   └── test/             # Widget, unit, and navigation test suites
+├── setup_app/            # Server Setup Wizard Desktop Application (Flutter)
 ├── apps/
-│   ├── web/                     # Next.js 14+ App Router frontend (TypeScript, Tailwind CSS)
-│   └── api/                     # FastAPI async backend (Python 3.12, SQLAlchemy 2, Pydantic v2)
-├── packages/
-│   └── types/                   # Shared TypeScript definitions for API contracts
+│   ├── api/              # FastAPI Backend, Tree-sitter engines, analyzers, LLM routing
+│   │   ├── src/          # API routers, intelligence services, database models
+│   │   └── requirements.txt
+│   └── install-site/     # Static distribution landing site & download portal
 ├── services/
-│   └── workers/                 # Lightweight Redis background task consumer
+│   └── workers/          # Redis background task worker (worker.py)
 ├── infrastructure/
-│   ├── docker/                  # Dockerfiles for web, api, and worker
-│   └── scripts/                 # Migration and helper scripts
-├── docs/
-│   └── architecture/
-│       └── stage-0.md           # Stage 0 architecture and security model
-├── tests/
-│   ├── unit/                    # Unit tests (schemas, slugification, security)
-│   ├── integration/             # Database relationships, cascading, Redis worker
-│   └── api/                     # Auth, Project CRUD, and Cross-Org Isolation tests
-├── .env.example                 # Example configuration
-├── docker-compose.yml           # Local multi-container development environment
-└── pytest.ini                   # Test runner configuration
+│   └── docker/           # Dockerfiles for API and Worker
+├── .github/
+│   └── workflows/
+│       ├── ci.yml        # Continuous integration (Analyze, Unit, Widget Tests)
+│       └── release.yml   # Multi-platform build & release pipeline (macOS DMG, Windows MSI, Linux)
+└── docker-compose.yml    # Local multi-container backend stack
 ```
 
 ---
 
-## 2. Prerequisites
+## 4. Running Locally
 
-- **Docker & Docker Compose** (Docker v24+, Compose v2+)
-- **Node.js 20+** and **npm**
-- **Python 3.12+**
-
----
-
-## 3. Quickstart (Local Docker Compose)
-
+### 1. Start the Backend Infrastructure
 ```bash
-# 1. Clone repository
-git clone <repository_url>
-cd Unotusk-MVP
+# Start PostgreSQL (pgvector), Redis, FastAPI Backend, and Background Worker
+docker compose up -d
+```
+* **API Documentation**: `http://localhost:8000/docs` (or configured host port `28000`)
+* **Health Check**: `http://localhost:8000/health/ready`
 
-# 2. Configure environment
-cp .env.example .env
-
-# 3. Start complete local stack (Postgres + pgvector, Redis, API, Worker, Web)
-docker compose up --build
+### 2. Run the Employee Desktop Client
+```bash
+cd app
+flutter pub get
+flutter run
 ```
 
-Access the services:
-- **Web Application**: `http://localhost:3000` (or `http://localhost:3005`)
-- **FastAPI Documentation**: `http://localhost:8000/docs`
-- **Readiness Check**: `http://localhost:8000/health/ready`
+### 3. Run the Server Setup Wizard
+```bash
+cd setup_app
+flutter pub get
+flutter run
+```
 
 ---
 
-## 4. Local Development (Without Docker)
+## 5. Testing & Verification
 
-### Backend & Worker
+### Flutter Client Test Suite
 ```bash
-# Setup Python virtual environment
+cd app
+flutter test
+flutter analyze
+```
+
+### Server Setup Wizard Test Suite
+```bash
+cd setup_app
+flutter test
+flutter analyze
+```
+
+### Backend Test Suite
+```bash
 cd apps/api
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Run migrations
-alembic upgrade head
-
-# Start API server
-uvicorn apps.api.src.main:app --reload --port 8000
-
-# Start Worker (in separate terminal)
-python services/workers/worker.py
-```
-
-### Frontend
-```bash
-cd apps/web
-npm install
-npm run dev
+pytest -v
 ```
 
 ---
 
-## 5. Running Automated Tests
+## 6. macOS Installation & Gatekeeper Note
 
-Run the complete test suite:
+Because the macOS build is distributed directly via disk image (`.dmg`) without an enterprise Apple Developer ID, macOS Gatekeeper attaches a quarantine attribute.
 
-```bash
-# Run pytest across unit, integration, and security tests
-apps/api/.venv/bin/pytest -v
-
-# Run with coverage report
-apps/api/.venv/bin/pytest --cov=apps/api/src
-```
-
-### Golden Security Test
-Run the cross-organization tenant isolation test:
-```bash
-apps/api/.venv/bin/pytest tests/api/test_cross_org_isolation.py -v
-```
-
----
-
-## 6. Stage 0 Scope & Decisions
-
-### Implemented in Stage 0:
-- **Identity & Organization Boundaries**: User registration, password hashing (bcrypt), JWT generation/validation, organization membership roles (`OWNER`, `ADMIN`, `MEMBER`).
-- **Project Boundary Enforcement**: Projects are strictly scoped to organizations. Slugs are unique within organizations.
-- **Cross-Organization Protection**: Enforced backend validation on every project lookup/mutation preventing IDOR access.
-- **Database & Migrations**: Reproducible Alembic migrations, PostgreSQL 16 with `pgvector` enabled at database level.
-- **Background Plumbing**: Redis task queue dispatcher and worker loop confirming `API -> Queue -> Worker` communication.
-- **Next.js UI Flow**: Login, Signup, Organization selector, Project List, Create Project, and Project Overview with clean Stage 1 repository connection entry point.
-
-### Intentionally Deferred to Later Stages:
-- **Stage 1**: GitHub OAuth, GitHub App webhook handling, repository cloning, AST parsing, commit history ingestion.
-- **Stage 2+**: Vector embeddings pipeline, similarity search, ontology graph construction, AI Project Intelligence Report generation.
-- **Out of Scope**: Licensing, degraded mode, enterprise mTLS, microservice sprawl, LLM chat agents.
+If macOS displays a warning (*"Unotusk is damaged and can't be opened"* or *"developer cannot be verified"*):
+1. Move `Unotusk` into `/Applications`.
+2. Open **Terminal** and run:
+   ```bash
+   xattr -cr /Applications/Unotusk.app
+   ```
+3. Launch `Unotusk` from `/Applications`.
+*(Alternatively, approve it under **System Settings → Privacy & Security → Security → Open Anyway**).*

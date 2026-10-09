@@ -127,6 +127,7 @@ class _AppShellState extends State<AppShell> {
   String _activeView = 'chat'; // chat, spec-history, graph, feed, admin
   String _defaultSettingsTab = 'general';
 
+  String? _activeConversationId;
   final List<ChatMessage> _messages = [];
   bool _isGenerating = false;
   final List<Timer> _generationTimers = [];
@@ -187,9 +188,10 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _openedProject = project;
       _openedProjectName = project.name;
+      _activeConversationId = null;
       _messages.clear();
       _isGenerating = false;
-      _activeView = 'overview';
+      _activeView = 'chat';
       _appStage = 'workspace';
     });
     
@@ -231,16 +233,6 @@ class _AppShellState extends State<AppShell> {
     }
 
     ApiService.setActiveProject(project);
-    _loadProjectInitialChat(project);
-  }
-
-  void _loadProjectInitialChat(ProjectItem project) async {
-    try {
-      final chats = await ApiService.fetchRecentChats(projectId: project.id);
-      if (chats.isNotEmpty && mounted) {
-        _loadRecentChat(chats.first.id);
-      }
-    } catch (_) {}
   }
 
   void _handleBackToProjects() async {
@@ -270,6 +262,7 @@ class _AppShellState extends State<AppShell> {
     }
 
     setState(() {
+      _activeConversationId = null;
       _messages.clear();
       _isGenerating = false;
       _activeView = 'chat';
@@ -283,6 +276,7 @@ class _AppShellState extends State<AppShell> {
     final currentHost = Uri.parse(ApiService.baseUrl).host;
     ApiService.setBaseUrl('http://$currentHost:28000'); // Reset port to control plane on logout
     setState(() {
+      _activeConversationId = null;
       _messages.clear();
       _openedProject = null;
       _openedProjectName = '';
@@ -299,6 +293,7 @@ class _AppShellState extends State<AppShell> {
   void _handleNewQuery() {
     _clearTimers();
     setState(() {
+      _activeConversationId = null;
       _messages.clear();
       _isGenerating = false;
       _activeView = 'chat';
@@ -311,13 +306,20 @@ class _AppShellState extends State<AppShell> {
     final queryId = 'q-${DateTime.now().millisecondsSinceEpoch}';
     final genId = 'g-${DateTime.now().millisecondsSinceEpoch + 1}';
 
-    ApiService.recordRecentChat(RecentChat(
-      id: queryId,
-      title: text.trim(),
-      ago: 'Just now',
-      time: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-      projectId: _openedProject?.id,
-    ));
+    // Only create a new recent chat record on the first query of a conversation thread
+    final isFirstMessage = _activeConversationId == null;
+    final tempConvId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+
+    if (isFirstMessage) {
+      _activeConversationId = tempConvId;
+      ApiService.recordRecentChat(RecentChat(
+        id: tempConvId,
+        title: text.trim(),
+        ago: 'Just now',
+        time: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+        projectId: _openedProject?.id,
+      ));
+    }
 
     setState(() {
       _isGenerating = true;
@@ -337,9 +339,18 @@ class _AppShellState extends State<AppShell> {
       final responseData = await ApiService.askQuestionDetailed(
         projectId: _openedProject?.id,
         question: text.trim(),
+        conversationId: isFirstMessage ? null : _activeConversationId,
       );
 
       if (!mounted) return;
+
+      // Update the active conversation ID with the permanent UUID assigned by the server
+      if (responseData.conversationId != null && responseData.conversationId!.isNotEmpty) {
+        final realId = responseData.conversationId!;
+        _activeConversationId = realId;
+        ApiService.updateRecentChatId(tempConvId, realId);
+      }
+
       setState(() {
         _isGenerating = false;
         final idx = _messages.indexWhere((m) => m.id == genId);
@@ -381,6 +392,7 @@ class _AppShellState extends State<AppShell> {
     final convId = id.toString();
     _clearTimers();
     setState(() {
+      _activeConversationId = convId;
       _isGenerating = true;
       _messages.clear();
       _activeView = 'chat';
@@ -493,6 +505,8 @@ class _AppShellState extends State<AppShell> {
                         onNavigateSettings: _openSettingsTab,
                         onOpenArchivedModal: () =>
                             setState(() => _archivedModalOpen = true),
+                        activeConversationId: _activeConversationId,
+                        projectId: _openedProject?.id,
                       ),
 
               // Main Application Area
@@ -604,6 +618,8 @@ class _AppShellState extends State<AppShell> {
                     _archivedModalOpen = true;
                   });
                 },
+                activeConversationId: _activeConversationId,
+                projectId: _openedProject?.id,
               ),
             ),
           ],
@@ -707,6 +723,8 @@ class _AppShellState extends State<AppShell> {
           messages: _messages,
           isGenerating: _isGenerating,
           onSubmitQuery: _handleSubmitQuery,
+          userName: _user.name,
+          projectName: _openedProjectName,
         );
     }
   }

@@ -74,6 +74,33 @@ class TopNavBar extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (onBackToProjects != null) ...[
+                InkWell(
+                  onTap: onBackToProjects,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.arrowLeft, size: 14, color: palette.textSec),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Projects',
+                          style: UnoTypography.body(
+                            color: palette.textSec,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('/', style: UnoTypography.body(color: palette.div, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               // Project Switcher Pill matching Kushall-07/SyncGuard · main ↕
               InkWell(
                 onTap: onBackToProjects,

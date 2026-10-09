@@ -101,7 +101,7 @@ void main() {
       expect(find.byType(SelectableText), findsOneWidget);
     });
 
-    testWidgets('renders Claude-style Callout alert blocks', (tester) async {
+    testWidgets('renders Editorial Callout alert blocks', (tester) async {
       const calloutMarkdown = '''
 > [!NOTE]
 > Database migrations must be run before starting the worker.

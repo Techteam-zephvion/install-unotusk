@@ -5,8 +5,10 @@ import shutil
 import tempfile
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.core.security_vault import decrypt_secret
 from apps.api.src.db.session import AsyncSessionLocal
@@ -18,6 +20,12 @@ from apps.api.src.models.project import Project
 from apps.api.src.models.repository import Repository
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
+from apps.api.src.schemas.code_atom import GitCommitArtifact
+from apps.api.src.services.code_atom import (
+    CodeAtomDecomposer,
+    extract_git_commit_artifact,
+    resolve_and_map_atomic_changes,
+)
 from apps.api.src.services.context_engine.retriever import generate_text_embedding
 from apps.api.src.services.github_client import GitHubClient
 from apps.api.src.services.parser.dependency_extractor import (
@@ -70,6 +78,7 @@ class IngestionService:
     async def run_ingestion(
         snapshot_id: uuid.UUID,
         override_local_dir: str | None = None,
+        commit_artifact: GitCommitArtifact | None = None,
     ) -> None:
         """Execute the end-to-end repository ingestion pipeline."""
         if AsyncSessionLocal is None:
@@ -225,6 +234,7 @@ class IngestionService:
 
                 # Second pass: Parse AST for symbols, chunks, and dependencies
                 processed_count = 0
+                created_symbols_list: list[tuple[str, CodeSymbol]] = []
                 for f_info in discovered_files:
                     repo_file = created_files_map[f_info["path"]]
                     content = f_info["content_bytes"]
@@ -253,6 +263,7 @@ class IngestionService:
                                     symbol_metadata=_clean_dict_null(sym.metadata),
                                 )
                                 session.add(code_sym)
+                                created_symbols_list.append((f_info["path"], code_sym))
 
                                 # Create code chunk for top-level symbol
                                 if 1 <= sym.start_line <= len(content_lines):
@@ -291,6 +302,7 @@ class IngestionService:
                                         symbol_metadata=_clean_dict_null(child_sym.metadata),
                                     )
                                     session.add(child_code_sym)
+                                    created_symbols_list.append((f_info["path"], child_code_sym))
 
                                     if 1 <= child_sym.start_line <= len(content_lines):
                                         child_lines = content_lines[
@@ -349,6 +361,50 @@ class IngestionService:
                     if processed_count % 50 == 0:
                         snapshot.processed_files = processed_count
                         await session.commit()
+
+                # 4.5. ATOM DECOMPOSITION & CHUNK INTEGRATION: Extract & Map Atomic Code Changes to CodeChunk
+                if commit_artifact is None and source_dir:
+                    commit_artifact = extract_git_commit_artifact(source_dir, fallback_sha=commit_sha)
+
+                if commit_artifact:
+                    commit_artifact.snapshot_id = snapshot.id
+                    commit_artifact.project_id = repository.project_id
+                    commit_artifact.repository_id = repository.id
+                    if commit_artifact.commit_sha and commit_artifact.commit_sha != "unknown":
+                        snapshot.commit_sha = commit_artifact.commit_sha
+
+                    symbol_catalog = [
+                        {
+                            "id": s.id,
+                            "name": s.name,
+                            "symbol_type": s.symbol_type.value,
+                            "file_path": p,
+                            "start_line": s.start_line,
+                            "end_line": s.end_line,
+                        }
+                        for p, s in created_symbols_list
+                    ]
+                    symbols_map: dict[str, CodeSymbol] = {}
+                    for _, s in created_symbols_list:
+                        symbols_map[f"{s.file_id}:{s.name}"] = s
+                        symbols_map[s.name] = s
+
+                    decomposer = CodeAtomDecomposer()
+                    decomp_result = decomposer.decompose(
+                        commit_artifact, symbol_catalog=symbol_catalog
+                    )
+
+                    atom_chunks = resolve_and_map_atomic_changes(
+                        changes=decomp_result.changes,
+                        snapshot_id=snapshot.id,
+                        files_map=created_files_map,
+                        symbols_map=symbols_map,
+                        session=session,
+                    )
+                    for atom_chunk in atom_chunks:
+                        session.add(atom_chunk)
+
+                    await session.flush()
 
                 # 5. INDEXING: Link internal dependencies & external packages
                 snapshot.status = SnapshotStatus.INDEXING
@@ -427,3 +483,90 @@ class IngestionService:
             finally:
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
+
+    @staticmethod
+    async def ingest_commit_atom_changes(
+        session: AsyncSession,
+        snapshot_id: uuid.UUID,
+        commit_artifact: GitCommitArtifact,
+        project_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
+    ) -> list[CodeChunk]:
+        """
+        Decomposes a GitCommitArtifact into AtomicCodeChange units and maps them
+        into existing CodeChunk records associated with the snapshot.
+
+        Resolves existing RepositorySnapshot, RepositoryFile, and CodeSymbol entities
+        without creating duplicates.
+        """
+        commit_artifact.snapshot_id = snapshot_id
+        if project_id:
+            commit_artifact.project_id = project_id
+        if repository_id:
+            commit_artifact.repository_id = repository_id
+
+        # 1. Fetch existing repository files for snapshot
+        file_query = select(RepositoryFile).where(RepositoryFile.snapshot_id == snapshot_id)
+        file_res = await session.execute(file_query)
+        files = file_res.scalars().all()
+        files_map = {f.path: f for f in files}
+
+        # 2. Fetch existing symbols for snapshot
+        sym_query = (
+            select(CodeSymbol, RepositoryFile.path)
+            .join(RepositoryFile, RepositoryFile.id == CodeSymbol.file_id)
+            .where(RepositoryFile.snapshot_id == snapshot_id)
+        )
+        sym_res = await session.execute(sym_query)
+        symbols_with_path = sym_res.all()
+
+        symbol_catalog: list[dict[str, Any]] = []
+        symbols_map: dict[str, CodeSymbol] = {}
+        for sym, file_path in symbols_with_path:
+            symbol_catalog.append(
+                {
+                    "id": sym.id,
+                    "name": sym.name,
+                    "symbol_type": sym.symbol_type.value,
+                    "file_path": file_path,
+                    "start_line": sym.start_line,
+                    "end_line": sym.end_line,
+                }
+            )
+            symbols_map[f"{sym.file_id}:{sym.name}"] = sym
+            symbols_map[sym.name] = sym
+
+        # 3. Decompose commit diff into atomic changes
+        decomposer = CodeAtomDecomposer()
+        decomp_result = decomposer.decompose(commit_artifact, symbol_catalog=symbol_catalog)
+
+        # 3.5 Check for existing chunks by fingerprint to avoid redundant re-embedding
+        fingerprints = [c.fingerprint for c in decomp_result.changes if c.fingerprint]
+        existing_chunks_by_fingerprint: dict[str, CodeChunk] = {}
+        if fingerprints:
+            existing_stmt = select(CodeChunk).where(
+                CodeChunk.snapshot_id == snapshot_id,
+                CodeChunk.fingerprint.in_(fingerprints),
+            )
+            existing_res = await session.execute(existing_stmt)
+            for ec in existing_res.scalars().all():
+                if ec.fingerprint:
+                    existing_chunks_by_fingerprint[ec.fingerprint] = ec
+
+        # 4. Map into CodeChunk instances with entity resolution and embedding generation
+        atom_chunks = resolve_and_map_atomic_changes(
+            changes=decomp_result.changes,
+            snapshot_id=snapshot_id,
+            files_map=files_map,
+            symbols_map=symbols_map,
+            session=session,
+            compute_embedding=True,
+            existing_chunks_by_fingerprint=existing_chunks_by_fingerprint,
+        )
+
+        for chunk in atom_chunks:
+            if chunk.fingerprint not in existing_chunks_by_fingerprint:
+                session.add(chunk)
+
+        await session.flush()
+        return atom_chunks

@@ -1,6 +1,6 @@
 class AppConfig {
   static const String appName = 'Unotusk';
-  static const String appVersion = '0.1.0';
+  static const String appVersion = '1.0.1';
   static const String defaultServerUrl = 'http://localhost:28000';
   
   static const Duration connectTimeout = Duration(seconds: 10);

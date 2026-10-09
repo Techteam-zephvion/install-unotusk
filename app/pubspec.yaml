@@ -51,6 +51,7 @@ dependencies:
   lucide_icons_flutter: ^3.1.20
   http: ^1.6.0
   window_manager: ^0.5.2
+  file_picker: ^13.1.0
 
 dev_dependencies:
   flutter_test:

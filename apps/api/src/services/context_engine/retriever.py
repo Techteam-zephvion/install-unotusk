@@ -2,6 +2,7 @@ import hashlib
 import re
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +70,24 @@ class RetrievedCandidate:
     file_id: uuid.UUID
     symbol_id: uuid.UUID | None = None
     signals: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
+    meta: dict[str, Any] = {}
+    if getattr(chunk, "snapshot_id", None):
+        meta["snapshot_id"] = str(chunk.snapshot_id)
+    if getattr(chunk, "commit_sha", None):
+        meta["commit_sha"] = chunk.commit_sha
+    if getattr(chunk, "commit_message", None):
+        meta["commit_message"] = chunk.commit_message
+    if getattr(chunk, "fingerprint", None):
+        meta["fingerprint"] = chunk.fingerprint
+    if getattr(chunk, "provenance", None):
+        meta["provenance"] = chunk.provenance
+    if getattr(chunk, "chunk_type", None):
+        meta["chunk_type"] = chunk.chunk_type
+    return meta
 
 
 DEFINITION_PATTERN = re.compile(
@@ -203,16 +222,21 @@ class MultiSignalRetriever:
                     signals={"symbol_match": score},
                 )
 
-        # 3. CONTENT / CODE CHUNK SEARCH: Match chunk name, path, and content with definition weighting
+        # 3. CONTENT / CODE CHUNK SEARCH: Match chunk name, path, commit message, and content with definition weighting
         chunk_conditions = []
         for kw in analyzed_query.keywords:
             if len(kw) >= 3:
                 chunk_conditions.append(CodeChunk.name.ilike(f"%{kw}%"))
                 chunk_conditions.append(CodeChunk.path.ilike(f"%{kw}%"))
                 chunk_conditions.append(CodeChunk.content.ilike(f"%{kw}%"))
+                chunk_conditions.append(CodeChunk.commit_message.ilike(f"%{kw}%"))
+            if len(kw) >= 7:
+                chunk_conditions.append(CodeChunk.commit_sha.ilike(f"{kw}%"))
+                chunk_conditions.append(CodeChunk.fingerprint.ilike(f"{kw}%"))
         for sym in analyzed_query.symbol_candidates:
             chunk_conditions.append(CodeChunk.name.ilike(f"%{sym}%"))
             chunk_conditions.append(CodeChunk.content.ilike(f"%{sym}%"))
+            chunk_conditions.append(CodeChunk.commit_message.ilike(f"%{sym}%"))
         for p in analyzed_query.path_candidates:
             chunk_conditions.append(CodeChunk.path.ilike(f"%{p}%"))
 
@@ -229,16 +253,22 @@ class MultiSignalRetriever:
             for chunk in chunk_res.scalars().all():
                 cid = f"chunk:{chunk.id}"
                 cname_lower = chunk.name.lower()
+                cname_stem = cname_lower.split(" (")[0].strip()
                 cpath_lower = chunk.path.lower()
+                cm_lower = (chunk.commit_message or "").lower()
 
                 # Determine lexical match quality:
-                # 1. Exact match on chunk definition name
+                # 1. Exact match on chunk definition name or stem (e.g. UserService (ADD) -> UserService)
                 # 2. Definition line match in content (e.g. def foo, class Bar)
                 # 3. Path / filename match
-                # 4. Standard content / comment match
+                # 4. Commit message match
+                # 5. Standard content / comment match
                 exact_name = any(
-                    kw.lower() == cname_lower for kw in analyzed_query.keywords
-                ) or any(sym.lower() == cname_lower for sym in analyzed_query.symbol_candidates)
+                    kw.lower() in (cname_lower, cname_stem) for kw in analyzed_query.keywords
+                ) or any(
+                    sym.lower() in (cname_lower, cname_stem)
+                    for sym in analyzed_query.symbol_candidates
+                )
 
                 def_match = any(
                     _check_definition_match(chunk.content, kw) for kw in analyzed_query.keywords
@@ -251,19 +281,28 @@ class MultiSignalRetriever:
                     p.lower() in cpath_lower for p in analyzed_query.path_candidates
                 ) or any(kw.lower() in cpath_lower for kw in analyzed_query.keywords)
 
+                commit_match = any(
+                    kw.lower() in cm_lower for kw in analyzed_query.keywords if len(kw) >= 3
+                ) or any(sym.lower() in cm_lower for sym in analyzed_query.symbol_candidates)
+
                 if exact_name:
                     content_score = 1.4
                 elif def_match:
                     content_score = 1.2
                 elif path_match:
                     content_score = 1.0
+                elif commit_match:
+                    content_score = 0.95
                 else:
                     content_score = 0.6
 
+                chunk_meta = _extract_chunk_metadata(chunk)
                 if cid in candidates:
                     candidates[cid].signals["content_match"] = max(
                         candidates[cid].signals.get("content_match", 0.0), content_score
                     )
+                    if chunk_meta:
+                        candidates[cid].metadata.update(chunk_meta)
                 else:
                     candidates[cid] = RetrievedCandidate(
                         candidate_id=cid,
@@ -276,6 +315,7 @@ class MultiSignalRetriever:
                         file_id=chunk.file_id,
                         symbol_id=chunk.symbol_id,
                         signals={"content_match": content_score},
+                        metadata=chunk_meta,
                     )
 
         # 4. DEPENDENCY SEARCH: Match packages and imported modules
@@ -312,15 +352,33 @@ class MultiSignalRetriever:
         # 5. VECTOR SEARCH: Match chunks with precomputed embeddings using vector similarity
         effective_query_embedding = query_embedding
         if effective_query_embedding is None:
-            query_parts = []
-            if analyzed_query.keywords:
-                query_parts.extend(analyzed_query.keywords)
-            if analyzed_query.symbol_candidates:
-                query_parts.extend(analyzed_query.symbol_candidates)
-            if analyzed_query.concept_keywords:
-                query_parts.extend(analyzed_query.concept_keywords)
-            if query_parts:
-                effective_query_embedding = generate_text_embedding(" ".join(query_parts))
+            query_text = (
+                analyzed_query.raw_query.strip()
+                if analyzed_query.raw_query and analyzed_query.raw_query.strip()
+                else ""
+            )
+            if not query_text:
+                query_parts = []
+                if analyzed_query.keywords:
+                    query_parts.extend(analyzed_query.keywords)
+                if analyzed_query.symbol_candidates:
+                    query_parts.extend(analyzed_query.symbol_candidates)
+                if analyzed_query.concept_keywords:
+                    query_parts.extend(analyzed_query.concept_keywords)
+                query_text = " ".join(query_parts)
+
+            if query_text:
+                try:
+                    from apps.api.src.services.code_atom.embedding import generate_code_embedding
+
+                    effective_query_embedding = generate_code_embedding(
+                        query_text, input_type="query"
+                    )
+                except Exception:
+                    effective_query_embedding = None
+
+                if effective_query_embedding is None:
+                    effective_query_embedding = generate_text_embedding(query_text)
 
         if effective_query_embedding is not None:
             vec_stmt = (
@@ -342,11 +400,14 @@ class MultiSignalRetriever:
             scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)
             for sim, chunk in scored_vector_chunks[:limit_per_signal]:
                 cid = f"chunk:{chunk.id}"
+                chunk_meta = _extract_chunk_metadata(chunk)
                 if cid in candidates:
                     candidates[cid].signals["vector_similarity"] = sim
                     candidates[cid].signals["semantic_match"] = max(
                         candidates[cid].signals.get("semantic_match", 0.0), sim
                     )
+                    if chunk_meta:
+                        candidates[cid].metadata.update(chunk_meta)
                 else:
                     candidates[cid] = RetrievedCandidate(
                         candidate_id=cid,
@@ -359,6 +420,7 @@ class MultiSignalRetriever:
                         file_id=chunk.file_id,
                         symbol_id=chunk.symbol_id,
                         signals={"vector_similarity": sim, "semantic_match": sim},
+                        metadata=chunk_meta,
                     )
 
         # 6. SEMANTIC / CONCEPT SEARCH: Match domain concept synonyms across chunks and symbols
@@ -368,6 +430,7 @@ class MultiSignalRetriever:
                 if len(concept) >= 3:
                     concept_chunk_conditions.append(CodeChunk.name.ilike(f"%{concept}%"))
                     concept_chunk_conditions.append(CodeChunk.content.ilike(f"%{concept}%"))
+                    concept_chunk_conditions.append(CodeChunk.commit_message.ilike(f"%{concept}%"))
 
             if concept_chunk_conditions:
                 concept_chunk_stmt = (
@@ -381,10 +444,13 @@ class MultiSignalRetriever:
                 concept_chunk_res = await session.execute(concept_chunk_stmt)
                 for chunk in concept_chunk_res.scalars().all():
                     cid = f"chunk:{chunk.id}"
+                    chunk_meta = _extract_chunk_metadata(chunk)
                     if cid in candidates:
                         candidates[cid].signals["semantic_match"] = max(
                             candidates[cid].signals.get("semantic_match", 0.0), 0.85
                         )
+                        if chunk_meta:
+                            candidates[cid].metadata.update(chunk_meta)
                     else:
                         candidates[cid] = RetrievedCandidate(
                             candidate_id=cid,
@@ -397,6 +463,7 @@ class MultiSignalRetriever:
                             file_id=chunk.file_id,
                             symbol_id=chunk.symbol_id,
                             signals={"semantic_match": 0.85},
+                            metadata=chunk_meta,
                         )
 
             # Match concept keywords in symbols

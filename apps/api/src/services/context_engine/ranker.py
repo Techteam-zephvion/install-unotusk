@@ -23,10 +23,15 @@ class MultiSignalRanker:
             # Create a logical deduplication key
             if cand.entity_type == "FILE":
                 key = f"file:{cand.file_id}:{cand.path}"
-            elif cand.symbol_id:
+            elif cand.entity_type == "CHUNK" and cand.metadata.get("fingerprint"):
+                # Distinct ATOM code-change chunk identified by deterministic fingerprint
+                key = f"chunk:atom:{cand.metadata['fingerprint']}"
+            elif cand.symbol_id and not cand.metadata.get("commit_sha"):
+                # Generic symbol candidate or symbol-mapped generic chunk
                 key = f"sym:{cand.symbol_id}"
             elif cand.entity_type == "CHUNK":
-                key = f"chunk:{cand.file_id}:{cand.path}:{cand.name}:{cand.start_line}:{cand.end_line}"
+                commit_key = cand.metadata.get("commit_sha") or "none"
+                key = f"chunk:{cand.file_id}:{cand.path}:{cand.name}:{cand.start_line}:{cand.end_line}:{commit_key}"
             elif cand.entity_type == "DEPENDENCY":
                 key = f"dep:{cand.file_id}:{cand.name}:{cand.start_line}"
             else:
@@ -39,12 +44,17 @@ class MultiSignalRanker:
                 # Merge signals taking the maximum for each signal
                 for sig, val in cand.signals.items():
                     existing.signals[sig] = max(existing.signals.get(sig, 0.0), val)
+                # Merge metadata
+                if cand.metadata:
+                    existing.metadata.update(cand.metadata)
                 # Keep richer content or preferred entity type (SYMBOL over generic CHUNK)
                 if cand.entity_type == "SYMBOL" and existing.entity_type != "SYMBOL":
                     cand.signals = existing.signals
+                    cand.metadata.update(existing.metadata)
                     deduped[key] = cand
                 elif len(cand.content) > len(existing.content):
                     cand.signals = existing.signals
+                    cand.metadata.update(existing.metadata)
                     deduped[key] = cand
 
         return list(deduped.values())
@@ -93,19 +103,24 @@ class MultiSignalRanker:
 
             # 3. Exact name and path matching boost
             name_lower = cand.name.lower()
+            name_stem = name_lower.split(" (")[0].strip()
             path_lower = cand.path.lower()
             for sym in analyzed_query.symbol_candidates:
-                if sym.lower() == name_lower:
+                if sym.lower() in (name_lower, name_stem):
                     score += 1.5
                     reasons.append(f"Exact symbol match for '{sym}'")
                 elif sym.lower() in path_lower:
                     score += 0.8
 
-            # 4. Keyword density in name vs content
+            # 4. Keyword density in name vs content vs commit message
             content_lower = cand.content.lower()
+            commit_msg_lower = str(cand.metadata.get("commit_message", "")).lower()
             for kw in analyzed_query.keywords:
-                if kw in name_lower:
+                if kw in name_lower or kw in name_stem:
                     score += 0.8
+                elif commit_msg_lower and kw in commit_msg_lower:
+                    score += 0.5
+                    reasons.append(f"Commit message match for '{kw}'")
                 elif kw in content_lower:
                     score += 0.3
 
