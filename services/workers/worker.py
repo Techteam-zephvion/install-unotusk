@@ -18,11 +18,19 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 QUEUE_NAME = os.getenv("QUEUE_NAME", "unotusk_tasks")
 
 
+
+async def delayed_requeue(task_data: dict[str, Any], r: aioredis.Redis, attempt: int) -> None:
+    await asyncio.sleep(2 ** attempt)
+    await r.lpush(QUEUE_NAME, json.dumps(task_data))
+
 async def process_task(task_data: dict[str, Any], r: aioredis.Redis) -> None:
     task_id = task_data.get("id")
     task_name = task_data.get("name")
     payload = task_data.get("payload", {})
-    logger.info(f"Processing task {task_id} of type '{task_name}'")
+    max_retries = task_data.get("max_retries", 3)
+    attempt = task_data.get("attempt", 0)
+    
+    logger.info(f"Processing task {task_id} of type '{task_name}' (Attempt {attempt + 1}/{max_retries + 1})")
 
     # Update status to PROCESSING
     task_data["status"] = "PROCESSING"
@@ -97,10 +105,19 @@ async def process_task(task_data: dict[str, Any], r: aioredis.Redis) -> None:
         logger.info(f"Task {task_id} completed successfully")
 
     except Exception as exc:
-        logger.error(f"Task {task_id} failed: {exc}", exc_info=True)
-        task_data["status"] = "FAILED"
-        task_data["error"] = str(exc)
-        await r.set(f"task:{task_id}", json.dumps(task_data), ex=3600)
+        if attempt < max_retries:
+            task_data["attempt"] = attempt + 1
+            task_data["status"] = "QUEUED"
+            task_data["error"] = str(exc)
+            await r.set(f"task:{task_id}", json.dumps(task_data), ex=3600)
+            logger.warning(f"Task {task_id} failed: {exc}. Retrying ({attempt + 1}/{max_retries})...")
+            # Push back to queue for retry
+            asyncio.create_task(delayed_requeue(task_data, r, attempt))
+        else:
+            logger.error(f"Task {task_id} failed after {max_retries + 1} attempts: {exc}", exc_info=True)
+            task_data["status"] = "FAILED"
+            task_data["error"] = str(exc)
+            await r.set(f"task:{task_id}", json.dumps(task_data), ex=3600)
 
 
 async def run_worker() -> None:

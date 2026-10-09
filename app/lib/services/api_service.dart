@@ -403,11 +403,12 @@ class ApiService {
           final localRegistry = LocalRegistryService();
           final localServers = await localRegistry.getRunningServers();
           for (final ls in localServers) {
+            final isRunning = ls.state == 'running' || ls.state == 'degraded' || ls.state == 'active';
             final fallbackProj = ProjectItem(
               id: ls.id,
               name: ls.name,
-              upsStatus: 'READY',
-              ingestionStatus: 'live',
+              upsStatus: isRunning ? 'READY' : 'STOPPED',
+              ingestionStatus: isRunning ? 'live' : 'stopped',
               lastIngestion: 'Just now',
               fpr: 0.0,
               days: 1,
@@ -417,16 +418,18 @@ class ApiService {
             
             bool mappedFromApi = false;
             try {
-              final localUri = Uri.parse('http://127.0.0.1:${ls.apiPort}/api/v1/projects');
-              final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
-              if (localRes.statusCode == 200) {
-                final localDecoded = jsonDecode(localRes.body);
-                List<dynamic> localList = [];
-                if (localDecoded is List) {
-                  localList = localDecoded;
-                } else if (localDecoded is Map && localDecoded['projects'] is List) {
-                  localList = localDecoded['projects'];
-                }
+              if (isRunning) {
+                final currentHost = Uri.parse(ApiService.baseUrl).host;
+                final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
+                final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
+                if (localRes.statusCode == 200) {
+                  final localDecoded = jsonDecode(localRes.body);
+                  List<dynamic> localList = [];
+                  if (localDecoded is List) {
+                    localList = localDecoded;
+                  } else if (localDecoded is Map && localDecoded['projects'] is List) {
+                    localList = localDecoded['projects'];
+                  }
                 
                 for (final p in localList) {
                   final pm = Map<String, dynamic>.from(p as Map);
@@ -458,6 +461,7 @@ class ApiService {
                     projects[idx] = localProj;
                   }
                 }
+              }
               }
             } catch (_) {}
             

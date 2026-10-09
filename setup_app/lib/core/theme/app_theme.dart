@@ -6,12 +6,12 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
+      brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.slate50,
-      colorScheme: const ColorScheme.light(
+      colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
         onPrimary: Colors.white,
-        surface: Colors.white,
+        surface: AppColors.slate100,
         onSurface: AppColors.slate900,
         outline: AppColors.slate200,
         outlineVariant: AppColors.slate100,
@@ -22,7 +22,7 @@ class AppTheme {
         space: 1,
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: AppColors.slate100,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
@@ -32,7 +32,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.slate100,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate400),
         border: OutlineInputBorder(

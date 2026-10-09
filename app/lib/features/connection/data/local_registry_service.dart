@@ -18,6 +18,7 @@ class LocalServer {
   final String? deploymentDir;
   final String? repoUrl;
   final String? groqApiKey;
+  final String? state;
 
   LocalServer({
     required this.id,
@@ -26,9 +27,10 @@ class LocalServer {
     this.deploymentDir,
     this.repoUrl,
     this.groqApiKey,
+    this.state,
   });
 
-  factory LocalServer.fromJson(Map<String, dynamic> json, {String? repoUrl, String? groqApiKey}) {
+  factory LocalServer.fromJson(Map<String, dynamic> json, {String? repoUrl, String? groqApiKey, String? state}) {
     return LocalServer(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -36,6 +38,7 @@ class LocalServer {
       deploymentDir: json['deploymentDir'],
       repoUrl: repoUrl,
       groqApiKey: groqApiKey,
+      state: state,
     );
   }
 }
@@ -62,29 +65,27 @@ class LocalRegistryService {
             final json = jsonDecode(content) as Map<String, dynamic>;
             final state = json['lastKnownState']?.toString().toLowerCase();
             
-            if (state == 'running') {
-              String? repoUrl;
-              String? groqApiKey;
-              
-              final deploymentDir = json['deploymentDir']?.toString();
-              if (deploymentDir != null) {
-                final envFile = File('$deploymentDir/.env');
-                if (envFile.existsSync()) {
-                  try {
-                    final lines = envFile.readAsLinesSync();
-                    for (final line in lines) {
-                      if (line.startsWith('TARGET_REPO_URL=')) {
-                        repoUrl = line.substring('TARGET_REPO_URL='.length).trim();
-                      } else if (line.startsWith('GROQ_API_KEY=')) {
-                        groqApiKey = line.substring('GROQ_API_KEY='.length).trim();
-                      }
+            String? repoUrl;
+            String? groqApiKey;
+            
+            final deploymentDir = json['deploymentDir']?.toString();
+            if (deploymentDir != null) {
+              final envFile = File('$deploymentDir/.env');
+              if (envFile.existsSync()) {
+                try {
+                  final lines = envFile.readAsLinesSync();
+                  for (final line in lines) {
+                    if (line.startsWith('TARGET_REPO_URL=')) {
+                      repoUrl = line.substring('TARGET_REPO_URL='.length).trim();
+                    } else if (line.startsWith('GROQ_API_KEY=')) {
+                      groqApiKey = line.substring('GROQ_API_KEY='.length).trim();
                     }
-                  } catch (_) {}
-                }
+                  }
+                } catch (_) {}
               }
-              
-              servers.add(LocalServer.fromJson(json, repoUrl: repoUrl, groqApiKey: groqApiKey));
             }
+            
+            servers.add(LocalServer.fromJson(json, repoUrl: repoUrl, groqApiKey: groqApiKey, state: state));
           } catch (_) {}
         }
       }

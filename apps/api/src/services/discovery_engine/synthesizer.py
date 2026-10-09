@@ -141,7 +141,10 @@ class FindingSynthesizer:
                     why_part = parts[0].replace("WHY:", "").strip()
                     rec_part = parts[1].strip()
                     if why_part:
-                        finding.why_it_matters = why_part
+                        knowledge_str = ""
+                        if "(Project Knowledge:" in finding.why_it_matters:
+                            knowledge_str = " " + finding.why_it_matters[finding.why_it_matters.find("(Project Knowledge:"):]
+                        finding.why_it_matters = why_part + knowledge_str
                     if rec_part:
                         finding.recommendation = rec_part
 

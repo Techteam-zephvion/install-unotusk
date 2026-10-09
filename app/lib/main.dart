@@ -195,7 +195,8 @@ class _AppShellState extends State<AppShell> {
     
     // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
     if (project.port != null) {
-      final targetUrl = 'http://127.0.0.1:${project.port}';
+      final currentHost = Uri.parse(ApiService.baseUrl).host;
+      final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {
         ApiService.setBaseUrl(targetUrl);
         try {
@@ -207,6 +208,24 @@ class _AppShellState extends State<AppShell> {
             role: _user.role,
             email: _user.email,
           );
+        } catch (_) {
+          try {
+            await ApiService.login(
+              email: _user.email,
+              password: 'password123',
+            );
+          } catch (_) {}
+        }
+        
+        // After logging into the target server, fetch its real project UUID
+        try {
+          final serverProjects = await ApiService.fetchProjects();
+          if (serverProjects.isNotEmpty) {
+            project = serverProjects.first;
+            setState(() {
+              _openedProject = project;
+            });
+          }
         } catch (_) {}
       }
     }
@@ -228,7 +247,8 @@ class _AppShellState extends State<AppShell> {
     _clearTimers();
     
     // Revert to Control Plane Server
-    final controlPlaneUrl = 'http://127.0.0.1:28000';
+    final currentHost = Uri.parse(ApiService.baseUrl).host;
+    final controlPlaneUrl = 'http://$currentHost:28000';
     if (ApiService.baseUrl != controlPlaneUrl) {
       ApiService.setBaseUrl(controlPlaneUrl);
       try {
@@ -239,7 +259,14 @@ class _AppShellState extends State<AppShell> {
           role: _user.role,
           email: _user.email,
         );
-      } catch (_) {}
+      } catch (_) {
+        try {
+          await ApiService.login(
+            email: _user.email,
+            password: 'password123',
+          );
+        } catch (_) {}
+      }
     }
 
     setState(() {
@@ -253,7 +280,8 @@ class _AppShellState extends State<AppShell> {
   void _handleLogOut() {
     _clearTimers();
     ApiService.logout();
-    ApiService.setBaseUrl('http://127.0.0.1:28000'); // Reset port to control plane on logout
+    final currentHost = Uri.parse(ApiService.baseUrl).host;
+    ApiService.setBaseUrl('http://$currentHost:28000'); // Reset port to control plane on logout
     setState(() {
       _messages.clear();
       _openedProject = null;

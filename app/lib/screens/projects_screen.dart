@@ -105,13 +105,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _checkServer() async {
     await ApiService.checkHealth();
+    if (mounted) {
+      _fetchServerProjects(isSilent: true);
+    }
   }
 
   void _fetchServerProjects({bool isSilent = false}) async {
     if (_isRefreshingProjects) return;
-    setState(() {
-      _isRefreshingProjects = true;
-    });
+    if (!isSilent) {
+      setState(() {
+        _isRefreshingProjects = true;
+      });
+    }
 
     final stopwatch = Stopwatch()..start();
     try {

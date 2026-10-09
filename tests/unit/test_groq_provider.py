@@ -6,8 +6,9 @@ from apps.api.src.services.llm.groq import GroqProvider
 
 
 @pytest.mark.asyncio
-async def test_groq_provider_offline_fallback():
-    provider = GroqProvider(api_key=None)
+async def test_groq_provider_offline_fallback(monkeypatch):
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "")
+    provider = GroqProvider(api_key="")
 
     evidence = [
         {

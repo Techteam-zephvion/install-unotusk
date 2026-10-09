@@ -152,7 +152,9 @@ async def test_reports_api_full_lifecycle_and_tenant_isolation(
     assert specific_data["id"] == str(report_a.id)
 
     # 4. User A triggers report generation for Project A
-    resp = await client.post(f"/api/v1/projects/{project_a.id}/reports", headers=headers_a)
+    from unittest.mock import patch
+    with patch("apps.api.src.workers.dispatcher.TaskDispatcher.enqueue", return_value="fake_task_id"):
+        resp = await client.post(f"/api/v1/projects/{project_a.id}/reports", headers=headers_a)
     assert resp.status_code in [200, 202]
     trigger_data = resp.json()
     assert "report_id" in trigger_data

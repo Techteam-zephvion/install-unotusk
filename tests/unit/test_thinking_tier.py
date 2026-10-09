@@ -291,9 +291,10 @@ async def test_claude_provider_prompt_guided_model():
 
 
 @pytest.mark.asyncio
-async def test_offline_synthesis_differentiation():
+async def test_offline_synthesis_differentiation(monkeypatch):
     """Verify offline synthesizer returns distinct answer structures for Hot, Warm, Cold."""
-    groq_offline = GroqProvider(api_key=None)
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "")
+    groq_offline = GroqProvider(api_key="")
     evidence = [
         {"type": "symbol", "file": "src/auth.py", "symbol": "login", "lines": "10-25", "relevance": 0.9}
     ]
