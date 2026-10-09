@@ -283,6 +283,7 @@ class QueryResponseData {
   final String confidence;
   final ReasoningModel? reasoning;
   final BddSpec? bdd;
+  final String? conversationId;
 
   const QueryResponseData({
     required this.segments,
@@ -291,6 +292,7 @@ class QueryResponseData {
     required this.confidence,
     this.reasoning,
     this.bdd,
+    this.conversationId,
   });
 }
 

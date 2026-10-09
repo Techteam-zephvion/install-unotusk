@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 
@@ -393,35 +394,61 @@ class _ChatInputBoxState extends State<ChatInputBox> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Text input
-                TextField(
-                  controller: widget.controller,
-                  maxLines: 4,
-                  minLines: 1,
-                  style: UnoTypography.body(
-                    color: widget.palette.text,
-                    fontSize: 15,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: widget.placeholder ??
-                        'Ask about a merge, a ticket, or a decision on your project…',
-                    hintStyle: UnoTypography.body(
-                      color: widget.palette.textSec,
+                // Text input with Enter submission and Shift+Enter for newline
+                Focus(
+                  onKeyEvent: (node, event) {
+                    if (event is KeyDownEvent) {
+                      final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+                          event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                      if (isEnter) {
+                        if (HardwareKeyboard.instance.isShiftPressed) {
+                          // Allow multiline insertion on Shift+Enter
+                          return KeyEventResult.ignored;
+                        } else {
+                          // Submit on Enter keydown
+                          if (canSubmit) {
+                            widget.onSubmit();
+                            setState(() {
+                              _showSuggestions = false;
+                              _attachedFileNames.clear();
+                            });
+                          }
+                          return KeyEventResult.handled;
+                        }
+                      }
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: TextField(
+                    controller: widget.controller,
+                    maxLines: 4,
+                    minLines: 1,
+                    textInputAction: TextInputAction.send,
+                    style: UnoTypography.body(
+                      color: widget.palette.text,
                       fontSize: 15,
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: InputDecoration(
+                      hintText: widget.placeholder ??
+                          'Ask about a merge, a ticket, or a decision on your project…',
+                      hintStyle: UnoTypography.body(
+                        color: widget.palette.textSec,
+                        fontSize: 15,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                    ),
+                    onSubmitted: (_) {
+                      if (canSubmit) {
+                        widget.onSubmit();
+                        setState(() {
+                          _showSuggestions = false;
+                          _attachedFileNames.clear();
+                        });
+                      }
+                    },
                   ),
-                  onSubmitted: (_) {
-                    if (canSubmit) {
-                      widget.onSubmit();
-                      setState(() {
-                        _showSuggestions = false;
-                        _attachedFileNames.clear();
-                      });
-                    }
-                  },
                 ),
 
                 if (_attachedFileNames.isNotEmpty) ...[

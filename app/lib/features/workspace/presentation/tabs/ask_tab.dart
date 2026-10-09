@@ -54,6 +54,13 @@ class _AskTabState extends ConsumerState<AskTab> {
   bool _isGenerating = false;
   ThinkingTier _selectedTier = ThinkingTier.warm;
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   static const List<String> _promptSuggestions = [
     'Why choose Postgres over Mongo in March?',
     'Which team owns the auth service?',
@@ -420,8 +427,19 @@ class _AskTabState extends ConsumerState<AskTab> {
                       // Serif Heading
                       Center(
                         child: Text(
-                          'Investigate your project?',
+                          '${_getGreeting()}, Developer',
                           style: AppTextStyles.heroHeading,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          'Investigate your project, architecture, or code decisions',
+                          style: AppTextStyles.inter(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),

@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 
@@ -211,33 +212,53 @@ class _AskInputBarState extends State<AskInputBar> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Text input field
-                  TextField(
-                    controller: widget.controller,
-                    onChanged: (text) {
-                      setState(() {
-                        _showSuggestions = text.trim().isNotEmpty && widget.suggestions.isNotEmpty;
-                      });
+                  // Text input field with Enter submission and Shift+Enter for newline
+                  Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent) {
+                        final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+                            event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                        if (isEnter) {
+                          if (HardwareKeyboard.instance.isShiftPressed) {
+                            return KeyEventResult.ignored;
+                          } else {
+                            if (canSubmit) {
+                              _submit(widget.controller.text);
+                            }
+                            return KeyEventResult.handled;
+                          }
+                        }
+                      }
+                      return KeyEventResult.ignored;
                     },
-                    onSubmitted: (text) {
-                      if (canSubmit) _submit(text);
-                    },
-                    style: AppTextStyles.inter(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                      height: 1.5,
-                    ),
-                    maxLines: null,
-                    decoration: InputDecoration(
-                      hintText: widget.placeholder ??
-                          'Ask about a merge, a ticket, or a decision on your project…',
-                      hintStyle: AppTextStyles.inter(
-                        fontSize: 14,
-                        color: AppColors.textSecondary.withValues(alpha: 0.8),
+                    child: TextField(
+                      controller: widget.controller,
+                      onChanged: (text) {
+                        setState(() {
+                          _showSuggestions = text.trim().isNotEmpty && widget.suggestions.isNotEmpty;
+                        });
+                      },
+                      onSubmitted: (text) {
+                        if (canSubmit) _submit(text);
+                      },
+                      textInputAction: TextInputAction.send,
+                      style: AppTextStyles.inter(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                        height: 1.5,
                       ),
-                      isDense: true,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.only(bottom: 12),
+                      maxLines: null,
+                      decoration: InputDecoration(
+                        hintText: widget.placeholder ??
+                            'Ask about a merge, a ticket, or a decision on your project…',
+                        hintStyle: AppTextStyles.inter(
+                          fontSize: 14,
+                          color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        ),
+                        isDense: true,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.only(bottom: 12),
+                      ),
                     ),
                   ),
 

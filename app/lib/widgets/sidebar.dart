@@ -19,6 +19,8 @@ class UnoSidebar extends StatefulWidget {
   final VoidCallback onLogOut;
   final Function(String) onNavigateSettings;
   final VoidCallback onOpenArchivedModal;
+  final String? activeConversationId;
+  final String? projectId;
 
   const UnoSidebar({
     super.key,
@@ -33,6 +35,8 @@ class UnoSidebar extends StatefulWidget {
     required this.onLogOut,
     required this.onNavigateSettings,
     required this.onOpenArchivedModal,
+    this.activeConversationId,
+    this.projectId,
   });
 
   @override
@@ -46,23 +50,41 @@ class _UnoSidebarState extends State<UnoSidebar> {
   @override
   void initState() {
     super.initState();
+    _recentChats = List.of(ApiService.recentChatsNotifier.value.isNotEmpty
+        ? ApiService.recentChatsNotifier.value
+        : ApiService.recordedChats);
+    ApiService.recentChatsNotifier.addListener(_onRecentChatsChanged);
     _loadRecentChats();
+  }
+
+  void _onRecentChatsChanged() {
+    if (mounted) {
+      setState(() {
+        _recentChats = List.of(ApiService.recentChatsNotifier.value);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    ApiService.recentChatsNotifier.removeListener(_onRecentChatsChanged);
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant UnoSidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadRecentChats();
+    if (oldWidget.projectId != widget.projectId) {
+      _loadRecentChats();
+    }
   }
 
   void _loadRecentChats() async {
     try {
-      final chats = await ApiService.fetchRecentChats();
+      final chats = await ApiService.fetchRecentChats(projectId: widget.projectId);
       if (mounted) {
         setState(() {
-          if (chats.isNotEmpty) {
-            _recentChats = chats;
-          }
+          _recentChats = chats;
         });
       }
     } catch (_) {
@@ -73,15 +95,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
   void _handleChatAction(String action, RecentChat chat) {
     switch (action) {
       case 'pin':
-        setState(() {
-          chat.isPinned = !chat.isPinned;
-          // Sort: pinned first, then original order
-          _recentChats.sort((a, b) {
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            return 0;
-          });
-        });
+        ApiService.togglePinRecentChat(chat.id);
         break;
       case 'rename':
         _showRenameDialog(chat);
@@ -90,7 +104,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
         _showMoveToProjectDialog(chat);
         break;
       case 'archive':
-        setState(() => _recentChats.removeWhere((c) => c.id == chat.id));
+        ApiService.removeRecentChat(chat.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('"${chat.title}" archived', style: const TextStyle(color: Colors.white)),
@@ -100,7 +114,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
               label: 'Undo',
               textColor: widget.palette.accent,
               onPressed: () {
-                setState(() => _recentChats.add(chat));
+                ApiService.recordRecentChat(chat);
               },
             ),
           ),
@@ -156,7 +170,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
           ),
           onSubmitted: (val) {
             if (val.trim().isNotEmpty) {
-              setState(() => chat.title = val.trim());
+              ApiService.renameRecentChat(chat.id, val.trim());
             }
             Navigator.of(ctx).pop();
           },
@@ -170,7 +184,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
             onPressed: () {
               final val = controller.text.trim();
               if (val.isNotEmpty) {
-                setState(() => chat.title = val);
+                ApiService.renameRecentChat(chat.id, val);
               }
               Navigator.of(ctx).pop();
             },
@@ -299,7 +313,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
           ),
           TextButton(
             onPressed: () {
-              setState(() => _recentChats.removeWhere((c) => c.id == chat.id));
+              ApiService.removeRecentChat(chat.id);
               Navigator.of(ctx).pop();
             },
             child: Text(
@@ -610,6 +624,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
                           return _RecentChatTile(
                             chat: chat,
                             palette: widget.palette,
+                            isSelected: widget.activeConversationId == chat.id,
                             onTap: () => widget.onLoadRecentChat(chat.id),
                             onAction: (action) => _handleChatAction(action, chat),
                           );
@@ -942,12 +957,14 @@ class _RecentChatTile extends StatefulWidget {
   final UnoPalette palette;
   final VoidCallback onTap;
   final Function(String) onAction;
+  final bool isSelected;
 
   const _RecentChatTile({
     required this.chat,
     required this.palette,
     required this.onTap,
     required this.onAction,
+    this.isSelected = false,
   });
 
   @override
@@ -968,36 +985,45 @@ class _RecentChatTileState extends State<_RecentChatTile> {
       onExit: (_) {
         if (!_menuOpen) setState(() => _hovered = false);
       },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(6),
-        hoverColor: p.bgElevated,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-          child: Row(
-            children: [
-              // Pin indicator
-              if (chat.isPinned)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Icon(
-                    Icons.push_pin,
-                    size: 12,
-                    color: p.accent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: widget.isSelected
+              ? p.accent.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(6),
+          hoverColor: p.bgElevated,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            child: Row(
+              children: [
+                // Pin indicator
+                if (chat.isPinned)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 12,
+                      color: p.accent,
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    chat.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: UnoTypography.body(
+                      color: widget.isSelected ? p.accent : p.text,
+                      fontSize: 12,
+                      fontWeight: (chat.isPinned || widget.isSelected)
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
                   ),
                 ),
-              Expanded(
-                child: Text(
-                  chat.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: UnoTypography.body(
-                    color: p.text,
-                    fontSize: 12,
-                    fontWeight: chat.isPinned ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ),
               // 3-dot menu — visible on hover or when menu is open
               if (_hovered || _menuOpen)
                 SizedBox(
@@ -1049,7 +1075,8 @@ class _RecentChatTileState extends State<_RecentChatTile> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   PopupMenuItem<String> _menuItem(

@@ -235,10 +235,12 @@ class _AppShellState extends State<AppShell> {
 
     // Only create a new recent chat record on the first query of a conversation thread
     final isFirstMessage = _activeConversationId == null;
+    final tempConvId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+
     if (isFirstMessage) {
-      _activeConversationId = 'conv-${DateTime.now().millisecondsSinceEpoch}';
+      _activeConversationId = tempConvId;
       ApiService.recordRecentChat(RecentChat(
-        id: _activeConversationId!,
+        id: tempConvId,
         title: text.trim(),
         ago: 'Just now',
         time: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
@@ -264,10 +266,18 @@ class _AppShellState extends State<AppShell> {
       final responseData = await ApiService.askQuestionDetailed(
         projectId: _openedProject?.id,
         question: text.trim(),
-        conversationId: _activeConversationId,
+        conversationId: isFirstMessage ? null : _activeConversationId,
       );
 
       if (!mounted) return;
+
+      // Update the active conversation ID with the permanent UUID assigned by the server
+      if (responseData.conversationId != null && responseData.conversationId!.isNotEmpty) {
+        final realId = responseData.conversationId!;
+        _activeConversationId = realId;
+        ApiService.updateRecentChatId(tempConvId, realId);
+      }
+
       setState(() {
         _isGenerating = false;
         final idx = _messages.indexWhere((m) => m.id == genId);
@@ -422,6 +432,8 @@ class _AppShellState extends State<AppShell> {
                         onNavigateSettings: _openSettingsTab,
                         onOpenArchivedModal: () =>
                             setState(() => _archivedModalOpen = true),
+                        activeConversationId: _activeConversationId,
+                        projectId: _openedProject?.id,
                       ),
 
               // Main Application Area
@@ -533,6 +545,8 @@ class _AppShellState extends State<AppShell> {
                     _archivedModalOpen = true;
                   });
                 },
+                activeConversationId: _activeConversationId,
+                projectId: _openedProject?.id,
               ),
             ),
           ],
@@ -636,6 +650,8 @@ class _AppShellState extends State<AppShell> {
           messages: _messages,
           isGenerating: _isGenerating,
           onSubmitQuery: _handleSubmitQuery,
+          userName: _user.name,
+          projectName: _openedProjectName,
         );
     }
   }
