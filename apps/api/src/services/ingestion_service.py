@@ -24,6 +24,7 @@ from apps.api.src.schemas.code_atom import GitCommitArtifact
 from apps.api.src.services.code_atom import (
     CodeAtomDecomposer,
     extract_git_commit_artifact,
+    extract_incremental_commit_artifacts,
     resolve_and_map_atomic_changes,
 )
 from apps.api.src.services.context_engine.retriever import generate_text_embedding
@@ -570,3 +571,165 @@ class IngestionService:
 
         await session.flush()
         return atom_chunks
+
+    @staticmethod
+    async def ingest_incremental_commit_artifacts(
+        session: AsyncSession,
+        snapshot_id: uuid.UUID,
+        commit_artifacts: list[GitCommitArtifact],
+        project_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
+        advance_checkpoint: bool = True,
+    ) -> list[CodeChunk]:
+        """
+        Incrementally processes and persists a list of GitCommitArtifacts in chronological order.
+
+        Guarantees:
+        - Processes commits sequentially in topological/chronological order.
+        - Idempotent and duplicate-safe using deterministic fingerprints.
+        - Reuses existing embeddings for unchanged fingerprints.
+        - Safely handles ADD, MODIFY, DELETE, RENAME, multi-file, and multi-hunk changes.
+        - Advances snapshot.commit_sha checkpoint only after all commits have been processed and flushed.
+        - If an error occurs, the checkpoint is not advanced.
+        """
+        if not commit_artifacts:
+            return []
+
+        # Fetch snapshot
+        snapshot_stmt = select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
+        snapshot_res = await session.execute(snapshot_stmt)
+        snapshot = snapshot_res.scalar_one_or_none()
+        if snapshot is None:
+            logger.error(f"Snapshot {snapshot_id} not found for incremental ingestion.")
+            return []
+
+        # Resolve project_id and repository_id if needed
+        if project_id is None or repository_id is None:
+            repo_stmt = select(Repository).where(Repository.id == snapshot.repository_id)
+            repo_res = await session.execute(repo_stmt)
+            repo = repo_res.scalar_one_or_none()
+            if repo:
+                p_id = getattr(repo, "project_id", None)
+                r_id = getattr(repo, "id", None)
+                if isinstance(p_id, uuid.UUID):
+                    project_id = project_id or p_id
+                if isinstance(r_id, uuid.UUID):
+                    repository_id = repository_id or r_id
+
+        all_mapped_chunks: list[CodeChunk] = []
+
+        for artifact in commit_artifacts:
+            chunks = await IngestionService.ingest_commit_atom_changes(
+                session=session,
+                snapshot_id=snapshot_id,
+                commit_artifact=artifact,
+                project_id=project_id,
+                repository_id=repository_id,
+            )
+            all_mapped_chunks.extend(chunks)
+
+        # Advance checkpoint only after all commits processed successfully
+        if advance_checkpoint and commit_artifacts:
+            last_commit_sha = commit_artifacts[-1].commit_sha
+            if last_commit_sha and last_commit_sha != "unknown":
+                snapshot.commit_sha = last_commit_sha
+                snapshot.completed_at = utc_now()
+                await session.flush()
+
+        return all_mapped_chunks
+
+    @staticmethod
+    async def ingest_incremental_commits(
+        session: AsyncSession,
+        snapshot_id: uuid.UUID,
+        repo_dir: str,
+        target_commit_sha: str = "HEAD",
+        base_commit_sha: str | None = None,
+        max_commits: int | None = None,
+        advance_checkpoint: bool = True,
+    ) -> list[CodeChunk]:
+        """
+        Discovers commits newer than the indexed checkpoint up to target_commit_sha,
+        and incrementally ingests atomic code changes.
+
+        - If base_commit_sha is omitted, uses snapshot.commit_sha as the checkpoint.
+        - If no new commits exist, returns [] as a safe no-op.
+        - Detects invalid base commits via InvalidBaseCommitError.
+        - Advances checkpoint only upon complete success.
+        """
+        snapshot_stmt = select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
+        snapshot_res = await session.execute(snapshot_stmt)
+        snapshot = snapshot_res.scalar_one_or_none()
+        if snapshot is None:
+            logger.error(f"Snapshot {snapshot_id} not found for incremental ingestion.")
+            return []
+
+        checkpoint_sha = base_commit_sha if base_commit_sha is not None else snapshot.commit_sha
+
+        # Extract commits since checkpoint
+        artifacts = extract_incremental_commit_artifacts(
+            repo_dir=repo_dir,
+            base_commit_sha=checkpoint_sha,
+            target_commit_sha=target_commit_sha,
+            max_commits=max_commits,
+        )
+
+        if not artifacts:
+            logger.info(
+                f"No new commits found between '{checkpoint_sha}' and '{target_commit_sha}' for snapshot {snapshot_id}."
+            )
+            return []
+
+        repo_stmt = select(Repository).where(Repository.id == snapshot.repository_id)
+        repo_res = await session.execute(repo_stmt)
+        repo = repo_res.scalar_one_or_none()
+        p_id = getattr(repo, "project_id", None) if repo else None
+        r_id = getattr(repo, "id", None) if repo else None
+        project_id = p_id if isinstance(p_id, uuid.UUID) else None
+        repository_id = r_id if isinstance(r_id, uuid.UUID) else None
+
+        return await IngestionService.ingest_incremental_commit_artifacts(
+            session=session,
+            snapshot_id=snapshot_id,
+            commit_artifacts=artifacts,
+            project_id=project_id,
+            repository_id=repository_id,
+            advance_checkpoint=advance_checkpoint,
+        )
+
+    @staticmethod
+    async def run_incremental_ingestion(
+        snapshot_id: uuid.UUID,
+        repo_dir: str,
+        target_commit_sha: str = "HEAD",
+        base_commit_sha: str | None = None,
+        max_commits: int | None = None,
+    ) -> list[CodeChunk]:
+        """
+        Callable standalone incremental ingestion runner managing its own database session.
+        Commits upon success or rolls back on failure, guaranteeing checkpoint safety.
+        """
+        if AsyncSessionLocal is None:
+            logger.error("Database session factory is not available.")
+            return []
+
+        async with AsyncSessionLocal() as session:
+            try:
+                chunks = await IngestionService.ingest_incremental_commits(
+                    session=session,
+                    snapshot_id=snapshot_id,
+                    repo_dir=repo_dir,
+                    target_commit_sha=target_commit_sha,
+                    base_commit_sha=base_commit_sha,
+                    max_commits=max_commits,
+                    advance_checkpoint=True,
+                )
+                await session.commit()
+                return chunks
+            except Exception as e:
+                logger.error(
+                    f"Incremental ingestion failed for snapshot {snapshot_id}: {e}",
+                    exc_info=True,
+                )
+                await session.rollback()
+                raise

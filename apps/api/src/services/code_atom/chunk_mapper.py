@@ -135,6 +135,9 @@ def resolve_and_map_atomic_changes(
         if repo_file is None and change.old_file_path:
             clean_old = change.old_file_path.replace("\\", "/").strip().lstrip("/")
             repo_file = norm_files.get(clean_old)
+            if repo_file is not None:
+                norm_files[clean_path] = repo_file
+                files_map[change.file_path] = repo_file
 
         # If still not found (e.g. deleted file), create a single RepositoryFile representation and register it
         if repo_file is None:

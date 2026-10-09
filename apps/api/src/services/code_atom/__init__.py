@@ -28,7 +28,11 @@ from apps.api.src.services.code_atom.fingerprint import (
     generate_code_atom_fingerprint,
     generate_code_atom_id,
 )
-from apps.api.src.services.code_atom.git_extractor import extract_git_commit_artifact
+from apps.api.src.services.code_atom.git_extractor import (
+    InvalidBaseCommitError,
+    extract_git_commit_artifact,
+    extract_incremental_commit_artifacts,
+)
 from apps.api.src.services.code_atom.normalization import (
     normalize_code_change,
     normalize_diff_line,
@@ -44,9 +48,11 @@ __all__ = [
     "GitCommitArtifact",
     "GitDiffHunk",
     "GitFileDiff",
+    "InvalidBaseCommitError",
     "VoyageCodeEmbeddingBackend",
     "embed_atomic_code_chunk",
     "extract_git_commit_artifact",
+    "extract_incremental_commit_artifacts",
     "format_atom_code_embedding_input",
     "generate_atom_code_embedding",
     "generate_code_embedding",
