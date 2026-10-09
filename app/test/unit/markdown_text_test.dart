@@ -70,7 +70,7 @@ Key properties:
         ),
       );
 
-      expect(find.byType(DataTable), findsOneWidget);
+      expect(find.byType(Table), findsOneWidget);
       expect(find.text('Feature'), findsOneWidget);
       expect(find.text('Status'), findsOneWidget);
       expect(find.text('Tier'), findsOneWidget);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
+import 'mermaid_diagram.dart';
 
 /// Editorial Markdown & Artifact Compiler.
 ///
@@ -82,11 +83,18 @@ class MarkdownText extends StatelessWidget {
 
       Widget blockWidget;
       if (block is _CodeBlockNode) {
-        blockWidget = _UnoCodeBlock(
-          node: block,
-          palette: effectivePalette,
-          onFileTap: onFileTap,
-        );
+        if (block.language.toLowerCase() == 'mermaid') {
+          blockWidget = MermaidDiagram(
+            code: block.code,
+            palette: effectivePalette,
+          );
+        } else {
+          blockWidget = _UnoCodeBlock(
+            node: block,
+            palette: effectivePalette,
+            onFileTap: onFileTap,
+          );
+        }
       } else if (block is _ArtifactNode) {
         blockWidget = _UnoArtifactCard(
           node: block,
@@ -203,41 +211,47 @@ class MarkdownText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: node.items.map((item) {
         return Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (item.isTask)
                 Padding(
-                  padding: const EdgeInsets.only(top: 3, right: 8),
+                  padding: const EdgeInsets.only(top: 3, right: 10),
                   child: Icon(
                     item.isChecked ? LucideIcons.checkSquare : LucideIcons.square,
-                    size: 15,
+                    size: 16,
                     color: item.isChecked ? p.accent : p.textSec,
                   ),
                 )
               else if (node.isOrdered)
-                SizedBox(
-                  width: 24,
-                  child: Text(
-                    item.prefix,
-                    style: UnoTypography.mono(
-                      color: p.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 10),
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      item.prefix.replaceAll('.', ''),
+                      style: UnoTypography.mono(
+                        color: p.accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.only(top: 6, right: 10, left: 2),
-                  child: Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: p.accent,
-                      shape: BoxShape.circle,
-                    ),
+                  padding: const EdgeInsets.only(top: 4, right: 8, left: 2),
+                  child: Icon(
+                    LucideIcons.chevronRight,
+                    size: 15,
+                    color: p.accent.withValues(alpha: 0.8),
                   ),
                 ),
               Expanded(
@@ -580,70 +594,69 @@ class _UnoTable extends StatelessWidget {
     if (node.headers.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      margin: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         color: p.bgSurface,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: p.div, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(const Color(0xFF22211D)),
-          dataRowColor: WidgetStateProperty.resolveWith((states) {
-            return const Color(0xFF181816);
-          }),
-          dividerThickness: 0.8,
-          horizontalMargin: 16,
-          columnSpacing: 24,
-          headingTextStyle: UnoTypography.body(
-            color: p.text,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-          columns: List.generate(node.headers.length, (colIdx) {
-            final title = node.headers[colIdx];
-            return DataColumn(
-              label: Text(
-                title.trim(),
-                style: UnoTypography.body(
-                  color: p.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width * 0.4),
+          child: Table(
+            defaultColumnWidth: const IntrinsicColumnWidth(),
+            border: TableBorder(
+              horizontalInside: BorderSide(color: p.div.withValues(alpha: 0.5), width: 0.8),
+              bottom: BorderSide(color: p.div.withValues(alpha: 0.5), width: 0.8),
+            ),
+            children: [
+              // Header
+              TableRow(
+                decoration: const BoxDecoration(color: Color(0xFF22211D)),
+                children: node.headers.map((title) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Text(
+                      title.trim(),
+                      style: UnoTypography.body(
+                        color: p.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
-            );
-          }),
-          rows: List.generate(node.rows.length, (rowIdx) {
-            final row = node.rows[rowIdx];
-            // Safe cell padding/clamping so unequal columns never throw
-            final safeCells = List<String>.from(row);
-            while (safeCells.length < node.headers.length) {
-              safeCells.add('');
-            }
-            if (safeCells.length > node.headers.length) {
-              safeCells.length = node.headers.length;
-            }
+              // Data Rows
+              ...List.generate(node.rows.length, (rowIdx) {
+                final row = node.rows[rowIdx];
+                final isEven = rowIdx % 2 == 0;
+                
+                final safeCells = List<String>.from(row);
+                while (safeCells.length < node.headers.length) safeCells.add('');
+                if (safeCells.length > node.headers.length) safeCells.length = node.headers.length;
 
-            final isEven = rowIdx % 2 == 0;
-            return DataRow(
-              color: WidgetStateProperty.all(
-                isEven ? const Color(0xFF1B1A17) : const Color(0xFF1F1E1B),
-              ),
-              cells: List.generate(node.headers.length, (cellIdx) {
-                final cellContent = safeCells[cellIdx];
-                return DataCell(
-                  _InlineRichText(
-                    text: cellContent.trim(),
-                    palette: p,
-                    style: baseStyle.copyWith(fontSize: 13),
-                    onLinkTap: onLinkTap,
+                return TableRow(
+                  decoration: BoxDecoration(
+                    color: isEven ? const Color(0xFF1B1A17) : const Color(0xFF1F1E1B),
                   ),
+                  children: safeCells.map((cell) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: _InlineRichText(
+                        text: cell.trim(),
+                        palette: p,
+                        style: baseStyle.copyWith(fontSize: 13),
+                        onLinkTap: onLinkTap,
+                      ),
+                    );
+                  }).toList(),
                 );
               }),
-            );
-          }),
+            ],
+          ),
         ),
       ),
     );
@@ -702,7 +715,14 @@ class _UnoCallout extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: bgCol,
+        gradient: LinearGradient(
+          colors: [
+            bgCol,
+            bgCol.withValues(alpha: 0.3),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: p.div, width: 0.8),
       ),
@@ -785,11 +805,11 @@ class _SyntaxHighlightedCode extends StatelessWidget {
     final spans = <TextSpan>[];
     final lines = source.split('\n');
 
-    final kwColor = p.accent; // Warm terracotta/coral
-    const strColor = Color(0xFF88B97C); // Olive green
-    const numColor = Color(0xFFE5C07B); // Amber gold
-    final commentColor = p.textSec; // Muted gray
-    const typeColor = Color(0xFF61AFEF); // Cyan/sky blue
+    const kwColor = Color(0xFFC678DD); // Vibrant purple
+    const strColor = Color(0xFF98C379); // Vibrant green
+    const numColor = Color(0xFFD19A66); // Amber gold
+    const commentColor = Color(0xFF8B949E); // Muted gray
+    const typeColor = Color(0xFF56B6C2); // Cyan
 
     final keywords = {
       'import', 'export', 'from', 'as', 'def', 'class', 'struct', 'interface',
