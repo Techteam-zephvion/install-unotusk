@@ -18,6 +18,8 @@
             theme: {
                 extend: {
                     colors: {
+                        rudraStart: '#ff4b1f',
+                        rudraEnd: '#ff9068',
                         paper: '#F8F7F4',
                         surface: '#FFFFFF',
                         surfaceTint: '#F2EFE9',
@@ -82,7 +84,40 @@
             opacity: 1;
             transform: translateY(0);
         }
-    </style>
+    
+        .rudra-badge {
+            background: linear-gradient(135deg, #ff4b1f, #ff9068);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            animation: pulse-rudra 2s infinite;
+        }
+        @keyframes pulse-rudra {
+            0% { filter: drop-shadow(0 0 2px rgba(255, 75, 31, 0.3)); }
+            50% { filter: drop-shadow(0 0 8px rgba(255, 75, 31, 0.6)); }
+            100% { filter: drop-shadow(0 0 2px rgba(255, 75, 31, 0.3)); }
+        }
+
+        @keyframes bounce-y {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(3px); }
+        }
+        .animate-bounce-y {
+            animation: bounce-y 1.5s infinite ease-in-out;
+            display: inline-block;
+        }
+        @keyframes bounce-x {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(3px); }
+        }
+        .animate-bounce-x {
+            animation: bounce-x 1.5s infinite ease-in-out;
+            display: inline-block;
+        }
+</style>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 </head>
 <body class="min-h-screen flex flex-col bg-paper text-ink selection:bg-ink selection:text-white">
 
@@ -121,7 +156,8 @@
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
                 
                 <!-- Main Statement (8 cols) -->
-                <div class="lg:col-span-8">
+                <div class="lg:col-span-8" data-aos="fade-right">
+                    <div class="mb-6 inline-block px-4 py-1.5 rounded-full bg-gradient-to-r from-[#ff4b1f]/10 to-[#ff9068]/10 border border-[#ff4b1f]/30 font-mono text-sm tracking-widest uppercase shadow-[0_0_15px_rgba(255,75,31,0.15)]"><span class="rudra-badge">Unotusk Rudra Edition</span></div>
                     <h1 class="font-serif text-4xl sm:text-5xl lg:text-[3.75rem] text-ink tracking-tight leading-[1.12] mb-7">
                         Grounded Codebase Intelligence for Your Team.
                     </h1>
@@ -143,10 +179,10 @@
                 </div>
 
                 <!-- Right Technical Aside / Manifest Panel (4 cols) -->
-                <div class="lg:col-span-4 hairline-all p-6 sm:p-7 bg-surface rounded-[2px]">
+                <div data-aos="fade-left" data-aos-delay="200" class="lg:col-span-4 hairline-all p-6 sm:p-7 bg-surface rounded-[2px]">
                     <div class="font-mono text-xs text-inkMuted uppercase tracking-wider mb-4 pb-2.5 hairline-b flex items-center justify-between">
                         <span>Distribution Spec</span>
-                        <span class="text-ink font-semibold" data-version-tag>v0.1.0-beta</span>
+                        <span class="rudra-badge border border-[#ff4b1f]/30 px-2.5 py-0.5 rounded-full" data-version-tag>v0.1.0-beta</span>
                     </div>
 
                     <div class="font-mono text-sm space-y-3 text-inkSecondary">
@@ -181,7 +217,7 @@
         </section>
 
         <!-- SECTION 2: PRODUCT ACCESS (Platform Matrix at 1.5x) -->
-        <section id="desktop-client" class="mb-20 lg:mb-28 scroll-mt-24">
+        <section id="desktop-client" data-aos="fade-up" class="mb-20 lg:mb-28 scroll-mt-24">
             <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 pb-4 mb-7 hairline-b">
                 <div>
                     <h2 class="font-serif text-3xl sm:text-4xl text-ink">Desktop Client Distribution</h2>
@@ -189,7 +225,7 @@
                 </div>
                 <div class="font-mono text-xs sm:text-sm text-inkMuted flex items-center gap-2">
                     <span class="inline-block w-2 h-2 rounded-full bg-live"></span>
-                    <span data-release-meta>Release v0.1.0-beta "Beta" • 2026-10-09</span>
+                    <span data-release-meta class="font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-orange-400">Release v0.1.0-beta "Rudra" • 2026-10-09</span>
                 </div>
             </div>
 
@@ -205,7 +241,7 @@
                 </div>
 
                 <!-- Row 1: macOS -->
-                <div class="grid grid-cols-1 md:grid-cols-12 px-7 py-5 hairline-b items-center gap-4 md:gap-0 hover:bg-paper/40 transition-colors">
+                <div class="grid grid-cols-1 md:grid-cols-12 px-7 py-5 hairline-b items-center gap-4 md:gap-0 hover:bg-white transition-all duration-300 hover:shadow-[inset_4px_0_0_#ff4b1f]">
                     <div class="col-span-2 flex items-center gap-3.5">
                         <svg class="w-5 h-5 text-ink shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.82 1.11-1.96.99-3.1-.96.04-2.11.64-2.79 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.15-.55 2.78-1.29z"/></svg>
                         <div>
@@ -227,13 +263,13 @@
                            data-download="employeeMacos"
                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-ink hover:bg-black text-white text-sm font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto shadow-sm">
                             <span>Download .dmg</span>
-                            <span class="text-xs text-white/70">&darr;</span>
+                            <span class="text-xs text-white/70 animate-bounce-y">&darr;</span>
                         </a>
                     </div>
                 </div>
 
                 <!-- Row 2: Windows -->
-                <div class="grid grid-cols-1 md:grid-cols-12 px-7 py-5 hairline-b items-center gap-4 md:gap-0 hover:bg-paper/40 transition-colors">
+                <div class="grid grid-cols-1 md:grid-cols-12 px-7 py-5 hairline-b items-center gap-4 md:gap-0 hover:bg-white transition-all duration-300 hover:shadow-[inset_4px_0_0_#ff4b1f]">
                     <div class="col-span-2 flex items-center gap-3.5">
                         <svg class="w-5 h-5 text-ink shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.051-1.899"/></svg>
                         <div>
@@ -255,13 +291,13 @@
                            data-download="employeeWindows"
                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-ink hover:bg-black text-white text-sm font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto shadow-sm">
                             <span>Download .msi</span>
-                            <span class="text-xs text-white/70">&darr;</span>
+                            <span class="text-xs text-white/70 animate-bounce-y">&darr;</span>
                         </a>
                     </div>
                 </div>
 
                 <!-- Row 3: Linux -->
-                <div class="grid grid-cols-1 md:grid-cols-12 px-7 py-5 items-center gap-4 md:gap-0 hover:bg-paper/40 transition-colors">
+                <div class="grid grid-cols-1 md:grid-cols-12 px-7 py-5 items-center gap-4 md:gap-0 hover:bg-white transition-all duration-300 hover:shadow-[inset_4px_0_0_#ff4b1f]">
                     <div class="col-span-2 flex items-center gap-3.5">
                         <svg class="w-5 h-5 text-ink shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                         <div>
@@ -283,7 +319,7 @@
                            data-download="employeeLinux"
                            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-ink hover:bg-black text-white text-sm font-mono font-medium rounded-[2px] transition-colors w-full md:w-auto shadow-sm">
                             <span>Download .tar.gz</span>
-                            <span class="text-xs text-white/70">&darr;</span>
+                            <span class="text-xs text-white/70 animate-bounce-y">&darr;</span>
                         </a>
                     </div>
                 </div>
@@ -318,7 +354,7 @@
         </section>
 
         <!-- SECTION 3: SERVER NODE (Actual Infrastructure Documentation at 1.5x) -->
-        <section id="server-node" class="mb-20 lg:mb-28 scroll-mt-24">
+        <section id="server-node" data-aos="fade-up" class="mb-20 lg:mb-28 scroll-mt-24">
             <div class="pb-4 mb-7 hairline-b">
                 <span class="font-mono text-xs text-accent tracking-wider uppercase block mb-1.5 font-semibold">Infrastructure Component</span>
                 <h2 class="font-serif text-3xl sm:text-4xl text-ink">Server Node Deployment</h2>
@@ -349,7 +385,7 @@
                                    data-download="serverWindows"
                                    class="text-sm font-mono font-semibold text-ink hover:text-accent transition-colors flex items-center gap-1.5">
                                     <span>Download .msi</span>
-                                    <span>&rarr;</span>
+                                    <span class="animate-bounce-x">&rarr;</span>
                                 </a>
                             </div>
 
@@ -362,7 +398,7 @@
                                    data-download="serverLinux"
                                    class="text-sm font-mono font-semibold text-ink hover:text-accent transition-colors flex items-center gap-1.5">
                                     <span>Download .tar.gz</span>
-                                    <span>&rarr;</span>
+                                    <span class="animate-bounce-x">&rarr;</span>
                                 </a>
                             </div>
                         </div>
@@ -431,7 +467,7 @@
         </section>
 
         <!-- SECTION 4: DEPLOYMENT ARCHITECTURE (The Visual Centerpiece at 1.5x) -->
-        <section id="architecture" class="mb-20 lg:mb-28 scroll-mt-24">
+        <section id="architecture" data-aos="fade-up" class="mb-20 lg:mb-28 scroll-mt-24">
             <div class="pb-4 mb-7 hairline-b">
                 <span class="font-mono text-xs text-accent tracking-wider uppercase block mb-1.5 font-semibold">Systems Architecture</span>
                 <h2 class="font-serif text-3xl sm:text-4xl text-ink">Deployment Topology</h2>
@@ -446,7 +482,8 @@
                 <div class="max-w-2xl mx-auto space-y-4 font-mono text-xs sm:text-sm">
                     
                     <!-- Node 1: Developer Machines -->
-                    <div class="hairline-all bg-surfaceTint p-4 sm:p-5 rounded-[2px] flex items-center justify-between">
+<div data-aos="fade-up" data-aos-delay="100">
+                    <div class="hairline-all bg-surfaceTint p-4 sm:p-5 rounded-[2px] flex items-center justify-between transition-all duration-300 hover:shadow-lg hover:border-accent/50">
                         <div>
                             <span class="text-xs text-inkMuted uppercase tracking-wider block font-medium">01 / Source</span>
                             <span class="font-sans font-semibold text-base sm:text-lg text-ink">Developer Machines</span>
@@ -454,13 +491,17 @@
                         <span class="text-xs sm:text-sm text-inkMuted">macOS, Windows, Linux</span>
                     </div>
 
-                    <!-- Flow 1 -->
+                    </div>
+<!-- Flow 1 -->
+<div data-aos="fade-in" data-aos-delay="200">
                     <div class="flex items-center justify-center text-inkMuted text-sm py-1">
                         <span>&darr;</span>
                     </div>
 
-                    <!-- Node 2: Desktop Client -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    </div>
+<!-- Node 2: Desktop Client -->
+<div data-aos="fade-up" data-aos-delay="300">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center justify-between mb-1.5">
                             <span class="text-xs text-accent uppercase tracking-wider font-semibold">02 / Client Interface</span>
                             <span class="text-xs sm:text-sm text-inkMuted">Local Client App</span>
@@ -471,7 +512,9 @@
                         </p>
                     </div>
 
-                    <!-- Flow 2: LAN Protocol Bridge -->
+                    </div>
+<!-- Flow 2: LAN Protocol Bridge -->
+<div data-aos="fade-in" data-aos-delay="400">
                     <div class="flex flex-col items-center justify-center text-center py-1.5">
                         <span class="text-inkMuted text-sm">&darr;</span>
                         <div class="my-1.5 px-4 py-1.5 hairline-all bg-paper rounded-[2px] text-xs sm:text-sm text-ink font-mono flex items-center gap-2.5">
@@ -483,18 +526,24 @@
                         <span class="text-inkMuted text-sm">&darr;</span>
                     </div>
 
-                    <!-- Node 3: Local LAN Boundary -->
+                    </div>
+<!-- Node 3: Local LAN Boundary -->
+<div data-aos="zoom-in" data-aos-delay="500">
                     <div class="border border-dashed border-ruleDark p-4 rounded-[2px] text-center font-mono text-xs sm:text-sm text-inkMuted bg-paper/60 uppercase tracking-wider">
                         [ LOCAL AREA NETWORK (LAN) &bull; AIR-GAPPED &bull; ZERO CLOUD EGRESS ]
                     </div>
 
-                    <!-- Flow 3: Server Ingress -->
+                    </div>
+<!-- Flow 3: Server Ingress -->
+<div data-aos="fade-in" data-aos-delay="600">
                     <div class="flex items-center justify-center text-inkMuted text-sm py-1">
                         <span>&darr;</span>
                     </div>
 
-                    <!-- Node 4: Unotusk Server Node -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    </div>
+<!-- Node 4: Unotusk Server Node -->
+<div data-aos="fade-up" data-aos-delay="700">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center justify-between mb-1.5">
                             <span class="text-xs text-accent uppercase tracking-wider font-semibold">03 / Central Node</span>
                             <span class="text-live text-xs sm:text-sm font-semibold">FastAPI :28000</span>
@@ -505,7 +554,9 @@
                         </p>
                     </div>
 
-                    <!-- Flow 4: Database Bridge -->
+                    </div>
+<!-- Flow 4: Database Bridge -->
+<div data-aos="fade-in" data-aos-delay="800">
                     <div class="flex flex-col items-center justify-center text-center py-1.5">
                         <span class="text-inkMuted text-sm">&darr;</span>
                         <div class="my-1.5 px-4 py-1.5 hairline-all bg-paper rounded-[2px] text-xs sm:text-sm text-ink font-mono flex items-center gap-2.5">
@@ -515,8 +566,10 @@
                         <span class="text-inkMuted text-sm">&darr;</span>
                     </div>
 
-                    <!-- Node 5: PostgreSQL + pgvector -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    </div>
+<!-- Node 5: PostgreSQL + pgvector -->
+<div data-aos="fade-up" data-aos-delay="900">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center justify-between mb-1.5">
                             <span class="text-xs text-inkMuted uppercase tracking-wider font-semibold">04 / Persistence Layer</span>
                             <span class="text-xs sm:text-sm text-inkMuted">Port 5432</span>
@@ -527,7 +580,9 @@
                         </p>
                     </div>
 
-                    <!-- Flow 5: Redis Task Broker Bridge -->
+                    </div>
+<!-- Flow 5: Redis Task Broker Bridge -->
+<div data-aos="fade-in" data-aos-delay="1000">
                     <div class="flex flex-col items-center justify-center text-center py-1.5">
                         <span class="text-inkMuted text-sm">&darr;</span>
                         <div class="my-1.5 px-4 py-1.5 hairline-all bg-paper rounded-[2px] text-xs sm:text-sm text-ink font-mono flex items-center gap-2.5">
@@ -537,8 +592,10 @@
                         <span class="text-inkMuted text-sm">&darr;</span>
                     </div>
 
-                    <!-- Node 6: Redis Task Queue -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    </div>
+<!-- Node 6: Redis Task Queue -->
+<div data-aos="fade-up" data-aos-delay="1100">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center justify-between mb-1.5">
                             <span class="text-xs text-inkMuted uppercase tracking-wider font-semibold">05 / Task Broker</span>
                             <span class="text-xs sm:text-sm text-inkMuted">Port 6379</span>
@@ -548,14 +605,15 @@
                             Coordinates asynchronous ingestion pipelines, AST parsing worker threads, and report builds.
                         </p>
                     </div>
-
+</div>
                 </div>
 
             </div>
         </section>
 
-        <!-- SECTION 5: QUICK START (Vertical Technical Procedure at 1.5x) -->
-        <section id="procedure" class="mb-20 lg:mb-28 scroll-mt-24">
+        </div>
+<!-- SECTION 5: QUICK START (Vertical Technical Procedure at 1.5x) -->
+        <section id="procedure" data-aos="fade-up" class="mb-20 lg:mb-28 scroll-mt-24">
             <div class="pb-4 mb-9 hairline-b">
                 <span class="font-mono text-xs text-accent tracking-wider uppercase block mb-1.5 font-semibold">Execution Order</span>
                 <h2 class="font-serif text-3xl sm:text-4xl text-ink">Installation Procedure</h2>
@@ -578,7 +636,7 @@
                 <div class="lg:col-span-8 space-y-5 font-mono text-sm">
                     
                     <!-- Step 01 -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center gap-3.5 mb-2">
                             <span class="text-accent font-semibold text-base">01</span>
                             <span class="font-sans font-semibold text-base sm:text-lg text-ink">Deploy Host Server</span>
@@ -589,7 +647,7 @@
                     </div>
 
                     <!-- Step 02 -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center gap-3.5 mb-2">
                             <span class="text-accent font-semibold text-base">02</span>
                             <span class="font-sans font-semibold text-base sm:text-lg text-ink">Verify Server Health</span>
@@ -603,7 +661,7 @@
                     </div>
 
                     <!-- Step 03 -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center gap-3.5 mb-2">
                             <span class="text-accent font-semibold text-base">03</span>
                             <span class="font-sans font-semibold text-base sm:text-lg text-ink">Share LAN Endpoint</span>
@@ -614,7 +672,7 @@
                     </div>
 
                     <!-- Step 04 -->
-                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px]">
+                    <div class="hairline-all bg-surface p-5 sm:p-6 rounded-[2px] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff4b1f]/10 hover:border-[#ff4b1f]/30">
                         <div class="flex items-center gap-3.5 mb-2">
                             <span class="text-accent font-semibold text-base">04</span>
                             <span class="font-sans font-semibold text-base sm:text-lg text-ink">Connect Desktop Clients</span>
@@ -623,7 +681,7 @@
                             Engineers launch the Desktop Client on macOS, Windows, or Linux, paste the host endpoint into the connection field, and immediately begin querying repository intelligence.
                         </p>
                     </div>
-
+</div>
                 </div>
 
             </div>
@@ -702,6 +760,17 @@
                     console.info('Unotusk distribution running with bundled release links:', err.message);
                 });
         })();
+    </script>
+
+    <!-- AOS Animation -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            duration: 800,
+            easing: 'ease-out-cubic',
+            once: true,
+            offset: 50
+        });
     </script>
 </body>
 </html>
