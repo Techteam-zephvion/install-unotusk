@@ -252,7 +252,9 @@ jobs:
         working-directory: app/build/macos/Build/Products/Release
         run: |
           APP=$(ls -d *.app 2>/dev/null | head -1)
-          if [ -z "$APP" ]; then echo "No .app found"; ls -la; exit 1; fi
+          # Clean extended attributes and apply valid ad-hoc deep code signing
+          xattr -cr "$APP" || true
+          codesign --force --deep --sign - "$APP" || true
 
           create-dmg \
             --volname "Unotusk Employee" \
