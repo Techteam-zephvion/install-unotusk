@@ -76,7 +76,7 @@ class RetrievedCandidate:
 def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
     meta: dict[str, Any] = {}
     if getattr(chunk, "snapshot_id", None):
-        meta["snapshot_id"] = chunk.snapshot_id
+        meta["snapshot_id"] = str(chunk.snapshot_id)
     if getattr(chunk, "commit_sha", None):
         meta["commit_sha"] = chunk.commit_sha
     if getattr(chunk, "commit_message", None):

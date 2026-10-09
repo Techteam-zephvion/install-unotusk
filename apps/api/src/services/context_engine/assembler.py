@@ -1,8 +1,19 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from apps.api.src.config.settings import settings
 from apps.api.src.services.context_engine.ranker import RankedCandidate
+
+
+def _json_safe(val: Any) -> Any:
+    if isinstance(val, uuid.UUID):
+        return str(val)
+    if isinstance(val, dict):
+        return {str(k): _json_safe(v) for k, v in val.items()}
+    if isinstance(val, list | tuple | set):
+        return [_json_safe(v) for v in val]
+    return val
 
 
 @dataclass
@@ -87,7 +98,7 @@ class ContextAssembler:
                     "chunk_type",
                 ):
                     if k in cand.metadata and cand.metadata[k] is not None:
-                        evidence_item[k] = cand.metadata[k]
+                        evidence_item[k] = _json_safe(cand.metadata[k])
 
             evidence_items.append(evidence_item)
 

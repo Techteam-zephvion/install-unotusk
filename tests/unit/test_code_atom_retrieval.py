@@ -1,3 +1,4 @@
+import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
@@ -303,7 +304,7 @@ async def test_6_metadata_and_provenance_survive_entire_retrieval_flow(mock_atom
     assert cand.metadata["commit_message"] == mock_atom_chunk.commit_message
     assert cand.metadata["fingerprint"] == mock_atom_chunk.fingerprint
     assert cand.metadata["provenance"] == mock_atom_chunk.provenance
-    assert cand.metadata["snapshot_id"] == mock_atom_chunk.snapshot_id
+    assert cand.metadata["snapshot_id"] == str(mock_atom_chunk.snapshot_id)
     assert cand.file_id == mock_atom_chunk.file_id
     assert cand.symbol_id == mock_atom_chunk.symbol_id
 
@@ -326,7 +327,7 @@ async def test_6_metadata_and_provenance_survive_entire_retrieval_flow(mock_atom
     assert item["commit_message"] == mock_atom_chunk.commit_message
     assert item["fingerprint"] == mock_atom_chunk.fingerprint
     assert item["provenance"] == mock_atom_chunk.provenance
-    assert item["snapshot_id"] == mock_atom_chunk.snapshot_id
+    assert item["snapshot_id"] == str(mock_atom_chunk.snapshot_id)
 
     # Check prompt context string formatting retains commit relationship
     assert "83efb9c1" in assembled.prompt_context
@@ -400,6 +401,10 @@ def test_8_context_assembly_includes_selected_atom_chunks(mock_atom_chunk):
     assert mock_atom_chunk.commit_sha[:8] in assembled.prompt_context
     assert len(assembled.evidence_items) == 1
     assert assembled.evidence_items[0]["fingerprint"] == mock_atom_chunk.fingerprint
+    assert assembled.evidence_items[0]["snapshot_id"] == str(mock_atom_chunk.snapshot_id)
+    # Explicitly verify evidence items are fully JSON serializable for PostgreSQL JSONB
+    json_serialized = json.dumps(assembled.evidence_items)
+    assert json_serialized is not None
 
 
 def test_9_existing_non_atom_retrieval_behaviour_remains_compatible():
