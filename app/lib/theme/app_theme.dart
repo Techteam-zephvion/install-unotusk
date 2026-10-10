@@ -116,12 +116,14 @@ class UnoTypography {
     double fontSize = 11,
     FontWeight fontWeight = FontWeight.normal,
     double letterSpacing = 0.5,
+    double? height,
   }) {
     return GoogleFonts.ibmPlexMono(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
       letterSpacing: letterSpacing,
+      height: height,
     );
   }
 

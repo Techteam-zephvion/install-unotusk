@@ -64,6 +64,19 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _showScrollToBottom = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
+      final show = _scrollController.position.maxScrollExtent - _scrollController.offset > 150;
+      if (show != _showScrollToBottom) {
+        setState(() => _showScrollToBottom = show);
+      }
+    });
+  }
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -286,6 +299,33 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_showScrollToBottom)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          onTap: () {
+                            _scrollController.animateTo(
+                              _scrollController.position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: widget.palette.bgSurface,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: widget.palette.div),
+                            ),
+                            child: Icon(
+                              LucideIcons.arrowDown,
+                              size: 16,
+                              color: widget.palette.text,
+                            ),
+                          ),
+                        ),
+                      ),
                     ChatInputBox(
                       controller: _inputController,
                       palette: widget.palette,
@@ -356,9 +396,9 @@ class _ChatScreenState extends State<ChatScreen> {
               MarkdownText(
                 text: msg.text ?? '',
                 palette: widget.palette,
-                baseStyle: UnoTypography.body(
+                baseStyle: UnoTypography.mono(
                   color: widget.palette.text,
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -441,6 +481,11 @@ class _ResponseCardState extends State<_ResponseCard> {
                 child: MarkdownText(
                   text: seg.text,
                   palette: widget.palette,
+                  baseStyle: UnoTypography.mono(
+                    color: widget.palette.text,
+                    fontSize: 14,
+                    height: 1.65,
+                  ),
                   trailing: seg.tag != null
                       ? TagBadge(
                           tag: seg.tag!,

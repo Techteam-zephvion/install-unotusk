@@ -101,6 +101,11 @@ class MarkdownText extends StatelessWidget {
           palette: effectivePalette,
           onFileTap: onFileTap,
         );
+      } else if (block is _ProjectNode) {
+        blockWidget = _UnoProjectCard(
+          node: block,
+          palette: effectivePalette,
+        );
       } else if (block is _TableNode) {
         blockWidget = _UnoTable(
           node: block,
@@ -567,6 +572,88 @@ class _UnoArtifactCardState extends State<_UnoArtifactCard> {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Uno Project Context Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _UnoProjectCard extends StatelessWidget {
+  final _ProjectNode node;
+  final UnoPalette palette;
+
+  const _UnoProjectCard({
+    required this.node,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image Container
+          Container(
+            width: 130,
+            height: 90,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.div, width: 1),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: node.image.isNotEmpty
+                ? (node.image.startsWith('http')
+                    ? Image.network(node.image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallback())
+                    : Image.asset(node.image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallback()))
+                : _buildFallback(),
+          ),
+          const SizedBox(width: 16),
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Project context',
+                  style: UnoTypography.mono(
+                    color: palette.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  node.tags,
+                  style: UnoTypography.mono(
+                    color: palette.textSec,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  node.description,
+                  style: UnoTypography.mono(
+                    color: palette.text,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFallback() {
+    return Center(
+      child: Icon(LucideIcons.cpu, size: 32, color: palette.textSec),
     );
   }
 }
@@ -1040,6 +1127,17 @@ class _ArtifactNode extends _MarkdownNode {
     required this.title,
     required this.language,
     required this.content,
+  });
+}
+
+class _ProjectNode extends _MarkdownNode {
+  final String image;
+  final String tags;
+  final String description;
+  _ProjectNode({
+    required this.image,
+    required this.tags,
+    required this.description,
   });
 }
 
