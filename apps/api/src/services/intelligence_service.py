@@ -22,7 +22,7 @@ from apps.api.src.schemas.intelligence import (
 )
 from apps.api.src.services.context_engine.engine import ProjectContextEngine
 from apps.api.src.services.context_engine.graph_expander import RelationshipExpander
-from apps.api.src.services.context_engine.query_analyzer import analyze_query
+from apps.api.src.services.context_engine.query_analyzer import analyze_query_async
 from apps.api.src.services.context_engine.ranker import MultiSignalRanker
 from apps.api.src.services.context_engine.retriever import MultiSignalRetriever
 
@@ -348,7 +348,7 @@ class IntelligenceService:
         await cls._verify_project_access(session, user_id, project_id)
         snapshot = await cls._get_active_snapshot(session, project_id)
 
-        analyzed = analyze_query(query)
+        analyzed = await analyze_query_async(query)
         raw = await MultiSignalRetriever.retrieve_candidates(
             session, snapshot.id, analyzed, query_embedding=query_embedding
         )

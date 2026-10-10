@@ -121,9 +121,6 @@ def analyze_query(query: str) -> AnalyzedQuery:
             path_candidates.append(word.lower())
 
         # Detect potential symbols:
-        # 1. CamelCase (e.g. AuthService, UserService, UserCreate)
-        # 2. snake_case with underscores (e.g. process_task, get_current_user)
-        # 3. dotted access (e.g. AuthController.login)
         if "." in word:
             parts = word.split(".")
             symbol_candidates.extend(parts)
@@ -147,7 +144,6 @@ def analyze_query(query: str) -> AnalyzedQuery:
                 if clean_w in synonyms or any(syn in clean_w for syn in synonyms):
                     concept_keywords.extend(synonyms)
 
-    # Deduplicate while preserving order
     dedup_keywords = list(dict.fromkeys(keywords))
     dedup_symbols = list(dict.fromkeys(symbol_candidates))
     dedup_paths = list(dict.fromkeys(path_candidates))
@@ -168,3 +164,35 @@ def analyze_query(query: str) -> AnalyzedQuery:
         temporal_intent=temporal_intent,
         temporal_keywords=detected_temporal_keywords,
     )
+
+
+async def analyze_query_async(query: str) -> AnalyzedQuery:
+    base = analyze_query(query)
+    
+    from apps.api.src.config.settings import settings
+    provider_name = (settings.LLM_PROVIDER or "offline").strip().lower()
+    if provider_name == "offline":
+        return base
+        
+    try:
+        from apps.api.src.services.llm.factory import get_llm_provider
+        provider = get_llm_provider(provider_name)
+        system_prompt = (
+            "You are a code intent analyzer. Extract the search intent from the query. "
+            "Respond strictly in JSON with fields: 'keywords' (list of semantic terms), "
+            "'symbol_candidates' (list of code symbols like AuthController), "
+            "'path_candidates' (list of file names/paths), "
+            "'concept_keywords' (list of broader architectural concepts like database, auth, api)."
+        )
+        res = await provider.generate_json(system_prompt, query)
+        
+        if res:
+            base.keywords = list(dict.fromkeys(base.keywords + res.get("keywords", [])))
+            base.symbol_candidates = list(dict.fromkeys(base.symbol_candidates + res.get("symbol_candidates", [])))
+            base.path_candidates = list(dict.fromkeys(base.path_candidates + res.get("path_candidates", [])))
+            base.concept_keywords = list(dict.fromkeys(base.concept_keywords + res.get("concept_keywords", [])))
+    except Exception as e:
+        import logging
+        logging.getLogger("unotusk-query-analyzer").warning(f"LLM query expansion failed: {e}")
+        
+    return base

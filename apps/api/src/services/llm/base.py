@@ -24,3 +24,8 @@ class LLMProvider(ABC):
         thinking_tier: str | None = None,
     ) -> GroundedAnswer:
         pass
+
+    @abstractmethod
+    async def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        """Generate a JSON response for structured extraction tasks."""
+        pass

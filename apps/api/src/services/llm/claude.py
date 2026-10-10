@@ -264,3 +264,25 @@ class ClaudeProvider(LLMProvider):
             lines.append("- Analyzed cross-module relationships, contracts, and failure boundary constraints.")
 
         return "\n".join(lines)
+
+    async def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        if not self._client:
+            return {}
+        import json
+        import re
+        try:
+            response = await self._client.messages.create(
+                model=self.model,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=1024,
+            )
+            content = response.content[0].text
+            # Claude doesn't have native json_object mode, extract JSON
+            json_match = re.search(r"\{.*\}", content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            return json.loads(content)
+        except Exception as e:
+            logger.error(f"Claude generate_json error: {e}")
+            return {}

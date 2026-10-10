@@ -8,7 +8,7 @@ from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.services.context_engine.assembler import ContextAssembler
 from apps.api.src.services.context_engine.graph_expander import RelationshipExpander
 from apps.api.src.services.context_engine.knowledge_retriever import KnowledgeRetriever
-from apps.api.src.services.context_engine.query_analyzer import analyze_query
+from apps.api.src.services.context_engine.query_analyzer import analyze_query_async
 from apps.api.src.services.context_engine.ranker import MultiSignalRanker
 from apps.api.src.services.context_engine.retriever import MultiSignalRetriever
 from apps.api.src.services.llm.base import GroundedAnswer, LLMProvider
@@ -30,7 +30,7 @@ class ProjectContextEngine:
         thinking_tier: str | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
-        analyzed = analyze_query(question)
+        analyzed = await analyze_query_async(question)
 
         # 1b. Generate Query Embedding for semantic retrieval if not provided
         if query_embedding is None and question:

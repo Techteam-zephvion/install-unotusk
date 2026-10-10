@@ -252,3 +252,23 @@ class GroqProvider(LLMProvider):
             lines.append("- Analyzed cross-module relationships, contracts, and failure boundary constraints.")
 
         return "\n".join(lines)
+
+    async def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        if not self._client:
+            return {}
+        import json
+        try:
+            response = await self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=1024,
+            )
+            content = response.choices[0].message.content
+            return json.loads(content)
+        except Exception as e:
+            logger.error(f"Groq generate_json error: {e}")
+            return {}

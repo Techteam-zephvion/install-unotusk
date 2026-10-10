@@ -29,6 +29,7 @@ from apps.api.src.services.discovery_engine.documentation_gap_analyzer import (
 from apps.api.src.services.discovery_engine.duplication_analyzer import DuplicationAnalyzer
 from apps.api.src.services.discovery_engine.legacy_analyzer import LegacyAnalyzer
 from apps.api.src.services.discovery_engine.ranker import rank_findings
+from apps.api.src.services.discovery_engine.security_analyzer import SecurityAnalyzer
 from apps.api.src.services.discovery_engine.synthesizer import FindingSynthesizer
 from apps.api.src.services.discovery_engine.test_gap_analyzer import TestGapAnalyzer
 from apps.api.src.services.discovery_engine.unused_code_analyzer import UnusedCodeAnalyzer
@@ -139,6 +140,7 @@ class ProjectDiscoveryEngine:
                 ArchitectureAnalyzer(),
                 LegacyAnalyzer(),
                 TestGapAnalyzer(),
+                SecurityAnalyzer(),
             ]
 
             # 5. Run Analyzers

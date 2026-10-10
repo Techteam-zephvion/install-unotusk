@@ -61,6 +61,7 @@ class FindingCategory(str, enum.Enum):
     CHANGE_RISK = "CHANGE_RISK"
     LEGACY = "LEGACY"
     TEST_GAP = "TEST_GAP"
+    SECURITY_RISK = "SECURITY_RISK"
 
 
 class FindingSeverity(str, enum.Enum):
