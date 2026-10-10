@@ -106,6 +106,11 @@ class MarkdownText extends StatelessWidget {
           node: block,
           palette: effectivePalette,
         );
+      } else if (block is _ScoreGuideNode) {
+        blockWidget = _UnoScoreGuide(
+          node: block,
+          palette: effectivePalette,
+        );
       } else if (block is _TableNode) {
         blockWidget = _UnoTable(
           node: block,
@@ -659,6 +664,110 @@ class _UnoProjectCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Uno Score Guide Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _UnoScoreGuide extends StatelessWidget {
+  final _ScoreGuideNode node;
+  final UnoPalette palette;
+
+  const _UnoScoreGuide({
+    required this.node,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: palette.bgBase,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: palette.div, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (node.title.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                node.title,
+                style: UnoTypography.mono(
+                  color: palette.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ...node.items.map((item) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: palette.div.withValues(alpha: 0.3))),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      item.range,
+                      style: UnoTypography.mono(
+                        color: palette.text,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          style: UnoTypography.mono(
+                            color: palette.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          item.description,
+                          style: UnoTypography.mono(
+                            color: palette.textSec,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (node.footer.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                node.footer,
+                style: UnoTypography.mono(
+                  color: palette.textSec,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Uno Table Renderer
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -682,12 +791,6 @@ class _UnoTable extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: p.bgSurface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: p.div, width: 1),
-      ),
-      clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: ConstrainedBox(
@@ -695,19 +798,18 @@ class _UnoTable extends StatelessWidget {
           child: Table(
             defaultColumnWidth: const IntrinsicColumnWidth(),
             border: TableBorder(
-              horizontalInside: BorderSide(color: p.div.withValues(alpha: 0.5), width: 0.8),
-              bottom: BorderSide(color: p.div.withValues(alpha: 0.5), width: 0.8),
+              horizontalInside: BorderSide(color: p.div.withValues(alpha: 0.3), width: 1),
+              bottom: BorderSide(color: p.div.withValues(alpha: 0.3), width: 1),
             ),
             children: [
               // Header
               TableRow(
-                decoration: const BoxDecoration(color: Color(0xFF22211D)),
                 children: node.headers.map((title) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Text(
                       title.trim(),
-                      style: UnoTypography.body(
+                      style: UnoTypography.mono(
                         color: p.text,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -719,19 +821,14 @@ class _UnoTable extends StatelessWidget {
               // Data Rows
               ...List.generate(node.rows.length, (rowIdx) {
                 final row = node.rows[rowIdx];
-                final isEven = rowIdx % 2 == 0;
-                
                 final safeCells = List<String>.from(row);
                 while (safeCells.length < node.headers.length) safeCells.add('');
                 if (safeCells.length > node.headers.length) safeCells.length = node.headers.length;
 
                 return TableRow(
-                  decoration: BoxDecoration(
-                    color: isEven ? const Color(0xFF1B1A17) : const Color(0xFF1F1E1B),
-                  ),
                   children: safeCells.map((cell) {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       child: _InlineRichText(
                         text: cell.trim(),
                         palette: p,
@@ -1187,6 +1284,20 @@ class _ParagraphNode extends _MarkdownNode {
   _ParagraphNode(this.text);
 }
 
+class _ScoreItemNode {
+  final String range;
+  final String label;
+  final String description;
+  _ScoreItemNode(this.range, this.label, this.description);
+}
+
+class _ScoreGuideNode extends _MarkdownNode {
+  final String title;
+  final String footer;
+  final List<_ScoreItemNode> items;
+  _ScoreGuideNode({required this.title, required this.footer, required this.items});
+}
+
 class _MarkdownParser {
   static List<_MarkdownNode> parse(String rawText) {
     final nodes = <_MarkdownNode>[];
@@ -1223,6 +1334,60 @@ class _MarkdownParser {
           title: title,
           language: _detectLanguage(type, title),
           content: contentLines.join('\n'),
+        ));
+        continue;
+      }
+
+      // ── Uno Project Tag: <project image="..." tags="..."> ──
+      if (trimmed.startsWith('<project')) {
+        final projectMatch = RegExp(r'<project(?:\s+image="([^"]*)")?(?:\s+tags="([^"]*)")?[^>]*>').firstMatch(trimmed);
+        final image = projectMatch?.group(1) ?? '';
+        final tags = projectMatch?.group(2) ?? '';
+        
+        final contentLines = <String>[];
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith('</project>')) {
+          contentLines.add(lines[i]);
+          i++;
+        }
+        if (i < lines.length) i++; // skip closing tag
+
+        nodes.add(_ProjectNode(
+          image: image,
+          tags: tags,
+          description: contentLines.join('\n').trim(),
+        ));
+        continue;
+      }
+
+      // ── Uno Score Guide Tag: <score-guide title="..." footer="..."> ──
+      if (trimmed.startsWith('<score-guide')) {
+        final guideMatch = RegExp(r'<score-guide(?:\s+title="([^"]*)")?(?:\s+footer="([^"]*)")?[^>]*>').firstMatch(trimmed);
+        final title = guideMatch?.group(1) ?? '';
+        final footer = guideMatch?.group(2) ?? '';
+        
+        final items = <_ScoreItemNode>[];
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith('</score-guide>')) {
+          final l = lines[i].trim();
+          if (l.startsWith('<score')) {
+            final scoreMatch = RegExp(r'<score(?:\s+range="([^"]*)")?(?:\s+label="([^"]*)")?[^>]*>(.*?)</score>').firstMatch(l);
+            if (scoreMatch != null) {
+              items.add(_ScoreItemNode(
+                scoreMatch.group(1) ?? '',
+                scoreMatch.group(2) ?? '',
+                scoreMatch.group(3) ?? '',
+              ));
+            }
+          }
+          i++;
+        }
+        if (i < lines.length) i++; // skip closing tag
+
+        nodes.add(_ScoreGuideNode(
+          title: title,
+          footer: footer,
+          items: items,
         ));
         continue;
       }
