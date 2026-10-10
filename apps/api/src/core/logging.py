@@ -148,6 +148,7 @@ class RequestTracingMiddleware(BaseHTTPMiddleware):
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
             response.headers["X-Request-ID"] = req_id
+            response.headers["X-Process-Time"] = str(duration_ms)
 
             # Access log
             self.logger.info(

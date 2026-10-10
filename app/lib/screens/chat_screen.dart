@@ -396,6 +396,7 @@ class _ChatScreenState extends State<ChatScreen> {
               MarkdownText(
                 text: msg.text ?? '',
                 palette: widget.palette,
+                selectable: true,
                 baseStyle: UnoTypography.mono(
                   color: widget.palette.text,
                   fontSize: 14,
@@ -481,6 +482,7 @@ class _ResponseCardState extends State<_ResponseCard> {
                 child: MarkdownText(
                   text: seg.text,
                   palette: widget.palette,
+                  selectable: true,
                   baseStyle: UnoTypography.mono(
                     color: widget.palette.text,
                     fontSize: 14,

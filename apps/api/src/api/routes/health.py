@@ -1,5 +1,5 @@
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +31,7 @@ async def health_check() -> HealthResponse:
 
 
 @router.get("/health/ready", response_model=ReadyResponse)
-async def ready_check(db: AsyncSession = Depends(get_db)) -> ReadyResponse:
+async def ready_check(response: Response, db: AsyncSession = Depends(get_db)) -> ReadyResponse:
     # Check Database
     try:
         await db.execute(text("SELECT 1"))
@@ -48,8 +48,12 @@ async def ready_check(db: AsyncSession = Depends(get_db)) -> ReadyResponse:
     except Exception as e:
         redis_status = f"unhealthy: {type(e).__name__}"
 
+    is_ready = db_status == "connected" and redis_status == "connected"
+    if not is_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
     return ReadyResponse(
-        status="ready" if db_status == "connected" and redis_status == "connected" else "degraded",
+        status="ready" if is_ready else "degraded",
         database=db_status,
         redis=redis_status,
     )

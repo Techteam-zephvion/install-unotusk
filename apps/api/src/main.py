@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -50,6 +51,9 @@ app = FastAPI(
 
 # Correlation & Request Tracing Middleware
 app.add_middleware(RequestTracingMiddleware)
+
+# Response Compression
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Data Plane Container-Level Authorization & Boundary Middleware
 app.add_middleware(DataPlaneSecurityMiddleware)
