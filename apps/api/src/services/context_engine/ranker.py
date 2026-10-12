@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from apps.api.src.services.code_atom.temporal import resolve_temporal_supersession
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
 from apps.api.src.services.context_engine.retriever import RetrievedCandidate
 
@@ -68,6 +69,9 @@ class MultiSignalRanker:
         # 1. Deduplicate redundant / overlapping candidates
         unique_candidates = MultiSignalRanker._deduplicate_candidates(candidates)
 
+        # 2. Resolve temporal supersession across candidates
+        resolve_temporal_supersession(unique_candidates)
+
         ranked: list[RankedCandidate] = []
 
         for cand in unique_candidates:
@@ -131,6 +135,33 @@ class MultiSignalRanker:
                     reasons.append(f"Semantic concept match for '{concept}'")
                 elif concept in content_lower:
                     score += 0.2
+
+            # 6. Temporal adjustments based on query intent and code change lifecycle
+            if not analyzed_query.is_temporal:
+                # Current-state query: prioritize current active implementation, demote superseded and deleted
+                if cand.metadata.get("is_deleted"):
+                    score *= 0.15
+                    reasons.append("Deleted code (demoted for current-state query)")
+                elif cand.metadata.get("is_superseded"):
+                    score *= 0.4
+                    reasons.append("Historical superseded change (demoted for current-state query)")
+                elif cand.metadata.get("is_current"):
+                    score += 0.5
+                    reasons.append("Latest active implementation")
+            else:
+                # Temporal / evolution query: highlight history, commit evidence, and change lineage
+                if cand.metadata.get("commit_sha") or cand.metadata.get("committed_at"):
+                    score += 0.6
+                    reasons.append("Historical commit evidence")
+                if cand.metadata.get("is_superseded"):
+                    score += 0.4
+                    reasons.append("Historical precursor in code evolution")
+                if cand.metadata.get("is_deleted"):
+                    score += 0.5
+                    reasons.append("Deletion event in code evolution")
+                if cand.metadata.get("renamed_from") or cand.metadata.get("renamed_to"):
+                    score += 0.4
+                    reasons.append("File rename lineage")
 
             # Normalize score (capped at 1.0)
             normalized_score = min(1.0, round(score / 3.0, 2))

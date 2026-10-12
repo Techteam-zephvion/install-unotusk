@@ -37,6 +37,11 @@ from apps.api.src.services.code_atom.normalization import (
     normalize_code_change,
     normalize_diff_line,
 )
+from apps.api.src.services.code_atom.temporal import (
+    classify_temporal_intent,
+    parse_candidate_timestamp,
+    resolve_temporal_supersession,
+)
 
 __all__ = [
     "AtomicCodeChange",
@@ -50,6 +55,7 @@ __all__ = [
     "GitFileDiff",
     "InvalidBaseCommitError",
     "VoyageCodeEmbeddingBackend",
+    "classify_temporal_intent",
     "embed_atomic_code_chunk",
     "extract_git_commit_artifact",
     "extract_incremental_commit_artifacts",
@@ -63,7 +69,9 @@ __all__ = [
     "map_atomic_code_change_to_code_chunk",
     "normalize_code_change",
     "normalize_diff_line",
+    "parse_candidate_timestamp",
     "parse_unified_diff",
     "reembed_atom_code_chunks",
     "resolve_and_map_atomic_changes",
+    "resolve_temporal_supersession",
 ]

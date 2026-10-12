@@ -51,19 +51,42 @@ class ContextAssembler:
                 truncated_content += "\n... [truncated]"
 
             commit_info = ""
-            if cand.metadata.get("commit_message"):
-                commit_sha_short = (
-                    cand.metadata.get("commit_sha", "")[:8]
-                    if cand.metadata.get("commit_sha")
-                    else "HEAD"
-                )
-                commit_info = f"- Commit: {commit_sha_short} — {cand.metadata['commit_message']}\n"
-            elif cand.metadata.get("commit_sha"):
-                commit_info = f"- Commit: {cand.metadata['commit_sha'][:8]}\n"
+            sha = cand.metadata.get("commit_sha")
+            msg = cand.metadata.get("commit_message")
+            ts = cand.metadata.get("committed_at") or (cand.metadata.get("provenance") or {}).get("committed_at")
+            author = cand.metadata.get("author") or (cand.metadata.get("provenance") or {}).get("author")
+            c_type = cand.metadata.get("chunk_type") or (cand.metadata.get("provenance") or {}).get("change_type")
+
+            if sha or msg or ts:
+                sha_str = f"Commit: {sha[:8]}" if sha else "Commit: HEAD"
+                parts = [sha_str]
+                if ts:
+                    parts.append(f"Date: {ts}")
+                if author:
+                    parts.append(f"Author: {author}")
+                if c_type:
+                    parts.append(f"Type: {c_type}")
+
+                header = " | ".join(parts)
+                if msg:
+                    commit_info = f"- {header} — {msg}\n"
+                else:
+                    commit_info = f"- {header}\n"
+
+            temporal_status = ""
+            if cand.metadata.get("is_superseded"):
+                by_sha = cand.metadata.get("superseded_by_sha")
+                by_text = f" by {by_sha[:8]}" if by_sha else ""
+                temporal_status = f"- Temporal Status: SUPERSEDED{by_text}\n"
+            elif cand.metadata.get("is_deleted"):
+                temporal_status = "- Temporal Status: DELETED\n"
+            elif cand.metadata.get("is_current"):
+                temporal_status = "- Temporal Status: CURRENT\n"
 
             candidate_section = (
                 f"### [{cand.entity_type}] {cand.path}\n"
                 f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
+                f"{temporal_status}"
                 f"{commit_info}"
                 f"- Relevance Score: {r.score}\n"
                 f"- Code / Evidence Snippet:\n"
@@ -96,6 +119,14 @@ class ContextAssembler:
                     "provenance",
                     "snapshot_id",
                     "chunk_type",
+                    "committed_at",
+                    "is_superseded",
+                    "is_current",
+                    "is_deleted",
+                    "superseded_by_sha",
+                    "superseded_by_date",
+                    "renamed_from",
+                    "renamed_to",
                 ):
                     if k in cand.metadata and cand.metadata[k] is not None:
                         evidence_item[k] = _json_safe(cand.metadata[k])

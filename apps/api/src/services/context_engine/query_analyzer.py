@@ -9,6 +9,9 @@ class AnalyzedQuery:
     symbol_candidates: list[str] = field(default_factory=list)
     path_candidates: list[str] = field(default_factory=list)
     concept_keywords: list[str] = field(default_factory=list)
+    is_temporal: bool = False
+    temporal_intent: str | None = None
+    temporal_keywords: list[str] = field(default_factory=list)
 
 
 # Stop words that don't help in code retrieval
@@ -150,10 +153,18 @@ def analyze_query(query: str) -> AnalyzedQuery:
     dedup_paths = list(dict.fromkeys(path_candidates))
     dedup_concepts = list(dict.fromkeys(concept_keywords))
 
+    # Detect temporal intent and code evolution queries
+    from apps.api.src.services.code_atom.temporal import classify_temporal_intent
+
+    is_temporal, temporal_intent, detected_temporal_keywords = classify_temporal_intent(cleaned)
+
     return AnalyzedQuery(
         raw_query=cleaned,
         keywords=dedup_keywords,
         symbol_candidates=dedup_symbols,
         path_candidates=dedup_paths,
         concept_keywords=dedup_concepts,
+        is_temporal=is_temporal,
+        temporal_intent=temporal_intent,
+        temporal_keywords=detected_temporal_keywords,
     )

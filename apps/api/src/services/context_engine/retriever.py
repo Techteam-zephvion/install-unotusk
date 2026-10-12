@@ -87,6 +87,27 @@ def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
         meta["provenance"] = chunk.provenance
     if getattr(chunk, "chunk_type", None):
         meta["chunk_type"] = chunk.chunk_type
+    if getattr(chunk, "created_at", None):
+        created_val = chunk.created_at
+        meta["created_at"] = (
+            created_val.isoformat() if hasattr(created_val, "isoformat") else str(created_val)
+        )
+
+    prov = getattr(chunk, "provenance", None)
+    if isinstance(prov, dict):
+        if prov.get("committed_at"):
+            meta["committed_at"] = prov.get("committed_at")
+        if prov.get("old_file_path"):
+            meta["old_file_path"] = prov.get("old_file_path")
+        if prov.get("file_path"):
+            meta["file_path"] = prov.get("file_path")
+        if prov.get("symbol_name"):
+            meta["symbol_name"] = prov.get("symbol_name")
+        if prov.get("change_type"):
+            meta["change_type"] = prov.get("change_type")
+        if prov.get("author_name") or prov.get("author"):
+            meta["author"] = prov.get("author_name") or prov.get("author")
+
     return meta
 
 
