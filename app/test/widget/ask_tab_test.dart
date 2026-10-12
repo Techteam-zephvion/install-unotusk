@@ -59,9 +59,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify initial Figma hero elements
-    expect(find.text('Investigate your project?'), findsOneWidget);
-    expect(find.textContaining('Unotusk can make mistakes'), findsOneWidget);
-    expect(find.text('Why choose Postgres over Mongo in March?'), findsOneWidget);
-    expect(find.text('Which team owns the auth service?'), findsOneWidget);
+    expect(find.text('Good morning.'), findsOneWidget);
+    expect(find.textContaining('Analyzed Files'), findsOneWidget);
+    expect(find.text('Discovered Risks'), findsOneWidget);
+    expect(find.text('Total Symbols'), findsOneWidget);
   });
 }

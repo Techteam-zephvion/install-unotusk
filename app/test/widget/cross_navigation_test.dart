@@ -61,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Initial Ask tab is displayed
-    expect(find.text('Investigate your project?'), findsOneWidget);
+    expect(find.text('Good morning.'), findsOneWidget);
     expect(find.text('Ask'), findsOneWidget);
     expect(find.text('Spec History'), findsOneWidget);
     expect(find.text('Ontology Graph'), findsOneWidget);

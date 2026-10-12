@@ -61,28 +61,6 @@ class _AskTabState extends ConsumerState<AskTab> {
     'FPR trend on auth service this month',
   ];
 
-  static const List<Map<String, dynamic>> _heroCards = [
-    {
-      'title': 'Why choose Postgres over Mongo in March?',
-      'tag': 'ADR #7 DECISION',
-      'icon': Icons.account_tree_outlined,
-    },
-    {
-      'title': 'Which team owns the auth service?',
-      'tag': 'ENG-2847 OWNERSHIP',
-      'icon': Icons.group_outlined,
-    },
-    {
-      'title': 'Generate a BDD spec for rate-limiter',
-      'tag': 'BDD CONTRACT',
-      'icon': Icons.assignment_outlined,
-    },
-    {
-      'title': 'FPR trend on auth service this month',
-      'tag': 'PRECISION METRIC',
-      'icon': Icons.trending_up_outlined,
-    },
-  ];
 
   @override
   void initState() {
@@ -398,6 +376,257 @@ class _AskTabState extends ConsumerState<AskTab> {
     });
   }
 
+  Widget _buildStatCard({required IconData icon, required Color iconColor, required String title, required String value}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(height: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.inter(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: AppTextStyles.mono(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionPill({required IconData icon, required String label, bool isPrimary = false}) {
+    return InkWell(
+      onTap: () {},
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isPrimary ? AppColors.accent : Colors.transparent,
+          border: Border.all(color: isPrimary ? AppColors.accent : AppColors.divider),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isPrimary ? AppColors.bgBase : AppColors.textPrimary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: AppTextStyles.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isPrimary ? AppColors.bgBase : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityItem({
+    required String title,
+    required String subtitle,
+    required String time,
+    required String status,
+    required Color statusColor,
+    required bool isLast,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: const Icon(Icons.history, size: 18, color: AppColors.textSecondary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTextStyles.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.inter(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  status,
+                  style: AppTextStyles.mono(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                time,
+                style: AppTextStyles.inter(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDemoButton({required String label, bool isPrimary = false, IconData? icon, Color? iconColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isPrimary ? AppColors.textPrimary : AppColors.bgElevated,
+        border: Border.all(color: isPrimary ? AppColors.textPrimary : AppColors.divider),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: iconColor ?? (isPrimary ? AppColors.bgBase : AppColors.textPrimary)),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            style: AppTextStyles.mono(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isPrimary ? AppColors.bgBase : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesignPrinciple({
+    required IconData icon,
+    required String title,
+    required String description,
+    required bool isLast,
+    Widget? actions,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.mono(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  description,
+                  style: AppTextStyles.mono(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                if (actions != null) ...[
+                  const SizedBox(height: 16),
+                  actions,
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool hasMessages = _messages.isNotEmpty;
@@ -407,36 +636,25 @@ class _AskTabState extends ConsumerState<AskTab> {
       body: Stack(
         children: [
           if (!hasMessages)
-            // ── Hero State (Warm Serif Hero) ──
+            // ── Dashboard Hero State ──
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 680),
+                  constraints: const BoxConstraints(maxWidth: 800),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Serif Heading
-                      Center(
-                        child: Text(
-                          'Investigate your project?',
-                          style: AppTextStyles.heroHeading,
-                          textAlign: TextAlign.center,
+                      // Greeting
+                      Text(
+                        'Good morning.',
+                        style: AppTextStyles.mono(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Text(
-                          'Investigate your project, architecture, or code decisions',
-                          style: AppTextStyles.inter(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
 
                       // Input Bar
                       AskInputBar(
@@ -449,80 +667,168 @@ class _AskTabState extends ConsumerState<AskTab> {
                         onSuggestionSelect: (text) => _runQuery(text, tier: _selectedTier),
                         suggestions: _promptSuggestions,
                       ),
-                      const SizedBox(height: 10),
-
-                      // Disclaimer
-                      Center(
-                        child: Text(
-                          'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
-                          style: AppTextStyles.inter(
-                            fontSize: 11,
-                            color: AppColors.textSecondary.withValues(alpha: 0.75),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                      const SizedBox(height: 32),
+                      
+                      // Stat Cards Grid
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
+                          return GridView.count(
+                            crossAxisCount: crossAxisCount,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: crossAxisCount == 4 ? 1.1 : 1.8,
+                            children: [
+                              _buildStatCard(
+                                icon: Icons.folder_outlined,
+                                iconColor: Colors.blueAccent,
+                                title: 'Analyzed Files',
+                                value: '1,248',
+                              ),
+                              _buildStatCard(
+                                icon: Icons.warning_amber_rounded,
+                                iconColor: Colors.orangeAccent,
+                                title: 'Discovered Risks',
+                                value: '14',
+                              ),
+                              _buildStatCard(
+                                icon: Icons.data_object,
+                                iconColor: Colors.greenAccent,
+                                title: 'Total Symbols',
+                                value: '8,432',
+                              ),
+                              _buildStatCard(
+                                icon: Icons.hub_outlined,
+                                iconColor: Colors.purpleAccent,
+                                title: 'Dependencies',
+                                value: '34',
+                              ),
+                            ],
+                          );
+                        }
                       ),
                       const SizedBox(height: 32),
-
-                      // 2x2 Hero Prompt Suggestions
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 2.5,
+                      
+                      // Quick Actions
+                      Text(
+                        'Quick actions',
+                        style: AppTextStyles.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
-                        itemCount: _heroCards.length,
-                        itemBuilder: (context, index) {
-                          final card = _heroCards[index];
-                          return InkWell(
-                            onTap: () => _runQuery(card['title'] as String, tier: _selectedTier),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.bgSurface,
-                                border: Border.all(color: AppColors.divider),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        card['tag'] as String,
-                                        style: AppTextStyles.mono(
-                                          fontSize: 10,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      Icon(
-                                        card['icon'] as IconData,
-                                        size: 14,
-                                        color: AppColors.accent,
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    card['title'] as String,
-                                    style: AppTextStyles.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildActionPill(icon: Icons.add, label: 'Analyze Repo', isPrimary: true),
+                          _buildActionPill(icon: Icons.upload_file, label: 'View Discoveries'),
+                          _buildActionPill(icon: Icons.assessment_outlined, label: 'Generate Report'),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Recent Activity
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Recent Activity',
+                            style: AppTextStyles.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {},
+                            child: Text(
+                              'View all',
+                              style: AppTextStyles.inter(
+                                fontSize: 13,
+                                color: AppColors.accent,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSurface,
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildActivityItem(
+                              title: 'Unotusk MVP Ingestion',
+                              subtitle: 'Analyzed 342 files across 4 languages',
+                              time: '2 mins ago',
+                              status: 'COMPLETED',
+                              statusColor: Colors.greenAccent,
+                              isLast: false,
+                            ),
+                            _buildActivityItem(
+                              title: 'Security Audit Scan',
+                              subtitle: 'Identified 2 high-severity risks in auth service',
+                              time: '1 hour ago',
+                              status: 'REVIEW REQUIRED',
+                              statusColor: Colors.orangeAccent,
+                              isLast: true,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 48),
+                      _buildDesignPrinciple(
+                        icon: Icons.near_me_outlined,
+                        title: '01 — Pointer and hover',
+                        description: 'Buttons darken slightly. Rows receive a faint background. Icons respond subtly. Interactive elements never look inert.',
+                        actions: Row(
+                          children: [
+                            _buildDemoButton(label: 'Save changes', isPrimary: true),
+                            const SizedBox(width: 8),
+                            _buildDemoButton(label: 'Cancel', isPrimary: false),
+                          ],
+                        ),
+                        isLast: false,
+                      ),
+                      _buildDesignPrinciple(
+                        icon: Icons.done_all,
+                        title: '02 — Selection and state',
+                        description: 'Checkboxes draw their checkmarks, navigation selection transitions cleanly, dropdowns open naturally, and attendance status changes receive immediate visual feedback.',
+                        actions: Row(
+                          children: [
+                            _buildDemoButton(label: 'Present', icon: Icons.check_box, iconColor: Colors.greenAccent),
+                            const SizedBox(width: 8),
+                            _buildDemoButton(label: 'Absent', icon: Icons.check_box_outline_blank),
+                          ],
+                        ),
+                        isLast: false,
+                      ),
+                      _buildDesignPrinciple(
+                        icon: Icons.keyboard_outlined,
+                        title: '03 — Keyboard and focus',
+                        description: 'Visible focus indicators, sensible Tab order, Enter and Space activation, Escape to close popovers, and keyboard navigation through tables and lists.',
+                        isLast: false,
+                      ),
+                      _buildDesignPrinciple(
+                        icon: Icons.sync,
+                        title: '04 — Loading and saving',
+                        description: 'Buttons show a compact loading state; saved records show a restrained checkmark; failed requests explain what happened and offer recovery. No giant spinners or celebration animations.',
+                        isLast: false,
+                      ),
+                      _buildDesignPrinciple(
+                        icon: Icons.swap_horiz,
+                        title: '05 — Navigation and transitions',
+                        description: 'Subtle page transitions, anchored menus, smoothly expanding filters, preserved scroll position where appropriate, and no jarring layout shifts.',
+                        isLast: true,
                       ),
                     ],
                   ),
