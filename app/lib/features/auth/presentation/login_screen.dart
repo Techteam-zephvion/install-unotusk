@@ -263,12 +263,40 @@ class _EntryCard extends StatelessWidget {
     const SizedBox(height: 20),
     Text('Work Email Address', style: AppTextStyles.label),
     const SizedBox(height: 5),
-    _OidcTextField(controller: emailCtrl, hint: 'you@company.com', keyboardType: TextInputType.emailAddress),
+    _OidcTextField(
+      controller: emailCtrl,
+      hint: 'you@company.com',
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: showPasswordField ? TextInputAction.next : TextInputAction.go,
+      onSubmitted: (_) {
+        if (showPasswordField) {
+          if (passwordCtrl.text.isNotEmpty && isValidEmail) onPasswordSignIn();
+        } else {
+          if (isValidEmail) onContinue();
+        }
+      },
+    ),
     if (showPasswordField) ...[
       const SizedBox(height: 12),
       Text('Password', style: AppTextStyles.label),
       const SizedBox(height: 5),
-      _OidcTextField(controller: passwordCtrl, hint: '••••••••', obscureText: obscurePassword, suffixIcon: GestureDetector(onTap: onObscureToggle, child: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 16, color: AppColors.textSecondary))),
+      _OidcTextField(
+        controller: passwordCtrl,
+        hint: '••••••••',
+        obscureText: obscurePassword,
+        textInputAction: TextInputAction.go,
+        onSubmitted: (_) {
+          if (isValidEmail) onPasswordSignIn();
+        },
+        suffixIcon: GestureDetector(
+          onTap: onObscureToggle,
+          child: Icon(
+            obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ),
     ],
     const SizedBox(height: 12),
     _OidcButton(label: showPasswordField ? 'Sign in' : 'Continue with OIDC Discovery', enabled: isValidEmail, filled: true, onPressed: showPasswordField ? onPasswordSignIn : onContinue),
@@ -424,12 +452,32 @@ class _OidcTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
-  const _OidcTextField({required this.controller, required this.hint, this.keyboardType, this.obscureText = false, this.suffixIcon});
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  const _OidcTextField({
+    required this.controller,
+    required this.hint,
+    this.keyboardType,
+    this.obscureText = false,
+    this.suffixIcon,
+    this.textInputAction,
+    this.onSubmitted,
+  });
   @override
   Widget build(BuildContext context) => TextField(
-    controller: controller, keyboardType: keyboardType, obscureText: obscureText,
-    style: AppTextStyles.bodyMd, cursorColor: AppColors.accent,
-    decoration: InputDecoration(hintText: hint, hintStyle: AppTextStyles.bodyMd.copyWith(color: AppColors.textMuted), filled: true, fillColor: AppColors.bgSurface, suffixIcon: suffixIcon,
+    controller: controller,
+    keyboardType: keyboardType,
+    obscureText: obscureText,
+    textInputAction: textInputAction,
+    onSubmitted: onSubmitted,
+    style: AppTextStyles.bodyMd,
+    cursorColor: AppColors.accent,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: AppTextStyles.bodyMd.copyWith(color: AppColors.textMuted),
+      filled: true,
+      fillColor: AppColors.bgSurface,
+      suffixIcon: suffixIcon,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent)),

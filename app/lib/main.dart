@@ -374,11 +374,11 @@ class _AppShellState extends State<AppShell> {
             data: QueryResponseData(
               segments: [
                 ResponseSegment(
-                  text: 'Server Response (http://10.0.0.59:28000):\n$e',
+                  text: 'Server Response:\n$e',
                   tag: 'NOTICE',
                 ),
               ],
-              meta: 'http://10.0.0.59:28000 · verified response',
+              meta: 'Grounded · verified response',
               queryType: 'hot',
               confidence: 'insufficient',
             ),

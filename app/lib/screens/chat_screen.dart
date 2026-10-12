@@ -7,6 +7,7 @@ import '../widgets/badges.dart';
 import '../widgets/chat_input_box.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/thinking_scanner.dart';
+import '../services/api_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final UnoPalette palette;
@@ -449,6 +450,28 @@ class _ResponseCardState extends State<_ResponseCard> {
   bool _thoughtExpanded = false;
   final Set<String> _expandedSteps = {};
 
+  String _sanitizeMeta(String meta) {
+    if (meta.isEmpty) return meta;
+    var cleaned = meta
+        // Remove "via http://..." or "via 10.0.0.59:28000" or "via 127.0.0.1:..."
+        .replaceAll(RegExp(r'\bvia\s+(https?://)?[^\s·]+', caseSensitive: false), '')
+        // Remove any remaining URLs like http://... or https://...
+        .replaceAll(RegExp(r'https?://[^\s·]+', caseSensitive: false), '')
+        // Remove raw IPs with or without port e.g. 10.0.0.59:28000 or 127.0.0.1
+        .replaceAll(RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b'), '')
+        // Remove leftover port numbers like :28000 or :28101
+        .replaceAll(RegExp(r':\d{4,5}\b'), '')
+        // Clean up redundant dots/separators
+        .replaceAll(RegExp(r'(\s*·\s*)+'), ' · ')
+        .replaceAll(RegExp(r'^\s*·\s*'), '')
+        .replaceAll(RegExp(r'\s*·\s*$'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (cleaned.isEmpty) return 'Grounded';
+    return cleaned;
+  }
+
   void _copyToClipboard() {
     final text = widget.data.segments.map((s) => s.text).join('\n\n');
     Clipboard.setData(ClipboardData(text: text));
@@ -480,7 +503,12 @@ class _ResponseCardState extends State<_ResponseCard> {
           ...widget.data.segments.map((seg) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: MarkdownText(
-                  text: seg.text,
+                  text: ApiService.synthesizeMermaidDiagram(
+                    question: '',
+                    content: seg.text,
+                    citations: widget.data.reasoning?.citations ?? const [],
+                    evidence: widget.data.reasoning?.evidence ?? const [],
+                  ),
                   palette: widget.palette,
                   selectable: true,
                   baseStyle: UnoTypography.mono(
@@ -509,7 +537,7 @@ class _ResponseCardState extends State<_ResponseCard> {
             children: [
               Expanded(
                 child: Text(
-                  widget.data.meta,
+                  _sanitizeMeta(widget.data.meta),
                   style: UnoTypography.mono(
                     color: widget.palette.textSec,
                     fontSize: 11,
@@ -1117,7 +1145,7 @@ class _ResponseCardState extends State<_ResponseCard> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Backend: http://10.0.0.59:28000 · Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
+                            'Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
                             style: UnoTypography.mono(
                               color: widget.palette.textSec,
                               fontSize: 9.5,

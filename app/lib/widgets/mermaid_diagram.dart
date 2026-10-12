@@ -39,12 +39,14 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   }
 
   String _generateHtml() {
+    final cleanCode = widget.code.replaceAll('`', '\\`').replaceAll('\$', '\\\$');
     return '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     body {
       background-color: transparent;
@@ -53,27 +55,55 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
       display: flex;
       justify-content: center;
       align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      color: #E2E0D9;
+      overflow-x: auto;
+    }
+    .mermaid {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+    svg {
+      max-width: 100% !important;
+      height: auto !important;
     }
   </style>
 </head>
 <body>
-  <pre class="mermaid">
-\${widget.code.replaceAll('`', '\\\\`').replaceAll('\\\$', '\\\\\\\$')}
-  </pre>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ 
-      startOnLoad: true, 
-      theme: 'dark',
-      themeVariables: {
-        primaryColor: '#2B2822',
-        primaryTextColor: '#E2E0D9',
-        primaryBorderColor: '#454035',
-        lineColor: '#888478',
-        secondaryColor: '#4A463B',
-        tertiaryColor: '#181816'
+  <div class="mermaid">
+$cleanCode
+  </div>
+  <script>
+    function renderDiagram() {
+      if (typeof mermaid !== 'undefined') {
+        try {
+          mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'dark',
+            themeVariables: {
+              primaryColor: '#2B2822',
+              primaryTextColor: '#E2E0D9',
+              primaryBorderColor: '#454035',
+              lineColor: '#888478',
+              secondaryColor: '#4A463B',
+              tertiaryColor: '#181816',
+              background: '#131311',
+              mainBkg: '#1D1C19'
+            }
+          });
+          mermaid.run();
+        } catch (e) {
+          console.error('Mermaid render error:', e);
+        }
       }
-    });
+    }
+    if (typeof mermaid !== 'undefined') {
+      renderDiagram();
+    } else {
+      window.addEventListener('DOMContentLoaded', renderDiagram);
+      window.addEventListener('load', renderDiagram);
+    }
   </script>
 </body>
 </html>
@@ -151,6 +181,7 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
               child: InAppWebView(
                 initialData: InAppWebViewInitialData(
                   data: _generateHtml(),
+                  baseUrl: WebUri('https://cdn.jsdelivr.net'),
                 ),
                 initialSettings: InAppWebViewSettings(
                   transparentBackground: true,

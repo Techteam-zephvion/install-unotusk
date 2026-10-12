@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
@@ -35,6 +36,11 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _orgController = TextEditingController();
 
+  final FocusNode _passwordFocusNode = FocusNode();
+  final FocusNode _nameFocusNode = FocusNode();
+  final FocusNode _orgFocusNode = FocusNode();
+  final FocusNode _createPasswordFocusNode = FocusNode();
+
   bool _obscurePassword = true;
   String _selectedRole = 'Engineer';
   bool _termsAgreed = false;
@@ -66,6 +72,10 @@ class _AuthScreenState extends State<AuthScreen> {
     _passwordController.dispose();
     _nameController.dispose();
     _orgController.dispose();
+    _passwordFocusNode.dispose();
+    _nameFocusNode.dispose();
+    _orgFocusNode.dispose();
+    _createPasswordFocusNode.dispose();
     super.dispose();
   }
 
@@ -90,6 +100,11 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _isLoading = false;
         _state = 'sign-in';
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _passwordFocusNode.requestFocus();
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -345,65 +360,79 @@ class _AuthScreenState extends State<AuthScreen> {
   //  Screen 1: Entry Screen (matches Image 2)
   // ─────────────────────────────────────────────────
   Widget _buildEntry() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildBadge(),
-        const SizedBox(height: 14),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter): () {
+          if (!_isLoading) _verifyEmail();
+        },
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+          if (!_isLoading) _verifyEmail();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildBadge(),
+            const SizedBox(height: 14),
 
-        Text(
-          'Sign in to Unotusk',
-          style: UnoTypography.brandSerif(
-            palette: widget.palette,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 8),
+            Text(
+              'Sign in to Unotusk',
+              style: UnoTypography.brandSerif(
+                palette: widget.palette,
+                fontSize: 24,
+              ),
+            ),
+            const SizedBox(height: 8),
 
-        Text(
-          'Authenticating via OpenID Connect (OIDC) identity provider for single sign-on security.',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 20),
-        _buildErrorBanner(),
-
-        Text(
-          'Work Email Address',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: _emailController,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'you@company.com',
-              hintStyle: UnoTypography.body(
-                color: widget.palette.textSec.withValues(alpha: 0.6),
+            Text(
+              'Authenticating via OpenID Connect (OIDC) identity provider for single sign-on security.',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
                 fontSize: 13,
               ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 11),
             ),
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _verifyEmail(),
-          ),
-        ),
+            const SizedBox(height: 20),
+            _buildErrorBanner(),
+
+            Text(
+              'Work Email Address',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _emailController,
+                textInputAction: TextInputAction.go,
+                style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'you@company.com',
+                  hintStyle: UnoTypography.body(
+                    color: widget.palette.textSec.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  if (!_isLoading) _verifyEmail();
+                },
+              ),
+            ),
         const SizedBox(height: 12),
 
         SizedBox(
@@ -521,269 +550,296 @@ class _AuthScreenState extends State<AuthScreen> {
           },
         ),
 
-        _buildServerFooter(),
-      ],
+            _buildServerFooter(),
+          ],
+        ),
+      ),
     );
+  }
+
+  // ─────────────────────────────────────────────────
+  void _submitCreateWorkspace() async {
+    final name = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : 'Alex Morgan';
+    final org = _orgController.text.trim().isNotEmpty
+        ? _orgController.text.trim()
+        : 'Acme Corporation';
+    final password = _passwordController.text;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await ApiService.createOrganisation(
+        fullName: name,
+        orgName: org,
+        password: password,
+        role: _selectedRole,
+        email: _emailController.text.trim().isNotEmpty
+            ? _emailController.text.trim()
+            : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      widget.onAuthenticated(user);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Failed to create workspace on http://10.0.0.59:28000:\n$e';
+      });
+    }
   }
 
   // ─────────────────────────────────────────────────
   //  Screen 2: Create your organisation (matches Image 3)
   // ─────────────────────────────────────────────────
   Widget _buildCreateOrg() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Create your organisation',
-          style: UnoTypography.brandSerif(
-            palette: widget.palette,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'No organisation found for . Set up your workspace.',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Full name
-        Text(
-          'Full name',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: _nameController,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Alex Morgan',
-              hintStyle: UnoTypography.body(
-                color: widget.palette.textSec.withValues(alpha: 0.6),
-                fontSize: 13,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 11),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Organisation name
-        Text(
-          'Organisation name',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: _orgController,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Acme Corporation',
-              hintStyle: UnoTypography.body(
-                color: widget.palette.textSec.withValues(alpha: 0.6),
-                fontSize: 13,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 11),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Password
-        Text(
-          'Password',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: _passwordController,
-            obscureText: true,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: '••••••••',
-              hintStyle: UnoTypography.body(
-                color: widget.palette.textSec.withValues(alpha: 0.6),
-                fontSize: 13,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 11),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Role
-        Text(
-          'Role',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgSurface,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedRole,
-              dropdownColor: widget.palette.bgElevated,
-              icon: Icon(Icons.arrow_drop_down, color: widget.palette.textSec),
-              isExpanded: true,
-              style:
-                  UnoTypography.body(color: widget.palette.text, fontSize: 13),
-              items: ['Engineer', 'Tech Lead', 'Manager', 'Developer', 'QA']
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                  .toList(),
-              onChanged: (val) =>
-                  setState(() => _selectedRole = val ?? 'Engineer'),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Terms of service checkbox
-        Row(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter): () {
+          if (!_isLoading) _submitCreateWorkspace();
+        },
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+          if (!_isLoading) _submitCreateWorkspace();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Checkbox(
-              value: _termsAgreed,
-              activeColor: widget.palette.accent,
-              onChanged: (val) => setState(() => _termsAgreed = val ?? false),
+            Text(
+              'Create your organisation',
+              style: UnoTypography.brandSerif(
+                palette: widget.palette,
+                fontSize: 24,
+              ),
             ),
-            Expanded(
+            const SizedBox(height: 6),
+            Text(
+              'No organisation found for . Set up your workspace.',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Full name
+            Text(
+              'Full name',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _nameController,
+                focusNode: _nameFocusNode,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => _orgFocusNode.requestFocus(),
+                style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Alex Morgan',
+                  hintStyle: UnoTypography.body(
+                    color: widget.palette.textSec.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Organisation name
+            Text(
+              'Organisation name',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _orgController,
+                focusNode: _orgFocusNode,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => _createPasswordFocusNode.requestFocus(),
+                style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Acme Corporation',
+                  hintStyle: UnoTypography.body(
+                    color: widget.palette.textSec.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Password
+            Text(
+              'Password',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _passwordController,
+                focusNode: _createPasswordFocusNode,
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) {
+                  if (!_isLoading) _submitCreateWorkspace();
+                },
+                style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  hintStyle: UnoTypography.body(
+                    color: widget.palette.textSec.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Role
+            Text(
+              'Role',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgSurface,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedRole,
+                  dropdownColor: widget.palette.bgElevated,
+                  icon: Icon(Icons.arrow_drop_down, color: widget.palette.textSec),
+                  isExpanded: true,
+                  style:
+                      UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                  items: ['Engineer', 'Tech Lead', 'Manager', 'Developer', 'QA']
+                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                      .toList(),
+                  onChanged: (val) =>
+                      setState(() => _selectedRole = val ?? 'Engineer'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Terms of service checkbox
+            Row(
+              children: [
+                Checkbox(
+                  value: _termsAgreed,
+                  activeColor: widget.palette.accent,
+                  onChanged: (val) => setState(() => _termsAgreed = val ?? false),
+                ),
+                Expanded(
+                  child: Text(
+                    'I agree to the Unotusk terms of service',
+                    style: UnoTypography.body(
+                      color: widget.palette.textSec,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Create workspace button
+            SizedBox(
+              height: 42,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitCreateWorkspace,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: widget.palette.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+                child: Text(
+                  'Create workspace',
+                  style: UnoTypography.body(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Back button
+            TextButton(
+              onPressed: () => setState(() => _state = 'entry'),
               child: Text(
-                'I agree to the Unotusk terms of service',
+                'Back',
                 style: UnoTypography.body(
                   color: widget.palette.textSec,
-                  fontSize: 12,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-
-        // Create workspace button
-        SizedBox(
-          height: 42,
-          child: ElevatedButton(
-            onPressed: _isLoading
-                ? null
-                : () async {
-                    final name = _nameController.text.trim().isNotEmpty
-                        ? _nameController.text.trim()
-                        : 'Alex Morgan';
-                    final org = _orgController.text.trim().isNotEmpty
-                        ? _orgController.text.trim()
-                        : 'Acme Corporation';
-                    final password = _passwordController.text;
-
-                    setState(() {
-                      _isLoading = true;
-                      _errorMessage = null;
-                    });
-
-                    try {
-                      final user = await ApiService.createOrganisation(
-                        fullName: name,
-                        orgName: org,
-                        password: password,
-                        role: _selectedRole,
-                        email: _emailController.text.trim().isNotEmpty
-                            ? _emailController.text.trim()
-                            : null,
-                      );
-                      if (!mounted) return;
-                      setState(() {
-                        _isLoading = false;
-                      });
-                      widget.onAuthenticated(user);
-                    } catch (e) {
-                      if (!mounted) return;
-                      setState(() {
-                        _isLoading = false;
-                        _errorMessage =
-                            'Failed to create workspace on http://10.0.0.59:28000:\n$e';
-                      });
-                    }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: widget.palette.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
-              ),
-            ),
-            child: Text(
-              'Create workspace',
-              style: UnoTypography.body(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Back button
-        TextButton(
-          onPressed: () => setState(() => _state = 'entry'),
-          child: Text(
-            'Back',
-            style: UnoTypography.body(
-              color: widget.palette.textSec,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -962,146 +1018,172 @@ class _AuthScreenState extends State<AuthScreen> {
   //  Screen 4: Password Sign In (matches Image 5)
   // ─────────────────────────────────────────────────
   Widget _buildSignIn() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildBadge(),
-        const SizedBox(height: 14),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter): () {
+          if (!_isLoading) _finishAuthentication();
+        },
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+          if (!_isLoading) _finishAuthentication();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildBadge(),
+            const SizedBox(height: 14),
 
-        Text(
-          'Sign in to Unotusk',
-          style: UnoTypography.brandSerif(
-            palette: widget.palette,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        Text(
-          'Authenticating via OpenID Connect (OIDC) identity provider for single sign-on security.',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 20),
-        _buildErrorBanner(),
-
-        // Work Email Address (Pre-filled)
-        Text(
-          'Work Email Address',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: _emailController,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 11),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Password with eye toggle
-        Text(
-          'Password',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  style: UnoTypography.body(
-                    color: widget.palette.text,
-                    fontSize: 13,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 11),
-                  ),
-                ),
-              ),
-              InkWell(
-                onTap: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
-                    size: 16,
-                    color: widget.palette.textSec,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Sign in Button
-        SizedBox(
-          height: 42,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : () => _finishAuthentication(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: widget.palette.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
+            Text(
+              'Sign in to Unotusk',
+              style: UnoTypography.brandSerif(
+                palette: widget.palette,
+                fontSize: 24,
               ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Sign in',
-                    style: UnoTypography.body(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+            const SizedBox(height: 8),
+
+            Text(
+              'Authenticating via OpenID Connect (OIDC) identity provider for single sign-on security.',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildErrorBanner(),
+
+            // Work Email Address (Pre-filled)
+            Text(
+              'Work Email Address',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TextField(
+                controller: _emailController,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) {
+                  if (_passwordController.text.isNotEmpty) {
+                    if (!_isLoading) _finishAuthentication();
+                  } else {
+                    _passwordFocusNode.requestFocus();
+                  }
+                },
+                style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 11),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Password with eye toggle
+            Text(
+              'Password',
+              style: UnoTypography.body(
+                color: widget.palette.textSec,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(color: widget.palette.div),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _passwordController,
+                      focusNode: _passwordFocusNode,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (_) {
+                        if (!_isLoading) _finishAuthentication();
+                      },
+                      style: UnoTypography.body(
+                        color: widget.palette.text,
+                        fontSize: 13,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 11),
+                      ),
                     ),
                   ),
-          ),
-        ),
+                  InkWell(
+                    onTap: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                        size: 16,
+                        color: widget.palette.textSec,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
 
-        _buildServerFooter(),
-      ],
+            // Sign in Button
+            SizedBox(
+              height: 42,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : () => _finishAuthentication(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: widget.palette.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        'Sign in',
+                        style: UnoTypography.body(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+
+            _buildServerFooter(),
+          ],
+        ),
+      ),
     );
   }
 
