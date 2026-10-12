@@ -65,7 +65,13 @@ def map_atomic_code_change_to_code_chunk(
     prov_data["fingerprint"] = change.fingerprint
     if getattr(change, "atomic_facts", None):
         prov_data["atomic_code_facts"] = [
-            f.model_dump() if hasattr(f, "model_dump") else f for f in change.atomic_facts
+            f.model_dump(mode="json") if hasattr(f, "model_dump") else f
+            for f in change.atomic_facts
+        ]
+    if getattr(change, "temporal_relations", None):
+        prov_data["temporal_relations"] = [
+            r.model_dump(mode="json") if hasattr(r, "model_dump") else r
+            for r in change.temporal_relations
         ]
 
     # Generate embedding if requested

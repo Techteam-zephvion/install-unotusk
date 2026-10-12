@@ -30,6 +30,18 @@ class FactConfidence(str, Enum):
     UNCERTAIN = "UNCERTAIN"
 
 
+class RelationType(str, Enum):
+    CALLS = "CALLS"
+    DEFINES = "DEFINES"
+    IMPORTS = "IMPORTS"
+    INHERITS = "INHERITS"
+    MUTATES = "MUTATES"
+    CONFIGURES = "CONFIGURES"
+    VALIDATES = "VALIDATES"
+    RAISES = "RAISES"
+    REFERENCES = "REFERENCES"
+
+
 class SemanticCodeFact(BaseModel):
     """
     Module 1: Atomic Fact Decomposition (Code-Lane).
@@ -55,6 +67,35 @@ class SemanticCodeFact(BaseModel):
 
 
 AtomicCodeFact = SemanticCodeFact
+
+
+class TemporalCodeRelation(BaseModel):
+    """
+    Module 2: Temporal 5-Tuple Extraction (Code-Lane).
+    Represents a structured code relationship with temporal validity:
+    (subject, relation, object, t_start, t_end) along with observation timestamp t_obs.
+    """
+
+    id: str
+    subject: str
+    relation: RelationType | str
+    object: str
+    t_start: datetime | None = None
+    t_end: datetime | None = None
+    t_obs: datetime | None = None
+    confidence: FactConfidence = FactConfidence.HIGH
+    is_uncertain: bool = False
+    source_fact_id: str | None = None
+    commit_sha: str | None = None
+    file_path: str | None = None
+    symbol_name: str | None = None
+    provenance: dict[str, Any] = Field(default_factory=dict)
+    fingerprint: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
+AtomicCodeRelation = TemporalCodeRelation
 
 
 class GitDiffHunk(BaseModel):
@@ -137,6 +178,7 @@ class AtomicCodeChange(BaseModel):
     fingerprint: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     atomic_facts: list[SemanticCodeFact] = Field(default_factory=list)
+    temporal_relations: list[TemporalCodeRelation] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
 
@@ -149,6 +191,8 @@ class CodeDecompositionResult(BaseModel):
     change_count: int = 0
     facts: list[SemanticCodeFact] = Field(default_factory=list)
     fact_count: int = 0
+    relations: list[TemporalCodeRelation] = Field(default_factory=list)
+    relation_count: int = 0
     files_affected: list[str] = Field(default_factory=list)
     symbols_affected: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

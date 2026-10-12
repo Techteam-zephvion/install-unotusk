@@ -8,6 +8,7 @@ from apps.api.src.schemas.code_atom import (
     GitCommitArtifact,
     GitFileDiff,
     SemanticCodeFact,
+    TemporalCodeRelation,
 )
 from apps.api.src.services.code_atom.diff_parser import parse_unified_diff
 from apps.api.src.services.code_atom.fact_decomposer import SemanticFactExtractor
@@ -16,6 +17,7 @@ from apps.api.src.services.code_atom.fingerprint import (
     generate_code_atom_id,
 )
 from apps.api.src.services.code_atom.normalization import normalize_code_change
+from apps.api.src.services.code_atom.relation_extractor import TemporalRelationExtractor
 
 SYMBOL_HEADER_PATTERN = re.compile(
     r"\b(?:def|class|function|fn|func|interface|type|struct|enum|export\s+(?:function|class|const|let))\s+([A-Za-z0-9_]+)"
@@ -28,14 +30,20 @@ class CodeAtomDecomposer:
     Maintains full provenance back to parent commit, snapshot, file, and symbol.
     """
 
-    def __init__(self, fact_extractor: SemanticFactExtractor | None = None):
+    def __init__(
+        self,
+        fact_extractor: SemanticFactExtractor | None = None,
+        relation_extractor: TemporalRelationExtractor | None = None,
+    ):
         self.fact_extractor = fact_extractor or SemanticFactExtractor()
+        self.relation_extractor = relation_extractor or TemporalRelationExtractor()
 
     def decompose(
         self,
         commit: GitCommitArtifact,
         symbol_catalog: list[dict[str, Any]] | None = None,
         extract_facts: bool = True,
+        extract_relations: bool = True,
     ) -> CodeDecompositionResult:
         """
         Decomposes a GitCommitArtifact into a collection of AtomicCodeChange units.
@@ -66,6 +74,10 @@ class CodeAtomDecomposer:
                 )
                 if extract_facts:
                     atomic_unit.atomic_facts = self.fact_extractor.extract_facts_deterministic(atomic_unit)
+                if extract_relations:
+                    atomic_unit.temporal_relations = self.relation_extractor.extract_relations_deterministic(
+                        atomic_unit, commit_time=commit.committed_at
+                    )
                 atomic_changes.append(atomic_unit)
                 continue
 
@@ -168,14 +180,20 @@ class CodeAtomDecomposer:
                 )
                 if extract_facts:
                     change_unit.atomic_facts = self.fact_extractor.extract_facts_deterministic(change_unit)
+                if extract_relations:
+                    change_unit.temporal_relations = self.relation_extractor.extract_relations_deterministic(
+                        change_unit, commit_time=commit.committed_at
+                    )
                 atomic_changes.append(change_unit)
 
         if not atomic_changes and (commit.raw_diff or commit.file_diffs):
             warnings.append("Diff contained no parsable hunks or file changes.")
 
         all_facts: list[SemanticCodeFact] = []
+        all_relations: list[TemporalCodeRelation] = []
         for c in atomic_changes:
             all_facts.extend(c.atomic_facts)
+            all_relations.extend(c.temporal_relations)
 
         return CodeDecompositionResult(
             commit_sha=commit.commit_sha,
@@ -183,6 +201,8 @@ class CodeAtomDecomposer:
             change_count=len(atomic_changes),
             facts=all_facts,
             fact_count=len(all_facts),
+            relations=all_relations,
+            relation_count=len(all_relations),
             files_affected=sorted(files_affected),
             symbols_affected=sorted(symbols_affected),
             warnings=warnings,
@@ -193,6 +213,7 @@ class CodeAtomDecomposer:
         commit: GitCommitArtifact,
         symbol_catalog: list[dict[str, Any]] | None = None,
         extract_facts: bool = True,
+        extract_relations: bool = True,
         use_llm: bool = True,
     ) -> CodeDecompositionResult:
         """
@@ -203,15 +224,28 @@ class CodeAtomDecomposer:
             commit=commit,
             symbol_catalog=symbol_catalog,
             extract_facts=False,
+            extract_relations=False,
         )
         all_facts: list[SemanticCodeFact] = []
-        if extract_facts:
-            for change in base_result.changes:
+        all_relations: list[TemporalCodeRelation] = []
+
+        for change in base_result.changes:
+            if extract_facts:
                 facts = await self.fact_extractor.extract_facts_async(change, use_llm=use_llm)
                 change.atomic_facts = facts
                 all_facts.extend(facts)
+
+            if extract_relations:
+                rels = await self.relation_extractor.extract_relations_async(
+                    change, commit_time=commit.committed_at, use_llm=use_llm
+                )
+                change.temporal_relations = rels
+                all_relations.extend(rels)
+
         base_result.facts = all_facts
         base_result.fact_count = len(all_facts)
+        base_result.relations = all_relations
+        base_result.relation_count = len(all_relations)
         return base_result
 
     def _resolve_symbol(

@@ -120,6 +120,25 @@ class ContextAssembler:
                 if fact_lines:
                     facts_info = "- Grounded Semantic Facts:\n" + "\n".join(fact_lines) + "\n"
 
+            rels_info = ""
+            raw_rels = cand.metadata.get("temporal_relations")
+            if isinstance(raw_rels, list) and raw_rels:
+                rel_lines = []
+                for rel in raw_rels[:4]:
+                    if isinstance(rel, dict) and rel.get("subject") and rel.get("relation"):
+                        subj = rel.get("subject")
+                        r_type = rel.get("relation")
+                        obj = rel.get("object")
+                        t_s = rel.get("t_start")
+                        t_e = rel.get("t_end")
+                        time_str = f" [t_start: {t_s or 'None'}, t_end: {t_e or 'None'}]"
+                        uncertain_tag = " (uncertain)" if rel.get("is_uncertain") else ""
+                        rel_lines.append(f"  * ({subj}, {r_type}, {obj}){time_str}{uncertain_tag}")
+                    elif isinstance(rel, str):
+                        rel_lines.append(f"  * {rel}")
+                if rel_lines:
+                    rels_info = "- Grounded Temporal Relations:\n" + "\n".join(rel_lines) + "\n"
+
             candidate_section = (
                 f"### [{cand.entity_type}] {cand.path}\n"
                 f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
@@ -127,6 +146,7 @@ class ContextAssembler:
                 f"{commit_info}"
                 f"{relationship_info}"
                 f"{facts_info}"
+                f"{rels_info}"
                 f"- Relevance Score: {r.score}\n"
                 f"- Code / Evidence Snippet:\n"
                 f"```\n{truncated_content}\n```\n"
@@ -173,6 +193,7 @@ class ContextAssembler:
                     "retrieval_reason",
                     "alternative_paths",
                     "atomic_code_facts",
+                    "temporal_relations",
                 ):
                     if k in cand.metadata and cand.metadata[k] is not None:
                         evidence_item[k] = _json_safe(cand.metadata[k])
