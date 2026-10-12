@@ -126,14 +126,15 @@ class ContextAssembler:
                 rel_lines = []
                 for rel in raw_rels[:4]:
                     if isinstance(rel, dict) and rel.get("subject") and rel.get("relation"):
-                        subj = rel.get("subject")
+                        subj = rel.get("canonical_subject") or rel.get("subject")
                         r_type = rel.get("relation")
-                        obj = rel.get("object")
+                        obj = rel.get("canonical_object") or rel.get("object")
                         t_s = rel.get("t_start")
                         t_e = rel.get("t_end")
                         time_str = f" [t_start: {t_s or 'None'}, t_end: {t_e or 'None'}]"
-                        uncertain_tag = " (uncertain)" if rel.get("is_uncertain") else ""
-                        rel_lines.append(f"  * ({subj}, {r_type}, {obj}){time_str}{uncertain_tag}")
+                        conflict_tag = " (conflict)" if rel.get("has_temporal_conflict") else ""
+                        uncertain_tag = " (uncertain)" if rel.get("is_uncertain") and not conflict_tag else ""
+                        rel_lines.append(f"  * ({subj}, {r_type}, {obj}){time_str}{conflict_tag}{uncertain_tag}")
                     elif isinstance(rel, str):
                         rel_lines.append(f"  * {rel}")
                 if rel_lines:

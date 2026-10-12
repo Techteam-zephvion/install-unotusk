@@ -58,6 +58,11 @@ from apps.api.src.services.code_atom.relation_extractor import (
     normalize_relation_name,
     validate_grounded_relation_tokens,
 )
+from apps.api.src.services.code_atom.relation_resolver import (
+    CodeEntityResolver,
+    TemporalRelationResolver,
+    reconcile_code_relationships,
+)
 from apps.api.src.services.code_atom.temporal import (
     classify_temporal_intent,
     parse_candidate_timestamp,
@@ -72,6 +77,7 @@ __all__ = [
     "CodeChangeType",
     "CodeDecompositionResult",
     "CodeEmbeddingBackend",
+    "CodeEntityResolver",
     "DevelopmentCodeEmbeddingBackend",
     "FactConfidence",
     "FactType",
@@ -84,6 +90,7 @@ __all__ = [
     "SemanticFactExtractor",
     "TemporalCodeRelation",
     "TemporalRelationExtractor",
+    "TemporalRelationResolver",
     "VoyageCodeEmbeddingBackend",
     "classify_temporal_intent",
     "deduplicate_facts",
@@ -108,6 +115,7 @@ __all__ = [
     "normalize_relation_name",
     "parse_candidate_timestamp",
     "parse_unified_diff",
+    "reconcile_code_relationships",
     "reembed_atom_code_chunks",
     "resolve_and_map_atomic_changes",
     "resolve_temporal_supersession",

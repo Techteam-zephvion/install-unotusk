@@ -89,6 +89,13 @@ class TemporalCodeRelation(BaseModel):
     commit_sha: str | None = None
     file_path: str | None = None
     symbol_name: str | None = None
+    canonical_subject: str | None = None
+    canonical_object: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    has_temporal_conflict: bool = False
+    conflict_detail: str | None = None
+    history_commit_shas: list[str] = Field(default_factory=list)
+    history_fact_ids: list[str] = Field(default_factory=list)
     provenance: dict[str, Any] = Field(default_factory=dict)
     fingerprint: str
 
