@@ -83,11 +83,35 @@ class ContextAssembler:
             elif cand.metadata.get("is_current"):
                 temporal_status = "- Temporal Status: CURRENT\n"
 
+            relationship_info = ""
+            rel_path = cand.metadata.get("relationship_path")
+            rel_type = cand.metadata.get("relationship_type")
+            rel_hop = cand.metadata.get("relationship_hop")
+            rel_reason = cand.metadata.get("retrieval_reason")
+            alt_paths = cand.metadata.get("alternative_paths")
+
+            if rel_path or rel_type:
+                rel_parts = []
+                if rel_path:
+                    rel_parts.append(f"Path: {rel_path}")
+                elif rel_type:
+                    rel_parts.append(f"Type: {rel_type}")
+                if rel_hop:
+                    rel_parts.append(f"Hop {rel_hop}")
+                rel_header = " | ".join(rel_parts)
+                relationship_info = f"- Relationship: {rel_header}\n"
+                if rel_reason and rel_reason != rel_path:
+                    relationship_info += f"- Relationship Reason: {rel_reason}\n"
+                if alt_paths:
+                    alt_str = ", ".join(alt_paths)
+                    relationship_info += f"- Alternative Paths: {alt_str}\n"
+
             candidate_section = (
                 f"### [{cand.entity_type}] {cand.path}\n"
                 f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
                 f"{temporal_status}"
                 f"{commit_info}"
+                f"{relationship_info}"
                 f"- Relevance Score: {r.score}\n"
                 f"- Code / Evidence Snippet:\n"
                 f"```\n{truncated_content}\n```\n"
@@ -127,6 +151,12 @@ class ContextAssembler:
                     "superseded_by_date",
                     "renamed_from",
                     "renamed_to",
+                    "relationship_path",
+                    "relationship_type",
+                    "relationship_hop",
+                    "connected_from",
+                    "retrieval_reason",
+                    "alternative_paths",
                 ):
                     if k in cand.metadata and cand.metadata[k] is not None:
                         evidence_item[k] = _json_safe(cand.metadata[k])

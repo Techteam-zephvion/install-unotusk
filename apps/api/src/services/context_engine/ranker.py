@@ -45,9 +45,49 @@ class MultiSignalRanker:
                 # Merge signals taking the maximum for each signal
                 for sig, val in cand.signals.items():
                     existing.signals[sig] = max(existing.signals.get(sig, 0.0), val)
-                # Merge metadata
+
+                # Merge metadata with provenance preservation
                 if cand.metadata:
-                    existing.metadata.update(cand.metadata)
+                    cand_hop = cand.metadata.get("relationship_hop")
+                    exist_hop = existing.metadata.get("relationship_hop")
+                    cand_path = cand.metadata.get("relationship_path")
+                    exist_path = existing.metadata.get("relationship_path")
+
+                    all_alts = list(existing.metadata.get("alternative_paths", []))
+                    for p in cand.metadata.get("alternative_paths", []):
+                        if p not in all_alts:
+                            all_alts.append(p)
+
+                    if cand_hop is not None and (exist_hop is None or cand_hop < exist_hop):
+                        # cand has shorter hop
+                        if exist_path and exist_path != cand_path and exist_path not in all_alts:
+                            all_alts.append(exist_path)
+                        existing.metadata.update(cand.metadata)
+                        existing.metadata["alternative_paths"] = all_alts
+                    elif exist_hop is not None and cand_hop is not None and cand_hop >= exist_hop:
+                        # existing has equal or shorter hop
+                        if cand_path and cand_path != exist_path and cand_path not in all_alts:
+                            all_alts.append(cand_path)
+                        for k, v in cand.metadata.items():
+                            if (
+                                k
+                                not in (
+                                    "relationship_hop",
+                                    "relationship_path",
+                                    "relationship_type",
+                                    "connected_from",
+                                    "retrieval_reason",
+                                    "alternative_paths",
+                                )
+                                and k not in existing.metadata
+                            ):
+                                existing.metadata[k] = v
+                        existing.metadata["alternative_paths"] = all_alts
+                    else:
+                        existing.metadata.update(cand.metadata)
+                        if all_alts:
+                            existing.metadata["alternative_paths"] = all_alts
+
                 # Keep richer content or preferred entity type (SYMBOL over generic CHUNK)
                 if cand.entity_type == "SYMBOL" and existing.entity_type != "SYMBOL":
                     cand.signals = existing.signals
@@ -104,6 +144,22 @@ class MultiSignalRanker:
                 elif sig == "graph_expansion_hop2":
                     score += val * 0.5
                     reasons.append("Graph transitive 2-hop neighbor")
+                elif sig.startswith("graph_expansion_hop"):
+                    try:
+                        hop_num = int(sig.replace("graph_expansion_hop", ""))
+                    except ValueError:
+                        hop_num = 3
+                    weight_mult = max(0.2, round(0.5 * (0.75 ** (hop_num - 2)), 2))
+                    score += val * weight_mult
+                    reasons.append(f"Graph transitive {hop_num}-hop neighbor")
+
+            # 2b. Add detailed relationship reason if available
+            rel_type = cand.metadata.get("relationship_type")
+            rel_hop = cand.metadata.get("relationship_hop")
+            conn_from = cand.metadata.get("connected_from")
+            if rel_type and rel_hop and rel_hop > 0:
+                conn_desc = f" from '{conn_from}'" if conn_from else ""
+                reasons.append(f"Connected {rel_type.lower()} (hop {rel_hop}){conn_desc}")
 
             # 3. Exact name and path matching boost
             name_lower = cand.name.lower()
