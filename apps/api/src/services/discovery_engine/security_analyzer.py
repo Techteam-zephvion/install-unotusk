@@ -1,6 +1,12 @@
 import re
-from apps.api.src.models.enums import FindingCategory, FindingSeverity, FindingConfidence
-from apps.api.src.services.discovery_engine.base import DiscoveryAnalyzer, CandidateFinding, DiscoveryContext
+
+from apps.api.src.models.enums import FindingCategory, FindingConfidence, FindingSeverity
+from apps.api.src.services.discovery_engine.base import (
+    CandidateFinding,
+    DiscoveryAnalyzer,
+    DiscoveryContext,
+)
+
 
 class SecurityAnalyzer(DiscoveryAnalyzer):
     @property
@@ -19,7 +25,7 @@ class SecurityAnalyzer(DiscoveryAnalyzer):
         for chunk in ctx.chunks:
             if not chunk.content:
                 continue
-                
+
             for pattern, reason in secret_patterns:
                 match = pattern.search(chunk.content)
                 if match:
@@ -49,10 +55,10 @@ class SecurityAnalyzer(DiscoveryAnalyzer):
             name_lower = symbol.name.lower()
             if name_lower in insecure_symbols:
                 title, desc, sev = insecure_symbols[name_lower]
-                
+
                 file = ctx.file_by_id.get(symbol.file_id)
                 path = file.path if file else "unknown"
-                
+
                 findings.append(
                     CandidateFinding(
                         category=self.category,

@@ -613,8 +613,8 @@ class _UnoProjectCard extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: node.image.isNotEmpty
                 ? (node.image.startsWith('http')
-                    ? Image.network(node.image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallback())
-                    : Image.asset(node.image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildFallback()))
+                    ? Image.network(node.image, fit: BoxFit.cover, errorBuilder: (_, _, _) => _buildFallback())
+                    : Image.asset(node.image, fit: BoxFit.cover, errorBuilder: (_, _, _) => _buildFallback()))
                 : _buildFallback(),
           ),
           const SizedBox(width: 16),
@@ -822,8 +822,12 @@ class _UnoTable extends StatelessWidget {
               ...List.generate(node.rows.length, (rowIdx) {
                 final row = node.rows[rowIdx];
                 final safeCells = List<String>.from(row);
-                while (safeCells.length < node.headers.length) safeCells.add('');
-                if (safeCells.length > node.headers.length) safeCells.length = node.headers.length;
+                while (safeCells.length < node.headers.length) {
+                  safeCells.add('');
+                }
+                if (safeCells.length > node.headers.length) {
+                  safeCells.length = node.headers.length;
+                }
 
                 return TableRow(
                   children: safeCells.map((cell) {

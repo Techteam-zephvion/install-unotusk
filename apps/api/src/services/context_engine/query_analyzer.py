@@ -168,12 +168,12 @@ def analyze_query(query: str) -> AnalyzedQuery:
 
 async def analyze_query_async(query: str) -> AnalyzedQuery:
     base = analyze_query(query)
-    
+
     from apps.api.src.config.settings import settings
     provider_name = (settings.LLM_PROVIDER or "offline").strip().lower()
     if provider_name == "offline":
         return base
-        
+
     try:
         from apps.api.src.services.llm.factory import get_llm_provider
         provider = get_llm_provider(provider_name)
@@ -185,7 +185,7 @@ async def analyze_query_async(query: str) -> AnalyzedQuery:
             "'concept_keywords' (list of broader architectural concepts like database, auth, api)."
         )
         res = await provider.generate_json(system_prompt, query)
-        
+
         if res:
             base.keywords = list(dict.fromkeys(base.keywords + res.get("keywords", [])))
             base.symbol_candidates = list(dict.fromkeys(base.symbol_candidates + res.get("symbol_candidates", [])))
@@ -194,5 +194,5 @@ async def analyze_query_async(query: str) -> AnalyzedQuery:
     except Exception as e:
         import logging
         logging.getLogger("unotusk-query-analyzer").warning(f"LLM query expansion failed: {e}")
-        
+
     return base

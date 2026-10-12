@@ -165,7 +165,7 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
               alignment: Alignment.center,
               child: Column(
                 children: [
-                  Icon(LucideIcons.imageOff, size: 32, color: p.textSec.withOpacity(0.5)),
+                  Icon(LucideIcons.imageOff, size: 32, color: p.textSec.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
                   Text(
                     'Inline webview not supported on this platform (Linux).',
