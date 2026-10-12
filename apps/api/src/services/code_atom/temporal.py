@@ -127,6 +127,18 @@ def _get_candidate_target(cand: RetrievedCandidate) -> tuple[str, str | None, st
     return path, symbol_name, old_path
 
 
+def _is_atom_candidate(cand: RetrievedCandidate) -> bool:
+    """Checks if candidate represents an ATOM code-change chunk with git context."""
+    prov = cand.metadata.get("provenance") or {}
+    c_type = str(cand.metadata.get("chunk_type") or prov.get("change_type") or "")
+    return bool(
+        cand.metadata.get("commit_sha")
+        or cand.metadata.get("fingerprint")
+        or cand.metadata.get("committed_at")
+        or c_type.upper().startswith("ATOM_")
+    )
+
+
 def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[RetrievedCandidate]:
     """
     Resolves chronological relationships across code chunk candidates:
@@ -140,7 +152,7 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
     # 1. Build rename linkage map: old_path -> canonical_new_path
     rename_map: dict[str, str] = {}
     for cand in candidates:
-        if cand.entity_type != "CHUNK":
+        if cand.entity_type != "CHUNK" or not _is_atom_candidate(cand):
             continue
         path, _, old_path = _get_candidate_target(cand)
         if old_path and old_path != path:
@@ -157,7 +169,7 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
     # 2. Group candidates by scope: scope_key -> list[RetrievedCandidate]
     scoped_groups: dict[tuple[str, str, str | None], list[RetrievedCandidate]] = {}
     for cand in candidates:
-        if cand.entity_type != "CHUNK":
+        if cand.entity_type != "CHUNK" or not _is_atom_candidate(cand):
             continue
 
         path, symbol_name, old_path = _get_candidate_target(cand)
@@ -183,6 +195,7 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
             else:
                 single_cand.metadata.setdefault("is_current", True)
                 single_cand.metadata.setdefault("is_superseded", False)
+                single_cand.metadata.setdefault("has_superseded_versions", False)
             continue
 
         # Multiple candidates in scope: extract timestamps
@@ -208,6 +221,7 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
             for _ts, cand in known_ts[:-1]:
                 cand.metadata["is_superseded"] = True
                 cand.metadata["is_current"] = False
+                cand.metadata["has_superseded_versions"] = False
                 if latest_sha:
                     cand.metadata["superseded_by_sha"] = latest_sha
                 if latest_ts:
@@ -218,9 +232,11 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
             if is_latest_delete:
                 latest_cand.metadata["is_deleted"] = True
                 latest_cand.metadata["is_current"] = False
+                latest_cand.metadata["has_superseded_versions"] = True
             else:
                 latest_cand.metadata["is_current"] = True
                 latest_cand.metadata["is_superseded"] = False
+                latest_cand.metadata["has_superseded_versions"] = True
 
             # If some candidates in the group had missing timestamps, do NOT invent dates
             for _ts, cand in cand_with_ts:

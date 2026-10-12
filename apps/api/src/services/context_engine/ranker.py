@@ -145,8 +145,8 @@ class MultiSignalRanker:
                 elif cand.metadata.get("is_superseded"):
                     score *= 0.4
                     reasons.append("Historical superseded change (demoted for current-state query)")
-                elif cand.metadata.get("is_current"):
-                    score += 0.5
+                elif cand.metadata.get("has_superseded_versions"):
+                    score += 0.4
                     reasons.append("Latest active implementation")
             else:
                 # Temporal / evolution query: highlight history, commit evidence, and change lineage
