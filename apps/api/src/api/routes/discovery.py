@@ -19,6 +19,7 @@ from apps.api.src.schemas.discovery import (
     FindingUpdateStatusRequest,
 )
 from apps.api.src.services.discovery_service import DiscoveryService
+from apps.api.src.services.project_service import ProjectService
 
 router = APIRouter()
 
@@ -30,7 +31,7 @@ router = APIRouter()
     summary="List all findings discovered for a project",
 )
 async def list_findings(
-    project_id: uuid.UUID,
+    project_id: str,
     category: FindingCategory | None = Query(None, description="Filter by finding category"),
     severity: FindingSeverity | None = Query(None, description="Filter by finding severity"),
     status: FindingStatus | None = Query(None, description="Filter by finding status"),
@@ -38,10 +39,11 @@ async def list_findings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[FindingResponse]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await DiscoveryService.list_findings(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         category=category,
         severity=severity,
         status=status,
@@ -56,15 +58,16 @@ async def list_findings(
     summary="Get detail of a specific finding",
 )
 async def get_finding(
-    project_id: uuid.UUID,
+    project_id: str,
     finding_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FindingResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await DiscoveryService.get_finding(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         finding_id=finding_id,
     )
 
@@ -76,16 +79,17 @@ async def get_finding(
     summary="Update finding status (OPEN, ACKNOWLEDGED, DISMISSED, RESOLVED)",
 )
 async def update_finding_status(
-    project_id: uuid.UUID,
+    project_id: str,
     finding_id: uuid.UUID,
     payload: FindingUpdateStatusRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FindingResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await DiscoveryService.update_finding_status(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         finding_id=finding_id,
         status=payload.status,
     )
@@ -98,14 +102,15 @@ async def update_finding_status(
     summary="Trigger proactive project discovery analysis",
 )
 async def trigger_discovery(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DiscoveryTriggerResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await DiscoveryService.trigger_discovery(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
     )
 
 
@@ -116,12 +121,13 @@ async def trigger_discovery(
     summary="Get discovery overview, finding counts, and latest run status",
 )
 async def get_discovery_status(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DiscoverSummaryResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await DiscoveryService.get_discovery_summary(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
     )

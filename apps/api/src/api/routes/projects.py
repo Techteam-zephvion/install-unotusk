@@ -59,40 +59,43 @@ async def list_projects(
 
 @router.get("/{project_id}", response_model=ProjectRead)
 async def get_project(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectRead:
-    # Service verifies project exists and caller has access
-    return await ProjectService.get_project(db, current_user.id, project_id)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await ProjectService.get_project(db, current_user.id, resolved_id)
 
 
 @router.patch("/{project_id}", response_model=ProjectRead)
 async def update_project(
-    project_id: uuid.UUID,
+    project_id: str,
     data: ProjectUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectRead:
-    return await ProjectService.update_project(db, current_user.id, project_id, data)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await ProjectService.update_project(db, current_user.id, resolved_id, data)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    await ProjectService.delete_project(db, current_user.id, project_id)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    await ProjectService.delete_project(db, current_user.id, resolved_id)
 
 
 @router.get("/{project_id}/members", response_model=list[ProjectMemberRead])
 async def list_project_members(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectMemberRead]:
-    return await ProjectService.list_project_members(db, current_user.id, project_id)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await ProjectService.list_project_members(db, current_user.id, resolved_id)
 
 
 @router.post(
@@ -101,30 +104,33 @@ async def list_project_members(
     status_code=status.HTTP_201_CREATED,
 )
 async def add_project_member(
-    project_id: uuid.UUID,
+    project_id: str,
     data: ProjectMemberAdd,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectMemberRead:
-    return await ProjectService.add_project_member(db, current_user.id, project_id, data)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await ProjectService.add_project_member(db, current_user.id, resolved_id, data)
 
 
 @router.delete("/{project_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_project_member(
-    project_id: uuid.UUID,
+    project_id: str,
     user_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    await ProjectService.remove_project_member(db, current_user.id, project_id, user_id)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    await ProjectService.remove_project_member(db, current_user.id, resolved_id, user_id)
 
 
 @router.get("/{project_id}/data-plane", response_model=dict)
 async def get_project_data_plane(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    await ProjectService.get_project(db, current_user.id, project_id)
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    await ProjectService.get_project(db, current_user.id, resolved_id)
     from apps.api.src.services.orchestrator_service import OrchestratorService
-    return OrchestratorService.get_project_data_plane_status(project_id)
+    return OrchestratorService.get_project_data_plane_status(resolved_id)

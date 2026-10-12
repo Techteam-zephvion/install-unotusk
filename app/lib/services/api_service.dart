@@ -499,7 +499,7 @@ class ApiService {
               if (isRunning) {
                 final currentHost = Uri.parse(ApiService.baseUrl).host;
                 final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
-                final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
+                final localRes = await _client.get(localUri, headers: _headers).timeout(const Duration(seconds: 2));
                 if (localRes.statusCode == 200) {
                   final localDecoded = jsonDecode(localRes.body);
                   List<dynamic> localList = [];
@@ -544,10 +544,8 @@ class ApiService {
             } catch (_) {}
             
             if (!mappedFromApi) {
-              if (!projects.any((p) => p.name == fallbackProj.name || p.id == fallbackProj.id)) {
-                projects.add(fallbackProj);
-              } else {
-                final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              if (idx != -1) {
                 // Keep existing, but add port/repo if missing
                 final existing = projects[idx];
                 projects[idx] = existing.copyWith(
@@ -583,6 +581,14 @@ class ApiService {
           final updated = projects.where((p) => p.id == activeProject!.id);
           if (updated.isNotEmpty) {
             activeProject = updated.first;
+          } else if (projects.isNotEmpty) {
+            // Previous active project is no longer valid; reselect a valid one
+            activeProject = projects.firstWhere(
+              (p) => p.upsStatus.toUpperCase() == 'READY',
+              orElse: () => projects.first,
+            );
+          } else {
+            activeProject = null;
           }
         }
         return projects;

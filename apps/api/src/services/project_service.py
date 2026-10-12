@@ -9,7 +9,6 @@ from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
-from apps.api.src.config.settings import settings
 from apps.api.src.models.enums import (
     IntegrationProvider,
     IntegrationStatus,
@@ -33,6 +32,34 @@ logger = logging.getLogger("unotusk-api")
 
 
 class ProjectService:
+    @staticmethod
+    async def resolve_project_id(
+        session: AsyncSession,
+        project_id: uuid.UUID | str,
+    ) -> uuid.UUID:
+        if isinstance(project_id, uuid.UUID):
+            return project_id
+        project_str = str(project_id).strip()
+        try:
+            return uuid.UUID(project_str)
+        except (ValueError, AttributeError):
+            pass
+
+        # Lookup by slug or name (case-insensitive)
+        result = await session.execute(
+            select(Project.id).where(
+                (Project.slug == project_str.lower())
+                | (Project.name.ilike(project_str))
+            ).limit(1)
+        )
+        found_id = result.scalar_one_or_none()
+        if found_id is not None:
+            return found_id
+        raise NotFoundException(
+            code="PROJECT_NOT_FOUND",
+            message=f"Project '{project_id}' not found",
+        )
+
     @staticmethod
     async def create_project(
         session: AsyncSession,
@@ -70,7 +97,6 @@ class ProjectService:
                 )
             slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
 
-        from apps.api.src.services.orchestrator_service import OrchestratorService
 
         # 3. Create Project
         project = Project(
@@ -91,24 +117,11 @@ class ProjectService:
         )
         session.add(creator_membership)
 
-        # 5. Determine Port & Orchestrate Data Plane
-        try:
-            if getattr(data, "port", None) is not None:
-                project.port = data.port
-            elif getattr(settings, "SERVER_PORT", None):
-                project.port = settings.SERVER_PORT
-            elif settings.APP_ENV != "test":
-                assigned_port = await OrchestratorService.spawn_project_container(
-                    project_id=project.id,
-                    organization_id=data.organization_id,
-                )
-                project.port = assigned_port
-            else:
-                project.port = getattr(settings, "PORT", 8000)
-        except Exception as e:
-            logger.error("Failed to orchestrate project: %s", e)
-            if not project.port:
-                project.port = getattr(settings, "SERVER_PORT", None) or getattr(settings, "PORT", 8000)
+        # 5. Determine Port & Data Plane
+        if getattr(data, "port", None) is not None:
+            project.port = data.port
+        else:
+            project.port = None
 
         # 6. Create Integration placeholder (ready for Stage 1)
         integration = Integration(
@@ -191,9 +204,10 @@ class ProjectService:
     async def get_project(
         session: AsyncSession,
         user_id: uuid.UUID,
-        project_id: uuid.UUID,
+        project_id: uuid.UUID | str,
     ) -> ProjectRead:
-        query = select(Project).where(Project.id == project_id)
+        resolved_id = await ProjectService.resolve_project_id(session, project_id)
+        query = select(Project).where(Project.id == resolved_id)
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -219,7 +233,7 @@ class ProjectService:
         # Check project membership
         proj_mem_res = await session.execute(
             select(ProjectMembership).where(
-                ProjectMembership.project_id == project_id,
+                ProjectMembership.project_id == resolved_id,
                 ProjectMembership.user_id == user_id,
             )
         )
@@ -240,10 +254,11 @@ class ProjectService:
     async def update_project(
         session: AsyncSession,
         user_id: uuid.UUID,
-        project_id: uuid.UUID,
+        project_id: uuid.UUID | str,
         data: ProjectUpdate,
     ) -> ProjectRead:
-        query = select(Project).where(Project.id == project_id)
+        resolved_id = await ProjectService.resolve_project_id(session, project_id)
+        query = select(Project).where(Project.id == resolved_id)
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -268,7 +283,7 @@ class ProjectService:
 
         proj_mem_res = await session.execute(
             select(ProjectMembership).where(
-                ProjectMembership.project_id == project_id,
+                ProjectMembership.project_id == resolved_id,
                 ProjectMembership.user_id == user_id,
             )
         )
@@ -302,9 +317,10 @@ class ProjectService:
     async def delete_project(
         session: AsyncSession,
         user_id: uuid.UUID,
-        project_id: uuid.UUID,
+        project_id: uuid.UUID | str,
     ) -> None:
-        query = select(Project).where(Project.id == project_id)
+        resolved_id = await ProjectService.resolve_project_id(session, project_id)
+        query = select(Project).where(Project.id == resolved_id)
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -337,9 +353,10 @@ class ProjectService:
     async def list_project_members(
         session: AsyncSession,
         user_id: uuid.UUID,
-        project_id: uuid.UUID,
+        project_id: uuid.UUID | str,
     ) -> list[ProjectMemberRead]:
-        query = select(Project).where(Project.id == project_id)
+        resolved_id = await ProjectService.resolve_project_id(session, project_id)
+        query = select(Project).where(Project.id == resolved_id)
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -366,7 +383,7 @@ class ProjectService:
         if org_mem.role == MembershipRole.MEMBER:
             proj_mem_res = await session.execute(
                 select(ProjectMembership).where(
-                    ProjectMembership.project_id == project_id,
+                    ProjectMembership.project_id == resolved_id,
                     ProjectMembership.user_id == user_id,
                 )
             )
@@ -379,7 +396,7 @@ class ProjectService:
         members_query = (
             select(ProjectMembership, User.name, User.email)
             .join(User, ProjectMembership.user_id == User.id)
-            .where(ProjectMembership.project_id == project_id)
+            .where(ProjectMembership.project_id == resolved_id)
             .order_by(ProjectMembership.created_at.asc())
         )
         members_res = await session.execute(members_query)
@@ -402,10 +419,11 @@ class ProjectService:
     async def add_project_member(
         session: AsyncSession,
         user_id: uuid.UUID,
-        project_id: uuid.UUID,
+        project_id: uuid.UUID | str,
         data: ProjectMemberAdd,
     ) -> ProjectMemberRead:
-        query = select(Project).where(Project.id == project_id)
+        resolved_id = await ProjectService.resolve_project_id(session, project_id)
+        query = select(Project).where(Project.id == resolved_id)
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -430,7 +448,7 @@ class ProjectService:
 
         proj_mem_res = await session.execute(
             select(ProjectMembership).where(
-                ProjectMembership.project_id == project_id,
+                ProjectMembership.project_id == resolved_id,
                 ProjectMembership.user_id == user_id,
             )
         )
@@ -481,7 +499,7 @@ class ProjectService:
         # Check if already a project member
         existing_pm = await session.execute(
             select(ProjectMembership).where(
-                ProjectMembership.project_id == project_id,
+                ProjectMembership.project_id == resolved_id,
                 ProjectMembership.user_id == target_user.id,
             )
         )
@@ -493,7 +511,7 @@ class ProjectService:
             )
         else:
             new_membership = ProjectMembership(
-                project_id=project_id,
+                project_id=resolved_id,
                 user_id=target_user.id,
                 role=data.role,
             )
@@ -516,10 +534,11 @@ class ProjectService:
     async def remove_project_member(
         session: AsyncSession,
         user_id: uuid.UUID,
-        project_id: uuid.UUID,
+        project_id: uuid.UUID | str,
         target_user_id: uuid.UUID,
     ) -> None:
-        query = select(Project).where(Project.id == project_id)
+        resolved_id = await ProjectService.resolve_project_id(session, project_id)
+        query = select(Project).where(Project.id == resolved_id)
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -532,7 +551,7 @@ class ProjectService:
         # Verify target membership exists
         target_pm_res = await session.execute(
             select(ProjectMembership).where(
-                ProjectMembership.project_id == project_id,
+                ProjectMembership.project_id == resolved_id,
                 ProjectMembership.user_id == target_user_id,
             )
         )
@@ -561,7 +580,7 @@ class ProjectService:
 
             caller_pm_res = await session.execute(
                 select(ProjectMembership).where(
-                    ProjectMembership.project_id == project_id,
+                    ProjectMembership.project_id == resolved_id,
                     ProjectMembership.user_id == user_id,
                 )
             )

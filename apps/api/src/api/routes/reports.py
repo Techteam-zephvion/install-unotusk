@@ -11,6 +11,7 @@ from apps.api.src.schemas.report import (
     ReportResponse,
     ReportTriggerResponse,
 )
+from apps.api.src.services.project_service import ProjectService
 from apps.api.src.services.report_service import ReportService
 
 router = APIRouter()
@@ -23,14 +24,15 @@ router = APIRouter()
     summary="Generate a new project intelligence report",
 )
 async def generate_report(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ReportTriggerResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await ReportService.trigger_report(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
     )
 
 
@@ -41,14 +43,15 @@ async def generate_report(
     summary="List all intelligence reports generated for a project",
 )
 async def list_reports(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ReportListItemResponse]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await ReportService.list_reports(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
     )
 
 
@@ -59,14 +62,15 @@ async def list_reports(
     summary="Get the latest intelligence report for a project",
 )
 async def get_latest_report(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ReportResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await ReportService.get_latest_report(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
     )
 
 
@@ -77,14 +81,15 @@ async def get_latest_report(
     summary="Get a specific intelligence report by ID",
 )
 async def get_report(
-    project_id: uuid.UUID,
+    project_id: str,
     report_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ReportResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await ReportService.get_report(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         report_id=report_id,
     )

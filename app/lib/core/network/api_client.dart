@@ -47,7 +47,7 @@ class ApiClient {
             targetPort = _projectPortMap[_activeProjectId];
           }
 
-          if (targetPort != null) {
+          if (targetPort != null && targetPort != 28000 && targetPort != 8000) {
             final uri = Uri.tryParse(baseServerUrl);
             if (uri != null && uri.hasPort && uri.port != targetPort) {
               options.baseUrl = uri.replace(port: targetPort).toString().replaceAll(RegExp(r'/+$'), '');

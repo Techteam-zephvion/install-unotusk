@@ -260,7 +260,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
                       Row(
                         children: [
                           Text(
-                            'Control Plane (Port 28000) · Data Plane Isolation (Port ${_dataPlaneStatus?.port ?? 28101})',
+                            _dataPlaneStatus?.port != null
+                                ? 'Control Plane (Port 28000) · Data Plane Isolation (Port ${_dataPlaneStatus!.port})'
+                                : 'Unified Control & Intelligence Engine (Port 28000)',
                             style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(width: 8),

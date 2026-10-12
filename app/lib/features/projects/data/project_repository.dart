@@ -26,7 +26,7 @@ class ProjectRepository {
           .toList();
     }
     for (final p in list) {
-      if (p.port != null) {
+      if (p.port != null && p.port != 28000 && p.port != 8000) {
         _apiClient.registerProjectPort(p.id, p.port!);
       }
     }
@@ -36,7 +36,7 @@ class ProjectRepository {
   Future<Project> getProjectById(String id) async {
     final response = await _apiClient.get(ApiEndpoints.projectById(id));
     final proj = Project.fromJson(Map<String, dynamic>.from(response.data));
-    if (proj.port != null) {
+    if (proj.port != null && proj.port != 28000 && proj.port != 8000) {
       _apiClient.registerProjectPort(proj.id, proj.port!);
     }
     return proj;
