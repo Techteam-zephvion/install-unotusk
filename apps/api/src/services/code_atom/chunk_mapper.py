@@ -63,6 +63,10 @@ def map_atomic_code_change_to_code_chunk(
     prov_data = dict(change.provenance) if change.provenance else {}
     prov_data["atom_id"] = change.id
     prov_data["fingerprint"] = change.fingerprint
+    if getattr(change, "atomic_facts", None):
+        prov_data["atomic_code_facts"] = [
+            f.model_dump() if hasattr(f, "model_dump") else f for f in change.atomic_facts
+        ]
 
     # Generate embedding if requested
     embedding_vec: list[float] | None = None

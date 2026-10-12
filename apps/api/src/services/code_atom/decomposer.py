@@ -7,8 +7,10 @@ from apps.api.src.schemas.code_atom import (
     CodeDecompositionResult,
     GitCommitArtifact,
     GitFileDiff,
+    SemanticCodeFact,
 )
 from apps.api.src.services.code_atom.diff_parser import parse_unified_diff
+from apps.api.src.services.code_atom.fact_decomposer import SemanticFactExtractor
 from apps.api.src.services.code_atom.fingerprint import (
     generate_code_atom_fingerprint,
     generate_code_atom_id,
@@ -26,10 +28,14 @@ class CodeAtomDecomposer:
     Maintains full provenance back to parent commit, snapshot, file, and symbol.
     """
 
+    def __init__(self, fact_extractor: SemanticFactExtractor | None = None):
+        self.fact_extractor = fact_extractor or SemanticFactExtractor()
+
     def decompose(
         self,
         commit: GitCommitArtifact,
         symbol_catalog: list[dict[str, Any]] | None = None,
+        extract_facts: bool = True,
     ) -> CodeDecompositionResult:
         """
         Decomposes a GitCommitArtifact into a collection of AtomicCodeChange units.
@@ -58,6 +64,8 @@ class CodeAtomDecomposer:
                     commit=commit,
                     file_diff=file_diff,
                 )
+                if extract_facts:
+                    atomic_unit.atomic_facts = self.fact_extractor.extract_facts_deterministic(atomic_unit)
                 atomic_changes.append(atomic_unit)
                 continue
 
@@ -158,19 +166,53 @@ class CodeAtomDecomposer:
                     fingerprint=fingerprint,
                     metadata=metadata,
                 )
+                if extract_facts:
+                    change_unit.atomic_facts = self.fact_extractor.extract_facts_deterministic(change_unit)
                 atomic_changes.append(change_unit)
 
         if not atomic_changes and (commit.raw_diff or commit.file_diffs):
             warnings.append("Diff contained no parsable hunks or file changes.")
 
+        all_facts: list[SemanticCodeFact] = []
+        for c in atomic_changes:
+            all_facts.extend(c.atomic_facts)
+
         return CodeDecompositionResult(
             commit_sha=commit.commit_sha,
             changes=atomic_changes,
             change_count=len(atomic_changes),
+            facts=all_facts,
+            fact_count=len(all_facts),
             files_affected=sorted(files_affected),
             symbols_affected=sorted(symbols_affected),
             warnings=warnings,
         )
+
+    async def decompose_async(
+        self,
+        commit: GitCommitArtifact,
+        symbol_catalog: list[dict[str, Any]] | None = None,
+        extract_facts: bool = True,
+        use_llm: bool = True,
+    ) -> CodeDecompositionResult:
+        """
+        Asynchronously decomposes a GitCommitArtifact, leveraging LLM extraction
+        when configured, with safe deterministic fallback.
+        """
+        base_result = self.decompose(
+            commit=commit,
+            symbol_catalog=symbol_catalog,
+            extract_facts=False,
+        )
+        all_facts: list[SemanticCodeFact] = []
+        if extract_facts:
+            for change in base_result.changes:
+                facts = await self.fact_extractor.extract_facts_async(change, use_llm=use_llm)
+                change.atomic_facts = facts
+                all_facts.extend(facts)
+        base_result.facts = all_facts
+        base_result.fact_count = len(all_facts)
+        return base_result
 
     def _resolve_symbol(
         self,

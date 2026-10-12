@@ -106,12 +106,27 @@ class ContextAssembler:
                     alt_str = ", ".join(alt_paths)
                     relationship_info += f"- Alternative Paths: {alt_str}\n"
 
+            facts_info = ""
+            raw_facts = cand.metadata.get("atomic_code_facts")
+            if isinstance(raw_facts, list) and raw_facts:
+                fact_lines = []
+                for f in raw_facts[:4]:
+                    if isinstance(f, dict) and f.get("statement"):
+                        ftype = f.get("fact_type", "BEHAVIOR")
+                        uncertain_tag = " (uncertain)" if f.get("is_uncertain") else ""
+                        fact_lines.append(f"  * \"{f['statement']}\" [{ftype}]{uncertain_tag}")
+                    elif isinstance(f, str):
+                        fact_lines.append(f"  * \"{f}\"")
+                if fact_lines:
+                    facts_info = "- Grounded Semantic Facts:\n" + "\n".join(fact_lines) + "\n"
+
             candidate_section = (
                 f"### [{cand.entity_type}] {cand.path}\n"
                 f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
                 f"{temporal_status}"
                 f"{commit_info}"
                 f"{relationship_info}"
+                f"{facts_info}"
                 f"- Relevance Score: {r.score}\n"
                 f"- Code / Evidence Snippet:\n"
                 f"```\n{truncated_content}\n```\n"
@@ -157,6 +172,7 @@ class ContextAssembler:
                     "connected_from",
                     "retrieval_reason",
                     "alternative_paths",
+                    "atomic_code_facts",
                 ):
                     if k in cand.metadata and cand.metadata[k] is not None:
                         evidence_item[k] = _json_safe(cand.metadata[k])

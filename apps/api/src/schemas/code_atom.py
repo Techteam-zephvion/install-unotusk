@@ -13,6 +13,50 @@ class CodeChangeType(str, Enum):
     RENAME = "RENAME"
 
 
+class FactType(str, Enum):
+    BEHAVIOR = "BEHAVIOR"
+    VALIDATION = "VALIDATION"
+    ERROR_HANDLING = "ERROR_HANDLING"
+    STATE_CHANGE = "STATE_CHANGE"
+    RELATIONSHIP = "RELATIONSHIP"
+    REMOVAL = "REMOVAL"
+    CONFIGURATION = "CONFIGURATION"
+    STRUCTURAL = "STRUCTURAL"
+
+
+class FactConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    UNCERTAIN = "UNCERTAIN"
+
+
+class SemanticCodeFact(BaseModel):
+    """
+    Module 1: Atomic Fact Decomposition (Code-Lane).
+    A small, self-contained, semantically meaningful fact about code behavior,
+    grounded in actual source code changes.
+    """
+
+    id: str
+    statement: str
+    fact_type: FactType = FactType.BEHAVIOR
+    confidence: FactConfidence = FactConfidence.HIGH
+    is_uncertain: bool = False
+    file_path: str
+    symbol_name: str | None = None
+    commit_sha: str
+    commit_message: str | None = None
+    change_type: CodeChangeType
+    evidenced_lines: list[str] = Field(default_factory=list)
+    provenance: dict[str, Any] = Field(default_factory=dict)
+    fingerprint: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
+AtomicCodeFact = SemanticCodeFact
+
+
 class GitDiffHunk(BaseModel):
     """Represents an individual hunk within a file diff."""
 
@@ -92,6 +136,7 @@ class AtomicCodeChange(BaseModel):
     provenance: dict[str, Any] = Field(default_factory=dict)
     fingerprint: str
     metadata: dict[str, Any] = Field(default_factory=dict)
+    atomic_facts: list[SemanticCodeFact] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
 
@@ -102,6 +147,8 @@ class CodeDecompositionResult(BaseModel):
     commit_sha: str
     changes: list[AtomicCodeChange] = Field(default_factory=list)
     change_count: int = 0
+    facts: list[SemanticCodeFact] = Field(default_factory=list)
+    fact_count: int = 0
     files_affected: list[str] = Field(default_factory=list)
     symbols_affected: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

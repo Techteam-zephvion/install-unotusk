@@ -107,6 +107,8 @@ def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
             meta["change_type"] = prov.get("change_type")
         if prov.get("author_name") or prov.get("author"):
             meta["author"] = prov.get("author_name") or prov.get("author")
+        if prov.get("atomic_code_facts"):
+            meta["atomic_code_facts"] = prov.get("atomic_code_facts")
 
     return meta
 

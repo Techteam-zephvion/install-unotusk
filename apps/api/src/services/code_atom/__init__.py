@@ -1,10 +1,14 @@
 from apps.api.src.schemas.code_atom import (
     AtomicCodeChange,
+    AtomicCodeFact,
     CodeChangeType,
     CodeDecompositionResult,
+    FactConfidence,
+    FactType,
     GitCommitArtifact,
     GitDiffHunk,
     GitFileDiff,
+    SemanticCodeFact,
 )
 from apps.api.src.services.code_atom.chunk_mapper import (
     generate_deterministic_chunk_id,
@@ -23,6 +27,12 @@ from apps.api.src.services.code_atom.embedding import (
     generate_code_embedding,
     get_code_embedding_backend,
     reembed_atom_code_chunks,
+)
+from apps.api.src.services.code_atom.fact_decomposer import (
+    SemanticFactExtractor,
+    deduplicate_facts,
+    generate_fact_fingerprint,
+    generate_fact_id,
 )
 from apps.api.src.services.code_atom.fingerprint import (
     generate_code_atom_fingerprint,
@@ -45,17 +55,23 @@ from apps.api.src.services.code_atom.temporal import (
 
 __all__ = [
     "AtomicCodeChange",
+    "AtomicCodeFact",
     "CodeAtomDecomposer",
     "CodeChangeType",
     "CodeDecompositionResult",
     "CodeEmbeddingBackend",
     "DevelopmentCodeEmbeddingBackend",
+    "FactConfidence",
+    "FactType",
     "GitCommitArtifact",
     "GitDiffHunk",
     "GitFileDiff",
     "InvalidBaseCommitError",
+    "SemanticCodeFact",
+    "SemanticFactExtractor",
     "VoyageCodeEmbeddingBackend",
     "classify_temporal_intent",
+    "deduplicate_facts",
     "embed_atomic_code_chunk",
     "extract_git_commit_artifact",
     "extract_incremental_commit_artifacts",
@@ -65,6 +81,8 @@ __all__ = [
     "generate_code_atom_fingerprint",
     "generate_code_atom_id",
     "generate_deterministic_chunk_id",
+    "generate_fact_fingerprint",
+    "generate_fact_id",
     "get_code_embedding_backend",
     "map_atomic_code_change_to_code_chunk",
     "normalize_code_change",
