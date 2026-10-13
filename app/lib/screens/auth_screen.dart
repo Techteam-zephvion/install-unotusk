@@ -35,7 +35,7 @@ class _AuthScreenState extends State<AuthScreen> {
       TextEditingController(text: 'Acme Corporation');
 
   bool _obscurePassword = true;
-  String _selectedRole = 'Engineer';
+  String _selectedRole = 'Member (Dev)';
   bool _termsAgreed = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -670,19 +670,38 @@ class _AuthScreenState extends State<AuthScreen> {
             border: Border.all(color: widget.palette.div),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: TextField(
-            controller: _passwordController,
-            obscureText: true,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: '••••••••',
-              hintStyle: UnoTypography.body(
-                color: widget.palette.textSec.withValues(alpha: 0.6),
-                fontSize: 13,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '••••••••',
+                    hintStyle: UnoTypography.body(
+                      color: widget.palette.textSec.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                ),
               ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 11),
-            ),
+              InkWell(
+                onTap: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                    size: 16,
+                    color: widget.palette.textSec,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -712,11 +731,11 @@ class _AuthScreenState extends State<AuthScreen> {
               isExpanded: true,
               style:
                   UnoTypography.body(color: widget.palette.text, fontSize: 13),
-              items: ['Engineer', 'Tech Lead', 'Manager', 'Developer', 'QA']
+              items: ['Member (Dev)', 'Manager']
                   .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                   .toList(),
               onChanged: (val) =>
-                  setState(() => _selectedRole = val ?? 'Engineer'),
+                  setState(() => _selectedRole = val ?? 'Member (Dev)'),
             ),
           ),
         ),

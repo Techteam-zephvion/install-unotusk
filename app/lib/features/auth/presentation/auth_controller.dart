@@ -83,6 +83,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String email,
     required String password,
     String? organizationName,
+    String? role,
   }) async {
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
 
@@ -92,6 +93,7 @@ class AuthController extends StateNotifier<AuthState> {
         email: email,
         password: password,
         organizationName: organizationName,
+        role: role,
       );
       state = state.copyWith(
         status: AuthStatus.authenticated,

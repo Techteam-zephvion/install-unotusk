@@ -346,6 +346,7 @@ class ApiService {
             'email': userEmail,
             'password': password.length >= 8 ? password : '${password}123',
             'organization_name': cleanOrg,
+            'role': role,
           }),
         )
         .timeout(_timeout);
@@ -722,16 +723,23 @@ class ApiService {
         debugSignals: debugSignals,
       );
 
+      final enrichedContent = synthesizeMermaidDiagram(
+        question: question,
+        content: content,
+        citations: citations,
+        evidence: evidenceItems,
+      );
+
       return QueryResponseData(
         conversationId: returnedConvId,
         segments: [
           ResponseSegment(
-            text: content,
+            text: enrichedContent,
             tag: confidence == 'HIGH' ? 'CONFIRMED' : 'INFERRED',
           ),
         ],
         meta:
-            'Grounded via 10.0.0.59:28000 · ${citations.length} sources · ${promptTokens + completionTokens} tokens · $confidence',
+            'Grounded · ${citations.length} sources · ${promptTokens + completionTokens} tokens · $confidence',
         queryType: 'hot',
         confidence: confidence.toLowerCase(),
         reasoning: reasoning,
@@ -748,6 +756,134 @@ class ApiService {
     }
   }
 
+  /// Synthesizes a valid Mermaid flowchart if the user requested a diagram/flowchart/architecture
+  /// or if the response analysis is an architecture breakdown without a ```mermaid block.
+  static String synthesizeMermaidDiagram({
+    required String question,
+    required String content,
+    List<String> citations = const [],
+    List<EvidenceItem> evidence = const [],
+  }) {
+    if (content.contains('```mermaid')) {
+      return content;
+    }
+
+    final qLower = question.toLowerCase();
+    final cLower = content.toLowerCase();
+
+    final wantsDiagram = qLower.contains('mermaid') ||
+        qLower.contains('flowchart') ||
+        qLower.contains('diagram') ||
+        qLower.contains('visualize') ||
+        qLower.contains('graph') ||
+        cLower.contains('mermaid') ||
+        cLower.contains('flowchart') ||
+        (cLower.contains('project analysis') && cLower.contains('visualize'));
+
+    if (!wantsDiagram) {
+      return content;
+    }
+
+    final symbols = <String>[];
+    final files = <String>[];
+    final components = <String>[];
+
+    // Extract symbols
+    final symbolBlock = RegExp(
+      r'\*\*Key Symbols[^\n]*\*\*([\s\S]*?)(?=\*\*|\n\n#|$)',
+      caseSensitive: false,
+    ).firstMatch(content);
+    if (symbolBlock != null) {
+      final matches = RegExp(r'[-*]\s*`?([a-zA-Z0-9_]+)`?').allMatches(symbolBlock.group(1)!);
+      for (final m in matches) {
+        final sym = m.group(1)!.trim();
+        if (sym.isNotEmpty && !symbols.contains(sym)) symbols.add(sym);
+      }
+    }
+
+    // Extract files
+    final fileBlock = RegExp(
+      r'\*\*Primary Files[^\n]*\*\*([\s\S]*?)(?=\*\*|\n\n#|$)',
+      caseSensitive: false,
+    ).firstMatch(content);
+    if (fileBlock != null) {
+      final matches = RegExp(r'[-*]\s*`?([a-zA-Z0-9_\-\./\\]+)`?').allMatches(fileBlock.group(1)!);
+      for (final m in matches) {
+        final f = m.group(1)!.trim();
+        if (f.isNotEmpty && !files.contains(f)) files.add(f);
+      }
+    }
+    if (files.isEmpty && citations.isNotEmpty) {
+      files.addAll(citations.take(3));
+    }
+
+    // Extract connected components
+    final compMatch = RegExp(
+      r'\*\*Connected Components:[^\n]*\*\*([\s\S]*?)(?=\n\n|$)',
+      caseSensitive: false,
+    ).firstMatch(content);
+    if (compMatch != null) {
+      final matches = RegExp(r'`?([a-zA-Z0-9_]+)`?').allMatches(compMatch.group(1)!);
+      for (final m in matches) {
+        final c = m.group(1)!.trim();
+        if (c.isNotEmpty &&
+            !c.startsWith('__') &&
+            !components.contains(c) &&
+            !symbols.contains(c)) {
+          components.add(c);
+        }
+      }
+    }
+
+    if (symbols.isEmpty) {
+      for (final ev in evidence) {
+        if (ev.symbol != null && ev.symbol!.isNotEmpty && !symbols.contains(ev.symbol!)) {
+          symbols.add(ev.symbol!);
+        }
+      }
+    }
+
+    if (symbols.isEmpty && files.isEmpty && components.isEmpty) {
+      return content;
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('\n\n### Architecture & Flowchart Visualization\n');
+    buffer.writeln('```mermaid');
+    buffer.writeln('flowchart TD');
+    buffer.writeln('    Client["Client Request"] --> Gateway["FastAPI Server / Control Plane"]');
+
+    final mainFile = files.isNotEmpty ? files.first : 'backend/main.py';
+    buffer.writeln('    Gateway --> MainFile["$mainFile"]');
+
+    if (symbols.isNotEmpty) {
+      buffer.writeln('    subgraph Endpoints ["Key Endpoints & Handlers"]');
+      for (int i = 0; i < symbols.length && i < 6; i++) {
+        final sym = symbols[i];
+        buffer.writeln('        F$i["$sym()"]');
+      }
+      buffer.writeln('    end');
+      buffer.writeln('    MainFile --> Endpoints');
+    }
+
+    if (components.isNotEmpty) {
+      buffer.writeln('    subgraph Entities ["Connected Schemas & Components"]');
+      for (int i = 0; i < components.length && i < 5; i++) {
+        final comp = components[i];
+        buffer.writeln('        C$i["$comp"]');
+      }
+      buffer.writeln('    end');
+      if (symbols.isNotEmpty) {
+        buffer.writeln('    Endpoints -.-> Entities');
+      } else {
+        buffer.writeln('    MainFile -.-> Entities');
+      }
+    }
+
+    buffer.writeln('```\n');
+    return '$content${buffer.toString()}';
+  }
+
   /// Backward-compatible askQuestion wrapper
   static Future<String> askQuestion({
     required String projectName,
@@ -761,7 +897,7 @@ class ApiService {
     if (response.segments.isNotEmpty) {
       return response.segments.first.text;
     }
-    return 'Grounded response received from http://10.0.0.59:28000';
+    return 'Grounded response received';
   }
 
   // ─────────────────────────────────────────────────────────
@@ -957,11 +1093,15 @@ class ApiService {
               data: QueryResponseData(
                 segments: [
                   ResponseSegment(
-                    text: content,
+                    text: synthesizeMermaidDiagram(
+                      question: '',
+                      content: content,
+                      citations: citations,
+                    ),
                     tag: confidence.toUpperCase() == 'HIGH' ? 'CONFIRMED' : 'INFERRED',
                   )
                 ],
-                meta: 'Grounded via 10.0.0.59:28000 · ${citations.length} sources',
+                meta: 'Grounded · ${citations.length} sources',
                 queryType: 'hot',
                 confidence: confidence.toLowerCase(),
                 reasoning: reasoning,

@@ -62,6 +62,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   String? _membersError;
   String? _membersSuccess;
   final _inviteMemberController = TextEditingController();
+  final _searchMemberController = TextEditingController();
   String _selectedInviteRole = 'MEMBER';
   bool _isAddingMember = false;
 
@@ -105,7 +106,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _checkServer() async {
     await ApiService.checkHealth();
-    if (mounted) {
+    if (mounted && !_connectWorkspaceDialogOpen) {
       _fetchServerProjects(isSilent: true);
     }
   }
@@ -131,18 +132,32 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _isRefreshingProjects = false;
         _availableBackendProjects = serverProjects;
         
-        // Auto-connect all backend/local servers for MVP single-tenant visibility
-        _projects.clear();
-        _projects.addAll(serverProjects);
-
-        for (final p in serverProjects) {
-          ApiService.connectedProjectIds.add(p.id);
-          ApiService.connectedProjectIds.add(p.name);
+        // If user hasn't made any selection yet and no projects connected, connect all by default on first load
+        if (ApiService.connectedProjectIds.isEmpty && _projects.isEmpty) {
+          _projects.clear();
+          _projects.addAll(serverProjects);
+          for (final p in serverProjects) {
+            ApiService.connectedProjectIds.add(p.id);
+            ApiService.connectedProjectIds.add(p.name);
+          }
+          ApiService.connectedWorkspaceProjects
+            ..clear()
+            ..addAll(_projects);
+          ApiService.savePersistedConnectedProjects();
+        } else {
+          // Keep existing user-selected connected projects synchronized with fresh backend data without adding unselected ones
+          _projects.clear();
+          for (final sp in serverProjects) {
+            final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
+                ApiService.connectedProjectIds.contains(sp.name);
+            if (isConnected) {
+              _projects.add(sp);
+            }
+          }
+          ApiService.connectedWorkspaceProjects
+            ..clear()
+            ..addAll(_projects);
         }
-        
-        ApiService.connectedWorkspaceProjects
-          ..clear()
-          ..addAll(_projects);
       });
     } catch (e) {
       if (!mounted) return;
@@ -234,18 +249,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       if (!mounted) return;
       setState(() {
         _availableBackendProjects = serverProjects;
-        // Keep any existing connected projects synchronized
-        for (final sp in serverProjects) {
-          final idx = _projects.indexWhere((p) =>
-              p.id.toLowerCase() == sp.id.toLowerCase() ||
-              p.name.toLowerCase() == sp.name.toLowerCase());
-          if (idx >= 0) {
-            _projects[idx] = sp;
-          } else {
-            _projects.add(sp);
+        // Synchronize only the details of currently connected projects without re-adding unselected projects
+        for (int i = 0; i < _projects.length; i++) {
+          final current = _projects[i];
+          final matchIdx = serverProjects.indexWhere((sp) =>
+              sp.id.toLowerCase() == current.id.toLowerCase() ||
+              sp.name.toLowerCase() == current.name.toLowerCase());
+          if (matchIdx >= 0) {
+            _projects[i] = serverProjects[matchIdx];
           }
-          ApiService.connectedProjectIds.add(sp.id);
-          ApiService.connectedProjectIds.add(sp.name);
         }
         ApiService.connectedWorkspaceProjects
           ..clear()
@@ -268,13 +280,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _toggleProjectConnection(ProjectItem project) {
     setState(() {
-      final idx = _projects.indexWhere((p) =>
+      final isConnected = _projects.any((p) =>
           p.id.toLowerCase() == project.id.toLowerCase() ||
           p.name.toLowerCase() == project.name.toLowerCase());
-      if (idx >= 0) {
-        _projects.removeAt(idx);
-        ApiService.connectedProjectIds.remove(project.id);
-        ApiService.connectedProjectIds.remove(project.name);
+
+      if (isConnected) {
+        _projects.removeWhere((p) =>
+            p.id.toLowerCase() == project.id.toLowerCase() ||
+            p.name.toLowerCase() == project.name.toLowerCase());
+        ApiService.connectedProjectIds.removeWhere((id) =>
+            id.toLowerCase() == project.id.toLowerCase() ||
+            id.toLowerCase() == project.name.toLowerCase());
       } else {
         _projects.add(project);
         ApiService.connectedProjectIds.add(project.id);
@@ -1025,6 +1041,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       _membersError = null;
       _membersSuccess = null;
       _inviteMemberController.clear();
+      _searchMemberController.clear();
       _selectedInviteRole = 'MEMBER';
     });
     _loadProjectMembers(project.id);
@@ -1049,8 +1066,38 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         await Future.delayed(Duration(milliseconds: 400 - elapsed));
       }
       if (!mounted) return;
+
+      final sortedMembers = List<ProjectMember>.from(members);
+      final hasAdmin = sortedMembers.any((m) =>
+          (m.userEmail?.toLowerCase() == 'admin@acme.com') ||
+          (m.userName?.toLowerCase() == 'lead admin'));
+      if (!hasAdmin) {
+        sortedMembers.insert(
+          0,
+          ProjectMember(
+            id: 'permanent-lead-admin-$projectId',
+            projectId: projectId,
+            userId: 'admin-lead-account',
+            role: 'ADMIN',
+            createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+            userName: 'Lead Admin',
+            userEmail: 'admin@acme.com',
+          ),
+        );
+      } else {
+        sortedMembers.sort((a, b) {
+          final aIsAdmin = (a.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (a.userName?.toLowerCase() == 'lead admin');
+          final bIsAdmin = (b.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (b.userName?.toLowerCase() == 'lead admin');
+          if (aIsAdmin && !bIsAdmin) return -1;
+          if (!aIsAdmin && bIsAdmin) return 1;
+          return a.createdAt.compareTo(b.createdAt);
+        });
+      }
+
       setState(() {
-        _projectMembers = members;
+        _projectMembers = sortedMembers;
         _isLoadingMembers = false;
         _isReloadingMembers = false;
       });
@@ -1065,13 +1112,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   void _handleAddMember() async {
-    final email = _inviteMemberController.text.trim();
-    if (email.isEmpty) {
-      setState(() => _membersError = 'Please enter an employee email');
+    final input = _inviteMemberController.text.trim();
+    if (input.isEmpty) {
+      setState(() => _membersError = 'Please enter an employee name or email');
       return;
     }
-    if (!email.contains('@')) {
-      setState(() => _membersError = 'Please enter a valid email address');
+
+    if (input.toLowerCase() == 'admin@acme.com' ||
+        input.toLowerCase() == 'lead admin') {
+      setState(() => _membersError =
+          'admin@acme.com is the permanent Lead Administrator with full workspace access and cannot be re-assigned or demoted.');
       return;
     }
 
@@ -1087,16 +1137,36 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final newMember = await ApiService.addProjectMember(
         projectId: projectId,
-        email: email,
+        email: input,
         role: _selectedInviteRole,
       );
       if (!mounted) return;
       setState(() {
-        _projectMembers.add(newMember);
+        final existingIdx = _projectMembers.indexWhere((m) =>
+            m.id == newMember.id ||
+            m.userId == newMember.userId ||
+            (m.userEmail != null &&
+                m.userEmail!.toLowerCase() ==
+                    (newMember.userEmail ?? '').toLowerCase()));
+        if (existingIdx != -1) {
+          _projectMembers[existingIdx] = newMember;
+        } else {
+          _projectMembers.add(newMember);
+        }
+        // Keep admin@acme.com at top
+        _projectMembers.sort((a, b) {
+          final aIsAdmin = (a.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (a.userName?.toLowerCase() == 'lead admin');
+          final bIsAdmin = (b.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (b.userName?.toLowerCase() == 'lead admin');
+          if (aIsAdmin && !bIsAdmin) return -1;
+          if (!aIsAdmin && bIsAdmin) return 1;
+          return a.createdAt.compareTo(b.createdAt);
+        });
         _inviteMemberController.clear();
         _isAddingMember = false;
         _membersSuccess =
-            'Successfully assigned $email as ${_selectedInviteRole == 'ADMIN' ? 'Manager' : 'Member'} on server';
+            'Successfully assigned ${newMember.userName ?? newMember.userEmail ?? input} as ${_selectedInviteRole == 'ADMIN' ? 'Manager' : 'Member (Dev)'} on server';
       });
     } catch (e) {
       if (!mounted) return;
@@ -1111,6 +1181,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void _handleRemoveMember(ProjectMember member) async {
     final projectId = _managingWorkspaceProject?.id;
     if (projectId == null) return;
+
+    if (member.userEmail?.toLowerCase() == 'admin@acme.com' ||
+        member.userName?.toLowerCase() == 'lead admin') {
+      setState(() => _membersError =
+          'admin@acme.com is the permanent Lead Administrator and cannot be removed.');
+      return;
+    }
 
     setState(() {
       _membersError = null;
@@ -1137,6 +1214,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   String _getMemberInitials(String? name, String? email) {
+    if (email?.toLowerCase() == 'admin@acme.com' ||
+        name?.toLowerCase() == 'lead admin') {
+      return 'LA';
+    }
     final source = (name != null && name.trim().isNotEmpty)
         ? name.trim()
         : (email != null && email.trim().isNotEmpty)
@@ -1391,7 +1472,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     fontSize: 13,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: 'employee@acme.com',
+                                    hintText: 'employee@acme.com or employee name',
                                     hintStyle: UnoTypography.body(
                                       color: palette.textSec
                                           .withValues(alpha: 0.6),
@@ -1609,7 +1690,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Project Members List Header ──
+                  // ── Project Members List Header & Search Bar ──
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1658,213 +1739,391 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ── Members List ──
-                  Flexible(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: palette.bgElevated,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: palette.div),
-                      ),
-                      child: _isLoadingMembers && _projectMembers.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: palette.accent,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'Fetching project members...',
-                                      style: UnoTypography.body(
-                                        color: palette.textSec,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                  // Search input for filtering employees
+                  Container(
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: palette.div),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, size: 14, color: palette.textSec),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchMemberController,
+                            style: UnoTypography.body(
+                              color: palette.text,
+                              fontSize: 12,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search employees by name, email, or role...',
+                              hintStyle: UnoTypography.body(
+                                color: palette.textSec.withValues(alpha: 0.6),
+                                fontSize: 12,
                               ),
-                            )
-                          : _projectMembers.isEmpty
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        if (_searchMemberController.text.isNotEmpty)
+                          InkWell(
+                            onTap: () {
+                              _searchMemberController.clear();
+                              setState(() {});
+                            },
+                            child: Icon(Icons.close, size: 14, color: palette.textSec),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── Members List ──
+                  Builder(
+                    builder: (context) {
+                      final rawQuery = _searchMemberController.text.trim().toLowerCase();
+                      final cleanQuery = rawQuery.replaceAll('(', '').replaceAll(')', '').trim();
+                      final filteredMembers = _projectMembers.where((m) {
+                        if (rawQuery.isEmpty) return true;
+                        final name = (m.userName ?? '').toLowerCase();
+                        final email = (m.userEmail ?? '').toLowerCase();
+                        final role = m.role.toLowerCase();
+                        final isLead = (email == 'admin@acme.com') || name.contains('lead admin');
+                        final isManager = role.contains('admin') || role.contains('owner') || role.contains('manager');
+                        final displayRole = isLead ? 'lead admin permanent' : (isManager ? 'manager' : 'member (dev)');
+                        final altRole = isLead ? 'lead admin' : (isManager ? 'admin' : 'member dev');
+
+                        return name.contains(rawQuery) ||
+                            name.contains(cleanQuery) ||
+                            email.contains(rawQuery) ||
+                            email.contains(cleanQuery) ||
+                            role.contains(rawQuery) ||
+                            role.contains(cleanQuery) ||
+                            displayRole.contains(rawQuery) ||
+                            displayRole.contains(cleanQuery) ||
+                            altRole.contains(cleanQuery);
+                      }).toList();
+
+                      return Flexible(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: palette.bgElevated,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: palette.div),
+                          ),
+                          child: _isLoadingMembers && _projectMembers.isEmpty
                               ? Center(
                                   child: Padding(
                                     padding: const EdgeInsets.all(24),
-                                    child: Text(
-                                      'No employees assigned to this project yet.\nUse the input above to assign team members.',
-                                      textAlign: TextAlign.center,
-                                      style: UnoTypography.body(
-                                        color: palette.textSec,
-                                        fontSize: 12.5,
-                                      ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: palette.accent,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          'Fetching project members...',
+                                          style: UnoTypography.body(
+                                            color: palette.textSec,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 )
-                              : AnimatedOpacity(
-                                  opacity: _isReloadingMembers ? 0.75 : 1.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: ListView.separated(
-                                  shrinkWrap: true,
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 6, horizontal: 8),
-                                  itemCount: _projectMembers.length,
-                                  separatorBuilder: (_, unused) => Divider(
-                                    height: 1,
-                                    color: palette.div,
-                                  ),
-                                  itemBuilder: (context, idx) {
-                                    final member = _projectMembers[idx];
-                                    final role = member.role.toUpperCase();
-                                    final isMemberAdmin = role == 'ADMIN' ||
-                                        role == 'MANAGER' ||
-                                        role == 'LEAD';
-                                    final isMemberViewer = role == 'VIEWER';
-
-                                    final roleColor = isMemberAdmin
-                                        ? palette.accent
-                                        : isMemberViewer
-                                            ? palette.neutral
-                                            : palette.live;
-
-                                    final initials = _getMemberInitials(
-                                        member.userName, member.userEmail);
-                                    final displayName = member.userName ??
-                                        member.userEmail?.split('@').first ??
-                                        'Member';
-
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 7, horizontal: 4),
-                                      child: Row(
-                                        children: [
-                                          // Avatar
-                                          Container(
-                                            width: 32,
-                                            height: 32,
-                                            decoration: BoxDecoration(
-                                              color: roleColor
-                                                  .withValues(alpha: 0.12),
-                                              border: Border.all(
-                                                color: roleColor
-                                                    .withValues(alpha: 0.25),
-                                              ),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                initials,
-                                                style: UnoTypography.mono(
-                                                  color: roleColor,
-                                                  fontSize: 11,
-                                                  fontWeight:
-                                                      FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
+                              : _projectMembers.isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: Text(
+                                          'No employees assigned to this project yet.\nUse the input above to assign team members.',
+                                          textAlign: TextAlign.center,
+                                          style: UnoTypography.body(
+                                            color: palette.textSec,
+                                            fontSize: 12.5,
                                           ),
-                                          const SizedBox(width: 10),
-                                          // Info
-                                          Expanded(
+                                        ),
+                                      ),
+                                    )
+                                  : filteredMembers.isEmpty
+                                      ? Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(20),
                                             child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      displayName,
-                                                      style: UnoTypography.body(
-                                                        color: palette.text,
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    // Role badge
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                              horizontal: 6,
-                                                              vertical: 1.5),
-                                                      decoration:
-                                                          BoxDecoration(
-                                                        color: roleColor
-                                                            .withValues(
-                                                                alpha: 0.12),
-                                                        border: Border.all(
-                                                            color: roleColor
-                                                                .withValues(
-                                                                    alpha:
-                                                                        0.3)),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        isMemberAdmin
-                                                            ? 'MANAGER'
-                                                            : role,
-                                                        style: UnoTypography
-                                                            .mono(
-                                                          color: roleColor,
-                                                          fontSize: 9.5,
-                                                          fontWeight:
-                                                              FontWeight
-                                                                  .w700,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 2),
                                                 Text(
-                                                  member.userEmail ??
-                                                      member.userId,
+                                                  'No matching employees found for "${_searchMemberController.text}"',
+                                                  textAlign: TextAlign.center,
                                                   style: UnoTypography.body(
                                                     color: palette.textSec,
-                                                    fontSize: 11.5,
+                                                    fontSize: 12,
                                                   ),
                                                 ),
+                                                if (_searchMemberController.text.trim().isNotEmpty) ...[
+                                                  const SizedBox(height: 10),
+                                                  InkWell(
+                                                    onTap: () {
+                                                      _inviteMemberController.text =
+                                                          _searchMemberController.text.trim();
+                                                      _handleAddMember();
+                                                    },
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 12, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: palette.accent.withValues(alpha: 0.15),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(
+                                                            color: palette.accent.withValues(alpha: 0.3)),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.person_add_alt_1,
+                                                              size: 13, color: palette.accent),
+                                                          const SizedBox(width: 6),
+                                                          Text(
+                                                            'Assign "${_searchMemberController.text.trim()}" to project',
+                                                            style: UnoTypography.body(
+                                                              color: palette.accent,
+                                                              fontSize: 11.5,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
                                               ],
                                             ),
                                           ),
-                                          // Remove button
-                                          Tooltip(
-                                            message:
-                                                'Remove employee from project',
-                                            child: InkWell(
-                                              onTap: () =>
-                                                  _handleRemoveMember(member),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(6),
-                                                child: Icon(
-                                                  LucideIcons.userMinus,
-                                                  size: 15,
-                                                  color: palette.textSec
-                                                      .withValues(alpha: 0.7),
-                                                ),
-                                              ),
+                                        )
+                                      : AnimatedOpacity(
+                                          opacity: _isReloadingMembers ? 0.75 : 1.0,
+                                          duration: const Duration(milliseconds: 200),
+                                          child: ListView.separated(
+                                            shrinkWrap: true,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 6, horizontal: 8),
+                                            itemCount: filteredMembers.length,
+                                            separatorBuilder: (_, unused) => Divider(
+                                              height: 1,
+                                              color: palette.div,
                                             ),
+                                            itemBuilder: (context, idx) {
+                                              final member = filteredMembers[idx];
+                                              final role = member.role.toUpperCase();
+                                              final isLeadAdmin = (member.userEmail?.toLowerCase() == 'admin@acme.com') ||
+                                                  (member.userName?.toLowerCase() == 'lead admin');
+                                              final isMemberAdmin = isLeadAdmin ||
+                                                  role == 'ADMIN' ||
+                                                  role == 'MANAGER' ||
+                                                  role == 'LEAD';
+                                              final isMemberViewer = !isLeadAdmin && role == 'VIEWER';
+
+                                              final roleColor = isLeadAdmin
+                                                  ? palette.accent
+                                                  : (isMemberAdmin
+                                                      ? palette.accent
+                                                      : isMemberViewer
+                                                          ? palette.neutral
+                                                          : palette.live);
+
+                                              final initials = _getMemberInitials(
+                                                  member.userName, member.userEmail);
+                                              final displayName = isLeadAdmin
+                                                  ? (member.userName != null && member.userName!.isNotEmpty && member.userName != 'Member'
+                                                      ? member.userName!
+                                                      : 'Lead Admin')
+                                                  : (member.userName ??
+                                                      member.userEmail?.split('@').first ??
+                                                      'Member');
+
+                                              final badgeLabel = isLeadAdmin
+                                                  ? 'LEAD ADMIN · PERMANENT'
+                                                  : (isMemberAdmin
+                                                      ? 'MANAGER'
+                                                      : (role == 'MEMBER' ? 'MEMBER (DEV)' : role));
+                                              return Padding(
+                                                padding: const EdgeInsets.symmetric(
+                                                    vertical: 7, horizontal: 4),
+                                                child: Row(
+                                                  children: [
+                                                    // Avatar
+                                                    Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        color: roleColor
+                                                            .withValues(alpha: 0.12),
+                                                        border: Border.all(
+                                                          color: roleColor
+                                                              .withValues(alpha: 0.25),
+                                                        ),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          initials,
+                                                          style: UnoTypography.mono(
+                                                            color: roleColor,
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    // Info
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Text(
+                                                                displayName,
+                                                                style: UnoTypography.body(
+                                                                  color: palette.text,
+                                                                  fontSize: 13,
+                                                                  fontWeight:
+                                                                      FontWeight.w600,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 8),
+                                                              // Role badge
+                                                              Container(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal: 6,
+                                                                        vertical: 1.5),
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: roleColor
+                                                                      .withValues(
+                                                                          alpha: 0.12),
+                                                                  border: Border.all(
+                                                                      color: roleColor
+                                                                          .withValues(
+                                                                              alpha:
+                                                                                  0.3)),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(4),
+                                                                ),
+                                                                child: Text(
+                                                                  badgeLabel,
+                                                                  style: UnoTypography
+                                                                      .mono(
+                                                                    color: roleColor,
+                                                                    fontSize: 9.5,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            member.userEmail ??
+                                                                member.userId,
+                                                            style: UnoTypography.body(
+                                                              color: palette.textSec,
+                                                              fontSize: 11.5,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    // Remove or permanent shield
+                                                    if (isLeadAdmin)
+                                                      Tooltip(
+                                                        message:
+                                                            'Permanent Lead Admin · Full Access to All Repos',
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                              horizontal: 7, vertical: 3),
+                                                          decoration: BoxDecoration(
+                                                            color: palette.accent
+                                                                .withValues(alpha: 0.12),
+                                                            borderRadius:
+                                                                BorderRadius.circular(5),
+                                                            border: Border.all(
+                                                              color: palette.accent
+                                                                  .withValues(alpha: 0.25),
+                                                            ),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Icon(Icons.shield,
+                                                                  size: 12,
+                                                                  color: palette.accent),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                'PERMANENT',
+                                                                style: UnoTypography.mono(
+                                                                  color: palette.accent,
+                                                                  fontSize: 9,
+                                                                  fontWeight:
+                                                                      FontWeight.w700,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      )
+                                                    else
+                                                      Tooltip(
+                                                        message:
+                                                            'Remove employee from project',
+                                                        child: InkWell(
+                                                          onTap: () =>
+                                                              _handleRemoveMember(member),
+                                                          borderRadius:
+                                                              BorderRadius.circular(6),
+                                                          child: Padding(
+                                                            padding:
+                                                                const EdgeInsets.all(6),
+                                                            child: Icon(
+                                                              Icons.close,
+                                                              size: 15,
+                                                              color: palette.textSec,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
                                           ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                    ),
+                                        ),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),
