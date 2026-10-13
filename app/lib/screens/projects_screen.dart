@@ -62,6 +62,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   String? _membersError;
   String? _membersSuccess;
   final _inviteMemberController = TextEditingController();
+  final _searchMemberController = TextEditingController();
   String _selectedInviteRole = 'MEMBER';
   bool _isAddingMember = false;
 
@@ -1040,6 +1041,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       _membersError = null;
       _membersSuccess = null;
       _inviteMemberController.clear();
+      _searchMemberController.clear();
       _selectedInviteRole = 'MEMBER';
     });
     _loadProjectMembers(project.id);
@@ -1624,7 +1626,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Project Members List Header ──
+                  // ── Project Members List Header & Search Bar ──
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1673,213 +1675,288 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ── Members List ──
-                  Flexible(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: palette.bgElevated,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: palette.div),
-                      ),
-                      child: _isLoadingMembers && _projectMembers.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: palette.accent,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'Fetching project members...',
-                                      style: UnoTypography.body(
-                                        color: palette.textSec,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                  // Search input for filtering employees
+                  Container(
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: palette.div),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, size: 14, color: palette.textSec),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchMemberController,
+                            style: UnoTypography.body(
+                              color: palette.text,
+                              fontSize: 12,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search employees by name, email, or role...',
+                              hintStyle: UnoTypography.body(
+                                color: palette.textSec.withValues(alpha: 0.6),
+                                fontSize: 12,
                               ),
-                            )
-                          : _projectMembers.isEmpty
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        if (_searchMemberController.text.isNotEmpty)
+                          InkWell(
+                            onTap: () {
+                              _searchMemberController.clear();
+                              setState(() {});
+                            },
+                            child: Icon(Icons.close, size: 14, color: palette.textSec),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── Members List ──
+                  Builder(
+                    builder: (context) {
+                      final query = _searchMemberController.text.trim().toLowerCase();
+                      final filteredMembers = _projectMembers.where((m) {
+                        if (query.isEmpty) return true;
+                        final name = (m.userName ?? '').toLowerCase();
+                        final email = (m.userEmail ?? '').toLowerCase();
+                        final role = m.role.toLowerCase();
+                        final displayRole = role.contains('admin') ? 'manager' : 'member dev';
+                        return name.contains(query) || email.contains(query) || role.contains(query) || displayRole.contains(query);
+                      }).toList();
+
+                      return Flexible(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: palette.bgElevated,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: palette.div),
+                          ),
+                          child: _isLoadingMembers && _projectMembers.isEmpty
                               ? Center(
                                   child: Padding(
                                     padding: const EdgeInsets.all(24),
-                                    child: Text(
-                                      'No employees assigned to this project yet.\nUse the input above to assign team members.',
-                                      textAlign: TextAlign.center,
-                                      style: UnoTypography.body(
-                                        color: palette.textSec,
-                                        fontSize: 12.5,
-                                      ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: palette.accent,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          'Fetching project members...',
+                                          style: UnoTypography.body(
+                                            color: palette.textSec,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 )
-                              : AnimatedOpacity(
-                                  opacity: _isReloadingMembers ? 0.75 : 1.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: ListView.separated(
-                                  shrinkWrap: true,
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 6, horizontal: 8),
-                                  itemCount: _projectMembers.length,
-                                  separatorBuilder: (_, unused) => Divider(
-                                    height: 1,
-                                    color: palette.div,
-                                  ),
-                                  itemBuilder: (context, idx) {
-                                    final member = _projectMembers[idx];
-                                    final role = member.role.toUpperCase();
-                                    final isMemberAdmin = role == 'ADMIN' ||
-                                        role == 'MANAGER' ||
-                                        role == 'LEAD';
-                                    final isMemberViewer = role == 'VIEWER';
-
-                                    final roleColor = isMemberAdmin
-                                        ? palette.accent
-                                        : isMemberViewer
-                                            ? palette.neutral
-                                            : palette.live;
-
-                                    final initials = _getMemberInitials(
-                                        member.userName, member.userEmail);
-                                    final displayName = member.userName ??
-                                        member.userEmail?.split('@').first ??
-                                        'Member';
-
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 7, horizontal: 4),
-                                      child: Row(
-                                        children: [
-                                          // Avatar
-                                          Container(
-                                            width: 32,
-                                            height: 32,
-                                            decoration: BoxDecoration(
-                                              color: roleColor
-                                                  .withValues(alpha: 0.12),
-                                              border: Border.all(
-                                                color: roleColor
-                                                    .withValues(alpha: 0.25),
-                                              ),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                initials,
-                                                style: UnoTypography.mono(
-                                                  color: roleColor,
-                                                  fontSize: 11,
-                                                  fontWeight:
-                                                      FontWeight.w700,
-                                                ),
+                              : _projectMembers.isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: Text(
+                                          'No employees assigned to this project yet.\nUse the input above to assign team members.',
+                                          textAlign: TextAlign.center,
+                                          style: UnoTypography.body(
+                                            color: palette.textSec,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : filteredMembers.isEmpty
+                                      ? Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Text(
+                                              'No matching employees found for "${_searchMemberController.text}"',
+                                              textAlign: TextAlign.center,
+                                              style: UnoTypography.body(
+                                                color: palette.textSec,
+                                                fontSize: 12,
                                               ),
                                             ),
                                           ),
-                                          const SizedBox(width: 10),
-                                          // Info
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
+                                        )
+                                      : AnimatedOpacity(
+                                          opacity: _isReloadingMembers ? 0.75 : 1.0,
+                                          duration: const Duration(milliseconds: 200),
+                                          child: ListView.separated(
+                                            shrinkWrap: true,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 6, horizontal: 8),
+                                            itemCount: filteredMembers.length,
+                                            separatorBuilder: (_, unused) => Divider(
+                                              height: 1,
+                                              color: palette.div,
+                                            ),
+                                            itemBuilder: (context, idx) {
+                                              final member = filteredMembers[idx];
+                                              final role = member.role.toUpperCase();
+                                              final isMemberAdmin = role == 'ADMIN' ||
+                                                  role == 'MANAGER' ||
+                                                  role == 'LEAD';
+                                              final isMemberViewer = role == 'VIEWER';
+
+                                              final roleColor = isMemberAdmin
+                                                  ? palette.accent
+                                                  : isMemberViewer
+                                                      ? palette.neutral
+                                                      : palette.live;
+
+                                              final initials = _getMemberInitials(
+                                                  member.userName, member.userEmail);
+                                              final displayName = member.userName ??
+                                                  member.userEmail?.split('@').first ??
+                                                  'Member';
+
+                                              final badgeLabel = isMemberAdmin
+                                                  ? 'MANAGER'
+                                                  : (role == 'MEMBER' ? 'MEMBER (DEV)' : role);
+
+                                              return Padding(
+                                                padding: const EdgeInsets.symmetric(
+                                                    vertical: 7, horizontal: 4),
+                                                child: Row(
                                                   children: [
-                                                    Text(
-                                                      displayName,
-                                                      style: UnoTypography.body(
-                                                        color: palette.text,
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w600,
+                                                    // Avatar
+                                                    Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        color: roleColor
+                                                            .withValues(alpha: 0.12),
+                                                        border: Border.all(
+                                                          color: roleColor
+                                                              .withValues(alpha: 0.25),
+                                                        ),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          initials,
+                                                          style: UnoTypography.mono(
+                                                            color: roleColor,
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
-                                                    // Role badge
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                              horizontal: 6,
-                                                              vertical: 1.5),
-                                                      decoration:
-                                                          BoxDecoration(
-                                                        color: roleColor
-                                                            .withValues(
-                                                                alpha: 0.12),
-                                                        border: Border.all(
-                                                            color: roleColor
-                                                                .withValues(
-                                                                    alpha:
-                                                                        0.3)),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(4),
+                                                    const SizedBox(width: 10),
+                                                    // Info
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Text(
+                                                                displayName,
+                                                                style: UnoTypography.body(
+                                                                  color: palette.text,
+                                                                  fontSize: 13,
+                                                                  fontWeight:
+                                                                      FontWeight.w600,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 8),
+                                                              // Role badge
+                                                              Container(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal: 6,
+                                                                        vertical: 1.5),
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: roleColor
+                                                                      .withValues(
+                                                                          alpha: 0.12),
+                                                                  border: Border.all(
+                                                                      color: roleColor
+                                                                          .withValues(
+                                                                              alpha:
+                                                                                  0.3)),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(4),
+                                                                ),
+                                                                child: Text(
+                                                                  badgeLabel,
+                                                                  style: UnoTypography
+                                                                      .mono(
+                                                                    color: roleColor,
+                                                                    fontSize: 9.5,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            member.userEmail ??
+                                                                member.userId,
+                                                            style: UnoTypography.body(
+                                                              color: palette.textSec,
+                                                              fontSize: 11.5,
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
-                                                      child: Text(
-                                                        isMemberAdmin
-                                                            ? 'MANAGER'
-                                                            : role,
-                                                        style: UnoTypography
-                                                            .mono(
-                                                          color: roleColor,
-                                                          fontSize: 9.5,
-                                                          fontWeight:
-                                                              FontWeight
-                                                                  .w700,
+                                                    ),
+                                                    // Remove button
+                                                    Tooltip(
+                                                      message:
+                                                          'Remove employee from project',
+                                                      child: InkWell(
+                                                        onTap: () =>
+                                                            _handleRemoveMember(member),
+                                                        borderRadius:
+                                                            BorderRadius.circular(6),
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets.all(6),
+                                                          child: Icon(
+                                                            Icons.close,
+                                                            size: 15,
+                                                            color: palette.textSec,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  member.userEmail ??
-                                                      member.userId,
-                                                  style: UnoTypography.body(
-                                                    color: palette.textSec,
-                                                    fontSize: 11.5,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                              );
+                                            },
                                           ),
-                                          // Remove button
-                                          Tooltip(
-                                            message:
-                                                'Remove employee from project',
-                                            child: InkWell(
-                                              onTap: () =>
-                                                  _handleRemoveMember(member),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(6),
-                                                child: Icon(
-                                                  LucideIcons.userMinus,
-                                                  size: 15,
-                                                  color: palette.textSec
-                                                      .withValues(alpha: 0.7),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                    ),
+                                        ),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),

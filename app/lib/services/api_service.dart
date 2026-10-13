@@ -347,6 +347,7 @@ class ApiService {
             'email': userEmail,
             'password': password.length >= 8 ? password : '${password}123',
             'organization_name': cleanOrg,
+            'role': role,
           }),
         )
         .timeout(_timeout);

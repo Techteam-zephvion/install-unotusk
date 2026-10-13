@@ -16,8 +16,9 @@ from apps.api.src.auth.security import (
 )
 from apps.api.src.config.settings import settings
 from apps.api.src.models.enums import MembershipRole
-from apps.api.src.models.membership import OrganizationMembership
+from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
 from apps.api.src.models.organization import Organization
+from apps.api.src.models.project import Project
 from apps.api.src.models.user import User
 from apps.api.src.schemas.auth import TokenResponse
 from apps.api.src.schemas.user import UserCreate, UserLogin, UserRead
@@ -59,6 +60,28 @@ class AuthService:
                 existing_user.name = data.name.strip()
             existing_user.password_hash = hash_password(data.password)
             session.add(existing_user)
+
+            role_raw = (data.role or "").strip().lower()
+            assigned_role = MembershipRole.ADMIN if ("manager" in role_raw or "admin" in role_raw or "lead" in role_raw) else MembershipRole.MEMBER
+
+            # Check if user has an org membership
+            org_mem_query = await session.execute(
+                select(OrganizationMembership).where(OrganizationMembership.user_id == existing_user.id)
+            )
+            existing_org_mems = org_mem_query.scalars().all()
+            if not existing_org_mems:
+                first_org_res = await session.execute(select(Organization).limit(1))
+                primary_org = first_org_res.scalar_one_or_none()
+                if primary_org:
+                    session.add(OrganizationMembership(
+                        organization_id=primary_org.id,
+                        user_id=existing_user.id,
+                        role=assigned_role,
+                    ))
+            else:
+                for om in existing_org_mems:
+                    om.role = assigned_role
+
             await session.commit()
             await session.refresh(existing_user)
 
@@ -84,6 +107,13 @@ class AuthService:
                 default_organization_id=default_org_id,
             )
 
+        # Determine desired role from data.role (maps Manager -> ADMIN, Member(Dev) -> MEMBER)
+        role_raw = (data.role or "").strip().lower()
+        if "manager" in role_raw or "admin" in role_raw or "lead" in role_raw:
+            assigned_role = MembershipRole.ADMIN
+        else:
+            assigned_role = MembershipRole.MEMBER
+
         # Create user
         user = User(
             email=normalized_email,
@@ -93,25 +123,53 @@ class AuthService:
         session.add(user)
         await session.flush()
 
-        # Create default organization for new user
-        org_name = data.organization_name.strip() if data.organization_name and data.organization_name.strip() else f"{user.name}'s Org"
-        base_slug = slugify(org_name)
-        org_slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
-
-        organization = Organization(
-            name=org_name,
-            slug=org_slug,
+        # In single-tenant deployment, find an existing organization if available
+        # (e.g. matching name or first existing org)
+        requested_org_name = data.organization_name.strip() if data.organization_name and data.organization_name.strip() else "Acme Corporation"
+        org_query = await session.execute(
+            select(Organization).where(Organization.name == requested_org_name).limit(1)
         )
-        session.add(organization)
-        await session.flush()
+        organization = org_query.scalar_one_or_none()
+        if organization is None:
+            # Fallback to any existing organization in single-tenant setup
+            first_org_res = await session.execute(select(Organization).limit(1))
+            organization = first_org_res.scalar_one_or_none()
 
-        # Assign user as OWNER
+        is_new_org = False
+        if organization is None:
+            # Create default organization if none exists
+            is_new_org = True
+            base_slug = slugify(requested_org_name)
+            org_slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
+            organization = Organization(
+                name=requested_org_name,
+                slug=org_slug,
+            )
+            session.add(organization)
+            await session.flush()
+
+        # Assign user to organization (OWNER if brand new org, otherwise assigned_role)
+        org_role = MembershipRole.OWNER if is_new_org else assigned_role
         membership = OrganizationMembership(
             organization_id=organization.id,
             user_id=user.id,
-            role=MembershipRole.OWNER,
+            role=org_role,
         )
         session.add(membership)
+
+        # Auto-assign user to all projects in this organization so they are visible in Lead Admin Manage Workspace
+        projects_res = await session.execute(
+            select(Project).where(Project.organization_id == organization.id)
+        )
+        existing_projects = projects_res.scalars().all()
+        for p in existing_projects:
+            pm = ProjectMembership(
+                project_id=p.id,
+                user_id=user.id,
+                role=assigned_role,
+            )
+            session.add(pm)
+
         await session.commit()
         await session.refresh(user)
 

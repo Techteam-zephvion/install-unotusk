@@ -19,6 +19,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
     organization_name: str | None = None
+    role: str | None = None
 
 
 class UserLogin(BaseModel):

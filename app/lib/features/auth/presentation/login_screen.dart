@@ -24,7 +24,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   final _orgCtrl = TextEditingController();
   bool _showPasswordField = false;
   bool _obscurePassword = true;
-  String _role = 'Engineer';
+  String _role = 'Member (Dev)';
   bool _agreed = false;
   String _orgName = '';
   String _orgProvider = 'Google OIDC';
@@ -138,7 +138,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       return;
     }
     setState(() => _screen = _AuthScreen.authenticating);
-    final success = await ref.read(authControllerProvider.notifier).signup(name: _nameCtrl.text.trim(), email: email, password: _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : 'oidc_placeholder', organizationName: _orgCtrl.text.trim());
+    final success = await ref.read(authControllerProvider.notifier).signup(
+          name: _nameCtrl.text.trim(),
+          email: email,
+          password: _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : 'oidc_placeholder',
+          organizationName: _orgCtrl.text.trim(),
+          role: _role,
+        );
     if (!mounted) return;
     if (success) { context.go('/projects'); }
     else { setState(() { _deniedReason = ref.read(authControllerProvider).errorMessage ?? 'Registration failed.'; _screen = _AuthScreen.denied; }); }
@@ -411,7 +417,7 @@ class _NewOrgCard extends StatelessWidget {
     Text('Password', style: AppTextStyles.label), const SizedBox(height: 5), _OidcTextField(controller: passwordCtrl, hint: '••••••••', obscureText: true),
     const SizedBox(height: 12),
     Text('Role', style: AppTextStyles.label), const SizedBox(height: 5),
-    Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), decoration: BoxDecoration(color: AppColors.bgSurface, border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(8)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: role, isExpanded: true, dropdownColor: AppColors.bgElevated, style: AppTextStyles.body, items: ['Engineer', 'Product Manager', 'Designer', 'Leadership', 'Other'].map((r) => DropdownMenuItem(value: r, child: Text(r, style: AppTextStyles.body))).toList(), onChanged: (v) { if (v != null) onRoleChange(v); }))),
+    Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), decoration: BoxDecoration(color: AppColors.bgSurface, border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(8)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: role, isExpanded: true, dropdownColor: AppColors.bgElevated, style: AppTextStyles.body, items: ['Member (Dev)', 'Manager'].map((r) => DropdownMenuItem(value: r, child: Text(r, style: AppTextStyles.body))).toList(), onChanged: (v) { if (v != null) onRoleChange(v); }))),
     const SizedBox(height: 16),
     GestureDetector(onTap: () => onAgreedChange(!agreed), child: Row(children: [Container(width: 18, height: 18, decoration: BoxDecoration(color: agreed ? AppColors.accent : Colors.transparent, border: Border.all(color: agreed ? AppColors.accent : AppColors.divider), borderRadius: BorderRadius.circular(4)), child: agreed ? const Icon(Icons.check, size: 12, color: Color(0xFF0D0A08)) : null), const SizedBox(width: 10), Flexible(child: Text('I agree to the Unotusk terms of service', style: AppTextStyles.caption))])),
     const SizedBox(height: 20),

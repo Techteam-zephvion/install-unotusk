@@ -35,7 +35,7 @@ class _AuthScreenState extends State<AuthScreen> {
       TextEditingController(text: 'Acme Corporation');
 
   bool _obscurePassword = true;
-  String _selectedRole = 'Engineer';
+  String _selectedRole = 'Member (Dev)';
   bool _termsAgreed = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -712,11 +712,11 @@ class _AuthScreenState extends State<AuthScreen> {
               isExpanded: true,
               style:
                   UnoTypography.body(color: widget.palette.text, fontSize: 13),
-              items: ['Engineer', 'Tech Lead', 'Manager', 'Developer', 'QA']
+              items: ['Member (Dev)', 'Manager']
                   .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                   .toList(),
               onChanged: (val) =>
-                  setState(() => _selectedRole = val ?? 'Engineer'),
+                  setState(() => _selectedRole = val ?? 'Member (Dev)'),
             ),
           ),
         ),
