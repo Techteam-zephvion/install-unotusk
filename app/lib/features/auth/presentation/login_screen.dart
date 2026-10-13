@@ -400,31 +400,149 @@ class _ExistingOrgCard extends StatelessWidget {
   ]));
 }
 
-class _NewOrgCard extends StatelessWidget {
-  final TextEditingController nameCtrl, orgCtrl, passwordCtrl; final String email, role; final bool agreed;
-  final ValueChanged<String> onRoleChange; final ValueChanged<bool> onAgreedChange; final VoidCallback onRegister, onBack;
-  const _NewOrgCard({super.key, required this.nameCtrl, required this.orgCtrl, required this.passwordCtrl, required this.email, required this.role, required this.agreed, required this.onRoleChange, required this.onAgreedChange, required this.onRegister, required this.onBack});
+class _NewOrgCard extends StatefulWidget {
+  final TextEditingController nameCtrl, orgCtrl, passwordCtrl;
+  final String email, role;
+  final bool agreed;
+  final ValueChanged<String> onRoleChange;
+  final ValueChanged<bool> onAgreedChange;
+  final VoidCallback onRegister, onBack;
+
+  const _NewOrgCard({
+    super.key,
+    required this.nameCtrl,
+    required this.orgCtrl,
+    required this.passwordCtrl,
+    required this.email,
+    required this.role,
+    required this.agreed,
+    required this.onRoleChange,
+    required this.onAgreedChange,
+    required this.onRegister,
+    required this.onBack,
+  });
+
   @override
-  Widget build(BuildContext context) => _AuthCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-    Text('Create your organisation', style: AppTextStyles.authHeading),
-    const SizedBox(height: 6),
-    Text('No organisation found for $email. Set up your workspace.', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary, height: 1.5)),
-    const SizedBox(height: 20),
-    Text('Full name', style: AppTextStyles.label), const SizedBox(height: 5), _OidcTextField(controller: nameCtrl, hint: 'Alex Morgan'),
-    const SizedBox(height: 12),
-    Text('Organisation name', style: AppTextStyles.label), const SizedBox(height: 5), _OidcTextField(controller: orgCtrl, hint: 'Acme Corporation'),
-    const SizedBox(height: 12),
-    Text('Password', style: AppTextStyles.label), const SizedBox(height: 5), _OidcTextField(controller: passwordCtrl, hint: '••••••••', obscureText: true),
-    const SizedBox(height: 12),
-    Text('Role', style: AppTextStyles.label), const SizedBox(height: 5),
-    Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), decoration: BoxDecoration(color: AppColors.bgSurface, border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(8)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: role, isExpanded: true, dropdownColor: AppColors.bgElevated, style: AppTextStyles.body, items: ['Member (Dev)', 'Manager'].map((r) => DropdownMenuItem(value: r, child: Text(r, style: AppTextStyles.body))).toList(), onChanged: (v) { if (v != null) onRoleChange(v); }))),
-    const SizedBox(height: 16),
-    GestureDetector(onTap: () => onAgreedChange(!agreed), child: Row(children: [Container(width: 18, height: 18, decoration: BoxDecoration(color: agreed ? AppColors.accent : Colors.transparent, border: Border.all(color: agreed ? AppColors.accent : AppColors.divider), borderRadius: BorderRadius.circular(4)), child: agreed ? const Icon(Icons.check, size: 12, color: Color(0xFF0D0A08)) : null), const SizedBox(width: 10), Flexible(child: Text('I agree to the Unotusk terms of service', style: AppTextStyles.caption))])),
-    const SizedBox(height: 20),
-    _OidcButton(label: 'Create workspace', enabled: agreed, filled: true, onPressed: onRegister),
-    const SizedBox(height: 10),
-    _OidcButton(label: 'Back', enabled: true, filled: false, onPressed: onBack),
-  ]));
+  State<_NewOrgCard> createState() => _NewOrgCardState();
+}
+
+class _NewOrgCardState extends State<_NewOrgCard> {
+  bool _obscurePassword = true;
+
+  @override
+  Widget build(BuildContext context) => _AuthCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Create your organisation', style: AppTextStyles.authHeading),
+            const SizedBox(height: 6),
+            Text(
+              'No organisation found for ${widget.email}. Set up your workspace.',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Full name', style: AppTextStyles.label),
+            const SizedBox(height: 5),
+            _OidcTextField(controller: widget.nameCtrl, hint: 'Alex Morgan'),
+            const SizedBox(height: 12),
+            Text('Organisation name', style: AppTextStyles.label),
+            const SizedBox(height: 5),
+            _OidcTextField(controller: widget.orgCtrl, hint: 'Acme Corporation'),
+            const SizedBox(height: 12),
+            Text('Password', style: AppTextStyles.label),
+            const SizedBox(height: 5),
+            _OidcTextField(
+              controller: widget.passwordCtrl,
+              hint: '••••••••',
+              obscureText: _obscurePassword,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('Role', style: AppTextStyles.label),
+            const SizedBox(height: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.bgSurface,
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: widget.role,
+                  isExpanded: true,
+                  dropdownColor: AppColors.bgElevated,
+                  style: AppTextStyles.body,
+                  items: ['Member (Dev)', 'Manager']
+                      .map((r) => DropdownMenuItem(
+                          value: r, child: Text(r, style: AppTextStyles.body)))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) widget.onRoleChange(v);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => widget.onAgreedChange(!widget.agreed),
+              child: Row(
+                children: [
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: widget.agreed ? AppColors.accent : Colors.transparent,
+                      border: Border.all(
+                        color: widget.agreed ? AppColors.accent : AppColors.divider,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: widget.agreed
+                        ? const Icon(Icons.check,
+                            size: 12, color: Color(0xFF0D0A08))
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      'I agree to the Unotusk terms of service',
+                      style: AppTextStyles.caption,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            _OidcButton(
+              label: 'Create workspace',
+              enabled: widget.agreed,
+              filled: true,
+              onPressed: widget.onRegister,
+            ),
+            const SizedBox(height: 10),
+            _OidcButton(
+              label: 'Back',
+              enabled: true,
+              filled: false,
+              onPressed: widget.onBack,
+            ),
+          ],
+        ),
+      );
 }
 
 class _OidcConsentCard extends StatelessWidget {
