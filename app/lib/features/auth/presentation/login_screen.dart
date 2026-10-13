@@ -110,8 +110,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
   Future<void> _handlePasswordSignIn() async {
     if (!_isValidEmail || _passwordCtrl.text.isEmpty) return;
+    final email = _emailCtrl.text.trim().toLowerCase();
+    if (!email.endsWith('@acme.com')) {
+      setState(() {
+        _deniedReason =
+            'Access restricted: Only organization accounts ending in @acme.com are permitted.';
+        _screen = _AuthScreen.denied;
+      });
+      return;
+    }
     setState(() => _screen = _AuthScreen.authenticating);
-    final success = await ref.read(authControllerProvider.notifier).login(email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+    final success = await ref.read(authControllerProvider.notifier).login(email: email, password: _passwordCtrl.text);
     if (!mounted) return;
     if (success) { context.go('/projects'); }
     else { setState(() { _deniedReason = ref.read(authControllerProvider).errorMessage ?? 'Authentication failed.'; _screen = _AuthScreen.denied; }); }
@@ -119,8 +128,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
   Future<void> _handleNewOrgRegister() async {
     if (_nameCtrl.text.trim().isEmpty || _orgCtrl.text.trim().isEmpty || !_agreed) return;
+    final email = _emailCtrl.text.trim().toLowerCase();
+    if (!email.endsWith('@acme.com')) {
+      setState(() {
+        _deniedReason =
+            'Access restricted: Only organization accounts ending in @acme.com are permitted.';
+        _screen = _AuthScreen.denied;
+      });
+      return;
+    }
     setState(() => _screen = _AuthScreen.authenticating);
-    final success = await ref.read(authControllerProvider.notifier).signup(name: _nameCtrl.text.trim(), email: _emailCtrl.text.trim(), password: _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : 'oidc_placeholder', organizationName: _orgCtrl.text.trim());
+    final success = await ref.read(authControllerProvider.notifier).signup(name: _nameCtrl.text.trim(), email: email, password: _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : 'oidc_placeholder', organizationName: _orgCtrl.text.trim());
     if (!mounted) return;
     if (success) { context.go('/projects'); }
     else { setState(() { _deniedReason = ref.read(authControllerProvider).errorMessage ?? 'Registration failed.'; _screen = _AuthScreen.denied; }); }

@@ -23,21 +23,20 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  // Navigation states matching user workflow:
-  // 'entry' (Image 2) -> 'checking-org' (Image 4) -> 'sign-in' (Image 5)
-  // 'entry' -> 'create-org' (Image 3 via Configure custom OIDC issuer)
-  String _state = 'entry';
+  // Mode: 0 = Sign In, 1 = Create Workspace, 2 = Select Project Server
+  int _activeMode = 0;
   bool _isServerConnected = false;
   Timer? _healthTimer;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _orgController = TextEditingController();
+  final TextEditingController _orgController =
+      TextEditingController(text: 'Acme Corporation');
 
   bool _obscurePassword = true;
   String _selectedRole = 'Engineer';
-  bool _termsAgreed = false;
+  bool _termsAgreed = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -45,7 +44,6 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _checkServer();
-    // Continuously check server health every 4 seconds
     _healthTimer =
         Timer.periodic(const Duration(seconds: 4), (_) => _checkServer());
   }
@@ -69,45 +67,39 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  void _verifyEmail() async {
-    final email = _emailController.text.trim();
+  bool _validateAcmeEmail(String rawEmail) {
+    final email = rawEmail.trim().toLowerCase();
     if (email.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter your work email.';
+        _errorMessage = 'Please enter your organization email address.';
       });
-      return;
+      return false;
     }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _state = 'checking-org';
-    });
-
-    try {
-      await ApiService.checkOrganisationMembership(email);
-      if (!mounted) return;
+    if (!email.contains('@')) {
       setState(() {
-        _isLoading = false;
-        _state = 'sign-in';
+        _errorMessage = 'Please enter a valid email format (e.g. name@acme.com).';
       });
-    } catch (e) {
-      if (!mounted) return;
+      return false;
+    }
+    if (!email.endsWith('@acme.com')) {
       setState(() {
-        _isLoading = false;
         _errorMessage =
-            'Cannot reach backend at http://10.0.0.59:28000.\nPlease verify the server is running and port 28000 is open.';
-        _state = 'entry';
+            'Access restricted: Only organization accounts ending in @acme.com are permitted.';
       });
+      return false;
     }
+    return true;
   }
 
-  void _finishAuthentication() async {
-    final email = _emailController.text.trim();
+  void _handleSignIn() async {
+    final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
-    if (email.isEmpty || password.isEmpty) {
+
+    if (!_validateAcmeEmail(email)) return;
+
+    if (password.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both your email and password.';
+        _errorMessage = 'Please enter your password.';
       });
       return;
     }
@@ -128,8 +120,63 @@ class _AuthScreenState extends State<AuthScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage =
-            'Sign in failed on http://10.0.0.59:28000:\n$e';
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _handleCreateWorkspace() async {
+    final email = _emailController.text.trim().toLowerCase();
+    final name = _nameController.text.trim();
+    final org = _orgController.text.trim();
+    final password = _passwordController.text;
+
+    if (name.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter your full name.';
+      });
+      return;
+    }
+
+    if (!_validateAcmeEmail(email)) return;
+
+    if (password.length < 8) {
+      setState(() {
+        _errorMessage = 'Password must be at least 8 characters long.';
+      });
+      return;
+    }
+
+    if (!_termsAgreed) {
+      setState(() {
+        _errorMessage = 'Please accept the terms of service to proceed.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await ApiService.createOrganisation(
+        fullName: name,
+        orgName: org.isNotEmpty ? org : 'Acme Corporation',
+        password: password,
+        role: _selectedRole,
+        email: email,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      widget.onAuthenticated(user);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -157,7 +204,7 @@ class _AuthScreenState extends State<AuthScreen> {
               _errorMessage!,
               style: UnoTypography.body(
                 color: const Color(0xFFE89885),
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -173,12 +220,11 @@ class _AuthScreenState extends State<AuthScreen> {
       backgroundColor: widget.palette.bgBase,
       body: Column(
         children: [
-          // ── Custom Window Title Bar with OIDC badge ──
+          // ── Window Title Bar ──
           WindowTitleBar(
             palette: widget.palette,
             trailing: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: widget.palette.accent.withValues(alpha: 0.125),
                 border: Border.all(
@@ -187,7 +233,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'OIDC 1.0 SSO',
+                'Acme Workspace',
                 style: UnoTypography.mono(
                   color: widget.palette.accent,
                   fontSize: 10,
@@ -203,15 +249,8 @@ class _AuthScreenState extends State<AuthScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 40, 24, 48),
                 child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: _state == 'checking-org' ? 380 : 420,
-                  ),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: _state == 'checking-org'
-                        ? 28
-                        : (MediaQuery.of(context).size.width < 450 ? 20 : 32),
-                    vertical: _state == 'checking-org' ? 32 : 32,
-                  ),
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
                   decoration: BoxDecoration(
                     color: widget.palette.bgSurface,
                     border: Border.all(color: widget.palette.div),
@@ -225,7 +264,9 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ],
                   ),
-                  child: _buildStateContent(),
+                  child: _activeMode == 2
+                      ? _buildServerList()
+                      : _buildAuthCard(),
                 ),
               ),
             ),
@@ -235,144 +276,154 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildStateContent() {
-    switch (_state) {
-      case 'checking-org':
-        return _buildCheckingOrg();
-      case 'sign-in':
-        return _buildSignIn();
-      case 'create-org':
-        return _buildCreateOrg();
-      case 'server-list':
-        return _buildServerList();
-      case 'entry':
-      default:
-        return _buildEntry();
-    }
-  }
-
-  // ─────────────────────────────────────────────────
-  //  Badge (OIDC Authentication)
-  // ─────────────────────────────────────────────────
-  Widget _buildBadge() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: widget.palette.accent.withValues(alpha: 0.08),
-          border: Border.all(
-            color: widget.palette.accent.withValues(alpha: 0.20),
-          ),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(LucideIcons.shield, size: 12, color: widget.palette.accent),
-            const SizedBox(width: 6),
-            Text(
-              'OIDC Authentication',
-              style: UnoTypography.mono(
-                color: widget.palette.text,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────
-  //  Footer (Server URL status)
-  // ─────────────────────────────────────────────────
-  Widget _buildServerFooter() {
-    final isOnline = _isServerConnected || ApiService.isConnected;
-    final dotColor = isOnline
-        ? const Color(0xFF6EC8B8) // Green / mint teal when server is on
-        : const Color(0xFFE05A5A); // Red when server is not on
-
+  Widget _buildAuthCard() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 24),
-        InkWell(
-          onTap: _checkServer,
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        // ── Organization Badge ──
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: widget.palette.accent.withValues(alpha: 0.08),
+              border: Border.all(
+                color: widget.palette.accent.withValues(alpha: 0.20),
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: dotColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: dotColor.withValues(alpha: 0.45),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    'Server: http://10.0.0.59:28000',
-                    overflow: TextOverflow.ellipsis,
-                    style: UnoTypography.mono(
-                      color: widget.palette.textSec,
-                      fontSize: 11,
-                    ),
+                Icon(LucideIcons.shieldCheck,
+                    size: 13, color: widget.palette.accent),
+                const SizedBox(width: 6),
+                Text(
+                  'Acme Corporation Auth',
+                  style: UnoTypography.mono(
+                    color: widget.palette.text,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  // ─────────────────────────────────────────────────
-  //  Screen 1: Entry Screen (matches Image 2)
-  // ─────────────────────────────────────────────────
-  Widget _buildEntry() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildBadge(),
         const SizedBox(height: 14),
 
+        // ── Heading & Subtitle ──
         Text(
-          'Sign in to Unotusk',
+          _activeMode == 0 ? 'Sign in to Unotusk' : 'Create Acme Workspace',
           style: UnoTypography.brandSerif(
             palette: widget.palette,
             fontSize: 24,
           ),
         ),
-        const SizedBox(height: 8),
-
+        const SizedBox(height: 6),
         Text(
-          'Authenticating via OpenID Connect (OIDC) identity provider for single sign-on security.',
+          _activeMode == 0
+              ? 'Enter your organization email credentials (@acme.com) to access project intelligence.'
+              : 'Register a new project intelligence workspace using your @acme.com corporate identity.',
           style: UnoTypography.body(
             color: widget.palette.textSec,
             fontSize: 13,
           ),
         ),
+        const SizedBox(height: 18),
+
+        // ── Segmented Mode Switcher (Sign In vs Create Workspace) ──
+        Container(
+          height: 38,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: widget.palette.bgElevated,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: widget.palette.div),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildTabButton(
+                  'Sign In',
+                  _activeMode == 0,
+                  () => setState(() {
+                    _activeMode = 0;
+                    _errorMessage = null;
+                  }),
+                ),
+              ),
+              Expanded(
+                child: _buildTabButton(
+                  'Create Workspace',
+                  _activeMode == 1,
+                  () => setState(() {
+                    _activeMode = 1;
+                    _errorMessage = null;
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
+
         _buildErrorBanner(),
 
+        // ── Mode-specific form ──
+        if (_activeMode == 0) _buildSignInForm() else _buildCreateWorkspaceForm(),
+
+        _buildServerFooter(),
+      ],
+    );
+  }
+
+  Widget _buildTabButton(String label, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(7),
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? widget.palette.bgSurface : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
+          border: isSelected
+              ? Border.all(color: widget.palette.div)
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: UnoTypography.body(
+            color: isSelected ? widget.palette.text : widget.palette.textSec,
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Sign In Form
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildSignInForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Work Email
         Text(
-          'Work Email Address',
+          'Work Email (@acme.com)',
           style: UnoTypography.body(
             color: widget.palette.textSec,
             fontSize: 12,
@@ -380,7 +431,6 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
         const SizedBox(height: 6),
-
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -392,7 +442,7 @@ class _AuthScreenState extends State<AuthScreen> {
             controller: _emailController,
             style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'you@company.com',
+              hintText: 'alex@acme.com',
               hintStyle: UnoTypography.body(
                 color: widget.palette.textSec.withValues(alpha: 0.6),
                 fontSize: 13,
@@ -400,21 +450,75 @@ class _AuthScreenState extends State<AuthScreen> {
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 11),
             ),
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _verifyEmail(),
+            onSubmitted: (_) => _handleSignIn(),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
+        // Password with eye toggle
+        Text(
+          'Password',
+          style: UnoTypography.body(
+            color: widget.palette.textSec,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: widget.palette.bgElevated,
+            border: Border.all(color: widget.palette.div),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  style: UnoTypography.body(
+                      color: widget.palette.text, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '••••••••',
+                    hintStyle: UnoTypography.body(
+                      color: widget.palette.textSec.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                  onSubmitted: (_) => _handleSignIn(),
+                ),
+              ),
+              InkWell(
+                onTap: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                    size: 16,
+                    color: widget.palette.textSec,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Submit Button
         SizedBox(
-          height: 40,
+          height: 42,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _verifyEmail,
+            onPressed: _isLoading ? null : _handleSignIn,
             style: ElevatedButton.styleFrom(
               backgroundColor: widget.palette.accent,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(9),
               ),
@@ -425,135 +529,34 @@ class _AuthScreenState extends State<AuthScreen> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
                 : Text(
-                    'Continue with OIDC Discovery',
+                    'Sign In',
                     style: UnoTypography.body(
                       color: Colors.white,
-                      fontSize: 13.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
         ),
-
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: Container(height: 1, color: widget.palette.div)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                'or sign in via OIDC provider',
-                style: UnoTypography.mono(
-                  color: widget.palette.textSec.withValues(alpha: 0.7),
-                  fontSize: 10.5,
-                ),
-              ),
-            ),
-            Expanded(child: Container(height: 1, color: widget.palette.div)),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // 1. Google OIDC (Image 2 style)
-        _buildProviderButton(
-          icon: Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              border: Border.all(color: widget.palette.textSec, width: 1.2),
-              borderRadius: BorderRadius.circular(2.5),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'G',
-              style: TextStyle(
-                color: widget.palette.textSec,
-                fontSize: 8.5,
-                fontWeight: FontWeight.bold,
-                height: 1,
-              ),
-            ),
-          ),
-          label: 'Sign in with Google OIDC',
-          onTap: () {
-            if (_emailController.text.trim().isEmpty) {
-              setState(() => _errorMessage = 'Please enter your work email first.');
-              return;
-            }
-            _verifyEmail();
-          },
-        ),
-        const SizedBox(height: 9),
-
-        // 2. Microsoft Entra OIDC (Image 2 style)
-        _buildProviderButton(
-          icon: Icon(
-            LucideIcons.layoutGrid,
-            size: 15,
-            color: widget.palette.textSec,
-          ),
-          label: 'Sign in with Microsoft Entra OIDC',
-          onTap: () {
-            if (_emailController.text.trim().isEmpty) {
-              setState(() => _errorMessage = 'Please enter your work email first.');
-              return;
-            }
-            _verifyEmail();
-          },
-        ),
-        const SizedBox(height: 9),
-
-        // 3. Select workspace/server (matches Image 2, opens server list)
-        _buildProviderButton(
-          icon: Icon(
-            LucideIcons.arrowLeftRight,
-            size: 15,
-            color: widget.palette.textSec,
-          ),
-          label: 'Create workspace',
-          onTap: () {
-            setState(() => _state = 'server-list');
-          },
-        ),
-
-        _buildServerFooter(),
       ],
     );
   }
 
-  // ─────────────────────────────────────────────────
-  //  Screen 2: Create your organisation (matches Image 3)
-  // ─────────────────────────────────────────────────
-  Widget _buildCreateOrg() {
+  // ─────────────────────────────────────────────────────────────
+  //  Create Workspace Form
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildCreateWorkspaceForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Full Name
         Text(
-          'Create your organisation',
-          style: UnoTypography.brandSerif(
-            palette: widget.palette,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'No organisation found for . Set up your workspace.',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Full name
-        Text(
-          'Full name',
+          'Full Name',
           style: UnoTypography.body(
             color: widget.palette.textSec,
             fontSize: 12,
@@ -582,11 +585,11 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
-        // Organisation name
+        // Organisation Name
         Text(
-          'Organisation name',
+          'Organisation Name',
           style: UnoTypography.body(
             color: widget.palette.textSec,
             fontSize: 12,
@@ -615,11 +618,44 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+
+        // Work Email
+        Text(
+          'Work Email (@acme.com)',
+          style: UnoTypography.body(
+            color: widget.palette.textSec,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: widget.palette.bgElevated,
+            border: Border.all(color: widget.palette.div),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: TextField(
+            controller: _emailController,
+            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'alex@acme.com',
+              hintStyle: UnoTypography.body(
+                color: widget.palette.textSec.withValues(alpha: 0.6),
+                fontSize: 13,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 11),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
 
         // Password
         Text(
-          'Password',
+          'Password (min 8 chars)',
           style: UnoTypography.body(
             color: widget.palette.textSec,
             fontSize: 12,
@@ -649,9 +685,9 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
-        // Role
+        // Role Dropdown
         Text(
           'Role',
           style: UnoTypography.body(
@@ -684,9 +720,9 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
-        // Terms of service checkbox
+        // Terms Checkbox
         Row(
           children: [
             Checkbox(
@@ -707,50 +743,11 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Create workspace button
+        // Submit Button
         SizedBox(
           height: 42,
           child: ElevatedButton(
-            onPressed: _isLoading
-                ? null
-                : () async {
-                    final name = _nameController.text.trim().isNotEmpty
-                        ? _nameController.text.trim()
-                        : 'Alex Morgan';
-                    final org = _orgController.text.trim().isNotEmpty
-                        ? _orgController.text.trim()
-                        : 'Acme Corporation';
-                    final password = _passwordController.text;
-
-                    setState(() {
-                      _isLoading = true;
-                      _errorMessage = null;
-                    });
-
-                    try {
-                      final user = await ApiService.createOrganisation(
-                        fullName: name,
-                        orgName: org,
-                        password: password,
-                        role: _selectedRole,
-                        email: _emailController.text.trim().isNotEmpty
-                            ? _emailController.text.trim()
-                            : null,
-                      );
-                      if (!mounted) return;
-                      setState(() {
-                        _isLoading = false;
-                      });
-                      widget.onAuthenticated(user);
-                    } catch (e) {
-                      if (!mounted) return;
-                      setState(() {
-                        _isLoading = false;
-                        _errorMessage =
-                            'Failed to create workspace on http://10.0.0.59:28000:\n$e';
-                      });
-                    }
-                  },
+            onPressed: _isLoading ? null : _handleCreateWorkspace,
             style: ElevatedButton.styleFrom(
               backgroundColor: widget.palette.accent,
               foregroundColor: Colors.white,
@@ -759,37 +756,32 @@ class _AuthScreenState extends State<AuthScreen> {
                 borderRadius: BorderRadius.circular(9),
               ),
             ),
-            child: Text(
-              'Create workspace',
-              style: UnoTypography.body(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Back button
-        TextButton(
-          onPressed: () => setState(() => _state = 'entry'),
-          child: Text(
-            'Back',
-            style: UnoTypography.body(
-              color: widget.palette.textSec,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    'Create workspace',
+                    style: UnoTypography.body(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
         ),
       ],
     );
   }
 
-  // ─────────────────────────────────────────────────
-  //  Screen 2B: Server List
-  // ─────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  //  Server List Screen
+  // ─────────────────────────────────────────────────────────────
   Widget _buildServerList() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -843,15 +835,18 @@ class _AuthScreenState extends State<AuthScreen> {
 
             final servers = snapshot.data ?? [];
             if (servers.isEmpty) {
-              return Text(
-                'No running servers found.',
-                style: UnoTypography.body(color: widget.palette.textSec, fontSize: 13),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No running servers found.',
+                  style: UnoTypography.body(color: widget.palette.textSec, fontSize: 13),
+                ),
               );
             }
 
             return Column(
               children: servers.map((project) {
-                final port = project.port ?? 28000;
+                final port = project.port ?? 8000;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: InkWell(
@@ -859,7 +854,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       final uri = Uri.parse(ApiService.baseUrl);
                       ApiService.serverHost = '${uri.host}:$port';
                       ApiService.baseUrl = 'http://${ApiService.serverHost}';
-                      setState(() => _state = 'entry');
+                      setState(() => _activeMode = 0);
                     },
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
@@ -908,7 +903,7 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 16),
 
         TextButton(
-          onPressed: () => setState(() => _state = 'entry'),
+          onPressed: () => setState(() => _activeMode = 0),
           child: Text(
             'Back',
             style: UnoTypography.body(
@@ -922,231 +917,67 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────
-  //  Screen 3: Checking membership (matches Image 4)
-  // ─────────────────────────────────────────────────
-  Widget _buildCheckingOrg() {
+  // ─────────────────────────────────────────────────────────────
+  //  Server Status Footer
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildServerFooter() {
+    final isOnline = _isServerConnected || ApiService.isConnected;
+    final dotColor = isOnline
+        ? const Color(0xFF6EC8B8) // Green / mint teal when server is online
+        : const Color(0xFFE05A5A); // Red when server is offline
+
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: Color(0xFF6EC8B8),
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Checking organisation membership...',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _emailController.text,
-          style: UnoTypography.mono(
-            color: const Color(0xFFD4725A),
-            fontSize: 12.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─────────────────────────────────────────────────
-  //  Screen 4: Password Sign In (matches Image 5)
-  // ─────────────────────────────────────────────────
-  Widget _buildSignIn() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildBadge(),
-        const SizedBox(height: 14),
-
-        Text(
-          'Sign in to Unotusk',
-          style: UnoTypography.brandSerif(
-            palette: widget.palette,
-            fontSize: 24,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        Text(
-          'Authenticating via OpenID Connect (OIDC) identity provider for single sign-on security.',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 20),
-        _buildErrorBanner(),
-
-        // Work Email Address (Pre-filled)
-        Text(
-          'Work Email Address',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: _emailController,
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 11),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Password with eye toggle
-        Text(
-          'Password',
-          style: UnoTypography.body(
-            color: widget.palette.textSec,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  style: UnoTypography.body(
-                    color: widget.palette.text,
-                    fontSize: 13,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 11),
-                  ),
-                ),
-              ),
-              InkWell(
-                onTap: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
-                    size: 16,
-                    color: widget.palette.textSec,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Sign in Button
-        SizedBox(
-          height: 42,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : () => _finishAuthentication(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: widget.palette.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
-              ),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Sign in',
-                    style: UnoTypography.body(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-          ),
-        ),
-
-        _buildServerFooter(),
-      ],
-    );
-  }
-
-  // ─────────────────────────────────────────────────
-  //  Provider Button Helper
-  // ─────────────────────────────────────────────────
-  Widget _buildProviderButton({
-    required Widget icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      height: 40,
-      child: Material(
-        color: widget.palette.bgElevated,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(9),
-          side: BorderSide(color: widget.palette.div),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(9),
-          child: Center(
+        const SizedBox(height: 24),
+        InkWell(
+          onTap: () {
+            setState(() => _activeMode = 2);
+          },
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                icon,
-                const SizedBox(width: 9),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: dotColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: dotColor.withValues(alpha: 0.45),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    label,
-                    maxLines: 1,
+                    'Server: ${ApiService.baseUrl}',
                     overflow: TextOverflow.ellipsis,
-                    style: UnoTypography.body(
-                      color: widget.palette.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                    style: UnoTypography.mono(
+                      color: widget.palette.textSec,
+                      fontSize: 11,
                     ),
                   ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  LucideIcons.arrowLeftRight,
+                  size: 11,
+                  color: widget.palette.textSec.withValues(alpha: 0.7),
                 ),
               ],
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

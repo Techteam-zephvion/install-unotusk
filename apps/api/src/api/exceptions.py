@@ -63,3 +63,18 @@ class BadRequestException(AppException):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST, code=code, message=message, details=details
         )
+
+
+class DisallowedEmailDomainException(BadRequestException):
+    def __init__(
+        self,
+        domain: str = "",
+        message: str = "Access restricted: Only organization accounts ending in @acme.com are permitted.",
+        allowed_domains: list[str] | None = None,
+    ):
+        super().__init__(
+            message=message,
+            code="DISALLOWED_EMAIL_DOMAIN",
+            details={"domain": domain, "allowed_domains": allowed_domains or ["acme.com"]},
+        )
+

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     ALGORITHM: str = "HS256"
+    ALLOWED_EMAIL_DOMAINS: list[str] = Field(
+        default=["acme.com"],
+        description="Permitted corporate email domains for authentication",
+    )
 
     # CORS
     CORS_ORIGINS: list[str] = [

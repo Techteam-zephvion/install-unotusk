@@ -3,12 +3,18 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.src.api.exceptions import ConflictException, UnauthorizedException
+from apps.api.src.api.exceptions import (
+    BadRequestException,
+    ConflictException,
+    DisallowedEmailDomainException,
+    UnauthorizedException,
+)
 from apps.api.src.auth.security import (
     create_access_token,
     hash_password,
     verify_password,
 )
+from apps.api.src.config.settings import settings
 from apps.api.src.models.enums import MembershipRole
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.organization import Organization
@@ -20,8 +26,24 @@ from apps.api.src.services.slug import slugify
 
 class AuthService:
     @staticmethod
+    def _verify_email_domain(email: str) -> str:
+        normalized = email.strip().lower()
+        if "@" not in normalized:
+            raise BadRequestException(code="INVALID_EMAIL", message="Invalid email format")
+        domain = normalized.split("@")[-1]
+        allowed = getattr(settings, "ALLOWED_EMAIL_DOMAINS", ["acme.com"])
+        if domain not in allowed:
+            raise DisallowedEmailDomainException(
+                domain=domain,
+                message=f"Access restricted: Only organization accounts ending in @{' or @'.join(allowed)} are permitted.",
+                allowed_domains=allowed,
+            )
+        return normalized
+
+    @staticmethod
     async def signup(session: AsyncSession, data: UserCreate) -> TokenResponse:
-        normalized_email = data.email.strip().lower()
+        normalized_email = AuthService._verify_email_domain(data.email)
+
 
         # Check existing user
         result = await session.execute(select(User).where(User.email == normalized_email))
@@ -110,7 +132,7 @@ class AuthService:
 
     @staticmethod
     async def login(session: AsyncSession, data: UserLogin) -> TokenResponse:
-        normalized_email = data.email.strip().lower()
+        normalized_email = AuthService._verify_email_domain(data.email)
         result = await session.execute(select(User).where(User.email == normalized_email))
         user = result.scalar_one_or_none()
 

@@ -6,7 +6,7 @@ from httpx import AsyncClient
 async def test_signup_flow(client: AsyncClient):
     payload = {
         "name": "Grace Hopper",
-        "email": "grace@navy.mil",
+        "email": "grace@acme.com",
         "password": "SuperSecurePassword123!",
     }
     response = await client.post("/api/v1/auth/signup", json=payload)
@@ -14,16 +14,42 @@ async def test_signup_flow(client: AsyncClient):
     data = response.json()
     assert "access_token" in data
     assert data["token_type"] == "bearer"
-    assert data["user"]["email"] == "grace@navy.mil"
+    assert data["user"]["email"] == "grace@acme.com"
     assert data["user"]["name"] == "Grace Hopper"
     assert data["default_organization_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_disallowed_domain_signup_rejected(client: AsyncClient):
+    payload = {
+        "name": "External User",
+        "email": "user@gmail.com",
+        "password": "SuperSecurePassword123!",
+    }
+    response = await client.post("/api/v1/auth/signup", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error"]["code"] == "DISALLOWED_EMAIL_DOMAIN"
+    assert "acme.com" in data["error"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_disallowed_domain_login_rejected(client: AsyncClient):
+    payload = {
+        "email": "user@external-corp.org",
+        "password": "SuperSecurePassword123!",
+    }
+    response = await client.post("/api/v1/auth/login", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error"]["code"] == "DISALLOWED_EMAIL_DOMAIN"
 
 
 @pytest.mark.asyncio
 async def test_duplicate_signup_rejected(client: AsyncClient):
     payload = {
         "name": "Grace Hopper",
-        "email": "duplicate@navy.mil",
+        "email": "duplicate@acme.com",
         "password": "SuperSecurePassword123!",
     }
     res1 = await client.post("/api/v1/auth/signup", json=payload)
@@ -40,14 +66,14 @@ async def test_login_flow(client: AsyncClient):
     # First signup
     signup_payload = {
         "name": "Linus Torvalds",
-        "email": "linus@kernel.org",
+        "email": "linus@acme.com",
         "password": "LinuxPassword123!",
     }
     await client.post("/api/v1/auth/signup", json=signup_payload)
 
     # Then login
     login_payload = {
-        "email": "linus@kernel.org",
+        "email": "linus@acme.com",
         "password": "LinuxPassword123!",
     }
     response = await client.post("/api/v1/auth/login", json=login_payload)
@@ -57,7 +83,7 @@ async def test_login_flow(client: AsyncClient):
 
     # Invalid password login
     bad_login = {
-        "email": "linus@kernel.org",
+        "email": "linus@acme.com",
         "password": "WrongPassword!",
     }
     bad_res = await client.post("/api/v1/auth/login", json=bad_login)
@@ -77,7 +103,7 @@ async def test_me_endpoint_requires_auth(client: AsyncClient):
         "/api/v1/auth/signup",
         json={
             "name": "Margaret Hamilton",
-            "email": "margaret@apollo.nasa.gov",
+            "email": "margaret@acme.com",
             "password": "ApolloPassword123!",
         },
     )
@@ -89,5 +115,6 @@ async def test_me_endpoint_requires_auth(client: AsyncClient):
     )
     assert auth_res.status_code == 200
     me_data = auth_res.json()
-    assert me_data["user"]["email"] == "margaret@apollo.nasa.gov"
+    assert me_data["user"]["email"] == "margaret@acme.com"
     assert len(me_data["organizations"]) >= 1
+
