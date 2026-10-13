@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/presentation/config_controller.dart';
 import '../../target/presentation/target_controller.dart';
@@ -90,6 +91,27 @@ class DeployController extends StateNotifier<DeployState> {
         lastKnownState: ServerState.running,
       );
       await serverRegistry.saveServer(instance);
+
+      try {
+        final dio = Dio();
+        await dio.post(
+          'http://127.0.0.1:28000/api/v1/projects/sync-servers',
+          data: {
+            'servers': [
+              {
+                'name': config.serverName,
+                'port': config.serverPort,
+                'state': 'running',
+                'repo_url': config.repoUrl,
+              }
+            ]
+          },
+          options: Options(
+            sendTimeout: const Duration(seconds: 3),
+            receiveTimeout: const Duration(seconds: 3),
+          ),
+        );
+      } catch (_) {}
 
       state = state.copyWith(
         isRunning: false,

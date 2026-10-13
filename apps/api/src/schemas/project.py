@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from apps.api.src.models.enums import MembershipRole, ProjectStatus
+from apps.api.src.schemas.repository import RepositoryRead
 
 
 class ProjectBase(BaseModel):
@@ -23,6 +24,18 @@ class ProjectUpdate(BaseModel):
     status: ProjectStatus | None = None
 
 
+class ServerSyncItem(BaseModel):
+    name: str
+    port: int
+    state: str = "running"
+    repo_url: str | None = None
+    description: str | None = None
+
+
+class ServerSyncRequest(BaseModel):
+    servers: list[ServerSyncItem]
+
+
 class ProjectRead(ProjectBase):
     id: uuid.UUID
     organization_id: uuid.UUID
@@ -32,6 +45,7 @@ class ProjectRead(ProjectBase):
     created_at: datetime
     updated_at: datetime
     role: MembershipRole | None = None
+    repository: RepositoryRead | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

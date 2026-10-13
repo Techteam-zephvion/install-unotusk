@@ -81,6 +81,7 @@ services:
       - $apiKeyVar=\${$apiKeyVar}
       - $modelVar=\${$modelVar}
       - SERVER_PORT=${config.serverPort}
+      - TARGET_REPO_URL=\${TARGET_REPO_URL:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
@@ -113,6 +114,7 @@ services:
       - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
       - $apiKeyVar=\${$apiKeyVar}
       - $modelVar=\${$modelVar}
+      - TARGET_REPO_URL=\${TARGET_REPO_URL:-}
       - QUEUE_NAME=unotusk_tasks
     networks:
       - unotusk-network

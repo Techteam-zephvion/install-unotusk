@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import '../models/workspace_models.dart';
-import '../features/connection/data/local_registry_service.dart';
 
 /// Centralized API Service for Unotusk.
 /// Strictly wired to the real backend server at port 28000 (Control Plane) and 28100 series (Data Plane).
@@ -469,13 +468,13 @@ class ApiService {
           final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
           final days = DateTime.now().difference(createdAt).inDays;
 
+          final isRunning = status.toUpperCase() == 'READY' || status.toUpperCase() == 'ACTIVE';
+
           return ProjectItem(
             id: id,
             name: name,
-            upsStatus: status,
-            ingestionStatus: status.toUpperCase() == 'READY'
-                ? 'live'
-                : (status.toUpperCase() == 'CREATED' ? 'ready' : 'ingesting'),
+            upsStatus: status.toUpperCase(),
+            ingestionStatus: isRunning ? 'live' : 'stopped',
             lastIngestion: _formatTimeAgo(createdAt),
             fpr: 0.04,
             days: days > 0 ? days : 1,
@@ -490,86 +489,6 @@ class ApiService {
                 : null,
           );
         }).toList();
-
-        try {
-          final localRegistry = LocalRegistryService();
-          final localServers = await localRegistry.getRunningServers();
-          for (final ls in localServers) {
-            final isRunning = ls.state == 'running' || ls.state == 'degraded' || ls.state == 'active';
-            final fallbackProj = ProjectItem(
-              id: ls.id,
-              name: ls.name,
-              upsStatus: isRunning ? 'READY' : 'STOPPED',
-              ingestionStatus: isRunning ? 'live' : 'stopped',
-              lastIngestion: 'Just now',
-              fpr: 0.0,
-              days: 1,
-              port: ls.apiPort,
-              repositoryName: ls.repoUrl,
-            );
-            
-            bool mappedFromApi = false;
-            try {
-              if (isRunning) {
-                final currentHost = Uri.parse(ApiService.baseUrl).host;
-                final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
-                final localRes = await _client.get(localUri, headers: _headers).timeout(const Duration(seconds: 2));
-                if (localRes.statusCode == 200) {
-                  final localDecoded = jsonDecode(localRes.body);
-                  List<dynamic> localList = [];
-                  if (localDecoded is List) {
-                    localList = localDecoded;
-                  } else if (localDecoded is Map && localDecoded['projects'] is List) {
-                    localList = localDecoded['projects'];
-                  }
-                
-                for (final p in localList) {
-                  final pm = Map<String, dynamic>.from(p as Map);
-                  final pName = pm['name']?.toString() ?? ls.name;
-                  
-                  final localProj = ProjectItem(
-                    id: pm['id']?.toString() ?? ls.id,
-                    name: pName,
-                    upsStatus: pm['status']?.toString() ?? 'READY',
-                    ingestionStatus: 'live',
-                    lastIngestion: 'Just now',
-                    fpr: 0.0,
-                    days: 1,
-                    port: ls.apiPort,
-                    organizationId: pm['organization_id']?.toString(),
-                    slug: pm['slug']?.toString(),
-                    description: pm['description']?.toString(),
-                    role: pm['role']?.toString(),
-                    repositoryName: pm['repository'] is Map
-                        ? (pm['repository']['full_name']?.toString() ?? pm['repository']['name']?.toString())
-                        : ls.repoUrl,
-                  );
-
-                  mappedFromApi = true;
-                  if (!projects.any((p) => p.name == localProj.name || p.id == localProj.id)) {
-                    projects.add(localProj);
-                  } else {
-                    final idx = projects.indexWhere((p) => p.name == localProj.name || p.id == localProj.id);
-                    projects[idx] = localProj;
-                  }
-                }
-              }
-              }
-            } catch (_) {}
-            
-            if (!mappedFromApi) {
-              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
-              if (idx != -1) {
-                // Keep existing, but add port/repo if missing
-                final existing = projects[idx];
-                projects[idx] = existing.copyWith(
-                  port: existing.port ?? fallbackProj.port,
-                  repositoryName: existing.repositoryName ?? fallbackProj.repositoryName,
-                );
-              }
-            }
-          }
-        } catch (_) {}
 
         cachedProjects = projects;
         if (connectedProjectIds.isEmpty) {

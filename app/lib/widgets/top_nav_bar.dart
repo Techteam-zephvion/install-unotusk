@@ -38,10 +38,11 @@ class TopNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = repoFullName ??
-        ((projectName != null && projectName!.isNotEmpty)
-            ? 'Kushall-07/$projectName'
-            : 'Kushall-07/SyncGuard');
+    final displayName = (repoFullName != null && repoFullName!.isNotEmpty)
+        ? repoFullName!
+        : ((projectName != null && projectName!.isNotEmpty)
+            ? projectName!
+            : 'Workspace');
     final displayBranch = branchName ?? 'main';
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
