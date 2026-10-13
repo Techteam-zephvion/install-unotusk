@@ -1788,14 +1788,27 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   // ── Members List ──
                   Builder(
                     builder: (context) {
-                      final query = _searchMemberController.text.trim().toLowerCase();
+                      final rawQuery = _searchMemberController.text.trim().toLowerCase();
+                      final cleanQuery = rawQuery.replaceAll('(', '').replaceAll(')', '').trim();
                       final filteredMembers = _projectMembers.where((m) {
-                        if (query.isEmpty) return true;
+                        if (rawQuery.isEmpty) return true;
                         final name = (m.userName ?? '').toLowerCase();
                         final email = (m.userEmail ?? '').toLowerCase();
                         final role = m.role.toLowerCase();
-                        final displayRole = role.contains('admin') ? 'manager' : 'member dev';
-                        return name.contains(query) || email.contains(query) || role.contains(query) || displayRole.contains(query);
+                        final isLead = (email == 'admin@acme.com') || name.contains('lead admin');
+                        final isManager = role.contains('admin') || role.contains('owner') || role.contains('manager');
+                        final displayRole = isLead ? 'lead admin permanent' : (isManager ? 'manager' : 'member (dev)');
+                        final altRole = isLead ? 'lead admin' : (isManager ? 'admin' : 'member dev');
+
+                        return name.contains(rawQuery) ||
+                            name.contains(cleanQuery) ||
+                            email.contains(rawQuery) ||
+                            email.contains(cleanQuery) ||
+                            role.contains(rawQuery) ||
+                            role.contains(cleanQuery) ||
+                            displayRole.contains(rawQuery) ||
+                            displayRole.contains(cleanQuery) ||
+                            altRole.contains(cleanQuery);
                       }).toList();
 
                       return Flexible(
