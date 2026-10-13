@@ -97,7 +97,7 @@ class OrchestratorService:
             container = client.containers.get(container_name)
             port_bindings = container.attrs.get("NetworkSettings", {}).get("Ports", {})
             assigned_port = None
-            for port_key, bindings in port_bindings.items():
+            for bindings in port_bindings.values():
                 if bindings:
                     assigned_port = int(bindings[0].get("HostPort"))
                     break
