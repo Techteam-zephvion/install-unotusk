@@ -105,7 +105,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _checkServer() async {
     await ApiService.checkHealth();
-    if (mounted) {
+    if (mounted && !_connectWorkspaceDialogOpen) {
       _fetchServerProjects(isSilent: true);
     }
   }
@@ -131,18 +131,32 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _isRefreshingProjects = false;
         _availableBackendProjects = serverProjects;
         
-        // Auto-connect all backend/local servers for MVP single-tenant visibility
-        _projects.clear();
-        _projects.addAll(serverProjects);
-
-        for (final p in serverProjects) {
-          ApiService.connectedProjectIds.add(p.id);
-          ApiService.connectedProjectIds.add(p.name);
+        // If user hasn't made any selection yet and no projects connected, connect all by default on first load
+        if (ApiService.connectedProjectIds.isEmpty && _projects.isEmpty) {
+          _projects.clear();
+          _projects.addAll(serverProjects);
+          for (final p in serverProjects) {
+            ApiService.connectedProjectIds.add(p.id);
+            ApiService.connectedProjectIds.add(p.name);
+          }
+          ApiService.connectedWorkspaceProjects
+            ..clear()
+            ..addAll(_projects);
+          ApiService.savePersistedConnectedProjects();
+        } else {
+          // Keep existing user-selected connected projects synchronized with fresh backend data without adding unselected ones
+          _projects.clear();
+          for (final sp in serverProjects) {
+            final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
+                ApiService.connectedProjectIds.contains(sp.name);
+            if (isConnected) {
+              _projects.add(sp);
+            }
+          }
+          ApiService.connectedWorkspaceProjects
+            ..clear()
+            ..addAll(_projects);
         }
-        
-        ApiService.connectedWorkspaceProjects
-          ..clear()
-          ..addAll(_projects);
       });
     } catch (e) {
       if (!mounted) return;
@@ -234,18 +248,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       if (!mounted) return;
       setState(() {
         _availableBackendProjects = serverProjects;
-        // Keep any existing connected projects synchronized
-        for (final sp in serverProjects) {
-          final idx = _projects.indexWhere((p) =>
-              p.id.toLowerCase() == sp.id.toLowerCase() ||
-              p.name.toLowerCase() == sp.name.toLowerCase());
-          if (idx >= 0) {
-            _projects[idx] = sp;
-          } else {
-            _projects.add(sp);
+        // Synchronize only the details of currently connected projects without re-adding unselected projects
+        for (int i = 0; i < _projects.length; i++) {
+          final current = _projects[i];
+          final matchIdx = serverProjects.indexWhere((sp) =>
+              sp.id.toLowerCase() == current.id.toLowerCase() ||
+              sp.name.toLowerCase() == current.name.toLowerCase());
+          if (matchIdx >= 0) {
+            _projects[i] = serverProjects[matchIdx];
           }
-          ApiService.connectedProjectIds.add(sp.id);
-          ApiService.connectedProjectIds.add(sp.name);
         }
         ApiService.connectedWorkspaceProjects
           ..clear()
@@ -268,13 +279,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _toggleProjectConnection(ProjectItem project) {
     setState(() {
-      final idx = _projects.indexWhere((p) =>
+      final isConnected = _projects.any((p) =>
           p.id.toLowerCase() == project.id.toLowerCase() ||
           p.name.toLowerCase() == project.name.toLowerCase());
-      if (idx >= 0) {
-        _projects.removeAt(idx);
-        ApiService.connectedProjectIds.remove(project.id);
-        ApiService.connectedProjectIds.remove(project.name);
+
+      if (isConnected) {
+        _projects.removeWhere((p) =>
+            p.id.toLowerCase() == project.id.toLowerCase() ||
+            p.name.toLowerCase() == project.name.toLowerCase());
+        ApiService.connectedProjectIds.removeWhere((id) =>
+            id.toLowerCase() == project.id.toLowerCase() ||
+            id.toLowerCase() == project.name.toLowerCase());
       } else {
         _projects.add(project);
         ApiService.connectedProjectIds.add(project.id);
