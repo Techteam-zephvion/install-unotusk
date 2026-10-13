@@ -1082,13 +1082,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   void _handleAddMember() async {
-    final email = _inviteMemberController.text.trim();
-    if (email.isEmpty) {
-      setState(() => _membersError = 'Please enter an employee email');
-      return;
-    }
-    if (!email.contains('@')) {
-      setState(() => _membersError = 'Please enter a valid email address');
+    final input = _inviteMemberController.text.trim();
+    if (input.isEmpty) {
+      setState(() => _membersError = 'Please enter an employee name or email');
       return;
     }
 
@@ -1104,16 +1100,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final newMember = await ApiService.addProjectMember(
         projectId: projectId,
-        email: email,
+        email: input,
         role: _selectedInviteRole,
       );
       if (!mounted) return;
       setState(() {
-        _projectMembers.add(newMember);
+        final existingIdx = _projectMembers.indexWhere((m) =>
+            m.id == newMember.id ||
+            m.userId == newMember.userId ||
+            (m.userEmail != null &&
+                m.userEmail!.toLowerCase() ==
+                    (newMember.userEmail ?? '').toLowerCase()));
+        if (existingIdx != -1) {
+          _projectMembers[existingIdx] = newMember;
+        } else {
+          _projectMembers.add(newMember);
+        }
         _inviteMemberController.clear();
         _isAddingMember = false;
         _membersSuccess =
-            'Successfully assigned $email as ${_selectedInviteRole == 'ADMIN' ? 'Manager' : 'Member'} on server';
+            'Successfully assigned ${newMember.userName ?? newMember.userEmail ?? input} as ${_selectedInviteRole == 'ADMIN' ? 'Manager' : 'Member (Dev)'} on server';
       });
     } catch (e) {
       if (!mounted) return;
@@ -1408,7 +1414,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     fontSize: 13,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: 'employee@acme.com',
+                                    hintText: 'employee@acme.com or employee name',
                                     hintStyle: UnoTypography.body(
                                       color: palette.textSec
                                           .withValues(alpha: 0.6),
@@ -1786,13 +1792,55 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                       ? Center(
                                           child: Padding(
                                             padding: const EdgeInsets.all(20),
-                                            child: Text(
-                                              'No matching employees found for "${_searchMemberController.text}"',
-                                              textAlign: TextAlign.center,
-                                              style: UnoTypography.body(
-                                                color: palette.textSec,
-                                                fontSize: 12,
-                                              ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'No matching employees found for "${_searchMemberController.text}"',
+                                                  textAlign: TextAlign.center,
+                                                  style: UnoTypography.body(
+                                                    color: palette.textSec,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                if (_searchMemberController.text.trim().isNotEmpty) ...[
+                                                  const SizedBox(height: 10),
+                                                  InkWell(
+                                                    onTap: () {
+                                                      _inviteMemberController.text =
+                                                          _searchMemberController.text.trim();
+                                                      _handleAddMember();
+                                                    },
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 12, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: palette.accent.withValues(alpha: 0.15),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(
+                                                            color: palette.accent.withValues(alpha: 0.3)),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.person_add_alt_1,
+                                                              size: 13, color: palette.accent),
+                                                          const SizedBox(width: 6),
+                                                          Text(
+                                                            'Assign "${_searchMemberController.text.trim()}" to project',
+                                                            style: UnoTypography.body(
+                                                              color: palette.accent,
+                                                              fontSize: 11.5,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ),
                                         )

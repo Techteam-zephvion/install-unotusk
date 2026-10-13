@@ -82,6 +82,25 @@ class AuthService:
                 for om in existing_org_mems:
                     om.role = assigned_role
 
+            # Auto-assign user to all projects in workspace so they are visible in Lead Admin Manage Workspace
+            projects_res = await session.execute(select(Project))
+            for p in projects_res.scalars().all():
+                existing_pm = await session.execute(
+                    select(ProjectMembership).where(
+                        ProjectMembership.project_id == p.id,
+                        ProjectMembership.user_id == existing_user.id,
+                    )
+                )
+                pm = existing_pm.scalar_one_or_none()
+                if pm is None:
+                    session.add(ProjectMembership(
+                        project_id=p.id,
+                        user_id=existing_user.id,
+                        role=assigned_role,
+                    ))
+                else:
+                    pm.role = assigned_role
+
             await session.commit()
             await session.refresh(existing_user)
 
@@ -157,10 +176,8 @@ class AuthService:
         )
         session.add(membership)
 
-        # Auto-assign user to all projects in this organization so they are visible in Lead Admin Manage Workspace
-        projects_res = await session.execute(
-            select(Project).where(Project.organization_id == organization.id)
-        )
+        # Auto-assign user to all projects in workspace so they are visible in Lead Admin Manage Workspace
+        projects_res = await session.execute(select(Project))
         existing_projects = projects_res.scalars().all()
         for p in existing_projects:
             pm = ProjectMembership(
@@ -212,6 +229,29 @@ class AuthService:
             subject=str(user.id),
             extra_claims={"email": user.email},
         )
+
+        # Ensure user is linked to all projects on login in single-tenant setup
+        org_role_res = await session.execute(
+            select(OrganizationMembership.role).where(OrganizationMembership.user_id == user.id).limit(1)
+        )
+        user_role = org_role_res.scalar_one_or_none() or MembershipRole.MEMBER
+
+        projects_res = await session.execute(select(Project))
+        existing_projects = projects_res.scalars().all()
+        for p in existing_projects:
+            pm_res = await session.execute(
+                select(ProjectMembership).where(
+                    ProjectMembership.project_id == p.id,
+                    ProjectMembership.user_id == user.id,
+                )
+            )
+            if pm_res.scalar_one_or_none() is None:
+                session.add(ProjectMembership(
+                    project_id=p.id,
+                    user_id=user.id,
+                    role=user_role,
+                ))
+        await session.commit()
 
         if default_org_id:
             await AuthService._auto_provision_if_needed(session, user.id, default_org_id)
