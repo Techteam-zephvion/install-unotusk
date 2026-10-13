@@ -48,6 +48,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo [2/4] Building Windows release binary (x64)...
+set "CL=%CL% /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
 call flutter build windows --release
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Flutter Windows build failed.
