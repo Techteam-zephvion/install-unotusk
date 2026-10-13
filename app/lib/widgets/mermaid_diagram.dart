@@ -44,28 +44,6 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
     });
   }
 
-  Future<void> _openInBrowser() async {
-    final cleanCode = widget.code.trim();
-    final jsonStr = jsonEncode({
-      'code': cleanCode,
-      'mermaid': {'theme': 'dark'},
-    });
-    final b64 = base64Url.encode(utf8.encode(jsonStr));
-    final url = 'https://mermaid.ink/img/$b64';
-
-    if (!kIsWeb) {
-      try {
-        if (Platform.isLinux) {
-          await Process.run('xdg-open', [url]);
-        } else if (Platform.isMacOS) {
-          await Process.run('open', [url]);
-        } else if (Platform.isWindows) {
-          await Process.run('cmd', ['/c', 'start', '', url]);
-        }
-      } catch (_) {}
-    }
-  }
-
   String _getMermaidImageUrl({String format = 'png'}) {
     final cleanCode = widget.code.trim();
     final payload = jsonEncode({
@@ -421,31 +399,74 @@ $cleanCode
           ),
         ),
       ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_isDownloading)
-              SizedBox(
-                width: 11,
-                height: 11,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: p.bgSurface,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: p.div, width: 0.6),
+        ),
+        child: _isDownloading
+            ? SizedBox(
+                width: 13,
+                height: 13,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.5,
                   color: p.accent,
                 ),
               )
-            else
-              Icon(LucideIcons.download, size: 12, color: p.textSec),
-            const SizedBox(width: 4),
-            Text(
-              _isDownloading ? 'Saving...' : 'Download',
-              style: UnoTypography.mono(
-                color: _isDownloading ? p.accent : p.textSec,
-                fontSize: 11,
+            : Icon(
+                LucideIcons.download,
+                size: 13,
+                color: p.textSec,
               ),
-            ),
-          ],
+      ),
+    );
+  }
+
+  Widget _buildFullscreenButton(UnoPalette p) {
+    return Tooltip(
+      message: 'Fullscreen',
+      waitDuration: const Duration(milliseconds: 300),
+      child: InkWell(
+        onTap: _openFullscreen,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: p.bgSurface,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: p.div, width: 0.6),
+          ),
+          child: Icon(
+            LucideIcons.maximize2,
+            size: 13,
+            color: p.textSec,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCopyButton(UnoPalette p) {
+    return Tooltip(
+      message: _copied ? 'Copied!' : 'Copy code',
+      waitDuration: const Duration(milliseconds: 300),
+      child: InkWell(
+        onTap: _copy,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: p.bgSurface,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: p.div, width: 0.6),
+          ),
+          child: Icon(
+            _copied ? LucideIcons.check : LucideIcons.copy,
+            size: 13,
+            color: _copied ? p.confirmed : p.textSec,
+          ),
         ),
       ),
     );
@@ -486,121 +507,42 @@ $cleanCode
                   ),
                 ),
                 const Spacer(),
-                // Actions (horizontally scrollable if constrained)
-                Flexible(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Segmented Toggle: Diagram | Code
-                        Container(
-                          decoration: BoxDecoration(
-                            color: p.bgSurface,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: p.div, width: 0.6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildToggleButton(
-                                label: 'Diagram',
-                                icon: LucideIcons.eye,
-                                active: !_showCode,
-                                onTap: () => setState(() => _showCode = false),
-                                p: p,
-                              ),
-                              _buildToggleButton(
-                                label: 'Code',
-                                icon: LucideIcons.code,
-                                active: _showCode,
-                                onTap: () => setState(() => _showCode = true),
-                                p: p,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        // Download Dropdown Button
-                        _buildDownloadButton(p),
-                        const SizedBox(width: 4),
-                        // Fullscreen Button
-                        InkWell(
-                          onTap: _openFullscreen,
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(LucideIcons.maximize2, size: 12, color: p.textSec),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Fullscreen',
-                                  style: UnoTypography.mono(
-                                    color: p.textSec,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Copy Code Button
-                        InkWell(
-                          onTap: _copy,
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _copied ? LucideIcons.check : LucideIcons.copy,
-                                  size: 13,
-                                  color: _copied ? p.confirmed : p.textSec,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _copied ? 'Copied!' : 'Copy',
-                                  style: UnoTypography.mono(
-                                    color: _copied ? p.confirmed : p.textSec,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Open in System Browser
-                        InkWell(
-                          onTap: _openInBrowser,
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(LucideIcons.externalLink, size: 12, color: p.textSec),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Open',
-                                  style: UnoTypography.mono(
-                                    color: p.textSec,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                // Segmented Toggle: Diagram | Code
+                Container(
+                  decoration: BoxDecoration(
+                    color: p.bgSurface,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: p.div, width: 0.6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildToggleButton(
+                        label: 'Diagram',
+                        icon: LucideIcons.eye,
+                        active: !_showCode,
+                        onTap: () => setState(() => _showCode = false),
+                        p: p,
+                      ),
+                      _buildToggleButton(
+                        label: 'Code',
+                        icon: LucideIcons.code,
+                        active: _showCode,
+                        onTap: () => setState(() => _showCode = true),
+                        p: p,
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 6),
+                // Icon-only Download Button
+                _buildDownloadButton(p),
+                const SizedBox(width: 6),
+                // Icon-only Fullscreen Button
+                _buildFullscreenButton(p),
+                const SizedBox(width: 6),
+                // Icon-only Copy Code Button
+                _buildCopyButton(p),
               ],
             ),
           ),
@@ -708,7 +650,7 @@ class _MermaidFullscreenDialogState extends State<_MermaidFullscreenDialog> {
                       ),
                     ),
                     const Spacer(),
-                    // Toggle: Diagram | Code
+                    // Segmented Toggle: Diagram | Code
                     Container(
                       decoration: BoxDecoration(
                         color: p.bgSurface,
@@ -736,7 +678,7 @@ class _MermaidFullscreenDialogState extends State<_MermaidFullscreenDialog> {
                       ),
                     ),
                     if (!_showCode) ...[
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       // Zoom Controls
                       Container(
                         decoration: BoxDecoration(
@@ -780,7 +722,7 @@ class _MermaidFullscreenDialogState extends State<_MermaidFullscreenDialog> {
                       ),
                     ],
                     const SizedBox(width: 8),
-                    // Download Menu
+                    // Icon-only Download Menu
                     PopupMenuButton<String>(
                       tooltip: 'Download diagram',
                       color: const Color(0xFF20201D),
@@ -821,68 +763,45 @@ class _MermaidFullscreenDialogState extends State<_MermaidFullscreenDialog> {
                         ),
                       ],
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: p.bgSurface,
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(color: p.div, width: 0.6),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_isDownloading)
-                              SizedBox(
-                                width: 12,
-                                height: 12,
+                        child: _isDownloading
+                            ? SizedBox(
+                                width: 14,
+                                height: 14,
                                 child: CircularProgressIndicator(strokeWidth: 1.5, color: p.accent),
                               )
-                            else
-                              Icon(LucideIcons.download, size: 13, color: p.textSec),
-                            const SizedBox(width: 5),
-                            Text(
-                              _isDownloading ? 'Saving...' : 'Download',
-                              style: UnoTypography.mono(
-                                color: _isDownloading ? p.accent : p.textSec,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
+                            : Icon(LucideIcons.download, size: 14, color: p.textSec),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Copy Code Button
-                    InkWell(
-                      onTap: _copy,
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: p.bgSurface,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: p.div, width: 0.6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _copied ? LucideIcons.check : LucideIcons.copy,
-                              size: 13,
-                              color: _copied ? p.confirmed : p.textSec,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              _copied ? 'Copied!' : 'Copy',
-                              style: UnoTypography.mono(
-                                color: _copied ? p.confirmed : p.textSec,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                    // Icon-only Copy Code Button
+                    Tooltip(
+                      message: _copied ? 'Copied!' : 'Copy code',
+                      waitDuration: const Duration(milliseconds: 300),
+                      child: InkWell(
+                        onTap: _copy,
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: p.bgSurface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: p.div, width: 0.6),
+                          ),
+                          child: Icon(
+                            _copied ? LucideIcons.check : LucideIcons.copy,
+                            size: 14,
+                            color: _copied ? p.confirmed : p.textSec,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     // Close Fullscreen Button
                     IconButton(
                       tooltip: 'Exit Fullscreen (ESC)',
