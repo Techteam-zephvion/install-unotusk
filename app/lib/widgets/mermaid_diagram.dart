@@ -41,6 +41,28 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
     });
   }
 
+  Future<void> _openInBrowser() async {
+    final cleanCode = widget.code.trim();
+    final jsonStr = jsonEncode({
+      'code': cleanCode,
+      'mermaid': {'theme': 'dark'},
+    });
+    final b64 = base64Url.encode(utf8.encode(jsonStr));
+    final url = 'https://mermaid.ink/img/$b64';
+
+    if (!kIsWeb) {
+      try {
+        if (Platform.isLinux) {
+          await Process.run('xdg-open', [url]);
+        } else if (Platform.isMacOS) {
+          await Process.run('open', [url]);
+        } else if (Platform.isWindows) {
+          await Process.run('cmd', ['/c', 'start', '', url]);
+        }
+      } catch (_) {}
+    }
+  }
+
   String _getMermaidImageUrl() {
     final cleanCode = widget.code.trim();
     final payload = jsonEncode({
@@ -370,6 +392,29 @@ $cleanCode
                           _copied ? 'Copied!' : 'Copy',
                           style: UnoTypography.mono(
                             color: _copied ? p.confirmed : p.textSec,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Open in System Browser
+                InkWell(
+                  onTap: _openInBrowser,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.externalLink, size: 12, color: p.textSec),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Open',
+                          style: UnoTypography.mono(
+                            color: p.textSec,
                             fontSize: 11,
                           ),
                         ),
