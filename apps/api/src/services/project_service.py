@@ -1,16 +1,15 @@
-from datetime import datetime
 import logging
 import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.src.auth.security import hash_password
 from apps.api.src.api.exceptions import (
     ConflictException,
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.auth.security import hash_password
 from apps.api.src.models.enums import (
     IntegrationProvider,
     IntegrationStatus,
@@ -448,7 +447,7 @@ class ProjectService:
 
         # In single-tenant MVP, ensure all registered users are synchronized into ProjectMembership
         # for this project so the Lead Admin can immediately see, search, and manage all workspace employees.
-        all_users_query = select(User).where(User.is_active == True)
+        all_users_query = select(User).where(User.is_active)
         all_users_res = await session.execute(all_users_query)
         all_users = all_users_res.scalars().all()
 
