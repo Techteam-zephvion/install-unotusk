@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,8 @@ class MermaidDiagram extends StatefulWidget {
 
 class _MermaidDiagramState extends State<MermaidDiagram> {
   bool _copied = false;
+  bool _showCode = false;
+  bool _imageError = false;
   late final bool _isWebViewSupported;
 
   @override
@@ -36,6 +39,28 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _copied = false);
     });
+  }
+
+  String _getMermaidImageUrl() {
+    final cleanCode = widget.code.trim();
+    final payload = jsonEncode({
+      'code': cleanCode,
+      'mermaid': {
+        'theme': 'dark',
+        'themeVariables': {
+          'background': '#131311',
+          'primaryColor': '#2B2822',
+          'primaryTextColor': '#E2E0D9',
+          'primaryBorderColor': '#454035',
+          'lineColor': '#888478',
+          'secondaryColor': '#4A463B',
+          'tertiaryColor': '#181816',
+          'mainBkg': '#1D1C19',
+        }
+      }
+    });
+    final b64 = base64Url.encode(utf8.encode(payload));
+    return 'https://mermaid.ink/img/$b64';
   }
 
   String _generateHtml() {
@@ -110,6 +135,159 @@ $cleanCode
 ''';
   }
 
+  Widget _buildCodeView(UnoPalette p) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      color: const Color(0xFF131311),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SelectableText(
+          widget.code.trim(),
+          style: UnoTypography.mono(
+            color: p.textSec,
+            fontSize: 12,
+            height: 1.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiagramView(UnoPalette p) {
+    if (_isWebViewSupported) {
+      return SizedBox(
+        height: 350,
+        child: InAppWebView(
+          initialData: InAppWebViewInitialData(
+            data: _generateHtml(),
+            baseUrl: WebUri('https://cdn.jsdelivr.net'),
+          ),
+          initialSettings: InAppWebViewSettings(
+            transparentBackground: true,
+            disableVerticalScroll: false,
+            disableHorizontalScroll: false,
+          ),
+        ),
+      );
+    }
+
+    if (_imageError) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            color: p.warn.withValues(alpha: 0.1),
+            child: Row(
+              children: [
+                Icon(LucideIcons.info, size: 13, color: p.warn),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Remote render unavailable offline. Showing Mermaid source.',
+                    style: UnoTypography.mono(color: p.warn, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildCodeView(p),
+        ],
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 180, maxHeight: 420),
+      color: const Color(0xFF131311),
+      child: InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 3.5,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Image.network(
+              _getMermaidImageUrl(),
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 200,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: p.accent,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Rendering Mermaid diagram...',
+                        style: UnoTypography.mono(color: p.textSec, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && !_imageError) {
+                    setState(() => _imageError = true);
+                  }
+                });
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required String label,
+    required IconData icon,
+    required bool active,
+    required VoidCallback onTap,
+    required UnoPalette p,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(3),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: active ? p.accent.withValues(alpha: 0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 11,
+              color: active ? p.accent : p.textSec,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: UnoTypography.mono(
+                color: active ? p.accent : p.textSec,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.palette;
@@ -145,6 +323,35 @@ $cleanCode
                   ),
                 ),
                 const Spacer(),
+                // Segmented Toggle: Diagram | Code
+                Container(
+                  decoration: BoxDecoration(
+                    color: p.surface,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: p.div, width: 0.6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildToggleButton(
+                        label: 'Diagram',
+                        icon: LucideIcons.eye,
+                        active: !_showCode,
+                        onTap: () => setState(() => _showCode = false),
+                        p: p,
+                      ),
+                      _buildToggleButton(
+                        label: 'Code',
+                        icon: LucideIcons.code,
+                        active: _showCode,
+                        onTap: () => setState(() => _showCode = true),
+                        p: p,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Copy Code Button
                 InkWell(
                   onTap: _copy,
                   borderRadius: BorderRadius.circular(4),
@@ -160,7 +367,7 @@ $cleanCode
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          _copied ? 'Copied code!' : 'Copy code',
+                          _copied ? 'Copied!' : 'Copy',
                           style: UnoTypography.mono(
                             color: _copied ? p.confirmed : p.textSec,
                             fontSize: 11,
@@ -175,41 +382,7 @@ $cleanCode
           ),
 
           // Content body
-          if (_isWebViewSupported)
-            SizedBox(
-              height: 350,
-              child: InAppWebView(
-                initialData: InAppWebViewInitialData(
-                  data: _generateHtml(),
-                  baseUrl: WebUri('https://cdn.jsdelivr.net'),
-                ),
-                initialSettings: InAppWebViewSettings(
-                  transparentBackground: true,
-                  disableVerticalScroll: false,
-                  disableHorizontalScroll: false,
-                ),
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(24),
-              alignment: Alignment.center,
-              child: Column(
-                children: [
-                  Icon(LucideIcons.imageOff, size: 32, color: p.textSec.withValues(alpha: 0.5)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Inline webview not supported on this platform (Linux).',
-                    style: UnoTypography.body(color: p.textSec, fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Copy the code to view it in Mermaid Live Editor.',
-                    style: UnoTypography.body(color: p.textSec, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
+          _showCode ? _buildCodeView(p) : _buildDiagramView(p),
         ],
       ),
     );
