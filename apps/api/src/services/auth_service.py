@@ -62,7 +62,10 @@ class AuthService:
             session.add(existing_user)
 
             role_raw = (data.role or "").strip().lower()
-            assigned_role = MembershipRole.ADMIN if ("manager" in role_raw or "admin" in role_raw or "lead" in role_raw) else MembershipRole.MEMBER
+            if normalized_email == "admin@acme.com":
+                assigned_role = MembershipRole.ADMIN
+            else:
+                assigned_role = MembershipRole.ADMIN if ("manager" in role_raw or "admin" in role_raw or "lead" in role_raw) else MembershipRole.MEMBER
 
             # Check if user has an org membership
             org_mem_query = await session.execute(
@@ -128,7 +131,9 @@ class AuthService:
 
         # Determine desired role from data.role (maps Manager -> ADMIN, Member(Dev) -> MEMBER)
         role_raw = (data.role or "").strip().lower()
-        if "manager" in role_raw or "admin" in role_raw or "lead" in role_raw:
+        if normalized_email == "admin@acme.com":
+            assigned_role = MembershipRole.ADMIN
+        elif "manager" in role_raw or "admin" in role_raw or "lead" in role_raw:
             assigned_role = MembershipRole.ADMIN
         else:
             assigned_role = MembershipRole.MEMBER

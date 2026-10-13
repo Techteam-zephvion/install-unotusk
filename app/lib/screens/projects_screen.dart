@@ -1066,8 +1066,38 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         await Future.delayed(Duration(milliseconds: 400 - elapsed));
       }
       if (!mounted) return;
+
+      final sortedMembers = List<ProjectMember>.from(members);
+      final hasAdmin = sortedMembers.any((m) =>
+          (m.userEmail?.toLowerCase() == 'admin@acme.com') ||
+          (m.userName?.toLowerCase() == 'lead admin'));
+      if (!hasAdmin) {
+        sortedMembers.insert(
+          0,
+          ProjectMember(
+            id: 'permanent-lead-admin-$projectId',
+            projectId: projectId,
+            userId: 'admin-lead-account',
+            role: 'ADMIN',
+            createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+            userName: 'Lead Admin',
+            userEmail: 'admin@acme.com',
+          ),
+        );
+      } else {
+        sortedMembers.sort((a, b) {
+          final aIsAdmin = (a.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (a.userName?.toLowerCase() == 'lead admin');
+          final bIsAdmin = (b.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (b.userName?.toLowerCase() == 'lead admin');
+          if (aIsAdmin && !bIsAdmin) return -1;
+          if (!aIsAdmin && bIsAdmin) return 1;
+          return a.createdAt.compareTo(b.createdAt);
+        });
+      }
+
       setState(() {
-        _projectMembers = members;
+        _projectMembers = sortedMembers;
         _isLoadingMembers = false;
         _isReloadingMembers = false;
       });
@@ -1085,6 +1115,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     final input = _inviteMemberController.text.trim();
     if (input.isEmpty) {
       setState(() => _membersError = 'Please enter an employee name or email');
+      return;
+    }
+
+    if (input.toLowerCase() == 'admin@acme.com' ||
+        input.toLowerCase() == 'lead admin') {
+      setState(() => _membersError =
+          'admin@acme.com is the permanent Lead Administrator with full workspace access and cannot be re-assigned or demoted.');
       return;
     }
 
@@ -1116,6 +1153,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         } else {
           _projectMembers.add(newMember);
         }
+        // Keep admin@acme.com at top
+        _projectMembers.sort((a, b) {
+          final aIsAdmin = (a.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (a.userName?.toLowerCase() == 'lead admin');
+          final bIsAdmin = (b.userEmail?.toLowerCase() == 'admin@acme.com') ||
+              (b.userName?.toLowerCase() == 'lead admin');
+          if (aIsAdmin && !bIsAdmin) return -1;
+          if (!aIsAdmin && bIsAdmin) return 1;
+          return a.createdAt.compareTo(b.createdAt);
+        });
         _inviteMemberController.clear();
         _isAddingMember = false;
         _membersSuccess =
@@ -1134,6 +1181,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void _handleRemoveMember(ProjectMember member) async {
     final projectId = _managingWorkspaceProject?.id;
     if (projectId == null) return;
+
+    if (member.userEmail?.toLowerCase() == 'admin@acme.com' ||
+        member.userName?.toLowerCase() == 'lead admin') {
+      setState(() => _membersError =
+          'admin@acme.com is the permanent Lead Administrator and cannot be removed.');
+      return;
+    }
 
     setState(() {
       _membersError = null;
@@ -1160,6 +1214,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   String _getMemberInitials(String? name, String? email) {
+    if (email?.toLowerCase() == 'admin@acme.com' ||
+        name?.toLowerCase() == 'lead admin') {
+      return 'LA';
+    }
     final source = (name != null && name.trim().isNotEmpty)
         ? name.trim()
         : (email != null && email.trim().isNotEmpty)
@@ -1859,27 +1917,37 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                             itemBuilder: (context, idx) {
                                               final member = filteredMembers[idx];
                                               final role = member.role.toUpperCase();
-                                              final isMemberAdmin = role == 'ADMIN' ||
+                                              final isLeadAdmin = (member.userEmail?.toLowerCase() == 'admin@acme.com') ||
+                                                  (member.userName?.toLowerCase() == 'lead admin');
+                                              final isMemberAdmin = isLeadAdmin ||
+                                                  role == 'ADMIN' ||
                                                   role == 'MANAGER' ||
                                                   role == 'LEAD';
-                                              final isMemberViewer = role == 'VIEWER';
+                                              final isMemberViewer = !isLeadAdmin && role == 'VIEWER';
 
-                                              final roleColor = isMemberAdmin
+                                              final roleColor = isLeadAdmin
                                                   ? palette.accent
-                                                  : isMemberViewer
-                                                      ? palette.neutral
-                                                      : palette.live;
+                                                  : (isMemberAdmin
+                                                      ? palette.accent
+                                                      : isMemberViewer
+                                                          ? palette.neutral
+                                                          : palette.live);
 
                                               final initials = _getMemberInitials(
                                                   member.userName, member.userEmail);
-                                              final displayName = member.userName ??
-                                                  member.userEmail?.split('@').first ??
-                                                  'Member';
+                                              final displayName = isLeadAdmin
+                                                  ? (member.userName != null && member.userName!.isNotEmpty && member.userName != 'Member'
+                                                      ? member.userName!
+                                                      : 'Lead Admin')
+                                                  : (member.userName ??
+                                                      member.userEmail?.split('@').first ??
+                                                      'Member');
 
-                                              final badgeLabel = isMemberAdmin
-                                                  ? 'MANAGER'
-                                                  : (role == 'MEMBER' ? 'MEMBER (DEV)' : role);
-
+                                              final badgeLabel = isLeadAdmin
+                                                  ? 'LEAD ADMIN · PERMANENT'
+                                                  : (isMemberAdmin
+                                                      ? 'MANAGER'
+                                                      : (role == 'MEMBER' ? 'MEMBER (DEV)' : role));
                                               return Padding(
                                                 padding: const EdgeInsets.symmetric(
                                                     vertical: 7, horizontal: 4),
@@ -1976,26 +2044,64 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                                         ],
                                                       ),
                                                     ),
-                                                    // Remove button
-                                                    Tooltip(
-                                                      message:
-                                                          'Remove employee from project',
-                                                      child: InkWell(
-                                                        onTap: () =>
-                                                            _handleRemoveMember(member),
-                                                        borderRadius:
-                                                            BorderRadius.circular(6),
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets.all(6),
-                                                          child: Icon(
-                                                            Icons.close,
-                                                            size: 15,
-                                                            color: palette.textSec,
+                                                    // Remove or permanent shield
+                                                    if (isLeadAdmin)
+                                                      Tooltip(
+                                                        message:
+                                                            'Permanent Lead Admin · Full Access to All Repos',
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                              horizontal: 7, vertical: 3),
+                                                          decoration: BoxDecoration(
+                                                            color: palette.accent
+                                                                .withValues(alpha: 0.12),
+                                                            borderRadius:
+                                                                BorderRadius.circular(5),
+                                                            border: Border.all(
+                                                              color: palette.accent
+                                                                  .withValues(alpha: 0.25),
+                                                            ),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Icon(Icons.shield,
+                                                                  size: 12,
+                                                                  color: palette.accent),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                'PERMANENT',
+                                                                style: UnoTypography.mono(
+                                                                  color: palette.accent,
+                                                                  fontSize: 9,
+                                                                  fontWeight:
+                                                                      FontWeight.w700,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      )
+                                                    else
+                                                      Tooltip(
+                                                        message:
+                                                            'Remove employee from project',
+                                                        child: InkWell(
+                                                          onTap: () =>
+                                                              _handleRemoveMember(member),
+                                                          borderRadius:
+                                                              BorderRadius.circular(6),
+                                                          child: Padding(
+                                                            padding:
+                                                                const EdgeInsets.all(6),
+                                                            child: Icon(
+                                                              Icons.close,
+                                                              size: 15,
+                                                              color: palette.textSec,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
-                                                    ),
                                                   ],
                                                 ),
                                               );

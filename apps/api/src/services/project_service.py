@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import uuid
 
@@ -394,6 +395,53 @@ class ProjectService:
                     message="You do not have access to this project",
                 )
 
+        # Ensure permanent admin@acme.com exists and is always linked with OWNER/ADMIN privileges
+        admin_user_res = await session.execute(
+            select(User).where(func.lower(User.email) == "admin@acme.com")
+        )
+        admin_user = admin_user_res.scalar_one_or_none()
+        if admin_user is None:
+            admin_user = User(
+                email="admin@acme.com",
+                name="Lead Admin",
+                password_hash=hash_password("admin123"),
+                is_active=True,
+            )
+            session.add(admin_user)
+            await session.flush()
+
+        admin_om_res = await session.execute(
+            select(OrganizationMembership).where(
+                OrganizationMembership.organization_id == project.organization_id,
+                OrganizationMembership.user_id == admin_user.id,
+            )
+        )
+        admin_om = admin_om_res.scalar_one_or_none()
+        if admin_om is None:
+            session.add(OrganizationMembership(
+                organization_id=project.organization_id,
+                user_id=admin_user.id,
+                role=MembershipRole.OWNER,
+            ))
+        elif admin_om.role != MembershipRole.OWNER:
+            admin_om.role = MembershipRole.OWNER
+
+        admin_pm_res = await session.execute(
+            select(ProjectMembership).where(
+                ProjectMembership.project_id == resolved_id,
+                ProjectMembership.user_id == admin_user.id,
+            )
+        )
+        admin_pm = admin_pm_res.scalar_one_or_none()
+        if admin_pm is None:
+            session.add(ProjectMembership(
+                project_id=resolved_id,
+                user_id=admin_user.id,
+                role=MembershipRole.ADMIN,
+            ))
+        elif admin_pm.role != MembershipRole.ADMIN:
+            admin_pm.role = MembershipRole.ADMIN
+
         # In single-tenant MVP, ensure all registered users are synchronized into ProjectMembership
         # for this project so the Lead Admin can immediately see, search, and manage all workspace employees.
         all_users_query = select(User).where(User.is_active == True)
@@ -421,8 +469,7 @@ class ProjectService:
                 ))
                 new_memberships_added = True
 
-        if new_memberships_added:
-            await session.commit()
+        await session.commit()
 
         members_query = (
             select(ProjectMembership, User.name, User.email)
@@ -433,18 +480,26 @@ class ProjectService:
         members_res = await session.execute(members_query)
         rows = members_res.all()
 
-        return [
-            ProjectMemberRead(
-                id=pm.id,
-                project_id=pm.project_id,
-                user_id=pm.user_id,
-                role=pm.role,
-                created_at=pm.created_at,
-                user_name=user_name,
-                user_email=user_email,
+        member_reads: list[ProjectMemberRead] = []
+        for pm, user_name, user_email in rows:
+            is_admin_account = (user_email or "").lower() == "admin@acme.com"
+            member_reads.append(
+                ProjectMemberRead(
+                    id=pm.id,
+                    project_id=pm.project_id,
+                    user_id=pm.user_id,
+                    role=MembershipRole.ADMIN if is_admin_account else pm.role,
+                    created_at=pm.created_at,
+                    user_name=user_name if (user_name and user_name.strip()) else ("Lead Admin" if is_admin_account else "Member"),
+                    user_email=user_email,
+                )
             )
-            for pm, user_name, user_email in rows
-        ]
+
+        # Sort admin@acme.com first, followed by others chronologically
+        member_reads.sort(
+            key=lambda item: (0 if (item.user_email or "").lower() == "admin@acme.com" else 1, item.created_at)
+        )
+        return member_reads
 
     @staticmethod
     async def add_project_member(
@@ -501,6 +556,12 @@ class ProjectService:
             target_user = await session.get(User, data.user_id)
         elif data.email:
             clean_identifier = data.email.lower().strip()
+            if clean_identifier == "admin@acme.com":
+                raise ConflictException(
+                    code="PERMANENT_ADMIN_IMMUTABLE",
+                    message="admin@acme.com is the permanent Lead Administrator with full repository access and cannot be re-assigned or demoted.",
+                )
+
             # 1. Exact email match
             u_res = await session.execute(
                 select(User).where(func.lower(User.email) == clean_identifier)
@@ -540,6 +601,12 @@ class ProjectService:
             raise NotFoundException(
                 code="USER_NOT_FOUND",
                 message="Target user not found",
+            )
+
+        if target_user.email.lower() == "admin@acme.com":
+            raise ConflictException(
+                code="PERMANENT_ADMIN_IMMUTABLE",
+                message="admin@acme.com is the permanent Lead Administrator with full repository access and cannot be re-assigned or demoted.",
             )
 
         # Target user must be part of the organization - auto-assign if missing in single-tenant setup
@@ -621,6 +688,13 @@ class ProjectService:
             raise NotFoundException(
                 code="MEMBERSHIP_NOT_FOUND",
                 message="User is not a member of this project",
+            )
+
+        target_user = await session.get(User, target_user_id)
+        if target_user and target_user.email.lower() == "admin@acme.com":
+            raise ForbiddenException(
+                code="PERMANENT_ADMIN_PROTECTED",
+                message="admin@acme.com is the permanent Lead Administrator and cannot be removed.",
             )
 
         # Permission check:
