@@ -456,7 +456,6 @@ class ProjectService:
         )
         existing_pm_user_ids = set((await session.execute(existing_pms_query)).scalars().all())
 
-        new_memberships_added = False
         for u in all_users:
             if u.id not in existing_pm_user_ids:
                 is_u_admin = u.email.lower() == "admin@acme.com"
@@ -476,7 +475,6 @@ class ProjectService:
                     user_id=u.id,
                     role=u_role,
                 ))
-                new_memberships_added = True
 
         await session.commit()
 
