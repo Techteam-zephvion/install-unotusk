@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final localRegistryServiceProvider = Provider<LocalRegistryService>((ref) {
@@ -45,11 +46,13 @@ class LocalServer {
 
 class LocalRegistryService {
   String get _registryBaseDir {
+    if (kIsWeb) return '';
     final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
     return '$home/.unotusk/servers';
   }
 
   Future<List<LocalServer>> getRunningServers() async {
+    if (kIsWeb) return [];
     final List<LocalServer> servers = [];
     final dir = Directory(_registryBaseDir);
     if (!dir.existsSync()) {

@@ -122,7 +122,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final serverProjects = await ApiService.fetchProjects();
       final elapsed = stopwatch.elapsedMilliseconds;
-      if (elapsed < 450 && !Platform.environment.containsKey('FLUTTER_TEST')) {
+      if (elapsed < 450 && !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
         await Future.delayed(Duration(milliseconds: 450 - elapsed));
       }
       if (!mounted) return;
