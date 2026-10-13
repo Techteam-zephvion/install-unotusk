@@ -348,7 +348,7 @@ $cleanCode
                 // Segmented Toggle: Diagram | Code
                 Container(
                   decoration: BoxDecoration(
-                    color: p.surface,
+                    color: p.bgSurface,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(color: p.div, width: 0.6),
                   ),

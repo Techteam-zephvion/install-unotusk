@@ -62,6 +62,9 @@ class UnoPalette {
 
   bool get isDark => bgBase == const Color(0xFF181816);
 
+  Color get surface => bgSurface;
+  Color get warn => const Color(0xFFE59866);
+
   // Query tiers
   static const queryCold = Color(0xFF6EC8B8);
   static const queryWarm = Color(0xFFE8A455);
