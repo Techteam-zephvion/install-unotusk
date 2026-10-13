@@ -15,38 +15,41 @@ from apps.api.src.schemas.knowledge import (
     KnowledgeUpdateRequest,
 )
 from apps.api.src.services.knowledge_service import KnowledgeService
+from apps.api.src.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects/{project_id}/knowledge", tags=["knowledge"])
 
 
 @router.post("", response_model=KnowledgeResponse, status_code=status.HTTP_201_CREATED)
 async def create_project_knowledge(
-    project_id: uuid.UUID,
+    project_id: str,
     request: KnowledgeCreateRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> KnowledgeResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await KnowledgeService.create_knowledge(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         data=request,
     )
 
 
 @router.get("", response_model=KnowledgeListResponse)
 async def list_project_knowledge(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     status: KnowledgeStatus | None = Query(None, description="Filter by status"),
     category: KnowledgeCategory | None = Query(None, description="Filter by category"),
     search: str | None = Query(None, description="Search term across title, content, symbols"),
 ) -> KnowledgeListResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     items = await KnowledgeService.list_knowledge(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         status=status,
         category=category,
         search=search,
@@ -56,31 +59,33 @@ async def list_project_knowledge(
 
 @router.get("/{knowledge_id}", response_model=KnowledgeResponse)
 async def get_project_knowledge(
-    project_id: uuid.UUID,
+    project_id: str,
     knowledge_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> KnowledgeResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await KnowledgeService.get_knowledge(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         knowledge_id=knowledge_id,
     )
 
 
 @router.patch("/{knowledge_id}", response_model=KnowledgeResponse)
 async def update_project_knowledge(
-    project_id: uuid.UUID,
+    project_id: str,
     knowledge_id: uuid.UUID,
     request: KnowledgeUpdateRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> KnowledgeResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await KnowledgeService.update_knowledge(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         knowledge_id=knowledge_id,
         data=request,
     )
@@ -88,29 +93,31 @@ async def update_project_knowledge(
 
 @router.post("/{knowledge_id}/archive", response_model=KnowledgeResponse)
 async def archive_project_knowledge(
-    project_id: uuid.UUID,
+    project_id: str,
     knowledge_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> KnowledgeResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await KnowledgeService.archive_knowledge(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         knowledge_id=knowledge_id,
     )
 
 
 @router.post("/{knowledge_id}/restore", response_model=KnowledgeResponse)
 async def restore_project_knowledge(
-    project_id: uuid.UUID,
+    project_id: str,
     knowledge_id: uuid.UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> KnowledgeResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await KnowledgeService.restore_knowledge(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         knowledge_id=knowledge_id,
     )

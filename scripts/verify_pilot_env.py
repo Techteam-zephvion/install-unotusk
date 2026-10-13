@@ -6,13 +6,13 @@ Pilot Environment Verification & Pre-flight Diagnostics Tool for Unotusk MVP.
 Audits:
 1. Host system prerequisites (CPU, RAM, Disk, OS).
 2. Container runtime (Docker daemon connectivity, Docker Compose v2).
-3. Port binding safety & collision checks (8000, 5432, 6379).
+3. Port binding safety & collision checks (28000, 5432, 6379).
 4. Release artifacts integrity (tarballs and SHA-256 checksums in dist/).
 5. Server configuration & secret hygiene (.env mode 0600, non-default secrets).
 6. Live server health probes (/health and /health/ready) if running.
 
 Usage:
-    python scripts/verify_pilot_env.py [--server-url http://localhost:8000]
+    python scripts/verify_pilot_env.py [--server-url http://localhost:28000]
 """
 
 import argparse
@@ -138,7 +138,7 @@ def check_docker_prerequisites() -> bool:
 def check_port_availability() -> bool:
     print_step("Checking Port Collision & Binding Safety")
     ports = [
-        (8000, "API Gateway / HTTP"),
+        (28000, "API Gateway / HTTP (Control Plane)"),
         (5432, "PostgreSQL (Internal)"),
         (6379, "Redis Cache (Internal)"),
     ]
@@ -288,7 +288,7 @@ def check_live_server(server_url: str) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="Unotusk MVP Pilot Environment Verification")
-    parser.add_argument("--server-url", default=os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:8000"), help="Unotusk server URL to probe")
+    parser.add_argument("--server-url", default=os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:28000"), help="Unotusk server URL to probe")
     args = parser.parse_args()
 
     print("==================================================================")

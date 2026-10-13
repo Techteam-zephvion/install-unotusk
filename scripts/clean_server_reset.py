@@ -140,7 +140,7 @@ def inspect_unotusk_state() -> dict:
     config_exists = DEPLOYMENT_DIR.exists() and (DEPLOYMENT_DIR / "docker-compose.yml").exists()
     env_exists = DEPLOYMENT_DIR.exists() and (DEPLOYMENT_DIR / ".env").exists()
 
-    port_8000_used = is_port_in_use(8000)
+    port_28000_used = is_port_in_use(28000)
 
     return {
         "unotusk_containers": unotusk_containers,
@@ -148,7 +148,7 @@ def inspect_unotusk_state() -> dict:
         "unotusk_volumes": unotusk_volumes,
         "deployment_dir_exists": config_exists,
         "env_file_exists": env_exists,
-        "port_8000_used": port_8000_used,
+        "port_28000_used": port_28000_used,
     }
 
 
@@ -189,7 +189,7 @@ def perform_reset(
     else:
         print_info(f"No deployment configuration found at: {DEPLOYMENT_DIR}")
 
-    print_info(f"Port 8000 status: {'OCCUPIED' if state['port_8000_used'] else 'FREE'}")
+    print_info(f"Port 28000 status: {'OCCUPIED' if state['port_28000_used'] else 'FREE'}")
 
     # Confirmation guard for destructive wipe
     if wipe_data and not dry_run and not yes:
@@ -280,11 +280,11 @@ def perform_reset(
     else:
         print_pass("✓ Zero Unotusk containers active.")
 
-    port_8000_free = not is_port_in_use(8000)
-    if not port_8000_free and not dry_run:
-        print_warn("Port 8000 is still in use by another process on the host!")
+    port_28000_free = not is_port_in_use(28000)
+    if not port_28000_free and not dry_run:
+        print_warn("Port 28000 is still in use by another process on the host!")
     else:
-        print_pass("✓ Port 8000 is free and available.")
+        print_pass("✓ Port 28000 is free and available.")
 
     print("\n==================================================")
     print(f"{Colors.GREEN}{Colors.BOLD}SERVER RESET COMPLETE{Colors.END}")
@@ -293,7 +293,7 @@ def perform_reset(
     print(f"  - Unotusk Containers:   {'[DRY-RUN]' if dry_run else 'STOPPED & REMOVED'}")
     print(f"  - Data Volumes:         {'[DRY-RUN]' if dry_run else ('WIPED' if wipe_data else 'PRESERVED')}")
     print(f"  - Configuration:        {'[DRY-RUN]' if dry_run else ('WIPED' if wipe_config else 'PRESERVED')}")
-    print(f"  - Port 8000:            {'[DRY-RUN]' if dry_run else ('RELEASED' if port_8000_free else 'OCCUPIED')}")
+    print(f"  - Port 28000:           {'[DRY-RUN]' if dry_run else ('RELEASED' if port_28000_free else 'OCCUPIED')}")
     print(f"  - Protected Containers: {state['other_containers_count']} foreign container(s) untouched.")
     print("\nThe host machine is ready for a fresh run of the Server Setup App:")
     print("  ./setup_app (or flutter run -d linux inside setup_app/)")
@@ -355,7 +355,7 @@ def main():
             print(f"  - {c['name']} ({c['status']})")
         print(f"Data Volumes:      {len(state['unotusk_volumes'])}")
         print(f"Config Directory:  {'Exists' if state['deployment_dir_exists'] else 'None'}")
-        print(f"Port 8000:         {'In Use' if state['port_8000_used'] else 'Free'}")
+        print(f"Port 28000:        {'In Use' if state['port_28000_used'] else 'Free'}")
         print(f"Other Containers:  {state['other_containers_count']} (protected)")
         sys.exit(0)
 

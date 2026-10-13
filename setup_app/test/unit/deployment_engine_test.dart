@@ -114,7 +114,7 @@ void main() {
       expect(result.isSuccess, true);
       expect(stages, contains(DeployStage.completed));
       final composeContent = File('${tempDir.path}/docker-compose.yml').readAsStringSync();
-      expect(composeContent, contains('"8085:8000"'));
+      expect(composeContent, contains('"8085:8085"'));
     });
 
     test('Deployment preserves existing POSTGRES_PASSWORD and AUTH_SECRET from existing .env', () async {

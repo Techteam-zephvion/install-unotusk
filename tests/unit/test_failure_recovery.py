@@ -237,10 +237,10 @@ class TestSecretSanitizerCoverage:
         assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in result
 
     def test_non_sensitive_content_preserved(self):
-        text = "Server starting on port 8000, environment=production, version=0.1.0"
+        text = "Server starting on port 28000, environment=production, version=0.1.0"
         result = self._sanitize(text)
         # Non-sensitive values must be preserved
-        assert "port 8000" in result
+        assert "port 28000" in result
         assert "production" in result
 
     def test_empty_string_safe(self):

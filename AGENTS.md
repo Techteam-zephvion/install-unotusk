@@ -11,7 +11,7 @@ The complex multi-repository microservice topology (`US`, `UPS`, `AI-PIE`, `UP`,
 ```
 UNOTUSK MVP =
 Flutter Desktop Client (app/) + Server Setup App (setup_app/)
-                       │ (HTTP REST: Port 8000)
+                       │ (HTTP REST: Port 28000 Control Plane / 28100+ Data Planes)
                        ▼
 FastAPI Async Backend (apps/api/)
   ├── Parser Engine (Tree-sitter: Python, TS/JS, Go)

@@ -47,7 +47,7 @@ class TestPortBinding:
             mock_socket_cls.return_value.__enter__.return_value = mock_sock
 
             with patch("shutil.which", return_value=None):
-                status = check_port_binding(8000)
+                status = check_port_binding(28000)
                 assert status["listening"] is True
 
 
@@ -61,7 +61,7 @@ class TestCorsAndHttpProbe:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value.__enter__.return_value = mock_resp
-            ok, msg = probe_cors_preflight("http://10.0.0.59:8000", "http://10.0.0.120:3000")
+            ok, msg = probe_cors_preflight("http://10.0.0.59:28000", "http://10.0.0.120:3000")
             assert ok is True
             assert "Allowed origin" in msg
 
@@ -71,7 +71,7 @@ class TestCorsAndHttpProbe:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value.__enter__.return_value = mock_resp
-            ok, msg = probe_cors_preflight("http://10.0.0.59:8000", "http://10.0.0.120:3000")
+            ok, msg = probe_cors_preflight("http://10.0.0.59:28000", "http://10.0.0.120:3000")
             assert ok is False
             assert "mismatch" in msg
 
@@ -82,7 +82,7 @@ class TestCorsAndHttpProbe:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value.__enter__.return_value = mock_resp
-            ok, status, body = probe_http_endpoint("http://10.0.0.59:8000/health")
+            ok, status, body = probe_http_endpoint("http://10.0.0.59:28000/health")
             assert ok is True
             assert status == 200
             assert "status" in body
@@ -100,6 +100,6 @@ class TestFullPreflight:
             results = run_full_preflight()
             assert results["all_passed"] is True
             assert results["lan_ip"] == "10.0.0.59"
-            assert results["employee_url"] == "http://10.0.0.59:8000"
+            assert results["employee_url"] == "http://10.0.0.59:28000"
             assert results["port_bound"] is True
             assert results["cors_ok"] is True

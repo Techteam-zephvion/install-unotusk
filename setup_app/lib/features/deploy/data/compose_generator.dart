@@ -84,9 +84,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "${config.serverPort}:8000"
+      - "${config.serverPort}:${config.serverPort}"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:${config.serverPort}/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10

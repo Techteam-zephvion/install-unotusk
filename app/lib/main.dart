@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:window_manager/window_manager.dart';
 import 'dialogs/archived_modal.dart';
 import 'dialogs/help_modal.dart';
@@ -196,39 +197,54 @@ class _AppShellState extends State<AppShell> {
     });
     
     // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
-    if (project.port != null) {
+    if (project.port != null && project.port != 28000) {
       final currentHost = Uri.parse(ApiService.baseUrl).host;
       final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {
-        ApiService.setBaseUrl(targetUrl);
+        // Pre-flight probe to ensure the target data plane is actually reachable
+        bool isReachable = false;
         try {
-          // Signup acts as auto-login via our modified backend
-          await ApiService.createOrganisation(
-            fullName: _user.name,
-            orgName: 'Acme Corporation',
-            password: 'password123',
-            role: _user.role,
-            email: _user.email,
-          );
+          final probeClient = http.Client();
+          final probeRes = await probeClient
+              .get(Uri.parse('$targetUrl/health'))
+              .timeout(const Duration(milliseconds: 1500));
+          probeClient.close();
+          isReachable = (probeRes.statusCode == 200);
         } catch (_) {
+          isReachable = false;
+        }
+
+        if (isReachable) {
+          ApiService.setBaseUrl(targetUrl);
           try {
-            await ApiService.login(
-              email: _user.email,
+            // Signup acts as auto-login via our modified backend
+            await ApiService.createOrganisation(
+              fullName: _user.name,
+              orgName: 'Acme Corporation',
               password: 'password123',
+              role: _user.role,
+              email: _user.email,
             );
+          } catch (_) {
+            try {
+              await ApiService.login(
+                email: _user.email,
+                password: 'password123',
+              );
+            } catch (_) {}
+          }
+          
+          // After logging into the target server, fetch its real project UUID
+          try {
+            final serverProjects = await ApiService.fetchProjects();
+            if (serverProjects.isNotEmpty) {
+              project = serverProjects.first;
+              setState(() {
+                _openedProject = project;
+              });
+            }
           } catch (_) {}
         }
-        
-        // After logging into the target server, fetch its real project UUID
-        try {
-          final serverProjects = await ApiService.fetchProjects();
-          if (serverProjects.isNotEmpty) {
-            project = serverProjects.first;
-            setState(() {
-              _openedProject = project;
-            });
-          }
-        } catch (_) {}
       }
     }
 
@@ -374,11 +390,11 @@ class _AppShellState extends State<AppShell> {
             data: QueryResponseData(
               segments: [
                 ResponseSegment(
-                  text: 'Server Response:\n$e',
+                  text: 'Server Response (${ApiService.baseUrl}):\n$e',
                   tag: 'NOTICE',
                 ),
               ],
-              meta: 'Grounded · verified response',
+              meta: '${ApiService.baseUrl} · error response',
               queryType: 'hot',
               confidence: 'insufficient',
             ),

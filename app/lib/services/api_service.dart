@@ -227,13 +227,27 @@ class ApiService {
   //  Authentication & User Profile
   // ─────────────────────────────────────────────────────────
 
+  static String _extractErrorMessage(http.Response res, {String defaultMsg = 'Request failed'}) {
+    try {
+      final data = jsonDecode(res.body);
+      if (data is Map) {
+        if (data['error'] is Map && data['error']['message'] != null) {
+          return data['error']['message'].toString();
+        }
+        if (data['message'] != null) return data['message'].toString();
+        if (data['detail'] != null) return data['detail'].toString();
+      }
+    } catch (_) {}
+    return '$defaultMsg (${res.statusCode})';
+  }
+
   /// Probes server connectivity for the provided work email
   static Future<Map<String, dynamic>> checkOrganisationMembership(
       String email) async {
     final healthOk = await checkHealth();
     if (!healthOk) {
       throw Exception(
-          lastError ?? 'Cannot reach backend server at http://10.0.0.59:28000');
+          lastError ?? 'Cannot reach backend server at $baseUrl');
     }
 
     try {
@@ -251,7 +265,7 @@ class ApiService {
     };
   }
 
-  /// Authenticates against http://10.0.0.59:28000/api/v1/auth/login
+  /// Authenticates against $baseUrl/api/v1/auth/login
   static Future<UserModel> login({
     required String email,
     required String password,
@@ -262,7 +276,7 @@ class ApiService {
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'email': email,
+            'email': email.trim().toLowerCase(),
             'password': password,
           }),
         )
@@ -304,14 +318,13 @@ class ApiService {
 
       return user;
     } else if (res.statusCode == 401) {
-      throw Exception(
-          'Invalid email or password on http://10.0.0.59:28000. Please verify credentials.');
+      throw Exception(_extractErrorMessage(res, defaultMsg: 'Invalid email or password. Please verify credentials.'));
     } else {
-      throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
+      throw Exception(_extractErrorMessage(res, defaultMsg: 'Sign in failed'));
     }
   }
 
-  /// Creates a new workspace / user on http://10.0.0.59:28000/api/v1/auth/signup
+  /// Creates a new workspace / user on $baseUrl/api/v1/auth/signup
   static Future<UserModel> createOrganisation({
     required String fullName,
     required String orgName,
@@ -319,9 +332,10 @@ class ApiService {
     required String role,
     String? email,
   }) async {
-    final userEmail = (email != null && email.isNotEmpty)
-        ? email
-        : '${fullName.toLowerCase().replaceAll(' ', '.')}@${orgName.toLowerCase().replaceAll(' ', '')}.com';
+    final cleanOrg = orgName.trim().isNotEmpty ? orgName.trim() : 'Acme Corporation';
+    final userEmail = (email != null && email.trim().isNotEmpty)
+        ? email.trim().toLowerCase()
+        : '${fullName.toLowerCase().replaceAll(' ', '.')}@acme.com';
 
     final uri = Uri.parse('$baseUrl/api/v1/auth/signup');
     final res = await _client
@@ -329,9 +343,10 @@ class ApiService {
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'name': fullName,
+            'name': fullName.trim(),
             'email': userEmail,
             'password': password.length >= 8 ? password : '${password}123',
+            'organization_name': cleanOrg,
           }),
         )
         .timeout(_timeout);
@@ -345,7 +360,7 @@ class ApiService {
       final user = UserModel(
         id: userData['id']?.toString(),
         name: userData['name']?.toString() ?? fullName,
-        org: orgName,
+        org: cleanOrg,
         email: userEmail,
         role: role,
       );
@@ -360,8 +375,7 @@ class ApiService {
 
       return user;
     } else {
-      throw Exception(
-          'Failed to create account on server (${res.statusCode}): ${res.body}');
+      throw Exception(_extractErrorMessage(res, defaultMsg: 'Failed to create account'));
     }
   }
 
@@ -499,7 +513,7 @@ class ApiService {
               if (isRunning) {
                 final currentHost = Uri.parse(ApiService.baseUrl).host;
                 final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
-                final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
+                final localRes = await _client.get(localUri, headers: _headers).timeout(const Duration(seconds: 2));
                 if (localRes.statusCode == 200) {
                   final localDecoded = jsonDecode(localRes.body);
                   List<dynamic> localList = [];
@@ -544,10 +558,8 @@ class ApiService {
             } catch (_) {}
             
             if (!mappedFromApi) {
-              if (!projects.any((p) => p.name == fallbackProj.name || p.id == fallbackProj.id)) {
-                projects.add(fallbackProj);
-              } else {
-                final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              if (idx != -1) {
                 // Keep existing, but add port/repo if missing
                 final existing = projects[idx];
                 projects[idx] = existing.copyWith(
@@ -583,6 +595,14 @@ class ApiService {
           final updated = projects.where((p) => p.id == activeProject!.id);
           if (updated.isNotEmpty) {
             activeProject = updated.first;
+          } else if (projects.isNotEmpty) {
+            // Previous active project is no longer valid; reselect a valid one
+            activeProject = projects.firstWhere(
+              (p) => p.upsStatus.toUpperCase() == 'READY',
+              orElse: () => projects.first,
+            );
+          } else {
+            activeProject = null;
           }
         }
         return projects;

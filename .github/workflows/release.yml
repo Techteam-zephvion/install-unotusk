@@ -98,6 +98,7 @@ jobs:
         shell: pwsh
         env:
           TAG: ${{ env.RELEASE_TAG }}
+          CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: |
           $numVer = [regex]::Match($env:TAG, '\d+\.\d+(\.\d+)?').Value
           if (-not $numVer) { $numVer = "1.0.1" }
@@ -360,6 +361,7 @@ jobs:
         shell: pwsh
         env:
           TAG: ${{ env.RELEASE_TAG }}
+          CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: |
           $numVer = [regex]::Match($env:TAG, '\d+\.\d+(\.\d+)?').Value
           if (-not $numVer) { $numVer = "1.0.1" }

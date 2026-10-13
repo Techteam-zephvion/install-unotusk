@@ -16,6 +16,7 @@ from apps.api.src.schemas.intelligence import (
     MessageRead,
 )
 from apps.api.src.services.intelligence_service import IntelligenceService
+from apps.api.src.services.project_service import ProjectService
 
 router = APIRouter()
 
@@ -27,15 +28,16 @@ router = APIRouter()
     summary="Ask a grounded question about the project",
 )
 async def ask_project(
-    project_id: uuid.UUID,
+    project_id: str,
     payload: GroundedAskRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> GroundedAnswerResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await IntelligenceService.ask_question(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         question=payload.question,
         conversation_id=payload.conversation_id,
         thinking_tier=payload.thinking_tier,
@@ -49,15 +51,16 @@ async def ask_project(
     summary="Create a new conversation thread for the project",
 )
 async def create_conversation(
-    project_id: uuid.UUID,
+    project_id: str,
     payload: ConversationCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ConversationRead:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await IntelligenceService.create_conversation(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         title=payload.title,
         initial_question=payload.initial_question,
     )
@@ -69,14 +72,15 @@ async def create_conversation(
     summary="List all conversation threads for a project",
 )
 async def list_conversations(
-    project_id: uuid.UUID,
+    project_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ConversationRead]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await IntelligenceService.list_conversations(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
     )
 
 
@@ -86,15 +90,16 @@ async def list_conversations(
     summary="Get all messages and evidence for a conversation",
 )
 async def get_conversation_messages(
-    project_id: uuid.UUID,
+    project_id: str,
     conversation_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[MessageRead]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await IntelligenceService.get_conversation_messages(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         conversation_id=conversation_id,
     )
 
@@ -106,16 +111,17 @@ async def get_conversation_messages(
     summary="Post a user message to a conversation thread and generate a grounded response",
 )
 async def post_conversation_message(
-    project_id: uuid.UUID,
+    project_id: str,
     conversation_id: uuid.UUID,
     payload: GroundedAskRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> GroundedAnswerResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await IntelligenceService.ask_question(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         question=payload.question,
         conversation_id=conversation_id,
     )
@@ -128,7 +134,7 @@ async def post_conversation_message(
     description="Available in development/test environments only. Returns 403 in production.",
 )
 async def debug_search_context(
-    project_id: uuid.UUID,
+    project_id: str,
     payload: ContextSearchRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -142,9 +148,10 @@ async def debug_search_context(
             status_code=403,
             detail="Debug endpoints are not available in production deployments.",
         )
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await IntelligenceService.debug_search_context(
         session=db,
         user_id=current_user.id,
-        project_id=project_id,
+        project_id=resolved_id,
         query=payload.query,
     )

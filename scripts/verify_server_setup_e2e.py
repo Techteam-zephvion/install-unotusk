@@ -17,7 +17,7 @@ import sys
 import urllib.error
 import urllib.request
 
-API_URL = os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:8000")
+API_URL = os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:28000")
 
 def print_step(name: str):
     print(f"\n[STEP] {name}")
