@@ -402,7 +402,7 @@ class ApiService {
 
   /// Fetches project list from http://10.0.0.59:28000/api/v1/projects
   static Future<List<ProjectItem>> fetchProjects() async {
-    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
       final mock = [
         const ProjectItem(
           id: 'proj-1',
