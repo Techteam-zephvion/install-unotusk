@@ -4,7 +4,7 @@ import os
 import sys
 import httpx
 
-BASE_URL = os.environ.get("SERVER_URL", "http://10.0.0.59:8000")
+BASE_URL = os.environ.get("SERVER_URL", "http://10.0.0.59:28000")
 API_PREFIX = f"{BASE_URL}/api/v1"
 
 async def run_e2e():

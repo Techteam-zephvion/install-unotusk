@@ -12,12 +12,13 @@ router = APIRouter(tags=["Health"])
 
 @router.get("/")
 async def root():
+    port = settings.SERVER_PORT or settings.PORT
     return {
         "service": "Unotusk MVP API",
         "status": "online",
         "version": "0.1.0",
         "health": "/health",
-        "message": "Unotusk MVP API is running. Connect via the Unotusk Employee Desktop Client using Server URL: http://10.0.0.59:8000",
+        "message": f"Unotusk MVP API is running. Connect via the Unotusk Employee Desktop Client using Server URL: http://10.0.0.59:{port}",
     }
 
 

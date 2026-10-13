@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Server settings
     HOST: str = Field(default="0.0.0.0")
-    PORT: int = Field(default=8000)
+    PORT: int = Field(default=28000)
     API_V1_PREFIX: str = "/api/v1"
 
     # Database

@@ -73,7 +73,7 @@ def test_inspect_unotusk_state_filters_foreign_containers(mock_port, mock_volume
 
     # Only server_unotusk_postgres_data should be identified
     assert state["unotusk_volumes"] == ["server_unotusk_postgres_data"]
-    assert state["port_8000_used"] is True
+    assert state["port_28000_used"] is True
 
 
 @patch("scripts.clean_server_reset.inspect_unotusk_state")
@@ -87,7 +87,7 @@ def test_perform_reset_dry_run_makes_no_calls(mock_port, mock_get_containers, mo
         "unotusk_volumes": ["server_unotusk_postgres_data"],
         "deployment_dir_exists": True,
         "env_file_exists": True,
-        "port_8000_used": True,
+        "port_28000_used": True,
     }
     mock_get_containers.return_value = []
     mock_port.return_value = False
@@ -111,7 +111,7 @@ def test_perform_reset_preserve_data_does_not_remove_volumes(
         "unotusk_volumes": ["server_unotusk_postgres_data"],
         "deployment_dir_exists": False,
         "env_file_exists": False,
-        "port_8000_used": False,
+        "port_28000_used": False,
     }
     # Remaining containers has unotusk-api to trigger surgical removal
     mock_get_containers.side_effect = [
@@ -141,7 +141,7 @@ def test_perform_reset_aborts_on_rejected_wipe_confirmation(mock_input, mock_ins
         "unotusk_volumes": ["server_unotusk_postgres_data"],
         "deployment_dir_exists": False,
         "env_file_exists": False,
-        "port_8000_used": False,
+        "port_28000_used": False,
     }
 
     success = perform_reset(wipe_data=True, wipe_config=False, dry_run=False, yes=False)

@@ -5,7 +5,7 @@ scripts/export_diagnostics.py
 Safe Diagnostic Bundle Exporter for Unotusk MVP Pilot.
 Collects sanitized technical diagnostics for troubleshooting customer pilot deployments on LAN:
 - System & hardware metrics (OS, CPU, memory, disk).
-- LAN network configuration (active adapters, IPv4, gateway, port 8000 binding).
+- LAN network configuration (active adapters, IPv4, gateway, port 28000 binding).
 - Docker service states (strictly filtered to Unotusk containers).
 - Server health probes (/health, /health/ready, /health/live).
 - Sanitized container & application logs (last 500 lines).
@@ -13,7 +13,7 @@ Collects sanitized technical diagnostics for troubleshooting customer pilot depl
 - Enforces zero customer source code and zero credentials.
 
 Usage:
-    python3 scripts/export_diagnostics.py [--output-dir ./diagnostics] [--server-url http://localhost:8000] [--archive]
+    python3 scripts/export_diagnostics.py [--output-dir ./diagnostics] [--server-url http://localhost:28000] [--archive]
 """
 
 import argparse
@@ -115,17 +115,17 @@ def get_lan_network_info() -> dict:
     """Collect network interfaces and LAN reachability metrics without sensitive data."""
     net_info = {
         "hostname": socket.gethostname(),
-        "port_8000_listening": False,
+        "port_28000_listening": False,
         "interfaces": [],
         "default_gateway": None,
     }
 
-    # Test if port 8000 is open locally
+    # Test if port 28000 is open locally
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1.0)
-            res = s.connect_ex(("127.0.0.1", 8000))
-            net_info["port_8000_listening"] = (res == 0)
+            res = s.connect_ex(("127.0.0.1", 28000))
+            net_info["port_28000_listening"] = (res == 0)
     except Exception:
         pass
 
@@ -240,7 +240,7 @@ def get_sanitized_logs(tail_lines: int = 500) -> dict:
     return logs
 
 
-def export_diagnostics_bundle(output_dir: str = "diagnostics", server_url: str = "http://localhost:8000", create_archive: bool = True) -> tuple[str, str, str]:
+def export_diagnostics_bundle(output_dir: str = "diagnostics", server_url: str = "http://localhost:28000", create_archive: bool = True) -> tuple[str, str, str]:
     """
     Generate sanitized diagnostics JSON and optional .tar.gz bundle.
     Returns (json_path, archive_path_or_empty, sha256_hash).
@@ -284,7 +284,7 @@ def export_diagnostics_bundle(output_dir: str = "diagnostics", server_url: str =
 def main():
     parser = argparse.ArgumentParser(description="Export sanitized diagnostics for Unotusk MVP pilot support.")
     parser.add_argument("--output-dir", default="diagnostics", help="Directory to store diagnostic archive")
-    parser.add_argument("--server-url", default=os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:8000"), help="Unotusk server URL")
+    parser.add_argument("--server-url", default=os.environ.get("UNOTUSK_SERVER_URL", "http://localhost:28000"), help="Unotusk server URL")
     parser.add_argument("--archive", action="store_true", default=True, help="Create compressed .tar.gz archive")
     args = parser.parse_args()
 

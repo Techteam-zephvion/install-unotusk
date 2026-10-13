@@ -5,14 +5,14 @@ scripts/verify_lan_connectivity.py
 LAN Connectivity Verification Probe & Preflight Check for Unotusk MVP.
 Runs comprehensive diagnostics on the Linux server host prior to running multi-client pilot tests:
 1. Detects primary RFC 1918 private LAN IP address.
-2. Checks port 8000 binding (0.0.0.0:8000 vs 127.0.0.1:8000).
+2. Checks port 28000 binding (0.0.0.0:28000 vs 127.0.0.1:28000).
 3. Tests HTTP GET /health and /health/ready on the LAN IP.
 4. Simulates CORS preflight OPTIONS request from a remote LAN employee client.
-5. Checks local firewall status (UFW / iptables) for port 8000 accessibility.
+5. Checks local firewall status (UFW / iptables) for port 28000 accessibility.
 6. Displays actionable pass/fail diagnosis and employee connection URL.
 
 Usage:
-    python3 scripts/verify_lan_connectivity.py [--port 8000] [--ip <override_ip>]
+    python3 scripts/verify_lan_connectivity.py [--port 28000] [--ip <override_ip>]
 """
 
 import argparse
@@ -103,7 +103,7 @@ def detect_primary_lan_ip() -> tuple[str | None, str | None]:
     return None, None
 
 
-def check_port_binding(port: int = 8000) -> dict:
+def check_port_binding(port: int = 28000) -> dict:
     """Check if the port is bound and listening on 0.0.0.0 or 127.0.0.1."""
     status = {
         "listening": False,
@@ -176,8 +176,8 @@ def probe_cors_preflight(server_url: str, client_origin: str) -> tuple[bool, str
         return False, f"OPTIONS request failed: {e}"
 
 
-def check_firewall_status(port: int = 8000) -> str:
-    """Check UFW / iptables to warn if port 8000 might be blocked."""
+def check_firewall_status(port: int = 28000) -> str:
+    """Check UFW / iptables to warn if port 28000 might be blocked."""
     if shutil.which("ufw"):
         try:
             res = subprocess.run(["ufw", "status"], capture_output=True, text=True, timeout=3)
@@ -193,7 +193,7 @@ def check_firewall_status(port: int = 8000) -> str:
     return "Firewall inspection skipped (standard Linux stack)"
 
 
-def run_full_preflight(lan_ip_override: str | None = None, port: int = 8000) -> dict:
+def run_full_preflight(lan_ip_override: str | None = None, port: int = 28000) -> dict:
     """Run all preflight checks and return structured diagnostic results."""
     results = {
         "lan_ip": None,
@@ -262,7 +262,7 @@ def run_full_preflight(lan_ip_override: str | None = None, port: int = 8000) -> 
 
 def main():
     parser = argparse.ArgumentParser(description="Unotusk MVP LAN Connectivity Verification Probe")
-    parser.add_argument("--port", type=int, default=8000, help="Port to probe (default: 8000)")
+    parser.add_argument("--port", type=int, default=28000, help="Port to probe (default: 28000)")
     parser.add_argument("--ip", type=str, default=None, help="Override detected LAN IP")
     parser.add_argument("--json", action="store_true", help="Output results as JSON")
     args = parser.parse_args()

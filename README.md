@@ -12,7 +12,7 @@
                                │   Figma Warm Dark Design System (#181816)    │
                                │      Native macOS (.dmg) | Windows (.msi)    │
                                └──────────────────────┬───────────────────────┘
-                                                      │ HTTP REST (:28000 / :8000)
+                                                      │ HTTP REST (:28000 Control Plane / :28100+ Data Planes)
                                                       ▼
 ┌──────────────────────────────┐       ┌──────────────────────────────────────┐
 │  Server Setup App            │       │      FastAPI Async Backend           │
@@ -110,8 +110,8 @@ install-unotusk/
 # Start PostgreSQL (pgvector), Redis, FastAPI Backend, and Background Worker
 docker compose up -d
 ```
-* **API Documentation**: `http://localhost:8000/docs` (or configured host port `28000`)
-* **Health Check**: `http://localhost:8000/health/ready`
+* **API Documentation**: `http://localhost:28000/docs`
+* **Health Check**: `http://localhost:28000/health/ready`
 
 ### 2. Run the Employee Desktop Client
 ```bash

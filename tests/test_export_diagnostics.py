@@ -42,7 +42,7 @@ class TestDiagnosticSanitization:
 class TestContainerIsolation:
     def test_docker_status_strictly_ignores_foreign_containers(self):
         foreign_mock_output = "\n".join([
-            json.dumps({"Names": "unotusk-api", "Image": "unotusk-api:latest", "Status": "Up", "State": "running", "Ports": "0.0.0.0:8000->8000/tcp"}),
+            json.dumps({"Names": "unotusk-api", "Image": "unotusk-api:latest", "Status": "Up", "State": "running", "Ports": "0.0.0.0:28000->28000/tcp"}),
             json.dumps({"Names": "unotusk-2-ups-1", "Image": "ups:dev", "Status": "Up", "State": "running", "Ports": "8443->8443/tcp"}),
             json.dumps({"Names": "nammadharani-web-1", "Image": "node:18", "Status": "Up", "State": "running", "Ports": "3000->3000/tcp"}),
             json.dumps({"Names": "supabase_db_unotusk-2", "Image": "supabase:latest", "Status": "Up", "State": "running", "Ports": "5432->5432/tcp"}),
@@ -85,11 +85,11 @@ class TestDiagnosticBundleExport:
             patch("scripts.export_diagnostics.get_sanitized_logs", return_value={
                 k: [sanitize_text(line) for line in v] for k, v in mock_logs.items()
             }),
-            patch("scripts.export_diagnostics.get_server_health", return_value={"url": "http://10.0.0.59:8000", "liveness": {"status": "ok"}}),
+            patch("scripts.export_diagnostics.get_server_health", return_value={"url": "http://10.0.0.59:28000", "liveness": {"status": "ok"}}),
         ):
             json_path, archive_path, sha256 = export_diagnostics_bundle(
                 output_dir=str(tmp_path),
-                server_url="http://10.0.0.59:8000",
+                server_url="http://10.0.0.59:28000",
                 create_archive=True,
             )
 

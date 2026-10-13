@@ -89,6 +89,6 @@ echo  2. Extract the ZIP completely into a folder (e.g. C:\Unotusk).
 echo  3. Run app.exe.
 echo  4. If Windows SmartScreen appears ("Windows protected your PC"):
 echo     Click "More info" -^> "Run anyway" (expected for unsigned pilot binaries).
-echo  5. In the app, enter the Linux Server LAN address: http://^<SERVER_LAN_IP^>:8000
+echo  5. In the app, enter the Linux Server LAN address: http://^<SERVER_LAN_IP^>:28000
 echo ================================================================
 exit /b 0

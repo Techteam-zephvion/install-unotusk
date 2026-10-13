@@ -25,7 +25,7 @@ void main() {
       expect(compose, isNot(contains('container_name: unotusk-api')));
 
       // Port exposure: only api port is exposed, postgres and redis are internal
-      expect(compose, contains('"8085:8000"'));
+      expect(compose, contains('"8085:8085"'));
       expect(compose, isNot(contains(':5432"')));
       expect(compose, isNot(contains(':6379"')));
       expect(compose, contains('networks:\n      - unotusk-network'));
@@ -41,7 +41,7 @@ void main() {
 
       final compose = ComposeGenerator.generateProductionCompose(config, imageVersion: '1.0.0');
       expect(compose, contains('image: ghcr.io/techteam-zephvion/unotusk-api:1.0.0'));
-      expect(compose, contains('"8085:8000"'));
+      expect(compose, contains('"8085:8085"'));
       expect(compose, isNot(contains('gsk_mock_123')));
       expect(compose, contains(r'AUTH_SECRET=${AUTH_SECRET}'));
       expect(compose, isNot(contains(':5432"')));

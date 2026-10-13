@@ -197,7 +197,7 @@ class _AppShellState extends State<AppShell> {
     });
     
     // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
-    if (project.port != null && project.port != 28000 && project.port != 8000) {
+    if (project.port != null && project.port != 28000) {
       final currentHost = Uri.parse(ApiService.baseUrl).host;
       final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {

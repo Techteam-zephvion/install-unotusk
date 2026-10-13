@@ -49,6 +49,7 @@ class OrchestratorService:
             "AUTH_SECRET": settings.AUTH_SECRET,
             "DATA_PLANE_PROJECT_ID": str(project_id),
             "DATA_PLANE_ORG_ID": str(organization_id),
+            "SERVER_PORT": str(port),
         }
 
         try:
@@ -74,7 +75,7 @@ class OrchestratorService:
                 image_name,
                 name=container_name,
                 environment=environment,
-                ports={'8000/tcp': port},
+                ports={f'{port}/tcp': port},
                 detach=True,
                 network=network_name,
                 restart_policy={"Name": "always"}
@@ -96,8 +97,10 @@ class OrchestratorService:
             container = client.containers.get(container_name)
             port_bindings = container.attrs.get("NetworkSettings", {}).get("Ports", {})
             assigned_port = None
-            if "8000/tcp" in port_bindings and port_bindings["8000/tcp"]:
-                assigned_port = int(port_bindings["8000/tcp"][0].get("HostPort"))
+            for port_key, bindings in port_bindings.items():
+                if bindings:
+                    assigned_port = int(bindings[0].get("HostPort"))
+                    break
 
             return {
                 "exists": True,
