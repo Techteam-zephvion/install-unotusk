@@ -80,12 +80,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void initState() {
     super.initState();
     // Restore any previously connected projects so they remain in workspace
+    if (ApiService.connectedProjectIds.isEmpty) {
+      ApiService.loadPersistedConnectedProjects();
+    }
+    if (ApiService.cachedProjects.isNotEmpty) {
+      final validIds = ApiService.cachedProjects.map((p) => p.id.toLowerCase()).toSet();
+      final validNames = ApiService.cachedProjects.map((p) => p.name.toLowerCase()).toSet();
+      ApiService.connectedProjectIds.removeWhere((id) =>
+          !validIds.contains(id.toLowerCase()) &&
+          !validNames.contains(id.toLowerCase()));
+    }
     if (ApiService.connectedWorkspaceProjects.isNotEmpty) {
       _projects.addAll(ApiService.connectedWorkspaceProjects);
     } else {
-      if (ApiService.connectedProjectIds.isEmpty) {
-        ApiService.loadPersistedConnectedProjects();
-      }
       for (final p in ApiService.cachedProjects) {
         if (ApiService.connectedProjectIds.contains(p.id) ||
             ApiService.connectedProjectIds.contains(p.name)) {
@@ -96,6 +103,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ..clear()
         ..addAll(_projects);
     }
+    _projects.removeWhere((p) =>
+        p.upsStatus.toUpperCase() == 'STOPPED' ||
+        p.upsStatus.toUpperCase() == 'DELETED' ||
+        p.upsStatus.toUpperCase() == 'OFFLINE');
     _checkServer();
     _fetchServerProjects(isSilent: true);
     _fetchAvailableWorkspaceProjects(isSilent: true);
@@ -129,16 +140,26 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       setState(() {
         _isLoadingProjects = false;
         _isRefreshingProjects = false;
-        _availableBackendProjects = serverProjects;
+        _availableBackendProjects = List<ProjectItem>.from(serverProjects);
         
-        // Auto-connect all backend/local servers for MVP single-tenant visibility
-        _projects.clear();
-        _projects.addAll(serverProjects);
+        final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
+        final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
+        ApiService.connectedProjectIds.removeWhere((id) =>
+            !validIds.contains(id.toLowerCase()) &&
+            !validNames.contains(id.toLowerCase()));
 
+        _projects.clear();
         for (final p in serverProjects) {
-          ApiService.connectedProjectIds.add(p.id);
-          ApiService.connectedProjectIds.add(p.name);
+          final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
+              p.upsStatus.toUpperCase() != 'DELETED' &&
+              p.upsStatus.toUpperCase() != 'OFFLINE';
+          if (isRunning &&
+              (ApiService.connectedProjectIds.contains(p.id) ||
+                  ApiService.connectedProjectIds.contains(p.name))) {
+            _projects.add(p);
+          }
         }
+        ApiService.savePersistedConnectedProjects();
         
         ApiService.connectedWorkspaceProjects
           ..clear()
@@ -233,20 +254,44 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final serverProjects = await ApiService.fetchProjects();
       if (!mounted) return;
       setState(() {
-        _availableBackendProjects = serverProjects;
-        // Keep any existing connected projects synchronized
+        _availableBackendProjects = List<ProjectItem>.from(serverProjects);
+        final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
+        final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
+
+        // Evict any deleted or stopped projects from _projects
+        _projects.removeWhere((p) =>
+            (!validIds.contains(p.id.toLowerCase()) &&
+            !validNames.contains(p.name.toLowerCase())) ||
+            p.upsStatus.toUpperCase() == 'STOPPED' ||
+            p.upsStatus.toUpperCase() == 'DELETED' ||
+            p.upsStatus.toUpperCase() == 'OFFLINE');
+
+        // Keep any existing connected running projects synchronized
         for (final sp in serverProjects) {
+          final isRunning = sp.upsStatus.toUpperCase() != 'STOPPED' &&
+              sp.upsStatus.toUpperCase() != 'DELETED' &&
+              sp.upsStatus.toUpperCase() != 'OFFLINE';
           final idx = _projects.indexWhere((p) =>
               p.id.toLowerCase() == sp.id.toLowerCase() ||
               p.name.toLowerCase() == sp.name.toLowerCase());
           if (idx >= 0) {
-            _projects[idx] = sp;
-          } else {
-            _projects.add(sp);
+            if (isRunning) {
+              _projects[idx] = sp;
+            } else {
+              _projects.removeAt(idx);
+            }
           }
-          ApiService.connectedProjectIds.add(sp.id);
-          ApiService.connectedProjectIds.add(sp.name);
         }
+
+        ApiService.connectedProjectIds.removeWhere((id) =>
+            !validIds.contains(id.toLowerCase()) &&
+            !validNames.contains(id.toLowerCase()));
+        for (final p in _projects) {
+          ApiService.connectedProjectIds.add(p.id);
+          ApiService.connectedProjectIds.add(p.name);
+        }
+        ApiService.savePersistedConnectedProjects();
+
         ApiService.connectedWorkspaceProjects
           ..clear()
           ..addAll(_projects);
@@ -267,6 +312,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   void _toggleProjectConnection(ProjectItem project) {
+    final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+        project.upsStatus.toUpperCase() == 'DELETED' ||
+        project.upsStatus.toUpperCase() == 'OFFLINE';
+    if (isStopped) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot connect ${project.name}: The project server is ${project.upsStatus.toLowerCase()} on the backend.',
+          ),
+          backgroundColor: Colors.red[800],
+        ),
+      );
+      return;
+    }
+
     setState(() {
       final idx = _projects.indexWhere((p) =>
           p.id.toLowerCase() == project.id.toLowerCase() ||
@@ -290,6 +350,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void _connectAllWorkspaceProjects() {
     setState(() {
       for (final p in _availableBackendProjects) {
+        final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
+            p.upsStatus.toUpperCase() != 'DELETED' &&
+            p.upsStatus.toUpperCase() != 'OFFLINE';
+        if (!isRunning) continue;
         final exists = _projects.any((item) =>
             item.id.toLowerCase() == p.id.toLowerCase() ||
             item.name.toLowerCase() == p.name.toLowerCase());
@@ -763,9 +827,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                       p.name.toLowerCase() ==
                                           project.name.toLowerCase());
 
+                                  final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                      project.upsStatus.toUpperCase() == 'DELETED' ||
+                                      project.upsStatus.toUpperCase() == 'OFFLINE';
+
                                   return InkWell(
-                                    onTap: () =>
-                                        _toggleProjectConnection(project),
+                                    onTap: isStopped
+                                        ? null
+                                        : () => _toggleProjectConnection(project),
                                     borderRadius: BorderRadius.circular(8),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
@@ -822,6 +891,30 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                                 const SizedBox(height: 4),
                                                 Builder(
                                                   builder: (context) {
+                                                    final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                                        project.upsStatus.toUpperCase() == 'DELETED' ||
+                                                        project.upsStatus.toUpperCase() == 'OFFLINE';
+
+                                                    if (isStopped) {
+                                                      return Container(
+                                                        padding: const EdgeInsets.symmetric(
+                                                            horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.redAccent.withValues(alpha: 0.12),
+                                                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          'STOPPED',
+                                                          style: UnoTypography.mono(
+                                                            color: Colors.redAccent,
+                                                            fontSize: 9,
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+
                                                     final isReady = project.upsStatus.toUpperCase() == 'READY' ||
                                                         project.upsStatus.toUpperCase() == 'ACTIVE' ||
                                                         project.ingestionStatus.toLowerCase() == 'live';
@@ -882,7 +975,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           // Connection state badge / button
-                                          if (isConnected)
+                                          if (isStopped)
+                                            const SizedBox.shrink()
+                                          else if (isConnected)
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
@@ -1272,6 +1367,30 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         // Ready Green Button / Status badge
                         Builder(
                           builder: (context) {
+                            final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                project.upsStatus.toUpperCase() == 'DELETED' ||
+                                project.upsStatus.toUpperCase() == 'OFFLINE';
+
+                            if (isStopped) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(alpha: 0.12),
+                                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'STOPPED',
+                                  style: UnoTypography.mono(
+                                    color: Colors.redAccent,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              );
+                            }
+
                             final isReady = project.upsStatus.toUpperCase() ==
                                     'READY' ||
                                 project.upsStatus.toUpperCase() == 'ACTIVE' ||
@@ -1887,27 +2006,32 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           ),
                         ],
                       ),
-                      InkWell(
-                        onTap: () =>
-                            setState(() => _managingWorkspaceProject = null),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: palette.bgElevated,
+                      Row(
+                        children: [
+
+                          InkWell(
+                            onTap: () =>
+                                setState(() => _managingWorkspaceProject = null),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: palette.div),
-                          ),
-                          child: Text(
-                            'Done',
-                            style: UnoTypography.body(
-                              color: palette.text,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: palette.bgElevated,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: palette.div),
+                              ),
+                              child: Text(
+                                'Done',
+                                style: UnoTypography.body(
+                                  color: palette.text,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -1919,6 +2043,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       ),
     );
   }
+
+
 
   Widget _buildInputField({
     required TextEditingController controller,
@@ -2392,6 +2518,48 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           // Ready Green Button / Status badge
           Builder(
             builder: (context) {
+              final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                  project.upsStatus.toUpperCase() == 'DELETED' ||
+                  project.upsStatus.toUpperCase() == 'OFFLINE' ||
+                  project.ingestionStatus.toLowerCase() == 'stopped' ||
+                  project.ingestionStatus.toLowerCase() == 'deleted';
+
+              if (isStopped) {
+                return Tooltip(
+                  message: 'Server Stopped on Backend',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.12),
+                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'STOPPED',
+                          style: UnoTypography.mono(
+                            color: Colors.redAccent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               final isReady = project.upsStatus.toUpperCase() == 'READY' ||
                   project.upsStatus.toUpperCase() == 'ACTIVE' ||
                   project.ingestionStatus.toLowerCase() == 'live';
@@ -2486,32 +2654,69 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             const SizedBox(width: 10),
           ],
 
-          // Open button
-          InkWell(
-            onTap: () => widget.onOpenProject(project),
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Open',
-                    style: UnoTypography.body(
-                      color: palette.accent,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+          // Open button / Server Stopped indicator
+          Builder(
+            builder: (context) {
+              final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                  project.upsStatus.toUpperCase() == 'DELETED' ||
+                  project.upsStatus.toUpperCase() == 'OFFLINE';
+
+              if (isStopped) {
+                return Tooltip(
+                  message: 'Cannot open: Project server is stopped on backend',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: palette.div),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.power_off, size: 13, color: palette.textSec),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Server Stopped',
+                          style: UnoTypography.body(
+                            color: palette.textSec,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_forward,
-                    size: 15,
-                    color: palette.accent,
+                );
+              }
+
+              return InkWell(
+                onTap: () => widget.onOpenProject(project),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Open',
+                        style: UnoTypography.body(
+                          color: palette.accent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 15,
+                        color: palette.accent,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),

@@ -185,6 +185,32 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _handleOpenProject(ProjectItem project) async {
+    final status = project.upsStatus.toUpperCase();
+    if (status == 'STOPPED' || status == 'DELETED' || status == 'OFFLINE') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.power_off, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Cannot open "${project.name}": The data-plane server is $status.',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _openedProject = project;
       _openedProjectName = project.name;

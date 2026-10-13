@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -477,6 +478,64 @@ class ApiService {
           );
         }).toList();
 
+        // Deep verification against actual project container / data plane
+        final currentHost = Uri.parse(baseUrl).host;
+        final verifiedProjects = await Future.wait(projects.map((proj) async {
+          if (accessToken == null) return proj;
+          try {
+            // 1. If project has a designated data-plane port, probe it directly
+            if (proj.port != null && proj.port! > 0) {
+              try {
+                final portHealthUri = Uri.parse('http://$currentHost:${proj.port}/health');
+                final portRes = await _client.get(portHealthUri).timeout(const Duration(seconds: 2));
+                if (portRes.statusCode == 200) {
+                  return proj.copyWith(
+                    upsStatus: 'READY',
+                    ingestionStatus: 'live',
+                  );
+                }
+              } catch (_) {}
+            }
+
+            final dp = await fetchDataPlaneStatus(proj.id);
+            if (dp.port != null && dp.port! > 0) {
+              try {
+                final portHealthUri = Uri.parse('http://$currentHost:${dp.port}/health');
+                final portRes = await _client.get(portHealthUri).timeout(const Duration(seconds: 2));
+                if (portRes.statusCode == 200) {
+                  return proj.copyWith(
+                    upsStatus: 'READY',
+                    ingestionStatus: 'live',
+                    port: dp.port,
+                  );
+                }
+              } catch (_) {}
+            }
+
+            if (!dp.isRunning) {
+              return proj.copyWith(
+                upsStatus: 'STOPPED',
+                ingestionStatus: 'stopped',
+                port: dp.port ?? proj.port,
+              );
+            } else {
+              return proj.copyWith(
+                upsStatus: 'READY',
+                ingestionStatus: 'live',
+                port: dp.port ?? proj.port,
+              );
+            }
+          } catch (_) {
+            return proj.copyWith(
+              upsStatus: 'STOPPED',
+              ingestionStatus: 'stopped',
+            );
+          }
+        }));
+        projects
+          ..clear()
+          ..addAll(verifiedProjects);
+
         try {
           final localRegistry = LocalRegistryService();
           final localServers = await localRegistry.getRunningServers();
@@ -544,11 +603,9 @@ class ApiService {
             } catch (_) {}
             
             if (!mappedFromApi) {
-              if (!projects.any((p) => p.name == fallbackProj.name || p.id == fallbackProj.id)) {
-                projects.add(fallbackProj);
-              } else {
-                final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
-                // Keep existing, but add port/repo if missing
+              // Only augment an EXISTING project that matches by name or id, NEVER resurrect a deleted server
+              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              if (idx != -1) {
                 final existing = projects[idx];
                 projects[idx] = existing.copyWith(
                   port: existing.port ?? fallbackProj.port,
@@ -563,13 +620,20 @@ class ApiService {
         if (connectedProjectIds.isEmpty) {
           loadPersistedConnectedProjects();
         }
-        if (connectedProjectIds.isNotEmpty) {
-          connectedWorkspaceProjects.clear();
-          for (final p in projects) {
-            if (connectedProjectIds.contains(p.id) ||
-                connectedProjectIds.contains(p.name)) {
-              connectedWorkspaceProjects.add(p);
-            }
+
+        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects
+        final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
+        final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
+        connectedProjectIds.removeWhere(
+          (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
+        );
+        savePersistedConnectedProjects();
+
+        connectedWorkspaceProjects.clear();
+        for (final p in projects) {
+          if (connectedProjectIds.contains(p.id) ||
+              connectedProjectIds.contains(p.name)) {
+            connectedWorkspaceProjects.add(p);
           }
         }
         if (activeProject == null && projects.isNotEmpty) {
@@ -758,27 +822,14 @@ class ApiService {
           'Ontology Graph',
           'Synthesized Verification',
         ],
-        ontologyEdges: relatedEntities.isNotEmpty && relatedEntities.any((e) => e.contains(':'))
+        ontologyEdges: relatedEntities.isNotEmpty
             ? relatedEntities
-            : const [
-                'Service:Auth',
-                'Decision:ADR-7',
-                'Commit:GH-7210',
-                'Ticket:ENG-2847',
-              ],
+            : const [],
         citations: citations.isNotEmpty
             ? citations
-            : const [
-                'tests/test_audio_preprocessing.py',
-                'tests/test_models_audio.py',
-                'tests/test_models_audio.py',
-                'tests/test_lavdf_manifest.py',
-                'tests/test_lavdf_manifest.py',
-                'tests/test_app.py',
-                'src/config.py',
-                'src/features/mel_spectrogram.py',
-                'src/preprocessing/augment.py',
-              ],
+            : (evidenceItems.isNotEmpty
+                ? evidenceItems.map((e) => e.file).where((f) => f.isNotEmpty).toSet().toList()
+                : const []),
         evidence: evidenceItems,
         debugSignals: debugSignals,
       );
@@ -1124,25 +1175,12 @@ class ApiService {
                 'Ontology Graph',
                 'Synthesized Verification',
               ],
-              ontologyEdges: const [
-                'Service:Auth',
-                'Decision:ADR-7',
-                'Commit:GH-7210',
-                'Ticket:ENG-2847',
-              ],
+              ontologyEdges: const [],
               citations: citations.isNotEmpty
                   ? citations
-                  : const [
-                      'tests/test_audio_preprocessing.py',
-                      'tests/test_models_audio.py',
-                      'tests/test_models_audio.py',
-                      'tests/test_lavdf_manifest.py',
-                      'tests/test_lavdf_manifest.py',
-                      'tests/test_app.py',
-                      'src/config.py',
-                      'src/features/mel_spectrogram.py',
-                      'src/preprocessing/augment.py',
-                    ],
+                  : (evidenceItems.isNotEmpty
+                      ? evidenceItems.map((e) => e.file).where((f) => f.isNotEmpty).toSet().toList()
+                      : const []),
               evidence: evidenceItems,
               debugSignals: debugSignals,
             );
@@ -1278,108 +1316,83 @@ class ApiService {
   //  Live Ontology Graph (SyncGuard Knowledge Graph Entities)
   // ─────────────────────────────────────────────────────────
 
-  /// Builds live knowledge graph nodes matching the repository ontology on http://10.0.0.59:28000
-  static Future<List<OntologyNode>> fetchOntologyNodes({String? projectId}) async {
+  static List<OntologyNode> _cachedGraphNodes = [];
+  static List<List<int>> _cachedGraphEdges = [];
+  static String? _cachedGraphPid;
+
+  /// Loads live repository graph nodes and edges from http://10.0.0.59:28000
+  static Future<void> _loadProjectGraph([String? projectId]) async {
     try {
       final pid = _resolveProjectId(projectId);
-      // Query server to verify project heartbeat
-      final pUri = Uri.parse('$baseUrl/api/v1/projects/$pid');
-      await _client.get(pUri, headers: _headers).timeout(const Duration(seconds: 3));
-    } catch (e) {
-      debugPrint('[ApiService] fetchOntologyNodes ping: $e');
-    }
+      if (_cachedGraphPid == pid && _cachedGraphNodes.isNotEmpty) return;
 
-    return const [
-      OntologyNode(
-        id: 0,
-        cx: 440.0,
-        cy: 155.0,
-        label: 'OIDC Decis…',
-        type: 'Decision',
-        subtitle: 'ADR-7: OIDC Authentication Migration',
-      ),
-      OntologyNode(
-        id: 1,
-        cx: 260.0,
-        cy: 280.0,
-        label: 'Auth Servi…',
-        type: 'Service',
-        subtitle: 'Core Authentication & Session Service',
-      ),
-      OntologyNode(
-        id: 2,
-        cx: 650.0,
-        cy: 130.0,
-        label: 'GH #7210',
-        type: 'Commit',
-        subtitle: 'Commit 7210: Migrate JWT verification to OIDC',
-      ),
-      OntologyNode(
-        id: 3,
-        cx: 650.0,
-        cy: 260.0,
-        label: 'ENG-1042',
-        type: 'Ticket',
-        subtitle: 'Jira ENG-1042: Implement Token Refresh Handler',
-      ),
-      OntologyNode(
-        id: 4,
-        cx: 440.0,
-        cy: 390.0,
-        label: 'Postgres D…',
-        type: 'Decision',
-        subtitle: 'PostgreSQL Session Store',
-      ),
-      OntologyNode(
-        id: 5,
-        cx: 650.0,
-        cy: 390.0,
-        label: 'ADR #7',
-        type: 'Decision',
-        subtitle: 'Architecture Decision: Database Session Caching',
-      ),
-      OntologyNode(
-        id: 6,
-        cx: 860.0,
-        cy: 200.0,
-        label: '@sam',
-        type: 'Person',
-        subtitle: 'Samir Patel (Security Engineering)',
-      ),
-      OntologyNode(
-        id: 7,
-        cx: 860.0,
-        cy: 390.0,
-        label: 'Billing Se…',
-        type: 'Service',
-        subtitle: 'Downstream Consumer: Billing Service',
-      ),
-      OntologyNode(
-        id: 8,
-        cx: 650.0,
-        cy: 500.0,
-        label: '@arch-deci…',
-        type: 'Ticket',
-        subtitle: '#arch-decisions Slack Channel Discussion',
-      ),
-    ];
+      final gUri = Uri.parse('$baseUrl/api/v1/projects/$pid/graph');
+      final res = await _client.get(gUri, headers: _headers).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final rawNodes = data['nodes'] as List<dynamic>? ?? [];
+        final rawEdges = data['edges'] as List<dynamic>? ?? [];
+
+        final idToIndex = <String, int>{};
+        final List<OntologyNode> nodes = [];
+
+        final displayNodes = rawNodes.take(24).toList();
+        final total = displayNodes.length;
+
+        for (int i = 0; i < total; i++) {
+          final m = displayNodes[i] as Map<String, dynamic>;
+          final rawId = m['id']?.toString() ?? '$i';
+          idToIndex[rawId] = i;
+
+          final type = m['type']?.toString() ?? 'File';
+          final label = m['label']?.toString() ?? m['name']?.toString() ?? 'Node $i';
+          final metadata = m['metadata'] as Map<String, dynamic>? ?? {};
+          final subtitle = metadata['path']?.toString() ?? metadata['language']?.toString();
+
+          final double angle = (i * 2 * math.pi) / (total > 0 ? total : 1);
+          final double radius = (i % 2 == 0) ? 220.0 : 150.0;
+          final double cx = 550.0 + radius * math.cos(angle);
+          final double cy = 300.0 + radius * math.sin(angle);
+
+          nodes.add(OntologyNode(
+            id: i,
+            cx: cx,
+            cy: cy,
+            label: label.length > 14 ? '${label.substring(0, 12)}…' : label,
+            type: type,
+            subtitle: subtitle ?? label,
+          ));
+        }
+
+        final List<List<int>> edges = [];
+        for (final e in rawEdges) {
+          final em = e as Map<String, dynamic>;
+          final src = em['source']?.toString();
+          final tgt = em['target']?.toString();
+          if (src != null && tgt != null && idToIndex.containsKey(src) && idToIndex.containsKey(tgt)) {
+            edges.add([idToIndex[src]!, idToIndex[tgt]!]);
+          }
+        }
+
+        _cachedGraphNodes = nodes;
+        _cachedGraphEdges = edges;
+        _cachedGraphPid = pid;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] _loadProjectGraph error: $e');
+    }
+  }
+
+  /// Builds live knowledge graph nodes matching the repository ontology on http://10.0.0.59:28000
+  static Future<List<OntologyNode>> fetchOntologyNodes({String? projectId}) async {
+    await _loadProjectGraph(projectId);
+    return _cachedGraphNodes;
   }
 
   /// Builds live knowledge graph edges connecting entities from http://10.0.0.59:28000
   static Future<List<List<int>>> fetchOntologyEdges({String? projectId}) async {
-    return const [
-      [0, 1], // OIDC Decis… <-> Auth Servi…
-      [0, 2], // OIDC Decis… <-> GH #7210
-      [0, 3], // OIDC Decis… <-> ENG-1042
-      [1, 4], // Auth Servi… <-> Postgres D…
-      [4, 5], // Postgres D… <-> ADR #7
-      [3, 5], // ENG-1042 <-> ADR #7
-      [3, 7], // ENG-1042 <-> Billing Se…
-      [2, 6], // GH #7210 <-> @sam
-      [6, 7], // @sam <-> Billing Se…
-      [5, 7], // ADR #7 <-> Billing Se…
-      [5, 8], // ADR #7 <-> @arch-deci…
-    ];
+    await _loadProjectGraph(projectId);
+    return _cachedGraphEdges;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1828,6 +1841,19 @@ class ApiService {
     if (res.statusCode != 200 && res.statusCode != 204 && res.statusCode != 202) {
       throw Exception('Failed to remove project member (HTTP ${res.statusCode}): ${res.body}');
     }
+  }
+
+  /// Deletes a project from the backend database
+  static Future<void> deleteProject(String projectId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$projectId');
+    final res = await _client.delete(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode != 200 && res.statusCode != 204 && res.statusCode != 202) {
+      throw Exception('Failed to delete project (HTTP ${res.statusCode}): ${res.body}');
+    }
+    cachedProjects.removeWhere((p) => p.id == projectId);
+    connectedProjectIds.remove(projectId);
+    connectedWorkspaceProjects.removeWhere((p) => p.id == projectId);
+    savePersistedConnectedProjects();
   }
 
   // ─────────────────────────────────────────────────────────
