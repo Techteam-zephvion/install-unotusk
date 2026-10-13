@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.api.exceptions import (
@@ -180,7 +180,6 @@ class AuthService:
                 email="admin@acme.com",
                 name="Lead Admin",
                 password_hash=hash_password("admin123"),
-                is_active=True,
             )
             session.add(admin_account)
             await session.flush()
@@ -264,7 +263,6 @@ class AuthService:
                     email="admin@acme.com",
                     name="Lead Admin",
                     password_hash=hash_password(data.password if len(data.password) >= 6 else "admin123"),
-                    is_active=True,
                 )
                 session.add(user)
                 await session.flush()

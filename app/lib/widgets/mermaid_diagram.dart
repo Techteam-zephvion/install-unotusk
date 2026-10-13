@@ -586,13 +586,13 @@ class _MermaidFullscreenDialogState extends State<_MermaidFullscreenDialog> {
 
   void _zoomIn() {
     final matrix = _transController.value.clone();
-    matrix.scale(1.3, 1.3);
+    matrix.scaleByDouble(1.3, 1.3, 1.0, 1.0);
     _transController.value = matrix;
   }
 
   void _zoomOut() {
     final matrix = _transController.value.clone();
-    matrix.scale(0.77, 0.77);
+    matrix.scaleByDouble(0.77, 0.77, 1.0, 1.0);
     _transController.value = matrix;
   }
 

@@ -1,4 +1,3 @@
-from datetime import datetime
 import logging
 import uuid
 
@@ -6,12 +5,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from apps.api.src.auth.security import hash_password
 from apps.api.src.api.exceptions import (
     ConflictException,
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.auth.security import hash_password
 from apps.api.src.models.enums import (
     IntegrationProvider,
     IntegrationStatus,
@@ -20,6 +19,7 @@ from apps.api.src.models.enums import (
 )
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
+from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
 from apps.api.src.models.repository import Repository
 from apps.api.src.models.user import User
@@ -573,56 +573,66 @@ class ProjectService:
                 message="Project not found",
             )
 
-        # Ensure permanent admin@acme.com exists and is always linked with OWNER/ADMIN privileges
-        admin_user_res = await session.execute(
-            select(User).where(func.lower(User.email) == "admin@acme.com")
-        )
-        admin_user = admin_user_res.scalar_one_or_none()
-        if admin_user is None:
-            admin_user = User(
-                email="admin@acme.com",
-                name="Lead Admin",
-                password_hash=hash_password("admin123"),
-                is_active=True,
-            )
-            session.add(admin_user)
-            await session.flush()
-
-        admin_om_res = await session.execute(
-            select(OrganizationMembership).where(
-                OrganizationMembership.organization_id == project.organization_id,
-                OrganizationMembership.user_id == admin_user.id,
-            )
-        )
-        admin_om = admin_om_res.scalar_one_or_none()
-        if admin_om is None:
-            session.add(OrganizationMembership(
-                organization_id=project.organization_id,
-                user_id=admin_user.id,
-                role=MembershipRole.OWNER,
-            ))
-        elif admin_om.role != MembershipRole.OWNER:
-            admin_om.role = MembershipRole.OWNER
-
-        admin_pm_res = await session.execute(
-            select(ProjectMembership).where(
-                ProjectMembership.project_id == resolved_id,
-                ProjectMembership.user_id == admin_user.id,
-            )
-        )
-        admin_pm = admin_pm_res.scalar_one_or_none()
-        if admin_pm is None:
-            session.add(ProjectMembership(
-                project_id=resolved_id,
-                user_id=admin_user.id,
-                role=MembershipRole.ADMIN,
-            ))
-        elif admin_pm.role != MembershipRole.ADMIN:
-            admin_pm.role = MembershipRole.ADMIN
-
-        # Check caller permissions - Lead Admin admin@acme.com always has unrestricted access
+        # Caller info
         caller = await session.get(User, user_id)
         is_lead_admin = caller is not None and caller.email.lower() == "admin@acme.com"
+
+        # Check if project belongs to Acme Corporation or if caller is Lead Admin
+        org_query = select(Organization).where(Organization.id == project.organization_id)
+        project_org = (await session.execute(org_query)).scalar_one_or_none()
+        is_acme_org = (
+            (project_org is not None and "acme" in project_org.slug.lower())
+            or is_lead_admin
+        )
+
+        if is_acme_org:
+            # Ensure permanent admin@acme.com exists and is always linked with OWNER/ADMIN privileges
+            admin_user_res = await session.execute(
+                select(User).where(func.lower(User.email) == "admin@acme.com")
+            )
+            admin_user = admin_user_res.scalar_one_or_none()
+            if admin_user is None:
+                admin_user = User(
+                    email="admin@acme.com",
+                    name="Lead Admin",
+                    password_hash=hash_password("admin123"),
+                )
+                session.add(admin_user)
+                await session.flush()
+
+            admin_om_res = await session.execute(
+                select(OrganizationMembership).where(
+                    OrganizationMembership.organization_id == project.organization_id,
+                    OrganizationMembership.user_id == admin_user.id,
+                )
+            )
+            admin_om = admin_om_res.scalar_one_or_none()
+            if admin_om is None:
+                session.add(OrganizationMembership(
+                    organization_id=project.organization_id,
+                    user_id=admin_user.id,
+                    role=MembershipRole.OWNER,
+                ))
+            elif admin_om.role != MembershipRole.OWNER:
+                admin_om.role = MembershipRole.OWNER
+
+            admin_pm_res = await session.execute(
+                select(ProjectMembership).where(
+                    ProjectMembership.project_id == resolved_id,
+                    ProjectMembership.user_id == admin_user.id,
+                )
+            )
+            admin_pm = admin_pm_res.scalar_one_or_none()
+            if admin_pm is None:
+                session.add(ProjectMembership(
+                    project_id=resolved_id,
+                    user_id=admin_user.id,
+                    role=MembershipRole.ADMIN,
+                ))
+            elif admin_pm.role != MembershipRole.ADMIN:
+                admin_pm.role = MembershipRole.ADMIN
+
+            await session.flush()
 
         if not is_lead_admin:
             mem_query = select(OrganizationMembership).where(
@@ -651,24 +661,28 @@ class ProjectService:
                         message="You do not have access to this project",
                     )
 
-        # In single-tenant MVP, ensure all registered users are synchronized into ProjectMembership
-        # for this project so the Lead Admin can immediately see, search, and manage all workspace employees.
-        all_users_query = select(User).where(User.is_active == True)
-        all_users_res = await session.execute(all_users_query)
-        all_users = all_users_res.scalars().all()
+        # In single-tenant MVP, ensure organization users are synchronized into ProjectMembership
+        # for this project so the Lead Admin can immediately see, search, and manage workspace employees.
+        org_users_query = (
+            select(User)
+            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+            .where(OrganizationMembership.organization_id == project.organization_id)
+        )
+        org_users_res = await session.execute(org_users_query)
+        org_users = org_users_res.scalars().all()
 
         existing_pms_query = select(ProjectMembership.user_id).where(
             ProjectMembership.project_id == resolved_id
         )
         existing_pm_user_ids = set((await session.execute(existing_pms_query)).scalars().all())
 
-        new_memberships_added = False
-        for u in all_users:
+        for u in org_users:
             if u.id not in existing_pm_user_ids:
                 is_u_admin = u.email.lower() == "admin@acme.com"
                 om_res = await session.execute(
                     select(OrganizationMembership.role).where(
-                        OrganizationMembership.user_id == u.id
+                        OrganizationMembership.user_id == u.id,
+                        OrganizationMembership.organization_id == project.organization_id,
                     ).limit(1)
                 )
                 om_role = om_res.scalar_one_or_none()
@@ -682,7 +696,7 @@ class ProjectService:
                     user_id=u.id,
                     role=u_role,
                 ))
-                new_memberships_added = True
+                existing_pm_user_ids.add(u.id)
 
         await session.commit()
 
@@ -812,18 +826,6 @@ class ProjectService:
                 )
                 target_user = u_res.scalar_one_or_none()
 
-            # 4. Auto-provision employee if not yet registered in single-tenant MVP
-            if target_user is None:
-                email_val = clean_identifier if "@" in clean_identifier else f"{clean_identifier.replace(' ', '.')}@acme.com"
-                name_val = clean_identifier if "@" not in clean_identifier else clean_identifier.split("@")[0].title()
-                target_user = User(
-                    email=email_val,
-                    name=name_val,
-                    password_hash=hash_password("password123"),
-                )
-                session.add(target_user)
-                await session.flush()
-
         if target_user is None:
             raise NotFoundException(
                 code="USER_NOT_FOUND",
@@ -836,7 +838,7 @@ class ProjectService:
                 message="admin@acme.com is the permanent Lead Administrator with full repository access and cannot be re-assigned or demoted.",
             )
 
-        # Target user must be part of the organization - auto-assign if missing in single-tenant setup
+        # Target user must be part of the organization
         target_org_mem_res = await session.execute(
             select(OrganizationMembership).where(
                 OrganizationMembership.organization_id == project.organization_id,
@@ -845,13 +847,10 @@ class ProjectService:
         )
         target_org_mem = target_org_mem_res.scalar_one_or_none()
         if target_org_mem is None:
-            target_org_mem = OrganizationMembership(
-                organization_id=project.organization_id,
-                user_id=target_user.id,
-                role=data.role,
+            raise ConflictException(
+                code="USER_NOT_IN_ORGANIZATION",
+                message="User is not a member of the organization",
             )
-            session.add(target_org_mem)
-            await session.flush()
 
         # Check if already a project member - update role if existing, else add new
         existing_pm = await session.execute(
@@ -862,6 +861,11 @@ class ProjectService:
         )
         pm = existing_pm.scalar_one_or_none()
         if pm is not None:
+            if pm.role == data.role or data.user_id is not None:
+                raise ConflictException(
+                    code="MEMBER_ALREADY_EXISTS",
+                    message="User is already a member of this project",
+                )
             pm.role = data.role
             new_membership = pm
         else:
