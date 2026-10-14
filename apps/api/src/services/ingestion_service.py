@@ -492,6 +492,7 @@ class IngestionService:
         commit_artifact: GitCommitArtifact,
         project_id: uuid.UUID | None = None,
         repository_id: uuid.UUID | None = None,
+        rename_history: dict[str, str] | None = None,
     ) -> list[CodeChunk]:
         """
         Decomposes a GitCommitArtifact into AtomicCodeChange units and maps them
@@ -539,7 +540,11 @@ class IngestionService:
 
         # 3. Decompose commit diff into atomic changes
         decomposer = CodeAtomDecomposer()
-        decomp_result = decomposer.decompose(commit_artifact, symbol_catalog=symbol_catalog)
+        decomp_result = decomposer.decompose(
+            commit_artifact,
+            symbol_catalog=symbol_catalog,
+            rename_history=rename_history,
+        )
 
         # 3.5 Check for existing chunks by fingerprint to avoid redundant re-embedding
         fingerprints = [c.fingerprint for c in decomp_result.changes if c.fingerprint]
@@ -617,14 +622,20 @@ class IngestionService:
                     repository_id = repository_id or r_id
 
         all_mapped_chunks: list[CodeChunk] = []
+        accumulated_renames: dict[str, str] = {}
 
         for artifact in commit_artifacts:
+            for fd in artifact.file_diffs:
+                if fd.old_path and fd.new_path and fd.old_path != fd.new_path:
+                    accumulated_renames[fd.old_path] = fd.new_path
+
             chunks = await IngestionService.ingest_commit_atom_changes(
                 session=session,
                 snapshot_id=snapshot_id,
                 commit_artifact=artifact,
                 project_id=project_id,
                 repository_id=repository_id,
+                rename_history=accumulated_renames,
             )
             all_mapped_chunks.extend(chunks)
 

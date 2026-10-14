@@ -134,7 +134,8 @@ class ContextAssembler:
                         time_str = f" [t_start: {t_s or 'None'}, t_end: {t_e or 'None'}]"
                         conflict_tag = " (conflict)" if rel.get("has_temporal_conflict") else ""
                         uncertain_tag = " (uncertain)" if rel.get("is_uncertain") and not conflict_tag else ""
-                        rel_lines.append(f"  * ({subj}, {r_type}, {obj}){time_str}{conflict_tag}{uncertain_tag}")
+                        ended_tag = " (ended)" if t_e else ""
+                        rel_lines.append(f"  * ({subj}, {r_type}, {obj}){time_str}{conflict_tag}{uncertain_tag}{ended_tag}")
                     elif isinstance(rel, str):
                         rel_lines.append(f"  * {rel}")
                 if rel_lines:

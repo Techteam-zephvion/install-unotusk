@@ -83,10 +83,34 @@ class MultiSignalRanker:
                             ):
                                 existing.metadata[k] = v
                         existing.metadata["alternative_paths"] = all_alts
-                    else:
-                        existing.metadata.update(cand.metadata)
-                        if all_alts:
-                            existing.metadata["alternative_paths"] = all_alts
+
+                    # Merge and deduplicate temporal relations across merged candidates
+                    all_existing_rels = existing.metadata.get("temporal_relations") or []
+                    cand_rels = cand.metadata.get("temporal_relations") or []
+                    if cand_rels:
+                        merged_rels = list(all_existing_rels)
+                        existing_keys = {
+                            (
+                                (r.get("canonical_subject") or r.get("subject", "")).lower(),
+                                str(r.get("relation", "")).lower(),
+                                (r.get("canonical_object") or r.get("object", "")).lower(),
+                            )
+                            for r in all_existing_rels
+                            if isinstance(r, dict)
+                        }
+                        for r in cand_rels:
+                            if isinstance(r, dict):
+                                k = (
+                                    (r.get("canonical_subject") or r.get("subject", "")).lower(),
+                                    str(r.get("relation", "")).lower(),
+                                    (r.get("canonical_object") or r.get("object", "")).lower(),
+                                )
+                                if k not in existing_keys:
+                                    existing_keys.add(k)
+                                    merged_rels.append(r)
+                            elif r not in merged_rels:
+                                merged_rels.append(r)
+                        existing.metadata["temporal_relations"] = merged_rels
 
                 # Keep richer content or preferred entity type (SYMBOL over generic CHUNK)
                 if cand.entity_type == "SYMBOL" and existing.entity_type != "SYMBOL":
@@ -201,6 +225,9 @@ class MultiSignalRanker:
                 elif cand.metadata.get("is_superseded"):
                     score *= 0.4
                     reasons.append("Historical superseded change (demoted for current-state query)")
+                elif cand.metadata.get("is_ended_relation"):
+                    score *= 0.2
+                    reasons.append("Ended historical relation (demoted for current-state query)")
                 elif cand.metadata.get("has_superseded_versions"):
                     score += 0.4
                     reasons.append("Latest active implementation")
@@ -215,6 +242,9 @@ class MultiSignalRanker:
                 if cand.metadata.get("is_deleted"):
                     score += 0.5
                     reasons.append("Deletion event in code evolution")
+                if cand.metadata.get("is_ended_relation"):
+                    score += 0.5
+                    reasons.append("Historical ended relation evidence")
                 if cand.metadata.get("renamed_from") or cand.metadata.get("renamed_to"):
                     score += 0.4
                     reasons.append("File rename lineage")

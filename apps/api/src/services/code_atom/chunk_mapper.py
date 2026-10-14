@@ -7,6 +7,9 @@ from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.schemas.code_atom import AtomicCodeChange
 from apps.api.src.services.code_atom.embedding import generate_atom_code_embedding
+from apps.api.src.services.code_atom.relation_resolver import (
+    reconcile_code_relationships,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,9 +72,10 @@ def map_atomic_code_change_to_code_chunk(
             for f in change.atomic_facts
         ]
     if getattr(change, "temporal_relations", None):
+        reconciled = reconcile_code_relationships(change.temporal_relations)
         prov_data["temporal_relations"] = [
             r.model_dump(mode="json") if hasattr(r, "model_dump") else r
-            for r in change.temporal_relations
+            for r in reconciled
         ]
 
     # Generate embedding if requested

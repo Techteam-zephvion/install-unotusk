@@ -18,6 +18,9 @@ from apps.api.src.services.code_atom.fingerprint import (
 )
 from apps.api.src.services.code_atom.normalization import normalize_code_change
 from apps.api.src.services.code_atom.relation_extractor import TemporalRelationExtractor
+from apps.api.src.services.code_atom.relation_resolver import (
+    reconcile_code_relationships,
+)
 
 SYMBOL_HEADER_PATTERN = re.compile(
     r"\b(?:def|class|function|fn|func|interface|type|struct|enum|export\s+(?:function|class|const|let))\s+([A-Za-z0-9_]+)"
@@ -44,6 +47,7 @@ class CodeAtomDecomposer:
         symbol_catalog: list[dict[str, Any]] | None = None,
         extract_facts: bool = True,
         extract_relations: bool = True,
+        rename_history: dict[str, str] | None = None,
     ) -> CodeDecompositionResult:
         """
         Decomposes a GitCommitArtifact into a collection of AtomicCodeChange units.
@@ -52,11 +56,18 @@ class CodeAtomDecomposer:
         - commit: GitCommitArtifact containing commit metadata and diff.
         - symbol_catalog: Optional list of known symbol records (with name, start_line, end_line,
           file_path, id, symbol_type) to correlate hunks with AST symbols.
+        - rename_history: Optional mapping of historical file renames (old_path -> new_path).
         """
         # 1. Resolve file diffs: use explicit file_diffs if provided, else parse raw_diff
         file_diffs = list(commit.file_diffs)
         if not file_diffs and commit.raw_diff:
             file_diffs = parse_unified_diff(commit.raw_diff)
+
+        # Build rename history from explicit diffs and caller-provided rename mapping
+        renames: dict[str, str] = dict(rename_history or {})
+        for fd in file_diffs:
+            if fd.old_path and fd.new_path and fd.old_path != fd.new_path:
+                renames[fd.old_path] = fd.new_path
 
         atomic_changes: list[AtomicCodeChange] = []
         files_affected: set[str] = set()
@@ -75,8 +86,11 @@ class CodeAtomDecomposer:
                 if extract_facts:
                     atomic_unit.atomic_facts = self.fact_extractor.extract_facts_deterministic(atomic_unit)
                 if extract_relations:
-                    atomic_unit.temporal_relations = self.relation_extractor.extract_relations_deterministic(
+                    raw_rels = self.relation_extractor.extract_relations_deterministic(
                         atomic_unit, commit_time=commit.committed_at
+                    )
+                    atomic_unit.temporal_relations = reconcile_code_relationships(
+                        raw_rels, rename_history=renames
                     )
                 atomic_changes.append(atomic_unit)
                 continue
@@ -181,8 +195,11 @@ class CodeAtomDecomposer:
                 if extract_facts:
                     change_unit.atomic_facts = self.fact_extractor.extract_facts_deterministic(change_unit)
                 if extract_relations:
-                    change_unit.temporal_relations = self.relation_extractor.extract_relations_deterministic(
+                    raw_rels = self.relation_extractor.extract_relations_deterministic(
                         change_unit, commit_time=commit.committed_at
+                    )
+                    change_unit.temporal_relations = reconcile_code_relationships(
+                        raw_rels, rename_history=renames
                     )
                 atomic_changes.append(change_unit)
 
@@ -195,14 +212,18 @@ class CodeAtomDecomposer:
             all_facts.extend(c.atomic_facts)
             all_relations.extend(c.temporal_relations)
 
+        reconciled_commit_relations = reconcile_code_relationships(
+            all_relations, rename_history=renames
+        )
+
         return CodeDecompositionResult(
             commit_sha=commit.commit_sha,
             changes=atomic_changes,
             change_count=len(atomic_changes),
             facts=all_facts,
             fact_count=len(all_facts),
-            relations=all_relations,
-            relation_count=len(all_relations),
+            relations=reconciled_commit_relations,
+            relation_count=len(reconciled_commit_relations),
             files_affected=sorted(files_affected),
             symbols_affected=sorted(symbols_affected),
             warnings=warnings,
@@ -215,6 +236,7 @@ class CodeAtomDecomposer:
         extract_facts: bool = True,
         extract_relations: bool = True,
         use_llm: bool = True,
+        rename_history: dict[str, str] | None = None,
     ) -> CodeDecompositionResult:
         """
         Asynchronously decomposes a GitCommitArtifact, leveraging LLM extraction
@@ -225,7 +247,13 @@ class CodeAtomDecomposer:
             symbol_catalog=symbol_catalog,
             extract_facts=False,
             extract_relations=False,
+            rename_history=rename_history,
         )
+        renames: dict[str, str] = dict(rename_history or {})
+        for fd in commit.file_diffs:
+            if fd.old_path and fd.new_path and fd.old_path != fd.new_path:
+                renames[fd.old_path] = fd.new_path
+
         all_facts: list[SemanticCodeFact] = []
         all_relations: list[TemporalCodeRelation] = []
 
@@ -236,16 +264,21 @@ class CodeAtomDecomposer:
                 all_facts.extend(facts)
 
             if extract_relations:
-                rels = await self.relation_extractor.extract_relations_async(
+                raw_rels = await self.relation_extractor.extract_relations_async(
                     change, commit_time=commit.committed_at, use_llm=use_llm
                 )
-                change.temporal_relations = rels
-                all_relations.extend(rels)
+                change.temporal_relations = reconcile_code_relationships(
+                    raw_rels, rename_history=renames
+                )
+                all_relations.extend(change.temporal_relations)
 
         base_result.facts = all_facts
         base_result.fact_count = len(all_facts)
-        base_result.relations = all_relations
-        base_result.relation_count = len(all_relations)
+        reconciled_commit_relations = reconcile_code_relationships(
+            all_relations, rename_history=renames
+        )
+        base_result.relations = reconciled_commit_relations
+        base_result.relation_count = len(reconciled_commit_relations)
         return base_result
 
     def _resolve_symbol(

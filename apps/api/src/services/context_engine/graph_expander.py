@@ -75,6 +75,49 @@ class RelationshipExpander:
                 c.metadata["retrieval_reason"] = "Direct retrieval match"
 
         expanded: dict[str, RetrievedCandidate] = {c.candidate_id: c for c in seed_candidates}
+
+        # Expand grounded temporal relations present in seed candidate metadata
+        for c in seed_candidates:
+            rels = c.metadata.get("temporal_relations")
+            if isinstance(rels, list) and rels:
+                for rel in rels:
+                    if isinstance(rel, dict):
+                        target_str = rel.get("canonical_object") or rel.get("object")
+                        rel_type = rel.get("relation", "CALLS")
+                        is_ended = bool(rel.get("t_end"))
+                        if target_str:
+                            rel_cid = f"temporal_rel:{target_str}"
+                            if rel_cid not in expanded and len(expanded) < max_expansions * 4:
+                                target_path = target_str.split("::")[0] if "::" in target_str else c.path
+                                sym_name = target_str.split("::")[-1] if "::" in target_str else target_str
+                                rel_path = f"{c.path} -> {str(rel_type).lower()} -> {target_str}"
+                                reason = (
+                                    f"Historical ended relation: {c.name} {rel_type} {target_str}"
+                                    if is_ended
+                                    else f"Verified temporal relation: {c.name} {rel_type} {target_str}"
+                                )
+                                expanded[rel_cid] = RetrievedCandidate(
+                                    candidate_id=rel_cid,
+                                    entity_type="RELATION_TARGET",
+                                    name=sym_name,
+                                    path=target_path,
+                                    start_line=1,
+                                    end_line=1,
+                                    content=f"// Resolved Temporal Relation Target: ({c.name} {rel_type} {target_str})",
+                                    file_id=c.file_id,
+                                    signals={"graph_expansion": 0.45},
+                                    metadata={
+                                        "relationship_path": rel_path,
+                                        "relationship_type": str(rel_type),
+                                        "relationship_hop": 1,
+                                        "connected_from": c.path,
+                                        "retrieval_reason": reason,
+                                        "alternative_paths": [],
+                                        "is_ended_relation": is_ended,
+                                        "temporal_relations": [rel],
+                                    },
+                                )
+
         seed_file_ids = {c.file_id for c in seed_candidates if c.file_id}
 
         if not seed_file_ids:
