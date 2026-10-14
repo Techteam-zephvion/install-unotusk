@@ -382,6 +382,7 @@ class IngestionService:
                             "file_path": p,
                             "start_line": s.start_line,
                             "end_line": s.end_line,
+                            "qualified_name": s.qualified_name,
                         }
                         for p, s in created_symbols_list
                     ]
@@ -533,6 +534,7 @@ class IngestionService:
                     "file_path": file_path,
                     "start_line": sym.start_line,
                     "end_line": sym.end_line,
+                    "qualified_name": sym.qualified_name,
                 }
             )
             symbols_map[f"{sym.file_id}:{sym.name}"] = sym

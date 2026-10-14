@@ -97,12 +97,22 @@ class CodeAtomDecomposer:
 
             for hunk in file_diff.hunks:
                 # Correlate symbol from symbol catalog or hunk section header
+                new_start = hunk.new_start_line
+                new_end = (
+                    hunk.new_start_line + hunk.new_line_count - 1
+                    if hunk.new_line_count > 0
+                    else hunk.new_start_line
+                )
                 symbol_id, symbol_name, symbol_type = self._resolve_symbol(
                     file_path=file_diff.new_path,
-                    start_line=hunk.new_start_line,
-                    end_line=hunk.new_start_line + hunk.new_line_count - 1,
+                    start_line=new_start,
+                    end_line=new_end,
                     section_header=hunk.section_header,
                     symbol_catalog=symbol_catalog,
+                    old_file_path=file_diff.old_path,
+                    old_start_line=hunk.old_start_line,
+                    old_line_count=hunk.old_line_count,
+                    new_line_count=hunk.new_line_count,
                 )
 
                 if symbol_name:
@@ -286,33 +296,116 @@ class CodeAtomDecomposer:
         file_path: str,
         start_line: int,
         end_line: int,
-        section_header: str | None,
-        symbol_catalog: list[dict[str, Any]] | None,
+        section_header: str | None = None,
+        symbol_catalog: list[dict[str, Any]] | None = None,
+        old_file_path: str | None = None,
+        old_start_line: int | None = None,
+        old_line_count: int | None = None,
+        new_line_count: int | None = None,
     ) -> tuple[uuid.UUID | None, str | None, str | None]:
-        """Resolves symbol identity from catalog or falls back to hunk header hint."""
-        clean_file = file_path.replace("\\", "/").strip().lower()
+        """
+        Resolves symbol identity from AST catalog or falls back to hunk header hint.
 
-        # 1. Try matching with provided AST symbol catalog
+        Guarantees:
+        1. Innermost enclosing symbol preference: when nested symbols enclose the line range
+           (e.g., method within class), selects the most specific (innermost) symbol.
+        2. Deletion handling: when new_line_count == 0 (pure deletion), correlates against
+           old_start_line and old_line_count in symbol catalog.
+        3. File path normalization & rename handling: matches against normalized new or old file path.
+        4. Hunk header symbol alignment: if diff header specifies symbol name but lines shifted,
+           matches named symbol from symbol catalog to preserve AST UUID.
+        5. Safe file-level fallback: returns (None, None, None) without hallucinating scope
+           when no enclosing symbol exists (e.g., top-level assignments or imports).
+        """
+        clean_new = file_path.replace("\\", "/").strip().lower().lstrip("/")
+        clean_old = (
+            old_file_path.replace("\\", "/").strip().lower().lstrip("/")
+            if old_file_path
+            else None
+        )
+
+        # 1. Determine effective query line range
+        is_deletion = (new_line_count == 0) or (start_line > end_line)
+        if not is_deletion and start_line > 0 and end_line >= start_line:
+            q_start, q_end = start_line, end_line
+        elif (
+            old_start_line is not None
+            and old_line_count is not None
+            and old_start_line > 0
+            and old_line_count > 0
+        ):
+            q_start = old_start_line
+            q_end = old_start_line + old_line_count - 1
+        elif start_line > 0:
+            q_start, q_end = start_line, max(start_line, end_line)
+        else:
+            q_start, q_end = 0, 0
+
+        # 2. Filter symbol catalog for matching candidate symbols in this file
+        candidate_symbols: list[dict[str, Any]] = []
         if symbol_catalog:
             for sym in symbol_catalog:
-                sym_path = str(sym.get("file_path", "")).replace("\\", "/").strip().lower()
-                if sym_path and sym_path != clean_file:
+                sym_path = str(sym.get("file_path", "")).replace("\\", "/").strip().lower().lstrip("/")
+                if not sym_path:
+                    candidate_symbols.append(sym)
                     continue
 
-                sym_start = sym.get("start_line", 0)
-                sym_end = sym.get("end_line", 0)
-                # Check line range overlap
-                if max(start_line, sym_start) <= min(end_line, sym_end):
-                    raw_id = sym.get("id")
-                    sym_uuid = uuid.UUID(str(raw_id)) if raw_id else None
-                    return sym_uuid, sym.get("name"), sym.get("symbol_type")
+                if sym_path == clean_new or (clean_old and sym_path == clean_old):
+                    candidate_symbols.append(sym)
+                elif sym_path.endswith(f"/{clean_new}") or clean_new.endswith(f"/{sym_path}"):
+                    candidate_symbols.append(sym)
+                elif clean_old and (sym_path.endswith(f"/{clean_old}") or clean_old.endswith(f"/{sym_path}")):
+                    candidate_symbols.append(sym)
 
-        # 2. Fall back to parsing the diff hunk section header
+        # 3. Correlate with AST symbol line bounds
+        if candidate_symbols and q_start > 0:
+            containing_symbols: list[tuple[int, dict[str, Any]]] = []
+            overlapping_symbols: list[tuple[int, int, dict[str, Any]]] = []
+
+            for sym in candidate_symbols:
+                s_start = sym.get("start_line", 0)
+                s_end = sym.get("end_line", 0)
+                if s_start <= 0 or s_end <= 0:
+                    continue
+
+                span = max(1, s_end - s_start + 1)
+                if s_start <= q_start and q_end <= s_end:
+                    containing_symbols.append((span, sym))
+                else:
+                    overlap = max(0, min(q_end, s_end) - max(q_start, s_start) + 1)
+                    if overlap > 0:
+                        overlapping_symbols.append((overlap, span, sym))
+
+            if containing_symbols:
+                containing_symbols.sort(key=lambda x: x[0])  # Smallest span = innermost symbol
+                best_sym = containing_symbols[0][1]
+                raw_id = best_sym.get("id")
+                sym_uuid = uuid.UUID(str(raw_id)) if raw_id else None
+                return sym_uuid, best_sym.get("name"), best_sym.get("symbol_type")
+
+            if overlapping_symbols:
+                overlapping_symbols.sort(key=lambda x: (-x[0], x[1]))  # Highest overlap, then smallest span
+                best_sym = overlapping_symbols[0][2]
+                raw_id = best_sym.get("id")
+                sym_uuid = uuid.UUID(str(raw_id)) if raw_id else None
+                return sym_uuid, best_sym.get("name"), best_sym.get("symbol_type")
+
+        # 4. Fall back to parsing the diff hunk section header
+        header_symbol_name: str | None = None
         if section_header:
             match = SYMBOL_HEADER_PATTERN.search(section_header)
             if match:
-                return None, match.group(1), "FUNCTION_OR_CLASS"
+                header_symbol_name = match.group(1)
 
+        if header_symbol_name:
+            for sym in candidate_symbols:
+                if sym.get("name") == header_symbol_name:
+                    raw_id = sym.get("id")
+                    sym_uuid = uuid.UUID(str(raw_id)) if raw_id else None
+                    return sym_uuid, sym.get("name"), sym.get("symbol_type") or "FUNCTION_OR_CLASS"
+            return None, header_symbol_name, "FUNCTION_OR_CLASS"
+
+        # 5. Safe file-level fallback
         return None, None, None
 
     def _create_file_level_atomic_change(

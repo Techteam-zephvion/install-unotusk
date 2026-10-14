@@ -63,9 +63,14 @@ def map_atomic_code_change_to_code_chunk(
     chunk_id = generate_deterministic_chunk_id(change.fingerprint)
 
     # Provenance dictionary copy
+    effective_symbol_id = symbol_id if symbol_id is not None else change.symbol_id
     prov_data = dict(change.provenance) if change.provenance else {}
     prov_data["atom_id"] = change.id
     prov_data["fingerprint"] = change.fingerprint
+    if effective_symbol_id is not None:
+        prov_data["symbol_id"] = str(effective_symbol_id)
+    if change.symbol_name and not prov_data.get("symbol_name"):
+        prov_data["symbol_name"] = change.symbol_name
     if getattr(change, "atomic_facts", None):
         prov_data["atomic_code_facts"] = [
             f.model_dump(mode="json") if hasattr(f, "model_dump") else f
@@ -95,7 +100,7 @@ def map_atomic_code_change_to_code_chunk(
         id=chunk_id,
         snapshot_id=snapshot_id,
         file_id=file_id,
-        symbol_id=symbol_id if symbol_id is not None else change.symbol_id,
+        symbol_id=effective_symbol_id,
         chunk_type=chunk_type,
         name=chunk_name,
         path=change.file_path,

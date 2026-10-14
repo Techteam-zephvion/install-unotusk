@@ -133,8 +133,8 @@ The ground-truth dataset consists of 10 handcrafted, verified scenarios spanning
 ## 5. Representative Failure Cases & Edge Cases
 
 1. **Hunk Header Symbol Resolution:**
-   - *Observation:* When unified diffs omit the function signature from the hunk header (e.g. `@@ -1,4 +1,7 @@` without trailing `def name():`), symbol resolution falls back to the file level (`weather.py`) rather than the local enclosing scope.
-   - *Mitigation:* In full repository ingestion, Tree-sitter AST symbol catalogs correlate line ranges with exact AST symbols, bridging partial diff headers.
+   - *Observation:* When unified diffs omit the function signature from the hunk header (e.g. `@@ -1,4 +1,7 @@` without trailing `def name():`), symbol resolution previously fell back to the file level rather than the local enclosing scope.
+   - *Mitigation (Implemented in Phase 13):* `CodeAtomDecomposer._resolve_symbol` now correlates diff hunk line bounds (`new_start_line`, `new_line_count`, `old_start_line`, `old_line_count`) with the Tree-sitter AST `symbol_catalog`, selecting the innermost enclosing symbol (smallest span), handling deletions, and preserving AST UUID identity even when hunk headers lack function signatures.
 
 2. **Dual Call / Mutation Semantics:**
    - *Observation:* Statements such as `user_repo.save(user)` represent both an invocation (`CALLS user_repo`) and a persistence side effect (`MUTATES user_repo`).
