@@ -248,10 +248,10 @@ class _AskTabState extends ConsumerState<AskTab> {
           ReasoningComponent(label: 'Authority', score: 0.93),
         ],
         routingPath: const ['Semantic Search', 'Vector Ingestion', 'Ontology Graph', 'Synthesized Verification'],
-        ontologyEdges: const ['Service:Auth', 'Decision:ADR-7', 'Commit:GH-7210', 'Ticket:ENG-2847'],
+        ontologyEdges: groundedAnswer.relatedEntities,
         citations: groundedAnswer.evidence.isNotEmpty
-            ? groundedAnswer.evidence.map((e) => e.file).toList()
-            : const ['src/auth/service.rs', 'docs/adr/007-postgres.md', 'crates/unotusk-core/src/lib.rs'],
+            ? groundedAnswer.evidence.map((e) => e.file).where((f) => f.isNotEmpty).toSet().toList()
+            : const [],
       );
 
       setState(() {
@@ -270,68 +270,23 @@ class _AskTabState extends ConsumerState<AskTab> {
       _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
-      // Fallback demo response if backend fails or is offline
-      final fallbackAnswer = GroundedAnswer(
-        conversationId: 'demo-conv',
-        messageId: 'demo-msg-${DateTime.now().millisecondsSinceEpoch}',
+      final errorAnswer = GroundedAnswer(
+        conversationId: 'err-conv',
+        messageId: 'err-msg-${DateTime.now().millisecondsSinceEpoch}',
         role: 'assistant',
-        content: _getDemoContentForQuery(text),
-        evidence: const [
-          EvidenceItem(
-            type: 'file',
-            file: 'crates/unotusk-auth/src/lib.rs',
-            lines: '42-88',
-            relevance: 0.95,
-            snippet: 'Database connection pool initialization with PostgreSQL pgvector support.',
-          ),
-          EvidenceItem(
-            type: 'file',
-            file: 'docs/adr/007-postgres-vs-mongo.md',
-            lines: '1-35',
-            relevance: 0.92,
-            snippet: 'Decision: Adopt PostgreSQL with pgvector for strict transactional integrity and unified search.',
-          ),
-        ],
-        relatedEntities: const ['Postgres', 'pgvector', 'ADR #7', 'ENG-2847'],
-        confidence: 'CONFIRMED',
+        content: 'Failed to retrieve answer from backend: $e\n\nPlease ensure backend is reachable at http://10.0.0.59:28000.',
+        evidence: const [],
+        relatedEntities: const [],
+        confidence: 'INFERRED',
         createdAt: DateTime.now(),
       );
 
-      final isBdd = text.toLowerCase().contains('bdd') ||
-          text.toLowerCase().contains('spec') ||
-          text.toLowerCase().contains('rate-limiter');
-
-      final bddData = isBdd
-          ? const BDDContractData(
-              given: 'A downstream client making requests to Auth endpoints with a valid API key',
-              when: 'The client exceeds 100 requests per second window threshold',
-              then: 'The rate-limiter returns HTTP 429 Too Many Requests with Retry-After header within 5ms',
-              kpi: 'Enforce latency ceiling < 5ms under load',
-              kpiTag: 'SLA TARGET',
-              kpiNote: 'p99 < 8ms under 10k RPS',
-              testCases: [
-                BDDTestCase(id: 1, desc: 'Under-quota requests succeed with HTTP 200 within 2ms'),
-                BDDTestCase(id: 2, desc: 'Burst limit triggers HTTP 429 with correct Retry-After header'),
-                BDDTestCase(id: 3, desc: 'Token bucket replenishment follows leaky bucket arithmetic'),
-              ],
-              risks: [
-                BDDRiskItem(tag: 'CONFIRMED', text: 'Redis latency spike during token bucket eviction under high memory load'),
-                BDDRiskItem(tag: 'INFERRED', text: 'Potential distributed clock skew across multi-region edge deployments'),
-              ],
-            )
-          : null;
-
       final reasoningData = ReasoningData(
-        compositeScore: 0.91,
-        components: const [
-          ReasoningComponent(label: 'Coverage', score: 0.93),
-          ReasoningComponent(label: 'Directness', score: 0.89),
-          ReasoningComponent(label: 'Recency', score: 0.92),
-          ReasoningComponent(label: 'Authority', score: 0.90),
-        ],
-        routingPath: const ['Semantic Search', 'Vector Ingestion', 'Ontology Graph', 'Verified Synthesis'],
-        ontologyEdges: const ['Service:Auth', 'Decision:ADR-7', 'Commit:GH-7210', 'Ticket:ENG-2847'],
-        citations: const ['crates/unotusk-auth/src/lib.rs', 'docs/adr/007-postgres-vs-mongo.md'],
+        compositeScore: 0.0,
+        components: const [],
+        routingPath: const ['Direct API Connection'],
+        ontologyEdges: const [],
+        citations: const [],
       );
 
       setState(() {
@@ -340,8 +295,8 @@ class _AskTabState extends ConsumerState<AskTab> {
           _messages[idx] = ChatMessageItem(
             id: genId,
             kind: 'response',
-            answer: fallbackAnswer,
-            bdd: bddData,
+            answer: errorAnswer,
+            bdd: null,
             reasoning: reasoningData,
           );
         }
@@ -351,18 +306,6 @@ class _AskTabState extends ConsumerState<AskTab> {
     }
   }
 
-  String _getDemoContentForQuery(String q) {
-    final lower = q.toLowerCase();
-    if (lower.contains('postgres') || lower.contains('mongo')) {
-      return 'PostgreSQL was selected over MongoDB in March per Architecture Decision Record (ADR #7) due to strict ACID transaction requirements for license token verification and built-in pgvector extension support for high-precision semantic search indexing.';
-    } else if (lower.contains('owns') || lower.contains('auth')) {
-      return 'The Auth Service (US) is owned by the Core Platform Security Team led by @sam (Ticket ENG-2847). Key responsibilities include OIDC token federation, employee mTLS certificate issuance, and session token verification.';
-    } else if (lower.contains('fpr')) {
-      return 'False Positive Rate (FPR) on the auth service has improved by +0.08 over the past 30 days, achieving a composite precision index of 0.88 across 42 verified commits and 18 ADR specifications.';
-    } else {
-      return 'Based on the repository context and ontology graph, this decision was recorded in ADR #7 with citations from the active codebase and PR history. All associated test contracts have verified compliance.';
-    }
-  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {

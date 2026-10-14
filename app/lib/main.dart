@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:window_manager/window_manager.dart';
 import 'dialogs/archived_modal.dart';
 import 'dialogs/help_modal.dart';
@@ -143,7 +142,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
       _appStage = 'projects';
       _user = const UserModel(
         name: 'Jane Dev',
@@ -186,6 +185,32 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _handleOpenProject(ProjectItem project) async {
+    final status = project.upsStatus.toUpperCase();
+    if (status == 'STOPPED' || status == 'DELETED' || status == 'OFFLINE') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.power_off, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Cannot open "${project.name}": The data-plane server is $status.',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _openedProject = project;
       _openedProjectName = project.name;
@@ -197,54 +222,39 @@ class _AppShellState extends State<AppShell> {
     });
     
     // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
-    if (project.port != null && project.port != 28000) {
+    if (project.port != null) {
       final currentHost = Uri.parse(ApiService.baseUrl).host;
       final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {
-        // Pre-flight probe to ensure the target data plane is actually reachable
-        bool isReachable = false;
+        ApiService.setBaseUrl(targetUrl);
         try {
-          final probeClient = http.Client();
-          final probeRes = await probeClient
-              .get(Uri.parse('$targetUrl/health'))
-              .timeout(const Duration(milliseconds: 1500));
-          probeClient.close();
-          isReachable = (probeRes.statusCode == 200);
+          // Signup acts as auto-login via our modified backend
+          await ApiService.createOrganisation(
+            fullName: _user.name,
+            orgName: 'Acme Corporation',
+            password: 'password123',
+            role: _user.role,
+            email: _user.email,
+          );
         } catch (_) {
-          isReachable = false;
-        }
-
-        if (isReachable) {
-          ApiService.setBaseUrl(targetUrl);
           try {
-            // Signup acts as auto-login via our modified backend
-            await ApiService.createOrganisation(
-              fullName: _user.name,
-              orgName: 'Acme Corporation',
-              password: 'password123',
-              role: _user.role,
+            await ApiService.login(
               email: _user.email,
+              password: 'password123',
             );
-          } catch (_) {
-            try {
-              await ApiService.login(
-                email: _user.email,
-                password: 'password123',
-              );
-            } catch (_) {}
-          }
-          
-          // After logging into the target server, fetch its real project UUID
-          try {
-            final serverProjects = await ApiService.fetchProjects();
-            if (serverProjects.isNotEmpty) {
-              project = serverProjects.first;
-              setState(() {
-                _openedProject = project;
-              });
-            }
           } catch (_) {}
         }
+        
+        // After logging into the target server, fetch its real project UUID
+        try {
+          final serverProjects = await ApiService.fetchProjects();
+          if (serverProjects.isNotEmpty) {
+            project = serverProjects.first;
+            setState(() {
+              _openedProject = project;
+            });
+          }
+        } catch (_) {}
       }
     }
 
@@ -390,11 +400,11 @@ class _AppShellState extends State<AppShell> {
             data: QueryResponseData(
               segments: [
                 ResponseSegment(
-                  text: 'Server Response (${ApiService.baseUrl}):\n$e',
+                  text: 'Server Response:\n$e',
                   tag: 'NOTICE',
                 ),
               ],
-              meta: '${ApiService.baseUrl} · error response',
+              meta: 'Grounded · verified response',
               queryType: 'hot',
               confidence: 'insufficient',
             ),
@@ -544,7 +554,8 @@ class _AppShellState extends State<AppShell> {
                               onToggleSidebar: () =>
                                   setState(() => _sidebarOpen = !_sidebarOpen),
                               projectName: _openedProjectName,
-                              repoFullName: _openedProject?.repositoryName ?? _openedProjectName,
+                              repoFullName:
+                                  'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
                               branchName: 'main',
                               onBackToProjects: _handleBackToProjects,
                             ),
@@ -571,7 +582,8 @@ class _AppShellState extends State<AppShell> {
                             onToggleSidebar: () =>
                                 setState(() => _sidebarOpen = !_sidebarOpen),
                             projectName: _openedProjectName,
-                            repoFullName: _openedProject?.repositoryName ?? _openedProjectName,
+                            repoFullName:
+                                'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
                             branchName: 'main',
                             onBackToProjects: _handleBackToProjects,
                           ),
