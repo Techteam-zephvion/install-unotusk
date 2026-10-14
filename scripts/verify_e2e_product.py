@@ -1,14 +1,13 @@
 import asyncio
-import json
 import os
-import sys
+
 import httpx
 
 BASE_URL = os.environ.get("SERVER_URL", "http://10.0.0.59:28000")
 API_PREFIX = f"{BASE_URL}/api/v1"
 
 async def run_e2e():
-    print(f"=== UNOTUSK MVP E2E INTEGRATION TEST ===")
+    print("=== UNOTUSK MVP E2E INTEGRATION TEST ===")
     print(f"Target Server URL: {BASE_URL}")
 
     async with httpx.AsyncClient(timeout=120.0) as client:

@@ -1,0 +1,238 @@
+{
+  "timestamp": "2026-10-14T10:05:09.702640+00:00",
+  "evaluation_scope": "Real-Repository Git Commits & End-to-End Code Retrieval (Phase 14)",
+  "dataset_summary": {
+    "total_cases": 10,
+    "total_indexed_chunks": 22,
+    "categories": [
+      "method_call",
+      "removal",
+      "method_replacement",
+      "imports_refactor",
+      "configuration",
+      "admin_guard",
+      "rbac_isolation",
+      "file_rename",
+      "pipeline_integration",
+      "scope_resolution"
+    ]
+  },
+  "atom_extraction_metrics": {
+    "fact_extraction": {
+      "true_positives": 10,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0
+    },
+    "relation_extraction": {
+      "true_positives": 8,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0
+    },
+    "temporal_correctness": {
+      "invariants_tested": 8,
+      "invariants_correct": 8,
+      "temporal_accuracy": 1.0,
+      "invented_timestamps": 0,
+      "ended_relations_identified": 6
+    },
+    "extraction_stability": {
+      "fact_jaccard": 1.0,
+      "relation_jaccard": 1.0
+    },
+    "latency_ms": {
+      "decomposition_mean_ms": 1.37,
+      "resolution_mean_ms": 0.12,
+      "total_mean_ms": 1.49,
+      "min_ms": 0.29,
+      "max_ms": 6.41
+    }
+  },
+  "retrieval_evaluation": {
+    "mean_reciprocal_rank": 1.0,
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "precision_at_1": 1.0,
+    "precision_at_3": 0.3333,
+    "precision_at_5": 0.2,
+    "provenance_survival_rate": 1.0,
+    "cases": [
+      {
+        "case_id": "real_01_method_call",
+        "query": "How are host port bindings extracted in OrchestratorService?",
+        "expected_targets": [
+          "apps/api/src/services/orchestrator_service.py",
+          "OrchestratorService"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "OrchestratorService (MODIFY)",
+        "top_1_path": "apps/api/src/services/orchestrator_service.py",
+        "total_ranked_candidates": 11,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15610
+      },
+      {
+        "case_id": "real_02_removal",
+        "query": "Where was unused new_memberships_added removed from project member synchronization?",
+        "expected_targets": [
+          "apps/api/src/services/project_service.py",
+          "ProjectService"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "ProjectService (MODIFY)",
+        "top_1_path": "apps/api/src/services/project_service.py",
+        "total_ranked_candidates": 40,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15967
+      },
+      {
+        "case_id": "real_03_method_replacement",
+        "query": "How is matrix scaling implemented in the mermaid diagram fullscreen dialog?",
+        "expected_targets": [
+          "app/lib/widgets/mermaid_diagram.dart",
+          "_MermaidFullscreenDialogState"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "_MermaidFullscreenDialogState (MODIFY)",
+        "top_1_path": "app/lib/widgets/mermaid_diagram.dart",
+        "total_ranked_candidates": 18,
+        "provenance_intact": true,
+        "relationship_expanded": false,
+        "assembled_chars": 15842
+      },
+      {
+        "case_id": "real_04_imports_refactor",
+        "query": "Which module imports sqlalchemy func for case-insensitive email queries in auth?",
+        "expected_targets": [
+          "apps/api/src/services/auth_service.py"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "auth_service.py (MODIFY)",
+        "top_1_path": "apps/api/src/services/auth_service.py",
+        "total_ranked_candidates": 23,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 14923
+      },
+      {
+        "case_id": "real_05_configuration",
+        "query": "What is the configured port or test environment check in ApiService?",
+        "expected_targets": [
+          "app/lib/services/api_service.dart",
+          "ApiService"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "ApiService (MODIFY)",
+        "top_1_path": "app/lib/services/api_service.dart",
+        "total_ranked_candidates": 25,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15607
+      },
+      {
+        "case_id": "real_06_admin_guard",
+        "query": "How does AuthService assign the ADMIN role permanently to admin@acme.com?",
+        "expected_targets": [
+          "apps/api/src/services/auth_service.py",
+          "AuthService"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "AuthService (MODIFY)",
+        "top_1_path": "apps/api/src/services/auth_service.py",
+        "total_ranked_candidates": 29,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15829
+      },
+      {
+        "case_id": "real_07_rbac_isolation",
+        "query": "Where does ProjectService validate organization membership before adding a member to a project?",
+        "expected_targets": [
+          "apps/api/src/services/project_service.py",
+          "ProjectService"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "ProjectService (MODIFY)",
+        "top_1_path": "apps/api/src/services/project_service.py",
+        "total_ranked_candidates": 40,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15868
+      },
+      {
+        "case_id": "real_08_file_rename",
+        "query": "Which GitHub workflow file handles release builds after decoupling from build.yml?",
+        "expected_targets": [
+          ".github/workflows/release.yml"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "release.yml (RENAME)",
+        "top_1_path": ".github/workflows/release.yml",
+        "total_ranked_candidates": 12,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15970
+      },
+      {
+        "case_id": "real_09_pipeline_integration",
+        "query": "How does ContextAssembler format temporal relationships and conflict warnings in prompt context?",
+        "expected_targets": [
+          "apps/api/src/services/context_engine/assembler.py",
+          "ContextAssembler"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "ContextAssembler (MODIFY)",
+        "top_1_path": "apps/api/src/services/context_engine/assembler.py",
+        "total_ranked_candidates": 24,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 15196
+      },
+      {
+        "case_id": "real_10_scope_resolution",
+        "query": "Where is AST symbol catalog correlation and innermost scope resolution implemented for diff hunks?",
+        "expected_targets": [
+          "apps/api/src/services/code_atom/decomposer.py",
+          "CodeAtomDecomposer"
+        ],
+        "first_match_rank": 1,
+        "reciprocal_rank": 1.0,
+        "top_1_candidate": "CodeAtomDecomposer (MODIFY)",
+        "top_1_path": "apps/api/src/services/code_atom/decomposer.py",
+        "total_ranked_candidates": 35,
+        "provenance_intact": true,
+        "relationship_expanded": true,
+        "assembled_chars": 14898
+      }
+    ]
+  },
+  "embedding_provider_verification": {
+    "active_provider_name": "development",
+    "active_model_name": "deterministic-synthesizer-1536",
+    "vector_dimension": 1536,
+    "voyage_target_model": "voyage-code-2",
+    "voyage_target_dimension": 1536,
+    "is_voyage_configured": false,
+    "live_credentials_available": false,
+    "fallback_mode_active": true,
+    "database_storage_layer": "PostgreSQL 16 + pgvector CompatibleVector(1536)",
+    "external_vector_db_discarded": "Qdrant discarded per Unotusk MVP specification"
+  }
+}
