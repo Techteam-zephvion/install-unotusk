@@ -544,8 +544,7 @@ class _AppShellState extends State<AppShell> {
                               onToggleSidebar: () =>
                                   setState(() => _sidebarOpen = !_sidebarOpen),
                               projectName: _openedProjectName,
-                              repoFullName:
-                                  'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
+                              repoFullName: _openedProject?.repositoryName ?? _openedProjectName,
                               branchName: 'main',
                               onBackToProjects: _handleBackToProjects,
                             ),
@@ -572,8 +571,7 @@ class _AppShellState extends State<AppShell> {
                             onToggleSidebar: () =>
                                 setState(() => _sidebarOpen = !_sidebarOpen),
                             projectName: _openedProjectName,
-                            repoFullName:
-                                'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
+                            repoFullName: _openedProject?.repositoryName ?? _openedProjectName,
                             branchName: 'main',
                             onBackToProjects: _handleBackToProjects,
                           ),

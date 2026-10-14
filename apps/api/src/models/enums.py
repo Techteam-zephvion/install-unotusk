@@ -12,6 +12,7 @@ class ProjectStatus(str, enum.Enum):
     CONNECTING = "CONNECTING"
     READY = "READY"
     ERROR = "ERROR"
+    STOPPED = "STOPPED"
 
 
 class IntegrationProvider(str, enum.Enum):

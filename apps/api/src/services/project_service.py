@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from apps.api.src.api.exceptions import (
     ConflictException,
@@ -18,7 +19,9 @@ from apps.api.src.models.enums import (
 )
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
+from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
+from apps.api.src.models.repository import Repository
 from apps.api.src.models.user import User
 from apps.api.src.schemas.project import (
     ProjectCreate,
@@ -26,7 +29,9 @@ from apps.api.src.schemas.project import (
     ProjectMemberRead,
     ProjectRead,
     ProjectUpdate,
+    ServerSyncRequest,
 )
+from apps.api.src.schemas.repository import RepositoryRead
 from apps.api.src.services.slug import slugify
 
 logger = logging.getLogger("unotusk-api")
@@ -141,6 +146,28 @@ class ProjectService:
         return project_read
 
     @staticmethod
+    def _get_live_docker_ports() -> dict[int, str]:
+        """Returns map of host_port -> state ('running', 'stopped') for unotusk containers."""
+        res: dict[int, str] = {}
+        try:
+            import docker
+            client = docker.from_env()
+            for c in client.containers.list(all=True):
+                labels = c.labels or {}
+                if labels.get("com.docker.compose.service") == "api":
+                    state = c.status
+                    ports = c.ports or {}
+                    for _p_spec, host_bindings in ports.items():
+                        if host_bindings:
+                            for b in host_bindings:
+                                hp = b.get("HostPort")
+                                if hp and int(hp) != 28000:
+                                    res[int(hp)] = state
+        except Exception:
+            pass
+        return res
+
+    @staticmethod
     async def list_projects(
         session: AsyncSession,
         user_id: uuid.UUID,
@@ -159,11 +186,14 @@ class ProjectService:
                 message="You do not belong to this organization",
             )
 
-        # Query projects strictly bound to organization
+        docker_ports = ProjectService._get_live_docker_ports()
+
+        # Query projects strictly bound to organization with repositories loaded
         if org_mem.role in (MembershipRole.OWNER, MembershipRole.ADMIN):
             # Organization OWNER / ADMIN sees all projects in the organization
             query = (
                 select(Project, ProjectMembership.role)
+                .options(selectinload(Project.repositories))
                 .outerjoin(
                     ProjectMembership,
                     (ProjectMembership.project_id == Project.id)
@@ -176,14 +206,24 @@ class ProjectService:
             rows = result.all()
             output = []
             for proj, p_role in rows:
+                if proj.port is not None and proj.port in docker_ports:
+                    d_state = docker_ports[proj.port]
+                    if d_state == "running" and proj.status != ProjectStatus.READY:
+                        proj.status = ProjectStatus.READY
+                    elif d_state != "running" and proj.status == ProjectStatus.READY:
+                        proj.status = ProjectStatus.STOPPED
+
                 p_read = ProjectRead.model_validate(proj)
                 p_read.role = p_role or org_mem.role
+                if proj.repositories:
+                    p_read.repository = RepositoryRead.model_validate(proj.repositories[0])
                 output.append(p_read)
             return output
         else:
             # Regular MEMBER only sees assigned projects
             query = (
                 select(Project, ProjectMembership.role)
+                .options(selectinload(Project.repositories))
                 .join(
                     ProjectMembership,
                     (ProjectMembership.project_id == Project.id)
@@ -196,8 +236,17 @@ class ProjectService:
             rows = result.all()
             output = []
             for proj, p_role in rows:
+                if proj.port is not None and proj.port in docker_ports:
+                    d_state = docker_ports[proj.port]
+                    if d_state == "running" and proj.status != ProjectStatus.READY:
+                        proj.status = ProjectStatus.READY
+                    elif d_state != "running" and proj.status == ProjectStatus.READY:
+                        proj.status = ProjectStatus.STOPPED
+
                 p_read = ProjectRead.model_validate(proj)
                 p_read.role = p_role
+                if proj.repositories:
+                    p_read.repository = RepositoryRead.model_validate(proj.repositories[0])
                 output.append(p_read)
             return output
 
@@ -208,7 +257,11 @@ class ProjectService:
         project_id: uuid.UUID | str,
     ) -> ProjectRead:
         resolved_id = await ProjectService.resolve_project_id(session, project_id)
-        query = select(Project).where(Project.id == resolved_id)
+        query = (
+            select(Project)
+            .options(selectinload(Project.repositories))
+            .where(Project.id == resolved_id)
+        )
         result = await session.execute(query)
         project = result.scalar_one_or_none()
 
@@ -249,7 +302,160 @@ class ProjectService:
 
         p_read = ProjectRead.model_validate(project)
         p_read.role = proj_mem.role if proj_mem else org_mem.role
+        if project.repositories:
+            p_read.repository = RepositoryRead.model_validate(project.repositories[0])
         return p_read
+
+    @staticmethod
+    async def sync_servers(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        data: ServerSyncRequest,
+    ) -> list[ProjectRead]:
+        import urllib.parse
+
+        # 1. Get user's primary organization
+        mem_query = select(OrganizationMembership).where(
+            OrganizationMembership.user_id == user_id,
+        )
+        mem_res = await session.execute(mem_query)
+        org_mem = mem_res.scalars().first()
+        if org_mem is None:
+            raise ForbiddenException(
+                code="ORGANIZATION_ACCESS_DENIED",
+                message="User has no organization memberships",
+            )
+        organization_id = org_mem.organization_id
+
+        synced_ports = {s.port for s in data.servers}
+        stale_slugs = {"orca", "syncguard", "unotusk-core"}
+
+        # 2. Clean up stale mock projects not in synced servers
+        existing_projects_query = (
+            select(Project)
+            .options(selectinload(Project.repositories))
+            .where(Project.organization_id == organization_id)
+        )
+        existing_res = await session.execute(existing_projects_query)
+        existing_projects = list(existing_res.scalars().all())
+
+        for p in existing_projects:
+            if p.slug in stale_slugs or (p.port is not None and p.port not in synced_ports):
+                await session.delete(p)
+        await session.flush()
+
+        # Re-fetch remaining projects
+        existing_res = await session.execute(existing_projects_query)
+        existing_projects = list(existing_res.scalars().all())
+        existing_by_port = {p.port: p for p in existing_projects if p.port is not None}
+        existing_by_name = {p.name.lower(): p for p in existing_projects}
+
+        for server in data.servers:
+            is_running = server.state.lower() in ("running", "active", "degraded")
+            target_status = ProjectStatus.READY if is_running else ProjectStatus.STOPPED
+
+            proj = existing_by_port.get(server.port) or existing_by_name.get(server.name.lower())
+            if proj is not None:
+                proj.name = server.name.strip()
+                proj.port = server.port
+                proj.status = target_status
+                if server.description:
+                    proj.description = server.description
+            else:
+                base_slug = slugify(server.name)
+                slug = base_slug
+                slug_check = await session.execute(
+                    select(Project).where(
+                        Project.organization_id == organization_id,
+                        Project.slug == slug,
+                    )
+                )
+                if slug_check.scalar_one_or_none() is not None:
+                    slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
+
+                proj = Project(
+                    organization_id=organization_id,
+                    name=server.name.strip(),
+                    slug=slug,
+                    description=server.description or f"Server instance for {server.name}",
+                    status=target_status,
+                    port=server.port,
+                )
+                session.add(proj)
+                await session.flush()
+
+                # Membership
+                mem = ProjectMembership(
+                    project_id=proj.id,
+                    user_id=user_id,
+                    role=MembershipRole.ADMIN,
+                )
+                session.add(mem)
+
+                # Integration
+                integration = Integration(
+                    project_id=proj.id,
+                    provider=IntegrationProvider.GITHUB,
+                    status=IntegrationStatus.CONNECTED if is_running else IntegrationStatus.PENDING,
+                    metadata={},
+                )
+                session.add(integration)
+                await session.flush()
+
+            # Handle repository linking
+            if server.repo_url and server.repo_url.strip():
+                repo_url = server.repo_url.strip()
+                path_parts = urllib.parse.urlparse(repo_url).path.strip("/").split("/")
+                if len(path_parts) >= 2:
+                    repo_owner = path_parts[-2]
+                    repo_name = path_parts[-1]
+                    if repo_name.endswith(".git"):
+                        repo_name = repo_name[:-4]
+                else:
+                    repo_owner, repo_name = "default", server.name
+
+                repo_full_name = f"{repo_owner}/{repo_name}"
+
+                repo_query = select(Repository).where(Repository.project_id == proj.id)
+                repo_res = await session.execute(repo_query)
+                repo = repo_res.scalars().first()
+
+                integ_query = select(Integration.id).where(Integration.project_id == proj.id)
+                integ_id = (await session.execute(integ_query)).scalar_one_or_none()
+                if integ_id is None:
+                    integ = Integration(
+                        project_id=proj.id,
+                        provider=IntegrationProvider.GITHUB,
+                        status=IntegrationStatus.CONNECTED,
+                        metadata={},
+                    )
+                    session.add(integ)
+                    await session.flush()
+                    integ_id = integ.id
+
+                if repo is not None:
+                    repo.owner = repo_owner
+                    repo.name = repo_name
+                    repo.full_name = repo_full_name
+                    repo.url = repo_url
+                else:
+                    repo = Repository(
+                        project_id=proj.id,
+                        integration_id=integ_id,
+                        provider=IntegrationProvider.GITHUB,
+                        external_id=f"{repo_owner}_{repo_name}_{uuid.uuid4().hex[:6]}",
+                        owner=repo_owner,
+                        name=repo_name,
+                        full_name=repo_full_name,
+                        default_branch="main",
+                        url=repo_url,
+                        is_private=False,
+                    )
+                    session.add(repo)
+
+        await session.commit()
+        session.expire_all()
+        return await ProjectService.list_projects(session, user_id, organization_id)
 
     @staticmethod
     async def update_project(
@@ -367,56 +573,66 @@ class ProjectService:
                 message="Project not found",
             )
 
-        # Ensure permanent admin@acme.com exists and is always linked with OWNER/ADMIN privileges
-        admin_user_res = await session.execute(
-            select(User).where(func.lower(User.email) == "admin@acme.com")
-        )
-        admin_user = admin_user_res.scalar_one_or_none()
-        if admin_user is None:
-            admin_user = User(
-                email="admin@acme.com",
-                name="Lead Admin",
-                password_hash=hash_password("admin123"),
-                is_active=True,
-            )
-            session.add(admin_user)
-            await session.flush()
-
-        admin_om_res = await session.execute(
-            select(OrganizationMembership).where(
-                OrganizationMembership.organization_id == project.organization_id,
-                OrganizationMembership.user_id == admin_user.id,
-            )
-        )
-        admin_om = admin_om_res.scalar_one_or_none()
-        if admin_om is None:
-            session.add(OrganizationMembership(
-                organization_id=project.organization_id,
-                user_id=admin_user.id,
-                role=MembershipRole.OWNER,
-            ))
-        elif admin_om.role != MembershipRole.OWNER:
-            admin_om.role = MembershipRole.OWNER
-
-        admin_pm_res = await session.execute(
-            select(ProjectMembership).where(
-                ProjectMembership.project_id == resolved_id,
-                ProjectMembership.user_id == admin_user.id,
-            )
-        )
-        admin_pm = admin_pm_res.scalar_one_or_none()
-        if admin_pm is None:
-            session.add(ProjectMembership(
-                project_id=resolved_id,
-                user_id=admin_user.id,
-                role=MembershipRole.ADMIN,
-            ))
-        elif admin_pm.role != MembershipRole.ADMIN:
-            admin_pm.role = MembershipRole.ADMIN
-
-        # Check caller permissions - Lead Admin admin@acme.com always has unrestricted access
+        # Caller info
         caller = await session.get(User, user_id)
         is_lead_admin = caller is not None and caller.email.lower() == "admin@acme.com"
+
+        # Check if project belongs to Acme Corporation or if caller is Lead Admin
+        org_query = select(Organization).where(Organization.id == project.organization_id)
+        project_org = (await session.execute(org_query)).scalar_one_or_none()
+        is_acme_org = (
+            (project_org is not None and "acme" in project_org.slug.lower())
+            or is_lead_admin
+        )
+
+        if is_acme_org:
+            # Ensure permanent admin@acme.com exists and is always linked with OWNER/ADMIN privileges
+            admin_user_res = await session.execute(
+                select(User).where(func.lower(User.email) == "admin@acme.com")
+            )
+            admin_user = admin_user_res.scalar_one_or_none()
+            if admin_user is None:
+                admin_user = User(
+                    email="admin@acme.com",
+                    name="Lead Admin",
+                    password_hash=hash_password("admin123"),
+                )
+                session.add(admin_user)
+                await session.flush()
+
+            admin_om_res = await session.execute(
+                select(OrganizationMembership).where(
+                    OrganizationMembership.organization_id == project.organization_id,
+                    OrganizationMembership.user_id == admin_user.id,
+                )
+            )
+            admin_om = admin_om_res.scalar_one_or_none()
+            if admin_om is None:
+                session.add(OrganizationMembership(
+                    organization_id=project.organization_id,
+                    user_id=admin_user.id,
+                    role=MembershipRole.OWNER,
+                ))
+            elif admin_om.role != MembershipRole.OWNER:
+                admin_om.role = MembershipRole.OWNER
+
+            admin_pm_res = await session.execute(
+                select(ProjectMembership).where(
+                    ProjectMembership.project_id == resolved_id,
+                    ProjectMembership.user_id == admin_user.id,
+                )
+            )
+            admin_pm = admin_pm_res.scalar_one_or_none()
+            if admin_pm is None:
+                session.add(ProjectMembership(
+                    project_id=resolved_id,
+                    user_id=admin_user.id,
+                    role=MembershipRole.ADMIN,
+                ))
+            elif admin_pm.role != MembershipRole.ADMIN:
+                admin_pm.role = MembershipRole.ADMIN
+
+            await session.flush()
 
         if not is_lead_admin:
             mem_query = select(OrganizationMembership).where(
@@ -445,23 +661,28 @@ class ProjectService:
                         message="You do not have access to this project",
                     )
 
-        # In single-tenant MVP, ensure all registered users are synchronized into ProjectMembership
-        # for this project so the Lead Admin can immediately see, search, and manage all workspace employees.
-        all_users_query = select(User).where(User.is_active)
-        all_users_res = await session.execute(all_users_query)
-        all_users = all_users_res.scalars().all()
+        # In single-tenant MVP, ensure organization users are synchronized into ProjectMembership
+        # for this project so the Lead Admin can immediately see, search, and manage workspace employees.
+        org_users_query = (
+            select(User)
+            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+            .where(OrganizationMembership.organization_id == project.organization_id)
+        )
+        org_users_res = await session.execute(org_users_query)
+        org_users = org_users_res.scalars().all()
 
         existing_pms_query = select(ProjectMembership.user_id).where(
             ProjectMembership.project_id == resolved_id
         )
         existing_pm_user_ids = set((await session.execute(existing_pms_query)).scalars().all())
 
-        for u in all_users:
+        for u in org_users:
             if u.id not in existing_pm_user_ids:
                 is_u_admin = u.email.lower() == "admin@acme.com"
                 om_res = await session.execute(
                     select(OrganizationMembership.role).where(
-                        OrganizationMembership.user_id == u.id
+                        OrganizationMembership.user_id == u.id,
+                        OrganizationMembership.organization_id == project.organization_id,
                     ).limit(1)
                 )
                 om_role = om_res.scalar_one_or_none()
@@ -475,6 +696,7 @@ class ProjectService:
                     user_id=u.id,
                     role=u_role,
                 ))
+                existing_pm_user_ids.add(u.id)
 
         await session.commit()
 
@@ -604,18 +826,6 @@ class ProjectService:
                 )
                 target_user = u_res.scalar_one_or_none()
 
-            # 4. Auto-provision employee if not yet registered in single-tenant MVP
-            if target_user is None:
-                email_val = clean_identifier if "@" in clean_identifier else f"{clean_identifier.replace(' ', '.')}@acme.com"
-                name_val = clean_identifier if "@" not in clean_identifier else clean_identifier.split("@")[0].title()
-                target_user = User(
-                    email=email_val,
-                    name=name_val,
-                    password_hash=hash_password("password123"),
-                )
-                session.add(target_user)
-                await session.flush()
-
         if target_user is None:
             raise NotFoundException(
                 code="USER_NOT_FOUND",
@@ -628,7 +838,7 @@ class ProjectService:
                 message="admin@acme.com is the permanent Lead Administrator with full repository access and cannot be re-assigned or demoted.",
             )
 
-        # Target user must be part of the organization - auto-assign if missing in single-tenant setup
+        # Target user must be part of the organization
         target_org_mem_res = await session.execute(
             select(OrganizationMembership).where(
                 OrganizationMembership.organization_id == project.organization_id,
@@ -637,13 +847,10 @@ class ProjectService:
         )
         target_org_mem = target_org_mem_res.scalar_one_or_none()
         if target_org_mem is None:
-            target_org_mem = OrganizationMembership(
-                organization_id=project.organization_id,
-                user_id=target_user.id,
-                role=data.role,
+            raise ConflictException(
+                code="USER_NOT_IN_ORGANIZATION",
+                message="User is not a member of the organization",
             )
-            session.add(target_org_mem)
-            await session.flush()
 
         # Check if already a project member - update role if existing, else add new
         existing_pm = await session.execute(
@@ -654,6 +861,11 @@ class ProjectService:
         )
         pm = existing_pm.scalar_one_or_none()
         if pm is not None:
+            if pm.role == data.role or data.user_id is not None:
+                raise ConflictException(
+                    code="MEMBER_ALREADY_EXISTS",
+                    message="User is already a member of this project",
+                )
             pm.role = data.role
             new_membership = pm
         else:

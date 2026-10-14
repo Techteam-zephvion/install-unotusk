@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import '../domain/server_instance.dart';
@@ -49,6 +50,7 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
       final servers = await registry.listServers();
       final updatedServers = await Future.wait(servers.map(_updateServerStatus));
       state = state.copyWith(isLoading: false, servers: updatedServers);
+      _syncToControlPlane(updatedServers);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -160,12 +162,50 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
     await registry.deleteServer(server, deleteVolumes: deleteVolumes);
     final updatedList = state.servers.where((s) => s.id != server.id).toList();
     state = state.copyWith(servers: updatedList);
+    _syncToControlPlane(updatedList);
   }
   
   Future<void> _updateLocalState(ServerInstance updated) async {
     await registry.saveServer(updated);
     final updatedList = state.servers.map((s) => s.id == updated.id ? updated : s).toList();
     state = state.copyWith(servers: updatedList);
+    _syncToControlPlane(updatedList);
+  }
+
+  Future<void> _syncToControlPlane(List<ServerInstance> servers) async {
+    try {
+      final dio = Dio();
+      final payload = {
+        'servers': servers.map((s) {
+          String? repoUrl;
+          try {
+            final envFile = File('${s.deploymentDir}/.env');
+            if (envFile.existsSync()) {
+              for (final line in envFile.readAsLinesSync()) {
+                if (line.startsWith('TARGET_REPO_URL=')) {
+                  repoUrl = line.substring('TARGET_REPO_URL='.length).trim();
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+          return {
+            'name': s.name,
+            'port': s.apiPort,
+            'state': s.lastKnownState.name,
+            'repo_url': repoUrl,
+          };
+        }).toList(),
+      };
+      await dio.post(
+        'http://127.0.0.1:28000/api/v1/projects/sync-servers',
+        data: payload,
+        options: Options(
+          sendTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
+    } catch (_) {}
   }
 }
 

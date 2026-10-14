@@ -1,9 +1,10 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.src.api.dependencies.auth import get_current_user
+from apps.api.src.api.dependencies.auth import get_current_user, get_optional_current_user
 from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.models.user import User
 from apps.api.src.schemas.project import (
@@ -12,11 +13,32 @@ from apps.api.src.schemas.project import (
     ProjectMemberRead,
     ProjectRead,
     ProjectUpdate,
+    ServerSyncRequest,
 )
 from apps.api.src.services.org_service import OrgService
 from apps.api.src.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
+
+
+@router.post("/sync-servers", response_model=list[ProjectRead])
+async def sync_servers(
+    data: ServerSyncRequest,
+    current_user: User | None = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ProjectRead]:
+    user_id = current_user.id if current_user else None
+    if user_id is None:
+        res = await db.execute(
+            select(User.id).where(User.email == "lead@acme.com").limit(1)
+        )
+        user_id = res.scalar_one_or_none()
+        if user_id is None:
+            first_user = (await db.execute(select(User.id).limit(1))).scalar_one_or_none()
+            user_id = first_user
+    if user_id is None:
+        return []
+    return await ProjectService.sync_servers(db, user_id, data)
 
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
