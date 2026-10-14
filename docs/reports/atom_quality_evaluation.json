@@ -1,0 +1,71 @@
+{
+  "timestamp": "2026-10-14T07:15:33.090443+00:00",
+  "dataset": {
+    "total_cases": 10,
+    "categories": [
+      "ambiguous",
+      "behavior",
+      "compound",
+      "configuration",
+      "deduplication",
+      "relations",
+      "removal",
+      "rename",
+      "temporal",
+      "temporal_conflict"
+    ],
+    "total_expected_facts": 14,
+    "total_expected_relations": 14
+  },
+  "fact_extraction": {
+    "true_positives": 14,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "false_positive_examples": [],
+    "false_negative_examples": []
+  },
+  "relationship_extraction": {
+    "true_positives": 14,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0
+  },
+  "temporal_correctness": {
+    "temporal_checks_total": 14,
+    "temporal_checks_correct": 14,
+    "accuracy": 1.0,
+    "unknown_timestamps_tested": 1,
+    "unknown_timestamps_preserved": 1,
+    "invented_timestamps": 0,
+    "ended_relations_identified": 1,
+    "conflicts_detected": 1
+  },
+  "entity_and_relation_resolution": {
+    "deduplication_cases": 1,
+    "deduplication_successful": 1,
+    "rename_lineage_cases": 1,
+    "rename_lineage_successful": 1,
+    "unresolved_duplicates": 0,
+    "incorrect_merges": 0
+  },
+  "stability": {
+    "runs": 5,
+    "mode": "deterministic",
+    "jaccard_similarity_facts": 1.0,
+    "jaccard_similarity_relations": 1.0,
+    "fact_count_variance": 0.0,
+    "relation_count_variance": 0.0
+  },
+  "performance_ms": {
+    "decomposition_mean_ms": 1.1,
+    "resolution_mean_ms": 0.22,
+    "total_mean_ms": 1.47,
+    "total_min_ms": 0.39,
+    "total_max_ms": 4.25
+  }
+}
