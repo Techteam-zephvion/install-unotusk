@@ -5,6 +5,8 @@ import '../../../../app/theme/app_text_styles.dart';
 import '../../data/workspace_repository.dart';
 import '../workspace_controller.dart';
 
+import '../../../../services/api_service.dart';
+
 class ProjectFeedItem {
   final String id;
   final String name;
@@ -40,44 +42,38 @@ class IngestionFeedTab extends ConsumerStatefulWidget {
 class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
   String? _reingestingId;
 
-  static const List<ProjectFeedItem> _projects = [
-    ProjectFeedItem(
-      id: 'proj-1',
-      name: 'Unotusk Core API',
-      serverStatus: 'active',
-      ingestionStatus: 'live',
-      fpr: 0.88,
-      days: 67,
-      lastIngestion: '4m ago',
-    ),
-    ProjectFeedItem(
-      id: 'proj-2',
-      name: 'Billing & Payments Service',
-      serverStatus: 'active',
-      ingestionStatus: 'live',
-      fpr: 0.92,
-      days: 67,
-      lastIngestion: '12m ago',
-    ),
-    ProjectFeedItem(
-      id: 'proj-3',
-      name: 'Project Intelligence Engine',
-      serverStatus: 'active',
-      ingestionStatus: 'live',
-      fpr: 0.95,
-      days: 58,
-      lastIngestion: '1h ago',
-    ),
-    ProjectFeedItem(
-      id: 'proj-4',
-      name: 'Unotusk Employee Client',
-      serverStatus: 'active',
-      ingestionStatus: 'live',
-      fpr: 0.85,
-      days: 42,
-      lastIngestion: '2h ago',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveProjects();
+  }
+
+  void _loadLiveProjects() async {
+    try {
+      await ApiService.fetchProjects();
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  List<ProjectFeedItem> get _projects {
+    if (ApiService.cachedProjects.isNotEmpty) {
+      return ApiService.cachedProjects.map((p) {
+        final ups = p.upsStatus.toUpperCase();
+        final isStopped = ups == 'STOPPED' || ups == 'DELETED' || ups == 'OFFLINE';
+        final status = ups == 'READY' ? 'active' : (isStopped ? ups.toLowerCase() : 'degraded');
+        return ProjectFeedItem(
+          id: p.id,
+          name: p.name,
+          serverStatus: status,
+          ingestionStatus: p.ingestionStatus,
+          fpr: p.fpr > 0 ? p.fpr : 0.88,
+          days: p.days,
+          lastIngestion: p.lastIngestion,
+        );
+      }).toList();
+    }
+    return [];
+  }
 
   void _triggerReingest(String id) async {
     setState(() => _reingestingId = id);
@@ -211,39 +207,49 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
                           // Action button
                           Align(
                             alignment: Alignment.centerRight,
-                            child: InkWell(
-                              onTap: isReingesting ? null : () => _triggerReingest(proj.id),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: AppColors.divider),
+                            child: Builder(
+                              builder: (context) {
+                                final isOffline = proj.serverStatus == 'stopped' || proj.serverStatus == 'deleted';
+                                return InkWell(
+                                  onTap: (isReingesting || isOffline) ? null : () => _triggerReingest(proj.id),
                                   borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isReingesting) ...[
-                                      const SizedBox(
-                                        width: 10,
-                                        height: 10,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 1.5,
-                                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    Text(
-                                      isReingesting ? 'Scanning…' : 'Re-ingest ↺',
-                                      style: AppTextStyles.mono(
-                                        fontSize: 10,
-                                        color: isReingesting ? AppColors.accent : AppColors.textSecondary,
-                                      ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: isOffline ? const Color(0xFFEF4444).withValues(alpha: 0.3) : AppColors.divider),
+                                      borderRadius: BorderRadius.circular(6),
+                                      color: isOffline ? const Color(0xFFEF4444).withValues(alpha: 0.05) : null,
                                     ),
-                                  ],
-                                ),
-                              ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isReingesting) ...[
+                                          const SizedBox(
+                                            width: 10,
+                                            height: 10,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 1.5,
+                                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                        ],
+                                        Text(
+                                          isOffline
+                                              ? 'Server Offline'
+                                              : (isReingesting ? 'Scanning…' : 'Re-ingest ↺'),
+                                          style: AppTextStyles.mono(
+                                            fontSize: 10,
+                                            color: isOffline
+                                                ? const Color(0xFFEF4444)
+                                                : (isReingesting ? AppColors.accent : AppColors.textSecondary),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -260,7 +266,9 @@ class _IngestionFeedTabState extends ConsumerState<IngestionFeedTab> {
   }
 
   Widget _buildStatusIndicator({required String label, required bool isActive}) {
-    final color = isActive ? AppColors.live : AppColors.inferred;
+    final upper = label.toUpperCase();
+    final isStopped = upper.contains('STOPPED') || upper.contains('DELETED') || upper.contains('OFFLINE');
+    final color = isStopped ? const Color(0xFFEF4444) : (isActive ? AppColors.live : AppColors.inferred);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

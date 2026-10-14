@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../../../services/api_service.dart';
 import '../workspace_controller.dart';
 
 class SpecHistoryItem {
@@ -46,57 +47,6 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedDateFilter;
 
-  static const List<SpecHistoryItem> _demoSpecs = [
-    SpecHistoryItem(
-      id: 'spec-1',
-      query: 'Why choose Postgres over Mongo in March?',
-      isoDate: '2026-03-14',
-      timestamp: 'Mar 14, 2026',
-      ago: '5d ago',
-      queryType: 'cold',
-      confidence: 'confirmed',
-      hasBDD: true,
-      score: 0.94,
-      fprDelta: 0.08,
-    ),
-    SpecHistoryItem(
-      id: 'spec-2',
-      query: 'Generate a BDD spec for rate-limiter',
-      isoDate: '2026-03-12',
-      timestamp: 'Mar 12, 2026',
-      ago: '7d ago',
-      queryType: 'warm',
-      confidence: 'confirmed',
-      hasBDD: true,
-      score: 0.91,
-      fprDelta: null,
-    ),
-    SpecHistoryItem(
-      id: 'spec-3',
-      query: 'Which team owns the auth service?',
-      isoDate: '2026-03-10',
-      timestamp: 'Mar 10, 2026',
-      ago: '9d ago',
-      queryType: 'hot',
-      confidence: 'confirmed',
-      hasBDD: false,
-      score: 0.88,
-      fprDelta: 0.04,
-    ),
-    SpecHistoryItem(
-      id: 'spec-4',
-      query: 'OIDC federation token exchange contract & verification',
-      isoDate: '2026-03-05',
-      timestamp: 'Mar 05, 2026',
-      ago: '14d ago',
-      queryType: 'cold',
-      confidence: 'confirmed',
-      hasBDD: true,
-      score: 0.96,
-      fprDelta: 0.12,
-    ),
-  ];
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -124,13 +74,16 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
       }).toList(),
     );
 
-    final specsList = (realSpecs != null && realSpecs.isNotEmpty) ? realSpecs : _demoSpecs;
+    final specsList = realSpecs ?? <SpecHistoryItem>[];
     final query = _searchController.text.toLowerCase();
     final filtered = specsList.where((s) {
       final matchesSearch = s.query.toLowerCase().contains(query);
       final matchesDate = _selectedDateFilter == null || s.isoDate == _selectedDateFilter;
       return matchesSearch && matchesDate;
     }).toList();
+
+    final activeProj = ApiService.cachedProjects.where((p) => p.id == widget.projectId).firstOrNull ?? ApiService.activeProject;
+    final projectName = activeProj?.name ?? 'Project';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -151,7 +104,7 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Unotusk Core API · 67 days indexed',
+                  '$projectName · Live Intelligence Records',
                   style: AppTextStyles.caption,
                 ),
                 const SizedBox(height: 24),
@@ -228,45 +181,18 @@ class _SpecHistoryTabState extends ConsumerState<SpecHistoryTab> {
                 ),
                 const SizedBox(height: 20),
 
-                // Recommendation Banner
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.08),
-                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.trending_up, size: 16, color: AppColors.accent),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: AppTextStyles.inter(fontSize: 12, color: AppColors.textSecondary),
-                            children: const [
-                              TextSpan(
-                                text: 'Similar spec available — ',
-                                style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600),
-                              ),
-                              TextSpan(
-                                text: 'OIDC federation contract matches 4 ontology edges with the rate-limiter spec.',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
                 // Specs List
                 if (filtered.isEmpty)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.all(40),
-                      child: Text('No matching specs found.', style: AppTextStyles.caption),
+                      child: Text(
+                        specsList.isEmpty
+                            ? 'No spec history recorded yet for $projectName. Inquire in Ask tab to record specifications.'
+                            : 'No matching specs found.',
+                        style: AppTextStyles.caption,
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   )
                 else
