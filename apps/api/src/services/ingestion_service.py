@@ -23,6 +23,7 @@ from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.schemas.code_atom import GitCommitArtifact
 from apps.api.src.services.code_atom import (
     CodeAtomDecomposer,
+    InvalidBaseCommitError,
     extract_git_commit_artifact,
     extract_incremental_commit_artifacts,
     resolve_and_map_atomic_changes,
@@ -473,15 +474,31 @@ class IngestionService:
 
             except Exception as e:
                 logger.error(f"Ingestion failed for snapshot {snapshot_id}: {e}", exc_info=True)
-                snapshot.status = SnapshotStatus.FAILED
-                snapshot.error_message = str(e)
-                snapshot.completed_at = utc_now()
-                proj_query = select(Project).where(Project.id == repository.project_id)
-                proj_res = await session.execute(proj_query)
-                proj = proj_res.scalar_one_or_none()
-                if proj:
-                    proj.status = ProjectStatus.ERROR
-                await session.commit()
+                try:
+                    await session.rollback()
+                except Exception:
+                    pass
+                try:
+                    snap_res = await session.execute(
+                        select(RepositorySnapshot).where(RepositorySnapshot.id == snapshot_id)
+                    )
+                    snap = snap_res.scalar_one_or_none()
+                    if snap:
+                        snap.status = SnapshotStatus.FAILED
+                        snap.error_message = str(e)
+                        snap.completed_at = utc_now()
+
+                    proj_res = await session.execute(
+                        select(Project).where(Project.id == repository.project_id)
+                    )
+                    proj = proj_res.scalar_one_or_none()
+                    if proj:
+                        proj.status = ProjectStatus.ERROR
+                    await session.commit()
+                except Exception as recovery_err:
+                    logger.error(
+                        f"Failed to record failure status for snapshot {snapshot_id}: {recovery_err}"
+                    )
             finally:
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -678,14 +695,28 @@ class IngestionService:
             return []
 
         checkpoint_sha = base_commit_sha if base_commit_sha is not None else snapshot.commit_sha
+        if checkpoint_sha in ("unknown", "local-dev-commit", ""):
+            checkpoint_sha = None
 
         # Extract commits since checkpoint
-        artifacts = extract_incremental_commit_artifacts(
-            repo_dir=repo_dir,
-            base_commit_sha=checkpoint_sha,
-            target_commit_sha=target_commit_sha,
-            max_commits=max_commits,
-        )
+        try:
+            artifacts = extract_incremental_commit_artifacts(
+                repo_dir=repo_dir,
+                base_commit_sha=checkpoint_sha,
+                target_commit_sha=target_commit_sha,
+                max_commits=max_commits,
+            )
+        except InvalidBaseCommitError as ibc_err:
+            logger.warning(
+                f"Invalid base checkpoint commit '{checkpoint_sha}' for snapshot {snapshot_id}: {ibc_err}. "
+                f"Resetting checkpoint to None and extracting all history up to {target_commit_sha}."
+            )
+            artifacts = extract_incremental_commit_artifacts(
+                repo_dir=repo_dir,
+                base_commit_sha=None,
+                target_commit_sha=target_commit_sha,
+                max_commits=max_commits,
+            )
 
         if not artifacts:
             logger.info(

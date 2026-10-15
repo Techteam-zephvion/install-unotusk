@@ -302,6 +302,7 @@ async def reembed_atom_code_chunks(
     snapshot_id: uuid.UUID | None = None,
     backend: CodeEmbeddingBackend | None = None,
     batch_size: int = 50,
+    only_missing: bool = False,
 ) -> int:
     """
     Safe, deterministic re-embedding path for existing ATOM CodeChunks.
@@ -312,6 +313,7 @@ async def reembed_atom_code_chunks(
       snapshot_id, file_id, symbol_id, path, start_line, end_line, and content.
     - Does NOT reprocess unrelated chunks.
     - Operates in transactional batches.
+    - When only_missing=True, filters to chunks where embedding is None.
     """
     from sqlalchemy import or_, select
 
@@ -325,6 +327,8 @@ async def reembed_atom_code_chunks(
     )
     if snapshot_id is not None:
         stmt = stmt.where(CodeChunk.snapshot_id == snapshot_id)
+    if only_missing:
+        stmt = stmt.where(CodeChunk.embedding.is_(None))
 
     res = await session.execute(stmt)
     atom_chunks = res.scalars().all()

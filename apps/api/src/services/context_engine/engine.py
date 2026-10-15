@@ -28,11 +28,19 @@ class ProjectContextEngine:
         project_id: uuid.UUID | None = None,
         query_embedding: list[float] | None = None,
         thinking_tier: str | None = None,
+        repository_id: uuid.UUID | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
 
-        # 1b. Generate Query Embedding for semantic retrieval if not provided
+        # 1b. Resolve repository_id if not explicitly provided
+        if repository_id is None:
+            snap_repo_stmt = select(RepositorySnapshot.repository_id).where(
+                RepositorySnapshot.id == snapshot_id
+            )
+            repository_id = (await session.execute(snap_repo_stmt)).scalar_one_or_none()
+
+        # 1c. Generate Query Embedding for semantic retrieval if not provided
         if query_embedding is None and question:
             try:
                 from apps.api.src.services.code_atom.embedding import generate_code_embedding
@@ -52,6 +60,7 @@ class ProjectContextEngine:
             snapshot_id=snapshot_id,
             analyzed_query=analyzed,
             query_embedding=query_embedding,
+            repository_id=repository_id,
         )
 
         # 3. Structural Relationship Expansion (Multi-hop graph traversal)

@@ -396,8 +396,8 @@ class RelationshipExpander:
 
                 # Register concrete CodeChunk candidate if not already present
                 chunk_cid = f"chunk:{chunk.id}"
-                if chunk.fingerprint:
-                    chunk_cid = f"chunk:atom:{chunk.fingerprint}"
+                atom_cid = f"chunk:atom:{chunk.fingerprint}" if chunk.fingerprint else None
+                existing_cand = expanded.get(chunk_cid) or (expanded.get(atom_cid) if atom_cid else None)
 
                 parent_cand = None
                 if sym_cid and sym_cid in expanded:
@@ -437,7 +437,7 @@ class RelationshipExpander:
                 c_sig_key = "graph_expansion" if rel_hop == 1 else f"graph_expansion_hop{rel_hop}"
                 c_weight = max(0.2, round(0.5 * (0.75 ** (rel_hop - 1)), 2))
 
-                if chunk_cid not in expanded:
+                if existing_cand is None:
                     meta = _extract_chunk_metadata(chunk)
                     meta.update(
                         {
@@ -464,7 +464,7 @@ class RelationshipExpander:
                     )
                 else:
                     RelationshipExpander._record_relationship_provenance(
-                        existing=expanded[chunk_cid],
+                        existing=existing_cand,
                         new_hop=rel_hop,
                         new_path=rel_path,
                         new_type=rel_type,

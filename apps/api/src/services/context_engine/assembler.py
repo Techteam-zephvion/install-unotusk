@@ -141,9 +141,19 @@ class ContextAssembler:
                 if rel_lines:
                     rels_info = "- Grounded Temporal Relations:\n" + "\n".join(rel_lines) + "\n"
 
+            scope_parts = []
+            repo_id = cand.metadata.get("repository_id")
+            snap_id = cand.metadata.get("snapshot_id")
+            if repo_id:
+                scope_parts.append(f"Repo: {repo_id}")
+            if snap_id:
+                scope_parts.append(f"Snapshot: {snap_id}")
+            scope_info = f"- Scope: {' | '.join(scope_parts)}\n" if scope_parts else ""
+
             candidate_section = (
                 f"### [{cand.entity_type}] {cand.path}\n"
                 f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
+                f"{scope_info}"
                 f"{temporal_status}"
                 f"{commit_info}"
                 f"{relationship_info}"
@@ -172,13 +182,19 @@ class ContextAssembler:
                 "relevance": r.score,
                 "snippet": cand.content[:200],
             }
+            if cand.file_id:
+                evidence_item["file_id"] = str(cand.file_id)
+            if cand.symbol_id:
+                evidence_item["symbol_id"] = str(cand.symbol_id)
+
             if cand.metadata:
                 for k in (
+                    "repository_id",
+                    "snapshot_id",
                     "commit_sha",
                     "commit_message",
                     "fingerprint",
                     "provenance",
-                    "snapshot_id",
                     "chunk_type",
                     "committed_at",
                     "is_superseded",

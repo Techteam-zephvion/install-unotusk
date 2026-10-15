@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
@@ -29,6 +29,21 @@ class CompatibleVector(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
+    class Comparator(TypeDecorator.Comparator):
+        def cosine_distance(self, other):
+            return self.op("<=>", return_type=Float)(other)
+
+        def l2_distance(self, other):
+            return self.op("<->", return_type=Float)(other)
+
+        def max_inner_product(self, other):
+            return self.op("<#>", return_type=Float)(other)
+
+        def l1_distance(self, other):
+            return self.op("<+>", return_type=Float)(other)
+
+    comparator_factory = Comparator
+
     def load_dialect_impl(self, dialect):
         if dialect.name == "postgresql" and _HAS_PGVECTOR and Vector is not None:
             return dialect.type_descriptor(Vector(1536))
@@ -43,6 +58,8 @@ class CompatibleVector(TypeDecorator):
         if value is None:
             return None
         if isinstance(value, list | tuple):
+            if not value:
+                return None
             return [float(x) for x in value]
         return value
 

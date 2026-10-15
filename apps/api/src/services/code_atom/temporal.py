@@ -152,7 +152,7 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
     # 1. Build rename linkage map: old_path -> canonical_new_path
     rename_map: dict[str, str] = {}
     for cand in candidates:
-        if cand.entity_type != "CHUNK" or not _is_atom_candidate(cand):
+        if cand.entity_type != "CHUNK":
             continue
         path, _, old_path = _get_candidate_target(cand)
         if old_path and old_path != path:
@@ -169,7 +169,7 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
     # 2. Group candidates by scope: scope_key -> list[RetrievedCandidate]
     scoped_groups: dict[tuple[str, str, str | None], list[RetrievedCandidate]] = {}
     for cand in candidates:
-        if cand.entity_type != "CHUNK" or not _is_atom_candidate(cand):
+        if cand.entity_type != "CHUNK":
             continue
 
         path, symbol_name, old_path = _get_candidate_target(cand)
@@ -199,13 +199,31 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
             continue
 
         # Multiple candidates in scope: extract timestamps
-        cand_with_ts: list[tuple[datetime | None, RetrievedCandidate]] = []
+        cand_with_ts: list[tuple[datetime | None, bool, RetrievedCandidate]] = []
         for cand in group:
             ts = parse_candidate_timestamp(cand)
-            cand_with_ts.append((ts, cand))
+            is_atom = _is_atom_candidate(cand)
+            cand_with_ts.append((ts, is_atom, cand))
 
         # Check if verified timestamps are present for comparison
-        known_ts = [item for item in cand_with_ts if item[0] is not None]
+        raw_known_ts = [item[0] for item in cand_with_ts if item[0] is not None]
+        has_atom_commits = any(item[1] for item in cand_with_ts)
+
+        known_ts: list[tuple[datetime, RetrievedCandidate]] = []
+        if raw_known_ts and has_atom_commits:
+            from datetime import timedelta
+
+            earliest_dt = min(raw_known_ts)
+            for ts, is_atom, cand in cand_with_ts:
+                if ts is not None:
+                    known_ts.append((ts, cand))
+                elif not is_atom:
+                    # Initial base chunk without commit metadata precedes the commit changes
+                    known_ts.append((earliest_dt - timedelta(seconds=1), cand))
+        elif len(raw_known_ts) >= 2:
+            for ts, _is_atom, cand in cand_with_ts:
+                if ts is not None:
+                    known_ts.append((ts, cand))
 
         if len(known_ts) >= 2:
             # Sort chronologically ascending
@@ -239,18 +257,15 @@ def resolve_temporal_supersession(candidates: list[RetrievedCandidate]) -> list[
                 latest_cand.metadata["has_superseded_versions"] = True
 
             # If some candidates in the group had missing timestamps, do NOT invent dates
-            for _ts, cand in cand_with_ts:
-                if _ts is None:
-                    # Leave is_superseded False or safely unmarked without fabricating timestamps
+            for _ts, _is_atom, cand in cand_with_ts:
+                if cand not in [k[1] for k in known_ts]:
                     cand.metadata.setdefault("is_superseded", False)
 
         elif len(known_ts) == 1:
-            # Only one has timestamp, others don't: safely don't fabricate order
-            for _ts, cand in cand_with_ts:
+            for _ts, _is_atom, cand in cand_with_ts:
                 cand.metadata.setdefault("is_superseded", False)
         else:
-            # None have timestamps: safe fallback without crashing or guessing
-            for _ts, cand in cand_with_ts:
+            for _ts, _is_atom, cand in cand_with_ts:
                 cand.metadata.setdefault("is_superseded", False)
 
         # Trace rename annotations

@@ -136,6 +136,8 @@ def resolve_and_map_atomic_changes(
     - Reuses existing chunks by fingerprint when provided to avoid re-embedding.
     """
     mapped_chunks: list[CodeChunk] = []
+    seen_batch_fingerprints: dict[str, CodeChunk] = {}
+
     # Build a normalized path lookup map for fast resolution: normalized_path -> RepositoryFile
     norm_files: dict[str, RepositoryFile] = {}
     for p, rf in files_map.items():
@@ -144,7 +146,26 @@ def resolve_and_map_atomic_changes(
     for change in changes:
         # Avoid re-embedding or creating duplicate chunks if already present
         if existing_chunks_by_fingerprint and change.fingerprint in existing_chunks_by_fingerprint:
-            mapped_chunks.append(existing_chunks_by_fingerprint[change.fingerprint])
+            ec = existing_chunks_by_fingerprint[change.fingerprint]
+            # Backfill embedding if missing from previous run
+            if compute_embedding and ec.embedding is None:
+                try:
+                    ec.embedding = generate_atom_code_embedding(
+                        commit_message=change.commit_message,
+                        content=change.raw_content,
+                        file_path=change.file_path,
+                        symbol_name=change.symbol_name,
+                    )
+                except Exception:
+                    pass
+            mapped_chunks.append(ec)
+            if change.fingerprint:
+                seen_batch_fingerprints[change.fingerprint] = ec
+            continue
+
+        # Prevent duplicate identical UUID instances within the current batch
+        if change.fingerprint and change.fingerprint in seen_batch_fingerprints:
+            mapped_chunks.append(seen_batch_fingerprints[change.fingerprint])
             continue
 
         clean_path = change.file_path.replace("\\", "/").strip().lstrip("/")
@@ -157,6 +178,8 @@ def resolve_and_map_atomic_changes(
             if repo_file is not None:
                 norm_files[clean_path] = repo_file
                 files_map[change.file_path] = repo_file
+                repo_file.path = change.file_path
+                repo_file.filename = os.path.basename(change.file_path)
 
         # If still not found (e.g. deleted file), create a single RepositoryFile representation and register it
         if repo_file is None:
@@ -197,5 +220,7 @@ def resolve_and_map_atomic_changes(
             compute_embedding=compute_embedding,
         )
         mapped_chunks.append(chunk)
+        if change.fingerprint:
+            seen_batch_fingerprints[change.fingerprint] = chunk
 
     return mapped_chunks

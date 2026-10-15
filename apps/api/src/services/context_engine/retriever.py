@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.file import RepositoryFile
+from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
 
@@ -77,6 +78,12 @@ def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
     meta: dict[str, Any] = {}
     if getattr(chunk, "snapshot_id", None):
         meta["snapshot_id"] = str(chunk.snapshot_id)
+    if getattr(chunk, "file_id", None):
+        meta["file_id"] = str(chunk.file_id)
+    if getattr(chunk, "symbol_id", None):
+        meta["symbol_id"] = str(chunk.symbol_id)
+    if getattr(chunk, "snapshot", None) and getattr(chunk.snapshot, "repository_id", None):
+        meta["repository_id"] = str(chunk.snapshot.repository_id)
     if getattr(chunk, "commit_sha", None):
         meta["commit_sha"] = chunk.commit_sha
     if getattr(chunk, "commit_message", None):
@@ -95,6 +102,12 @@ def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
 
     prov = getattr(chunk, "provenance", None)
     if isinstance(prov, dict):
+        if prov.get("repository_id"):
+            meta["repository_id"] = str(prov.get("repository_id"))
+        if prov.get("file_id"):
+            meta["file_id"] = str(prov.get("file_id"))
+        if prov.get("symbol_id"):
+            meta["symbol_id"] = str(prov.get("symbol_id"))
         if prov.get("committed_at"):
             meta["committed_at"] = prov.get("committed_at")
         if prov.get("old_file_path"):
@@ -138,7 +151,18 @@ class MultiSignalRetriever:
         analyzed_query: AnalyzedQuery,
         limit_per_signal: int = 15,
         query_embedding: list[float] | None = None,
+        repository_id: uuid.UUID | None = None,
     ) -> list[RetrievedCandidate]:
+        if repository_id is not None:
+            snap_check = await session.execute(
+                select(RepositorySnapshot.id).where(
+                    RepositorySnapshot.id == snapshot_id,
+                    RepositorySnapshot.repository_id == repository_id,
+                )
+            )
+            if snap_check.scalar_one_or_none() is None:
+                return []
+
         candidates: dict[str, RetrievedCandidate] = {}
 
         # 1. FILE SEARCH: Match paths & filenames with exact / prefix / substring differentiation
@@ -406,23 +430,54 @@ class MultiSignalRetriever:
                     effective_query_embedding = generate_text_embedding(query_text)
 
         if effective_query_embedding is not None:
-            vec_stmt = (
-                select(CodeChunk)
-                .where(
-                    CodeChunk.snapshot_id == snapshot_id,
-                    CodeChunk.embedding.isnot(None),
-                )
-                .limit(limit_per_signal * 3)
-            )
-            vec_res = await session.execute(vec_stmt)
-            vector_chunks = vec_res.scalars().all()
             scored_vector_chunks = []
-            for chunk in vector_chunks:
-                if chunk.embedding:
-                    sim = compute_cosine_similarity(effective_query_embedding, chunk.embedding)
-                    if sim > 0.2:
-                        scored_vector_chunks.append((sim, chunk))
-            scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)
+            bind = getattr(session, "bind", None)
+            if bind is None and hasattr(session, "get_bind"):
+                try:
+                    bind = session.get_bind()
+                except Exception:
+                    bind = None
+            dialect_name = getattr(getattr(bind, "dialect", None), "name", "")
+
+            # 1. Native pgvector distance query on PostgreSQL
+            if dialect_name == "postgresql":
+                try:
+                    distance_expr = CodeChunk.embedding.cosine_distance(effective_query_embedding)
+                    pg_vec_stmt = (
+                        select(CodeChunk, distance_expr.label("distance"))
+                        .where(
+                            CodeChunk.snapshot_id == snapshot_id,
+                            CodeChunk.embedding.isnot(None),
+                        )
+                        .order_by(distance_expr.asc())
+                        .limit(limit_per_signal)
+                    )
+                    pg_res = await session.execute(pg_vec_stmt)
+                    for chunk, dist in pg_res.all():
+                        sim = 1.0 - float(dist) if dist is not None else 0.0
+                        if sim > 0.2:
+                            scored_vector_chunks.append((sim, chunk))
+                except Exception:
+                    scored_vector_chunks = []
+
+            # 2. In-memory fallback if not PostgreSQL or if native query failed
+            if not scored_vector_chunks and dialect_name != "postgresql":
+                vec_stmt = (
+                    select(CodeChunk)
+                    .where(
+                        CodeChunk.snapshot_id == snapshot_id,
+                        CodeChunk.embedding.isnot(None),
+                    )
+                )
+                vec_res = await session.execute(vec_stmt)
+                vector_chunks = vec_res.scalars().all()
+                for chunk in vector_chunks:
+                    if chunk.embedding:
+                        sim = compute_cosine_similarity(effective_query_embedding, chunk.embedding)
+                        if sim > 0.2:
+                            scored_vector_chunks.append((sim, chunk))
+                scored_vector_chunks.sort(key=lambda x: x[0], reverse=True)
+
             for sim, chunk in scored_vector_chunks[:limit_per_signal]:
                 cid = f"chunk:{chunk.id}"
                 chunk_meta = _extract_chunk_metadata(chunk)
@@ -528,6 +583,10 @@ class MultiSignalRetriever:
                             symbol_id=sym.id,
                             signals={"semantic_match": 0.85},
                         )
+
+        if repository_id is not None:
+            for c in candidates.values():
+                c.metadata.setdefault("repository_id", str(repository_id))
 
         # 7. ORDER CANDIDATES BY QUERY RELEVANCE
         weights = {
