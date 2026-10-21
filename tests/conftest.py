@@ -58,29 +58,7 @@ from apps.api.src.models.project import Project
 from apps.api.src.models.user import User
 
 try:
-    from pgvector.asyncpg import register_vector
-    _HAS_PGVECTOR_ASYNCPG = True
-except ImportError:
-    _HAS_PGVECTOR_ASYNCPG = False
-
-try:
     test_engine = create_async_engine(TEST_DB_URL, poolclass=NullPool, echo=False)
-
-    if _HAS_PGVECTOR_ASYNCPG and hasattr(test_engine, "sync_engine"):
-        from sqlalchemy import event
-
-        @event.listens_for(test_engine.sync_engine, "connect")
-        def _register_test_pgvector_codecs(dbapi_connection, connection_record):
-            if hasattr(dbapi_connection, "run_async"):
-                async def _register(conn):
-                    try:
-                        await register_vector(conn)
-                    except Exception:
-                        pass
-                try:
-                    dbapi_connection.run_async(_register)
-                except Exception:
-                    pass
 
     TestSessionLocal = async_sessionmaker(
         bind=test_engine,

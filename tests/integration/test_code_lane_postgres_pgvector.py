@@ -11,6 +11,7 @@ from apps.api.src.models.enums import (
     IntegrationProvider,
     IntegrationStatus,
     SnapshotStatus,
+    SymbolType,
 )
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.integration import Integration
@@ -72,7 +73,7 @@ async def _setup_project_hierarchy(
         provider=IntegrationProvider.GITHUB,
         status=IntegrationStatus.CONNECTED,
         external_id=f"gh-ext-{uuid.uuid4().hex[:8]}",
-        metadata={},
+        integration_metadata={},
     )
     db_session.add(integration)
 
@@ -109,8 +110,8 @@ async def test_1_pgvector_extension_and_schema_initialization(db_session: AsyncS
     has_vector = await _has_pgvector_extension(db_session)
 
     # Inspect code_chunks columns in PostgreSQL schema
-    def _inspect_columns(connection):
-        insp = sa_inspect(connection)
+    def _inspect_columns(sync_session):
+        insp = sa_inspect(sync_session.connection())
         return {col["name"]: col for col in insp.get_columns("code_chunks")}
 
     columns = await db_session.run_sync(_inspect_columns)
@@ -162,6 +163,8 @@ async def test_2_vector_embedding_persistence_and_retrieval(
         id=uuid.uuid4(),
         snapshot_id=snapshot.id,
         path="src/auth.py",
+        filename="auth.py",
+        extension=".py",
         language="python",
         size_bytes=120,
     )
@@ -230,6 +233,8 @@ async def test_3_native_vector_cosine_distance_query_and_ordering(
         id=uuid.uuid4(),
         snapshot_id=snapshot.id,
         path="src/service.py",
+        filename="service.py",
+        extension=".py",
         language="python",
         size_bytes=300,
     )
@@ -318,6 +323,8 @@ async def test_4_empty_and_missing_embeddings_handling(
         id=uuid.uuid4(),
         snapshot_id=snapshot.id,
         path="README.md",
+        filename="README.md",
+        extension=".md",
         language="markdown",
         size_bytes=50,
     )
@@ -371,7 +378,13 @@ async def test_5_repository_and_snapshot_scope_isolation(
         db_session, create_test_user, create_test_org, create_test_project, tag="alpha"
     )
     file_alpha = RepositoryFile(
-        id=uuid.uuid4(), snapshot_id=snap_alpha.id, path="alpha.py", language="python", size_bytes=100
+        id=uuid.uuid4(),
+        snapshot_id=snap_alpha.id,
+        path="alpha.py",
+        filename="alpha.py",
+        extension=".py",
+        language="python",
+        size_bytes=100,
     )
     db_session.add(file_alpha)
 
@@ -380,7 +393,13 @@ async def test_5_repository_and_snapshot_scope_isolation(
         db_session, create_test_user, create_test_org, create_test_project, tag="beta"
     )
     file_beta = RepositoryFile(
-        id=uuid.uuid4(), snapshot_id=snap_beta.id, path="beta.py", language="python", size_bytes=100
+        id=uuid.uuid4(),
+        snapshot_id=snap_beta.id,
+        path="beta.py",
+        filename="beta.py",
+        extension=".py",
+        language="python",
+        size_bytes=100,
     )
     db_session.add(file_beta)
     await db_session.commit()
@@ -453,7 +472,13 @@ async def test_6_incremental_indexing_duplicate_protection_and_rollback(
         db_session, create_test_user, create_test_org, create_test_project, tag="inc"
     )
     repo_file = RepositoryFile(
-        id=uuid.uuid4(), snapshot_id=snapshot.id, path="inc.py", language="python", size_bytes=100
+        id=uuid.uuid4(),
+        snapshot_id=snapshot.id,
+        path="inc.py",
+        filename="inc.py",
+        extension=".py",
+        language="python",
+        size_bytes=100,
     )
     db_session.add(repo_file)
     await db_session.commit()
@@ -528,6 +553,8 @@ async def test_7_code_lane_retrieval_pipeline_with_real_db_records(
         id=uuid.uuid4(),
         snapshot_id=snapshot.id,
         path="apps/api/src/services/billing.py",
+        filename="billing.py",
+        extension=".py",
         language="python",
         size_bytes=450,
     )
@@ -537,9 +564,11 @@ async def test_7_code_lane_retrieval_pipeline_with_real_db_records(
         id=uuid.uuid4(),
         file_id=repo_file.id,
         name="BillingEngine",
-        kind="CLASS",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="BillingEngine",
         start_line=5,
         end_line=25,
+        symbol_metadata={},
     )
     db_session.add(symbol)
     await db_session.commit()
