@@ -167,6 +167,7 @@ async def test_2_vector_embedding_persistence_and_retrieval(
         extension=".py",
         language="python",
         size_bytes=120,
+        content_hash="hash_auth_01",
     )
     db_session.add(repo_file)
     await db_session.commit()
@@ -237,6 +238,7 @@ async def test_3_native_vector_cosine_distance_query_and_ordering(
         extension=".py",
         language="python",
         size_bytes=300,
+        content_hash="hash_service_01",
     )
     db_session.add(repo_file)
     await db_session.commit()
@@ -327,6 +329,7 @@ async def test_4_empty_and_missing_embeddings_handling(
         extension=".md",
         language="markdown",
         size_bytes=50,
+        content_hash="hash_readme_01",
     )
     db_session.add(repo_file)
     await db_session.commit()
@@ -385,6 +388,7 @@ async def test_5_repository_and_snapshot_scope_isolation(
         extension=".py",
         language="python",
         size_bytes=100,
+        content_hash="hash_alpha_01",
     )
     db_session.add(file_alpha)
 
@@ -400,6 +404,7 @@ async def test_5_repository_and_snapshot_scope_isolation(
         extension=".py",
         language="python",
         size_bytes=100,
+        content_hash="hash_beta_01",
     )
     db_session.add(file_beta)
     await db_session.commit()
@@ -479,6 +484,7 @@ async def test_6_incremental_indexing_duplicate_protection_and_rollback(
         extension=".py",
         language="python",
         size_bytes=100,
+        content_hash="hash_inc_01",
     )
     db_session.add(repo_file)
     await db_session.commit()
@@ -557,6 +563,7 @@ async def test_7_code_lane_retrieval_pipeline_with_real_db_records(
         extension=".py",
         language="python",
         size_bytes=450,
+        content_hash="hash_billing_01",
     )
     db_session.add(repo_file)
 
