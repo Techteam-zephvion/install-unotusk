@@ -49,6 +49,14 @@ class CodeEmbeddingBackend(ABC):
         """Generates an embedding vector for text or code."""
         ...
 
+    def embed_text(
+        self,
+        text: str,
+        input_type: str | None = None,
+    ) -> list[float] | None:
+        """Convenience alias for generate_embedding."""
+        return self.generate_embedding(text, input_type=input_type)
+
 
 class DevelopmentCodeEmbeddingBackend(CodeEmbeddingBackend):
     """
