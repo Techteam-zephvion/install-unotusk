@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/server_discovery_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/window_title_bar.dart';
 
@@ -26,6 +27,8 @@ class _AuthScreenState extends State<AuthScreen> {
   // Mode: 0 = Sign In, 1 = Create Workspace, 2 = Select Project Server
   int _activeMode = 0;
   bool _isServerConnected = false;
+  bool _isScanning = false;
+  ServerDiscoveryResult? _discoveryResult;
   Timer? _healthTimer;
 
   final TextEditingController _emailController = TextEditingController();
@@ -42,9 +45,23 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
-    _checkServer();
+    _initServer();
     _healthTimer =
         Timer.periodic(const Duration(seconds: 4), (_) => _checkServer());
+  }
+
+  void _initServer({bool forceRescan = false}) async {
+    setState(() {
+      _isScanning = true;
+    });
+    final result = await ApiService.autoDetectWithResult(forceRescan: forceRescan);
+    if (mounted) {
+      setState(() {
+        _isScanning = false;
+        _isServerConnected = ApiService.isConnected;
+        _discoveryResult = result;
+      });
+    }
   }
 
   void _checkServer() async {
@@ -213,6 +230,196 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Widget _buildServerDiscoveryStatusCard() {
+    if (_isScanning) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: widget.palette.bgElevated,
+          border: Border.all(color: widget.palette.div),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(widget.palette.accent),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Searching network for active Unotusk server...',
+                style: UnoTypography.body(
+                  color: widget.palette.textSec,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_isServerConnected) {
+      return const SizedBox.shrink();
+    }
+
+    final result = _discoveryResult ?? ApiService.lastDiscoveryResult;
+    if (result == null || result.isSuccess) {
+      return const SizedBox.shrink();
+    }
+
+    final subnet = result.scannedSubnet ?? 'local network';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4725A).withValues(alpha: 0.08),
+        border: Border.all(color: const Color(0xFFD4725A).withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.serverOff,
+                size: 16,
+                color: Color(0xFFD4725A),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No servers are available',
+                  style: UnoTypography.body(
+                    color: const Color(0xFFE89885),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4725A).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '0/${result.totalScanned > 0 ? result.totalScanned : 254} alive',
+                  style: UnoTypography.mono(
+                    color: const Color(0xFFE89885),
+                    fontSize: 10.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Scanned $subnet on port 28000. No running Unotusk Control Plane responded.',
+            style: UnoTypography.body(
+              color: widget.palette.textSec,
+              fontSize: 11.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Clean terminal error log box
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141412),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: widget.palette.div),
+            ),
+            constraints: const BoxConstraints(maxHeight: 110),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: result.logs.map((line) {
+                  final isErr = line.contains('[ERROR]');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      line,
+                      style: UnoTypography.mono(
+                        color: isErr
+                            ? const Color(0xFFE89885)
+                            : widget.palette.textSec.withValues(alpha: 0.85),
+                        fontSize: 10,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              InkWell(
+                onTap: _showServerSwitchDialog,
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Text(
+                    'Manual IP',
+                    style: UnoTypography.body(
+                      color: widget.palette.textSec,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _initServer(forceRescan: true),
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: widget.palette.bgElevated,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: widget.palette.div),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.refreshCw,
+                        size: 11,
+                        color: widget.palette.text,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Re-scan Subnet',
+                        style: UnoTypography.body(
+                          color: widget.palette.text,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -234,7 +441,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
                   constraints: BoxConstraints(
-                    maxWidth: _activeMode == 1 ? 580 : (_activeMode == 2 ? 460 : 420),
+                    maxWidth: _activeMode == 1 ? 580 : (_activeMode == 2 ? 460 : 440),
                   ),
                   margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
@@ -325,6 +532,8 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 14),
 
         _buildErrorBanner(),
+
+        _buildServerDiscoveryStatusCard(),
 
         // ── Mode-specific form ──
         if (_activeMode == 0) _buildSignInForm() else _buildCreateWorkspaceForm(),
@@ -982,6 +1191,270 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  void _showServerSwitchDialog() {
+    final controller = TextEditingController(text: ApiService.baseUrl);
+    ServerDiscoveryResult? dialogResult = _discoveryResult ?? ApiService.lastDiscoveryResult;
+    bool isScanningDialog = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: widget.palette.bgSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: widget.palette.div),
+              ),
+              title: Text(
+                'Connect to Server',
+                style: UnoTypography.brandSerif(palette: widget.palette, fontSize: 18),
+              ),
+              content: SizedBox(
+                width: 460,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enter the Control Plane address (Port 28000):',
+                      style: UnoTypography.body(color: widget.palette.textSec, fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      style: UnoTypography.mono(color: widget.palette.text, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'http://127.0.0.1:28000',
+                        hintStyle: UnoTypography.mono(color: widget.palette.textSec, fontSize: 13),
+                        filled: true,
+                        fillColor: widget.palette.bgBase,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: widget.palette.div),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ActionChip(
+                          avatar: isScanningDialog
+                              ? SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(widget.palette.accent),
+                                  ),
+                                )
+                              : const Icon(Icons.autorenew, size: 14),
+                          label: Text(
+                            isScanningDialog ? 'Scanning Subnet...' : 'Auto-Detect',
+                            style: UnoTypography.mono(color: widget.palette.text, fontSize: 11),
+                          ),
+                          backgroundColor: widget.palette.bgBase,
+                          onPressed: isScanningDialog
+                              ? null
+                              : () async {
+                                  setDialogState(() {
+                                    isScanningDialog = true;
+                                  });
+                                  final result = await ApiService.autoDetectWithResult(forceRescan: true);
+                                  if (context.mounted) {
+                                    setDialogState(() {
+                                      isScanningDialog = false;
+                                      dialogResult = result;
+                                      if (result.isSuccess && result.serverUrl != null) {
+                                        controller.text = result.serverUrl!;
+                                      }
+                                    });
+                                  }
+                                  _checkServer();
+                                  if (mounted) {
+                                    setState(() {
+                                      _discoveryResult = result;
+                                      _isServerConnected = ApiService.isConnected;
+                                    });
+                                  }
+                                },
+                        ),
+                        ActionChip(
+                          label: Text('Localhost (28000)', style: UnoTypography.mono(color: widget.palette.text, fontSize: 11)),
+                          backgroundColor: widget.palette.bgBase,
+                          onPressed: () {
+                            controller.text = 'http://127.0.0.1:28000';
+                          },
+                        ),
+                        ActionChip(
+                          label: Text('This PC LAN (10.0.0.35)', style: UnoTypography.mono(color: widget.palette.text, fontSize: 11)),
+                          backgroundColor: widget.palette.bgBase,
+                          onPressed: () {
+                            controller.text = 'http://10.0.0.35:28000';
+                          },
+                        ),
+                        ActionChip(
+                          label: Text('Linux (10.0.0.59)', style: UnoTypography.mono(color: widget.palette.text, fontSize: 11)),
+                          backgroundColor: widget.palette.bgBase,
+                          onPressed: () {
+                            controller.text = 'http://10.0.0.59:28000';
+                          },
+                        ),
+                      ],
+                    ),
+
+                    if (isScanningDialog) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: widget.palette.bgBase,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: widget.palette.div),
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(widget.palette.accent),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Probing local endpoints & scanning subnet .1 to .254...',
+                                style: UnoTypography.body(color: widget.palette.textSec, fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (dialogResult != null) ...[
+                      const SizedBox(height: 14),
+                      if (dialogResult!.isSuccess)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6EC8B8).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF6EC8B8).withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle, size: 14, color: Color(0xFF6EC8B8)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Server discovered: ${dialogResult!.serverUrl}',
+                                  style: UnoTypography.mono(color: const Color(0xFF6EC8B8), fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4725A).withValues(alpha: 0.09),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFD4725A).withValues(alpha: 0.35)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(LucideIcons.alertTriangle, size: 13, color: Color(0xFFD4725A)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'No servers available on local network',
+                                      style: UnoTypography.body(
+                                        color: const Color(0xFFE89885),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '0/254 alive',
+                                    style: UnoTypography.mono(color: const Color(0xFFE89885), fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Scanned ${dialogResult!.scannedSubnet ?? "subnet"} on port 28000: 0 responsive servers.',
+                                style: UnoTypography.body(color: widget.palette.textSec, fontSize: 11),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF141412),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: widget.palette.div),
+                                ),
+                                constraints: const BoxConstraints(maxHeight: 75),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: dialogResult!.logs.map((l) => Text(
+                                      l,
+                                      style: UnoTypography.mono(
+                                        color: l.contains('[ERROR]')
+                                            ? const Color(0xFFE89885)
+                                            : widget.palette.textSec.withValues(alpha: 0.85),
+                                        fontSize: 9.5,
+                                      ),
+                                    )).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text('Cancel', style: UnoTypography.body(color: widget.palette.textSec, fontSize: 13)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.palette.accent,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    final target = controller.text.trim();
+                    if (target.isNotEmpty) {
+                      ApiService.setBaseUrl(target);
+                      _checkServer();
+                    }
+                    Navigator.of(ctx).pop();
+                    setState(() {});
+                  },
+                  child: const Text('Connect'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────
   //  Server Status Footer
   // ─────────────────────────────────────────────────────────────
@@ -995,9 +1468,7 @@ class _AuthScreenState extends State<AuthScreen> {
       children: [
         const SizedBox(height: 14),
         InkWell(
-          onTap: () {
-            setState(() => _activeMode = 2);
-          },
+          onTap: _showServerSwitchDialog,
           borderRadius: BorderRadius.circular(4),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

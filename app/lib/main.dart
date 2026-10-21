@@ -155,7 +155,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _loadInitialTelemetry() async {
-    await ApiService.checkHealth();
+    await ApiService.autoDetectAndConnect();
   }
 
   @override

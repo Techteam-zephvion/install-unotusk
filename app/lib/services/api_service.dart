@@ -5,15 +5,17 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../models/workspace_models.dart';
 import '../features/connection/data/local_registry_service.dart';
+import 'server_discovery_service.dart';
 
 /// Centralized API Service for Unotusk.
 /// Strictly wired to the real backend server at port 28000 (Control Plane) and 28100 series (Data Plane).
 /// ZERO MOCK DATA: All data, intelligence, and operations come directly from http://10.0.0.59:28000.
 class ApiService {
-  static String serverHost = '10.0.0.59:28000';
+  static String serverHost = '10.0.0.35:28000';
   static String baseUrl = 'http://$serverHost';
 
   static final List<RecentChat> _recordedChats = [];
@@ -117,6 +119,64 @@ class ApiService {
     }
     baseUrl = cleaned;
     serverHost = baseUrl.replaceAll('http://', '').replaceAll('https://', '');
+    try {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString(ServerDiscoveryService.prefKeyServerUrl, baseUrl);
+      });
+    } catch (_) {}
+  }
+
+  static ServerDiscoveryResult? get lastDiscoveryResult => ServerDiscoveryService.lastResult;
+  static final ValueNotifier<ServerDiscoveryResult?> discoveryNotifier =
+      ValueNotifier<ServerDiscoveryResult?>(null);
+
+  /// Automatically discovers and connects to the active server instance with detailed result.
+  static Future<ServerDiscoveryResult> autoDetectWithResult({
+    bool forceRescan = false,
+    void Function(String line)? onLog,
+  }) async {
+    try {
+      final discovery = ServerDiscoveryService();
+      final result = await discovery.discoverWithDetails(
+        forceRescan: forceRescan,
+        onLog: onLog,
+      );
+      discoveryNotifier.value = result;
+
+      if (result.isSuccess && result.serverUrl != null) {
+        setBaseUrl(result.serverUrl!);
+        await checkHealth();
+      } else {
+        setBaseUrl(result.fallbackUrl);
+        isConnected = false;
+        lastError = result.errorMessage;
+      }
+      return result;
+    } catch (e) {
+      debugPrint('[ApiService] autoDetectWithResult error: $e');
+      final errResult = ServerDiscoveryResult(
+        isSuccess: false,
+        serverUrl: null,
+        fallbackUrl: baseUrl,
+        logs: ['[ERROR] Exception during discovery: $e'],
+        errorMessage: 'Discovery failed: $e',
+      );
+      discoveryNotifier.value = errResult;
+      isConnected = false;
+      return errResult;
+    }
+  }
+
+  /// Automatically discovers and connects to the active server instance.
+  static Future<String> autoDetectAndConnect({
+    bool forceRescan = false,
+    void Function(String line)? onLog,
+  }) async {
+    final result = await autoDetectWithResult(
+      forceRescan: forceRescan,
+      onLog: onLog,
+    );
+    return result.serverUrl ?? result.fallbackUrl;
   }
 
   static final http.Client _client = http.Client();
@@ -198,6 +258,11 @@ class ApiService {
       if (res.statusCode == 200) {
         isConnected = true;
         lastError = null;
+        try {
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString(ServerDiscoveryService.prefKeyServerUrl, baseUrl);
+          });
+        } catch (_) {}
         return true;
       } else {
         isConnected = false;

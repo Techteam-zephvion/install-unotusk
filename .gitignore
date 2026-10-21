@@ -20,6 +20,8 @@ apps/web/out/
 apps/web/build/
 dist/
 build/
+client_app/
+
 
 # Coverage & testing
 .coverage
