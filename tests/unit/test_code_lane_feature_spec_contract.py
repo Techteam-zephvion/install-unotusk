@@ -11,6 +11,9 @@ Verifies:
    fully-populated EvidenceItem objects.
 4. Empty candidate sets and zero-evidence cases degrade gracefully.
 5. Error recovery handles retrieval failures cleanly.
+6. FeatureSpecificationGenerator synthesizes grounded BDD scenarios from evidence.
+7. Superseded precursor code flags diagnostic warnings.
+8. MultiSignalRanker tie-breaking, path boosting, and test demotion.
 """
 
 import uuid
