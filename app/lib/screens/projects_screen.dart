@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -57,14 +58,42 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   // Manage Workspace Dialog State
   ProjectItem? _managingWorkspaceProject;
   List<ProjectMember> _projectMembers = [];
+  List<ProjectMember> _workspaceEmployees = [];
   bool _isLoadingMembers = false;
   bool _isReloadingMembers = false;
+  bool _isLoadingWorkspaceEmployees = false;
+  String _workspaceMembersTab = 'available'; // Default to Available in Database tab
+  String? _assigningUserId;
+  final Map<String, String> _employeeAssignRole = {};
   String? _membersError;
   String? _membersSuccess;
-  final _inviteMemberController = TextEditingController();
   final _searchMemberController = TextEditingController();
-  String _selectedInviteRole = 'MEMBER';
-  bool _isAddingMember = false;
+
+  /// Returns employees retrieved from database that are not yet assigned to the current project
+  List<ProjectMember> get _availableEmployees {
+    final employees = _workspaceEmployees;
+    if (employees.isEmpty) return [];
+    final members = _projectMembers;
+    final assignedEmails = members
+        .map((m) => (m.userEmail ?? '').trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final assignedUserIds = members
+        .map((m) => m.userId.trim())
+        .where((u) => u.isNotEmpty)
+        .toSet();
+
+    return employees.where((u) {
+      final email = (u.userEmail ?? '').trim().toLowerCase();
+      final name = (u.userName ?? '').trim().toLowerCase();
+      // Exclude permanent Lead Admin
+      if (email == 'admin@acme.com' || name == 'lead admin') return false;
+      // Exclude employees already assigned to project
+      if (assignedEmails.contains(email)) return false;
+      if (assignedUserIds.contains(u.userId.trim())) return false;
+      return true;
+    }).toList();
+  }
 
   // Connect Server & Workspace State
   final _serverUrlController = TextEditingController();
@@ -81,12 +110,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void initState() {
     super.initState();
     // Restore any previously connected projects so they remain in workspace
+    if (ApiService.connectedProjectIds.isEmpty) {
+      ApiService.loadPersistedConnectedProjects();
+    }
+    if (ApiService.cachedProjects.isNotEmpty) {
+      final validIds = ApiService.cachedProjects.map((p) => p.id.toLowerCase()).toSet();
+      final validNames = ApiService.cachedProjects.map((p) => p.name.toLowerCase()).toSet();
+      ApiService.connectedProjectIds.removeWhere((id) =>
+          !validIds.contains(id.toLowerCase()) &&
+          !validNames.contains(id.toLowerCase()));
+    }
     if (ApiService.connectedWorkspaceProjects.isNotEmpty) {
       _projects.addAll(ApiService.connectedWorkspaceProjects);
     } else {
-      if (ApiService.connectedProjectIds.isEmpty) {
-        ApiService.loadPersistedConnectedProjects();
-      }
       for (final p in ApiService.cachedProjects) {
         if (ApiService.connectedProjectIds.contains(p.id) ||
             ApiService.connectedProjectIds.contains(p.name)) {
@@ -97,6 +133,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ..clear()
         ..addAll(_projects);
     }
+    _projects.removeWhere((p) =>
+        p.upsStatus.toUpperCase() == 'STOPPED' ||
+        p.upsStatus.toUpperCase() == 'DELETED' ||
+        p.upsStatus.toUpperCase() == 'OFFLINE');
     _checkServer();
     _fetchServerProjects(isSilent: true);
     _fetchAvailableWorkspaceProjects(isSilent: true);
@@ -106,7 +146,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _checkServer() async {
     await ApiService.checkHealth();
-    if (mounted && !_connectWorkspaceDialogOpen) {
+    if (mounted) {
       _fetchServerProjects(isSilent: true);
     }
   }
@@ -123,41 +163,37 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final serverProjects = await ApiService.fetchProjects();
       final elapsed = stopwatch.elapsedMilliseconds;
-      if (elapsed < 450 && !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
+      if (elapsed < 450 && !Platform.environment.containsKey('FLUTTER_TEST')) {
         await Future.delayed(Duration(milliseconds: 450 - elapsed));
       }
       if (!mounted) return;
       setState(() {
         _isLoadingProjects = false;
         _isRefreshingProjects = false;
-        _availableBackendProjects = serverProjects;
+        _availableBackendProjects = List<ProjectItem>.from(serverProjects);
         
-        // If user hasn't made any selection yet and no projects connected, connect all by default on first load
-        if (ApiService.connectedProjectIds.isEmpty && _projects.isEmpty) {
-          _projects.clear();
-          _projects.addAll(serverProjects);
-          for (final p in serverProjects) {
-            ApiService.connectedProjectIds.add(p.id);
-            ApiService.connectedProjectIds.add(p.name);
+        final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
+        final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
+        ApiService.connectedProjectIds.removeWhere((id) =>
+            !validIds.contains(id.toLowerCase()) &&
+            !validNames.contains(id.toLowerCase()));
+
+        _projects.clear();
+        for (final p in serverProjects) {
+          final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
+              p.upsStatus.toUpperCase() != 'DELETED' &&
+              p.upsStatus.toUpperCase() != 'OFFLINE';
+          if (isRunning &&
+              (ApiService.connectedProjectIds.contains(p.id) ||
+                  ApiService.connectedProjectIds.contains(p.name))) {
+            _projects.add(p);
           }
-          ApiService.connectedWorkspaceProjects
-            ..clear()
-            ..addAll(_projects);
-          ApiService.savePersistedConnectedProjects();
-        } else {
-          // Keep existing user-selected connected projects synchronized with fresh backend data without adding unselected ones
-          _projects.clear();
-          for (final sp in serverProjects) {
-            final isConnected = ApiService.connectedProjectIds.contains(sp.id) ||
-                ApiService.connectedProjectIds.contains(sp.name);
-            if (isConnected) {
-              _projects.add(sp);
-            }
-          }
-          ApiService.connectedWorkspaceProjects
-            ..clear()
-            ..addAll(_projects);
         }
+        ApiService.savePersistedConnectedProjects();
+        
+        ApiService.connectedWorkspaceProjects
+          ..clear()
+          ..addAll(_projects);
       });
     } catch (e) {
       if (!mounted) return;
@@ -221,7 +257,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void dispose() {
     _serverTimer?.cancel();
     _serverUrlController.dispose();
-    _inviteMemberController.dispose();
+    _searchMemberController.dispose();
     super.dispose();
   }
 
@@ -248,17 +284,44 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final serverProjects = await ApiService.fetchProjects();
       if (!mounted) return;
       setState(() {
-        _availableBackendProjects = serverProjects;
-        // Synchronize only the details of currently connected projects without re-adding unselected projects
-        for (int i = 0; i < _projects.length; i++) {
-          final current = _projects[i];
-          final matchIdx = serverProjects.indexWhere((sp) =>
-              sp.id.toLowerCase() == current.id.toLowerCase() ||
-              sp.name.toLowerCase() == current.name.toLowerCase());
-          if (matchIdx >= 0) {
-            _projects[i] = serverProjects[matchIdx];
+        _availableBackendProjects = List<ProjectItem>.from(serverProjects);
+        final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
+        final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
+
+        // Evict any deleted or stopped projects from _projects
+        _projects.removeWhere((p) =>
+            (!validIds.contains(p.id.toLowerCase()) &&
+            !validNames.contains(p.name.toLowerCase())) ||
+            p.upsStatus.toUpperCase() == 'STOPPED' ||
+            p.upsStatus.toUpperCase() == 'DELETED' ||
+            p.upsStatus.toUpperCase() == 'OFFLINE');
+
+        // Keep any existing connected running projects synchronized
+        for (final sp in serverProjects) {
+          final isRunning = sp.upsStatus.toUpperCase() != 'STOPPED' &&
+              sp.upsStatus.toUpperCase() != 'DELETED' &&
+              sp.upsStatus.toUpperCase() != 'OFFLINE';
+          final idx = _projects.indexWhere((p) =>
+              p.id.toLowerCase() == sp.id.toLowerCase() ||
+              p.name.toLowerCase() == sp.name.toLowerCase());
+          if (idx >= 0) {
+            if (isRunning) {
+              _projects[idx] = sp;
+            } else {
+              _projects.removeAt(idx);
+            }
           }
         }
+
+        ApiService.connectedProjectIds.removeWhere((id) =>
+            !validIds.contains(id.toLowerCase()) &&
+            !validNames.contains(id.toLowerCase()));
+        for (final p in _projects) {
+          ApiService.connectedProjectIds.add(p.id);
+          ApiService.connectedProjectIds.add(p.name);
+        }
+        ApiService.savePersistedConnectedProjects();
+
         ApiService.connectedWorkspaceProjects
           ..clear()
           ..addAll(_projects);
@@ -279,18 +342,29 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   void _toggleProjectConnection(ProjectItem project) {
+    final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+        project.upsStatus.toUpperCase() == 'DELETED' ||
+        project.upsStatus.toUpperCase() == 'OFFLINE';
+    if (isStopped) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cannot connect ${project.name}: The project server is ${project.upsStatus.toLowerCase()} on the backend.',
+          ),
+          backgroundColor: Colors.red[800],
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      final isConnected = _projects.any((p) =>
+      final idx = _projects.indexWhere((p) =>
           p.id.toLowerCase() == project.id.toLowerCase() ||
           p.name.toLowerCase() == project.name.toLowerCase());
-
-      if (isConnected) {
-        _projects.removeWhere((p) =>
-            p.id.toLowerCase() == project.id.toLowerCase() ||
-            p.name.toLowerCase() == project.name.toLowerCase());
-        ApiService.connectedProjectIds.removeWhere((id) =>
-            id.toLowerCase() == project.id.toLowerCase() ||
-            id.toLowerCase() == project.name.toLowerCase());
+      if (idx >= 0) {
+        _projects.removeAt(idx);
+        ApiService.connectedProjectIds.remove(project.id);
+        ApiService.connectedProjectIds.remove(project.name);
       } else {
         _projects.add(project);
         ApiService.connectedProjectIds.add(project.id);
@@ -306,6 +380,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void _connectAllWorkspaceProjects() {
     setState(() {
       for (final p in _availableBackendProjects) {
+        final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
+            p.upsStatus.toUpperCase() != 'DELETED' &&
+            p.upsStatus.toUpperCase() != 'OFFLINE';
+        if (!isRunning) continue;
         final exists = _projects.any((item) =>
             item.id.toLowerCase() == p.id.toLowerCase() ||
             item.name.toLowerCase() == p.name.toLowerCase());
@@ -779,9 +857,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                       p.name.toLowerCase() ==
                                           project.name.toLowerCase());
 
+                                  final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                      project.upsStatus.toUpperCase() == 'DELETED' ||
+                                      project.upsStatus.toUpperCase() == 'OFFLINE';
+
                                   return InkWell(
-                                    onTap: () =>
-                                        _toggleProjectConnection(project),
+                                    onTap: isStopped
+                                        ? null
+                                        : () => _toggleProjectConnection(project),
                                     borderRadius: BorderRadius.circular(8),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
@@ -838,6 +921,30 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                                 const SizedBox(height: 4),
                                                 Builder(
                                                   builder: (context) {
+                                                    final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                                        project.upsStatus.toUpperCase() == 'DELETED' ||
+                                                        project.upsStatus.toUpperCase() == 'OFFLINE';
+
+                                                    if (isStopped) {
+                                                      return Container(
+                                                        padding: const EdgeInsets.symmetric(
+                                                            horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.redAccent.withValues(alpha: 0.12),
+                                                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          'STOPPED',
+                                                          style: UnoTypography.mono(
+                                                            color: Colors.redAccent,
+                                                            fontSize: 9,
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+
                                                     final isReady = project.upsStatus.toUpperCase() == 'READY' ||
                                                         project.upsStatus.toUpperCase() == 'ACTIVE' ||
                                                         project.ingestionStatus.toLowerCase() == 'live';
@@ -898,7 +1005,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           // Connection state badge / button
-                                          if (isConnected)
+                                          if (isStopped)
+                                            const SizedBox.shrink()
+                                          else if (isConnected)
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
@@ -1033,18 +1142,47 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  void _openManageWorkspace(ProjectItem project) {
+  void _openManageWorkspace(ProjectItem project) async {
     setState(() {
       _managingWorkspaceProject = project;
       _isLoadingMembers = true;
       _isReloadingMembers = false;
+      _isLoadingWorkspaceEmployees = true;
+      _workspaceMembersTab = 'available'; // Default to Available in Database tab
       _membersError = null;
       _membersSuccess = null;
-      _inviteMemberController.clear();
       _searchMemberController.clear();
-      _selectedInviteRole = 'MEMBER';
     });
-    _loadProjectMembers(project.id);
+
+    final stopwatch = Stopwatch()..start();
+    try {
+      final membersFuture = ApiService.fetchProjectMembers(project.id);
+      final employeesFuture = ApiService.fetchOrganizationEmployees();
+      final results = await Future.wait([membersFuture, employeesFuture]);
+
+      final elapsed = stopwatch.elapsedMilliseconds;
+      if (elapsed < 400 && !Platform.environment.containsKey('FLUTTER_TEST')) {
+        await Future.delayed(Duration(milliseconds: 400 - elapsed));
+      }
+      if (!mounted) return;
+
+      final members = results[0];
+      final employees = results[1];
+
+      setState(() {
+        _projectMembers = members;
+        _workspaceEmployees = employees;
+        _isLoadingMembers = false;
+        _isLoadingWorkspaceEmployees = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _membersError = 'Failed to load team data: $e';
+        _isLoadingMembers = false;
+        _isLoadingWorkspaceEmployees = false;
+      });
+    }
   }
 
   void _loadProjectMembers(String projectId, {bool isReload = false}) async {
@@ -1060,44 +1198,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     final stopwatch = Stopwatch()..start();
     try {
-      final members = await ApiService.fetchProjectMembers(projectId);
+      final membersFuture = ApiService.fetchProjectMembers(projectId);
+      final employeesFuture = ApiService.fetchOrganizationEmployees();
+      final results = await Future.wait([membersFuture, employeesFuture]);
+
       final elapsed = stopwatch.elapsedMilliseconds;
       if (isReload && elapsed < 400) {
         await Future.delayed(Duration(milliseconds: 400 - elapsed));
       }
       if (!mounted) return;
-
-      final sortedMembers = List<ProjectMember>.from(members);
-      final hasAdmin = sortedMembers.any((m) =>
-          (m.userEmail?.toLowerCase() == 'admin@acme.com') ||
-          (m.userName?.toLowerCase() == 'lead admin'));
-      if (!hasAdmin) {
-        sortedMembers.insert(
-          0,
-          ProjectMember(
-            id: 'permanent-lead-admin-$projectId',
-            projectId: projectId,
-            userId: 'admin-lead-account',
-            role: 'ADMIN',
-            createdAt: DateTime.fromMillisecondsSinceEpoch(0),
-            userName: 'Lead Admin',
-            userEmail: 'admin@acme.com',
-          ),
-        );
-      } else {
-        sortedMembers.sort((a, b) {
-          final aIsAdmin = (a.userEmail?.toLowerCase() == 'admin@acme.com') ||
-              (a.userName?.toLowerCase() == 'lead admin');
-          final bIsAdmin = (b.userEmail?.toLowerCase() == 'admin@acme.com') ||
-              (b.userName?.toLowerCase() == 'lead admin');
-          if (aIsAdmin && !bIsAdmin) return -1;
-          if (!aIsAdmin && bIsAdmin) return 1;
-          return a.createdAt.compareTo(b.createdAt);
-        });
-      }
-
       setState(() {
-        _projectMembers = sortedMembers;
+        _projectMembers = results[0];
+        _workspaceEmployees = results[1];
         _isLoadingMembers = false;
         _isReloadingMembers = false;
       });
@@ -1111,25 +1223,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
 
-  void _handleAddMember() async {
-    final input = _inviteMemberController.text.trim();
-    if (input.isEmpty) {
-      setState(() => _membersError = 'Please enter an employee name or email');
-      return;
-    }
-
-    if (input.toLowerCase() == 'admin@acme.com' ||
-        input.toLowerCase() == 'lead admin') {
-      setState(() => _membersError =
-          'admin@acme.com is the permanent Lead Administrator with full workspace access and cannot be re-assigned or demoted.');
-      return;
-    }
-
+  void _handleAssignEmployee(ProjectMember employee, {String role = 'MEMBER'}) async {
     final projectId = _managingWorkspaceProject?.id;
     if (projectId == null) return;
 
     setState(() {
-      _isAddingMember = true;
+      _assigningUserId = employee.userId;
       _membersError = null;
       _membersSuccess = null;
     });
@@ -1137,43 +1236,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final newMember = await ApiService.addProjectMember(
         projectId: projectId,
-        email: input,
-        role: _selectedInviteRole,
+        userId: employee.userId,
+        email: employee.userEmail,
+        role: role,
       );
       if (!mounted) return;
       setState(() {
-        final existingIdx = _projectMembers.indexWhere((m) =>
-            m.id == newMember.id ||
-            m.userId == newMember.userId ||
-            (m.userEmail != null &&
-                m.userEmail!.toLowerCase() ==
-                    (newMember.userEmail ?? '').toLowerCase()));
-        if (existingIdx != -1) {
-          _projectMembers[existingIdx] = newMember;
-        } else {
-          _projectMembers.add(newMember);
-        }
-        // Keep admin@acme.com at top
-        _projectMembers.sort((a, b) {
-          final aIsAdmin = (a.userEmail?.toLowerCase() == 'admin@acme.com') ||
-              (a.userName?.toLowerCase() == 'lead admin');
-          final bIsAdmin = (b.userEmail?.toLowerCase() == 'admin@acme.com') ||
-              (b.userName?.toLowerCase() == 'lead admin');
-          if (aIsAdmin && !bIsAdmin) return -1;
-          if (!aIsAdmin && bIsAdmin) return 1;
-          return a.createdAt.compareTo(b.createdAt);
-        });
-        _inviteMemberController.clear();
-        _isAddingMember = false;
-        _membersSuccess =
-            'Successfully assigned ${newMember.userName ?? newMember.userEmail ?? input} as ${_selectedInviteRole == 'ADMIN' ? 'Manager' : 'Member (Dev)'} on server';
+        _projectMembers.add(newMember);
+        _assigningUserId = null;
+        _membersSuccess = 'Assigned ${employee.userName ?? employee.userEmail} as $role';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isAddingMember = false;
-        _membersError =
-            'Failed to assign employee on server: ${e.toString().replaceAll('Exception: ', '')}';
+        _membersError = 'Failed to assign: $e';
+        _assigningUserId = null;
       });
     }
   }
@@ -1184,8 +1261,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     if (member.userEmail?.toLowerCase() == 'admin@acme.com' ||
         member.userName?.toLowerCase() == 'lead admin') {
-      setState(() => _membersError =
-          'admin@acme.com is the permanent Lead Administrator and cannot be removed.');
+      setState(() => _membersError = 'Cannot remove Lead Admin from project.');
       return;
     }
 
@@ -1195,20 +1271,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     });
 
     try {
-      await ApiService.removeProjectMember(member.userId, projectId);
+      await ApiService.removeProjectMember(
+        member.userId,
+        projectId,
+      );
       if (!mounted) return;
       setState(() {
-        _projectMembers.removeWhere((m) =>
-            m.id == member.id ||
-            (m.userId == member.userId && m.userEmail == member.userEmail));
-        _membersSuccess =
-            'Removed ${member.userName ?? member.userEmail ?? 'member'} from project on server';
+        _projectMembers.removeWhere((m) => m.userId == member.userId);
+        _membersSuccess = 'Removed ${member.userName ?? member.userEmail} from project';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _membersError =
-            'Failed to remove member on server: ${e.toString().replaceAll('Exception: ', '')}';
+        _membersError = e.toString().replaceAll('Exception: ', '');
       });
     }
   }
@@ -1218,27 +1293,84 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         name?.toLowerCase() == 'lead admin') {
       return 'LA';
     }
-    final source = (name != null && name.trim().isNotEmpty)
-        ? name.trim()
-        : (email != null && email.trim().isNotEmpty)
-            ? email.split('@').first
-            : 'EM';
-    final parts = source.split(' ');
-    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    if (name != null && name.trim().isNotEmpty) {
+      final parts = name.trim().split(RegExp(r'\s+'));
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return parts[0].substring(0, math.min(2, parts[0].length)).toUpperCase();
     }
-    if (source.length >= 2) {
-      return source.substring(0, 2).toUpperCase();
+    if (email != null && email.isNotEmpty) {
+      return email.substring(0, math.min(2, email.length)).toUpperCase();
     }
-    return source.isNotEmpty ? source[0].toUpperCase() : 'M';
+    return 'EM';
   }
 
-  // ─────────────────────────────────────────────────
-  //  Manage Workspace Modal Overlay (Manager RBAC)
-  // ─────────────────────────────────────────────────
+  Widget _buildMemberTabButton({
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required UnoPalette palette,
+    Color? badgeColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? palette.accent.withValues(alpha: 0.15)
+              : palette.bgElevated,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected
+                ? palette.accent.withValues(alpha: 0.4)
+                : palette.div,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: UnoTypography.body(
+                color: isSelected ? palette.text : palette.textSec,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: (badgeColor ?? palette.accent)
+                    .withValues(alpha: isSelected ? 0.25 : 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: UnoTypography.mono(
+                  color: isSelected
+                      ? (badgeColor ?? palette.accent)
+                      : palette.textSec,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildManageWorkspaceModal(UnoPalette palette) {
     final project = _managingWorkspaceProject;
     if (project == null) return const SizedBox.shrink();
+
+    final rawQuery = _searchMemberController.text.trim().toLowerCase();
 
     return GestureDetector(
       onTap: () => setState(() => _managingWorkspaceProject = null),
@@ -1353,6 +1485,30 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         // Ready Green Button / Status badge
                         Builder(
                           builder: (context) {
+                            final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                project.upsStatus.toUpperCase() == 'DELETED' ||
+                                project.upsStatus.toUpperCase() == 'OFFLINE';
+
+                            if (isStopped) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(alpha: 0.12),
+                                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'STOPPED',
+                                  style: UnoTypography.mono(
+                                    color: Colors.redAccent,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              );
+                            }
+
                             final isReady = project.upsStatus.toUpperCase() ==
                                     'READY' ||
                                 project.upsStatus.toUpperCase() == 'ACTIVE' ||
@@ -1430,195 +1586,109 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // ── Assign Employee Header ──
-                  Text(
-                    'ASSIGN EMPLOYEE',
-                    style: UnoTypography.mono(
-                      color: palette.textSec,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                  // ── Search Input Row ──
+                  Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: palette.div),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.search,
+                          size: 16,
+                          color: palette.textSec,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchMemberController,
+                            style: UnoTypography.body(
+                              color: palette.text,
+                              fontSize: 13,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search employees in database...',
+                              hintStyle: UnoTypography.body(
+                                color: palette.textSec.withValues(alpha: 0.6),
+                                fontSize: 13,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        if (_searchMemberController.text.isNotEmpty)
+                          InkWell(
+                            onTap: () {
+                              _searchMemberController.clear();
+                              setState(() {});
+                            },
+                            child: Icon(Icons.close, size: 14, color: palette.textSec),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
 
-                  // ── Invite Input Row ──
+                  const SizedBox(height: 14),
+
+                  // ── Tabs Header: Assigned to Project vs Available in Database ──
                   Row(
                     children: [
-                      // Email Input
-                      Expanded(
-                        child: Container(
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: palette.bgElevated,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: palette.div),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.alternate_email,
-                                size: 15,
-                                color: palette.textSec,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  controller: _inviteMemberController,
-                                  style: UnoTypography.body(
-                                    color: palette.text,
-                                    fontSize: 13,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'employee@acme.com or employee name',
-                                    hintStyle: UnoTypography.body(
-                                      color: palette.textSec
-                                          .withValues(alpha: 0.6),
-                                      fontSize: 13,
-                                    ),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                  onSubmitted: (_) => _handleAddMember(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      _buildMemberTabButton(
+                        label: 'Available in Database',
+                        count: _availableEmployees.length,
+                        isSelected: _workspaceMembersTab == 'available',
+                        onTap: () => setState(() => _workspaceMembersTab = 'available'),
+                        palette: palette,
+                        badgeColor: palette.live,
                       ),
-                      const SizedBox(width: 8),
-                      // Role Selector Dropdown (opens DOWN below button)
-                      PopupMenuButton<String>(
-                        tooltip: '',
-                        position: PopupMenuPosition.under,
-                        offset: const Offset(0, 5),
-                        color: palette.bgSurface,
-                        elevation: 8,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: palette.div),
-                        ),
-                        onSelected: (val) {
-                          setState(() => _selectedInviteRole = val);
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'MEMBER',
-                            height: 38,
-                            child: Row(
-                              children: [
-                                Text(
-                                  'Member (Dev)',
-                                  style: UnoTypography.body(
-                                    color: _selectedInviteRole == 'MEMBER'
-                                        ? palette.live
-                                        : palette.text,
-                                    fontSize: 12.5,
-                                    fontWeight: _selectedInviteRole == 'MEMBER'
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'ADMIN',
-                            height: 38,
-                            child: Row(
-                              children: [
-                                Text(
-                                  'Manager',
-                                  style: UnoTypography.body(
-                                    color: _selectedInviteRole == 'ADMIN'
-                                        ? palette.accent
-                                        : palette.text,
-                                    fontSize: 12.5,
-                                    fontWeight: _selectedInviteRole == 'ADMIN'
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        child: Container(
-                          height: 38,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: palette.bgElevated,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: palette.div),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _selectedInviteRole == 'ADMIN'
-                                    ? 'Manager'
-                                    : 'Member (Dev)',
-                                style: UnoTypography.body(
-                                  color: palette.text,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.keyboard_arrow_down,
-                                size: 16,
-                                color: palette.textSec,
-                              ),
-                            ],
-                          ),
-                        ),
+                      const SizedBox(width: 10),
+                      _buildMemberTabButton(
+                        label: 'Assigned to Project',
+                        count: _projectMembers.length,
+                        isSelected: _workspaceMembersTab == 'assigned',
+                        onTap: () => setState(() => _workspaceMembersTab = 'assigned'),
+                        palette: palette,
                       ),
-                      const SizedBox(width: 8),
-                      // Add Button
+                      const Spacer(),
                       InkWell(
-                        onTap: _isAddingMember ? null : _handleAddMember,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          height: 38,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: _isAddingMember
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.add,
-                                        size: 15,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Assign',
-                                        style: UnoTypography.body(
-                                          color: Colors.white,
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                        onTap: _isReloadingMembers
+                            ? () {}
+                            : () => _loadProjectMembers(project.id, isReload: true),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 13,
+                                height: 13,
+                                child: _isReloadingMembers
+                                    ? CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                            palette.accent),
+                                      )
+                                    : Icon(Icons.refresh,
+                                        size: 13, color: palette.textSec),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Reload',
+                                style: UnoTypography.body(
+                                  color: palette.textSec,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1688,442 +1758,459 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  // ── Project Members List Header & Search Bar ──
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'PROJECT EMPLOYEES (${_projectMembers.length})',
-                        style: UnoTypography.mono(
-                          color: palette.textSec,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  // ── Members / Available List ──
+                  Flexible(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: palette.bgElevated,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: palette.div),
                       ),
-                      InkWell(
-                        onTap: _isReloadingMembers
-                            ? () {}
-                            : () => _loadProjectMembers(project.id, isReload: true),
-                        borderRadius: BorderRadius.circular(4),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 13,
-                                height: 13,
-                                child: _isReloadingMembers
-                                    ? CircularProgressIndicator(
-                                        strokeWidth: 1.5,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                            palette.accent),
-                                      )
-                                    : Icon(Icons.refresh,
-                                        size: 13, color: palette.textSec),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Reload',
-                                style: UnoTypography.body(
-                                  color: palette.textSec,
-                                  fontSize: 11,
+                      child: Builder(
+                        builder: (context) {
+                          if (_workspaceMembersTab == 'available') {
+                            if (_isLoadingWorkspaceEmployees && _workspaceEmployees.isEmpty) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: palette.accent,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Retrieving employees from database...',
+                                        style: UnoTypography.body(
+                                          color: palette.textSec,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                              );
+                            }
 
-                  // Search input for filtering employees
-                  Container(
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: palette.bgElevated,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: palette.div),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search, size: 14, color: palette.textSec),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchMemberController,
-                            style: UnoTypography.body(
-                              color: palette.text,
-                              fontSize: 12,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Search employees by name, email, or role...',
-                              hintStyle: UnoTypography.body(
-                                color: palette.textSec.withValues(alpha: 0.6),
-                                fontSize: 12,
-                              ),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        if (_searchMemberController.text.isNotEmpty)
-                          InkWell(
-                            onTap: () {
-                              _searchMemberController.clear();
-                              setState(() {});
-                            },
-                            child: Icon(Icons.close, size: 14, color: palette.textSec),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                            final filteredAvailable = _availableEmployees.where((u) {
+                              if (rawQuery.isEmpty) return true;
+                              final name = (u.userName ?? '').toLowerCase();
+                              final email = (u.userEmail ?? '').toLowerCase();
+                              return name.contains(rawQuery) || email.contains(rawQuery);
+                            }).toList();
 
-                  // ── Members List ──
-                  Builder(
-                    builder: (context) {
-                      final rawQuery = _searchMemberController.text.trim().toLowerCase();
-                      final cleanQuery = rawQuery.replaceAll('(', '').replaceAll(')', '').trim();
-                      final filteredMembers = _projectMembers.where((m) {
-                        if (rawQuery.isEmpty) return true;
-                        final name = (m.userName ?? '').toLowerCase();
-                        final email = (m.userEmail ?? '').toLowerCase();
-                        final role = m.role.toLowerCase();
-                        final isLead = (email == 'admin@acme.com') || name.contains('lead admin');
-                        final isManager = role.contains('admin') || role.contains('owner') || role.contains('manager');
-                        final displayRole = isLead ? 'lead admin permanent' : (isManager ? 'manager' : 'member (dev)');
-                        final altRole = isLead ? 'lead admin' : (isManager ? 'admin' : 'member dev');
-
-                        return name.contains(rawQuery) ||
-                            name.contains(cleanQuery) ||
-                            email.contains(rawQuery) ||
-                            email.contains(cleanQuery) ||
-                            role.contains(rawQuery) ||
-                            role.contains(cleanQuery) ||
-                            displayRole.contains(rawQuery) ||
-                            displayRole.contains(cleanQuery) ||
-                            altRole.contains(cleanQuery);
-                      }).toList();
-
-                      return Flexible(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: palette.bgElevated,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: palette.div),
-                          ),
-                          child: _isLoadingMembers && _projectMembers.isEmpty
-                              ? Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: palette.accent,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Text(
-                                          'Fetching project members...',
-                                          style: UnoTypography.body(
-                                            color: palette.textSec,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
+                            if (filteredAvailable.isEmpty) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    rawQuery.isEmpty
+                                        ? 'All registered employees are already assigned to this project!'
+                                        : 'No employees found matching "$rawQuery"',
+                                    textAlign: TextAlign.center,
+                                    style: UnoTypography.body(
+                                      color: palette.textSec,
+                                      fontSize: 12.5,
                                     ),
                                   ),
-                                )
-                              : _projectMembers.isEmpty
-                                  ? Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(24),
+                                ),
+                              );
+                            }
+
+                            return ListView.separated(
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                              itemCount: filteredAvailable.length,
+                              separatorBuilder: (_, unused) => Divider(
+                                height: 1,
+                                color: palette.div,
+                              ),
+                              itemBuilder: (context, idx) {
+                                final employee = filteredAvailable[idx];
+                                final isAssigning = _assigningUserId == employee.userId;
+                                final selectedRole = _employeeAssignRole[employee.userId] ?? 'MEMBER';
+
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
+                                  child: Row(
+                                    children: [
+                                      // Avatar
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: palette.live.withValues(alpha: 0.15),
+                                          border: Border.all(
+                                            color: palette.live.withValues(alpha: 0.35),
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
                                         child: Text(
-                                          'No employees assigned to this project yet.\nUse the input above to assign team members.',
-                                          textAlign: TextAlign.center,
-                                          style: UnoTypography.body(
-                                            color: palette.textSec,
-                                            fontSize: 12.5,
+                                          _getMemberInitials(employee.userName, employee.userEmail),
+                                          style: UnoTypography.mono(
+                                            color: palette.live,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
-                                    )
-                                  : filteredMembers.isEmpty
-                                      ? Center(
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(20),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'No matching employees found for "${_searchMemberController.text}"',
-                                                  textAlign: TextAlign.center,
-                                                  style: UnoTypography.body(
-                                                    color: palette.textSec,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                if (_searchMemberController.text.trim().isNotEmpty) ...[
-                                                  const SizedBox(height: 10),
-                                                  InkWell(
-                                                    onTap: () {
-                                                      _inviteMemberController.text =
-                                                          _searchMemberController.text.trim();
-                                                      _handleAddMember();
-                                                    },
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                          horizontal: 12, vertical: 6),
-                                                      decoration: BoxDecoration(
-                                                        color: palette.accent.withValues(alpha: 0.15),
-                                                        borderRadius: BorderRadius.circular(6),
-                                                        border: Border.all(
-                                                            color: palette.accent.withValues(alpha: 0.3)),
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Icon(Icons.person_add_alt_1,
-                                                              size: 13, color: palette.accent),
-                                                          const SizedBox(width: 6),
-                                                          Text(
-                                                            'Assign "${_searchMemberController.text.trim()}" to project',
-                                                            style: UnoTypography.body(
-                                                              color: palette.accent,
-                                                              fontSize: 11.5,
-                                                              fontWeight: FontWeight.w600,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
+                                      const SizedBox(width: 10),
+                                      // Name and Email
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              employee.userName ?? employee.userEmail ?? 'Employee',
+                                              style: UnoTypography.body(
+                                                color: palette.text,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              employee.userEmail ?? employee.userId,
+                                              style: UnoTypography.body(
+                                                color: palette.textSec,
+                                                fontSize: 11.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Role selector dropdown
+                                      PopupMenuButton<String>(
+                                        tooltip: '',
+                                        position: PopupMenuPosition.under,
+                                        offset: const Offset(0, 5),
+                                        color: palette.bgSurface,
+                                        elevation: 8,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          side: BorderSide(color: palette.div),
+                                        ),
+                                        onSelected: (val) {
+                                          setState(() {
+                                            _employeeAssignRole[employee.userId] = val;
+                                          });
+                                        },
+                                        itemBuilder: (context) => [
+                                          PopupMenuItem(
+                                            value: 'MEMBER',
+                                            height: 36,
+                                            child: Text('Member (Dev)',
+                                                style: UnoTypography.body(
+                                                    color: palette.text, fontSize: 12)),
                                           ),
-                                        )
-                                      : AnimatedOpacity(
-                                          opacity: _isReloadingMembers ? 0.75 : 1.0,
-                                          duration: const Duration(milliseconds: 200),
-                                          child: ListView.separated(
-                                            shrinkWrap: true,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 8),
-                                            itemCount: filteredMembers.length,
-                                            separatorBuilder: (_, unused) => Divider(
-                                              height: 1,
-                                              color: palette.div,
-                                            ),
-                                            itemBuilder: (context, idx) {
-                                              final member = filteredMembers[idx];
-                                              final role = member.role.toUpperCase();
-                                              final isLeadAdmin = (member.userEmail?.toLowerCase() == 'admin@acme.com') ||
-                                                  (member.userName?.toLowerCase() == 'lead admin');
-                                              final isMemberAdmin = isLeadAdmin ||
-                                                  role == 'ADMIN' ||
-                                                  role == 'MANAGER' ||
-                                                  role == 'LEAD';
-                                              final isMemberViewer = !isLeadAdmin && role == 'VIEWER';
-
-                                              final roleColor = isLeadAdmin
-                                                  ? palette.accent
-                                                  : (isMemberAdmin
-                                                      ? palette.accent
-                                                      : isMemberViewer
-                                                          ? palette.neutral
-                                                          : palette.live);
-
-                                              final initials = _getMemberInitials(
-                                                  member.userName, member.userEmail);
-                                              final displayName = isLeadAdmin
-                                                  ? (member.userName != null && member.userName!.isNotEmpty && member.userName != 'Member'
-                                                      ? member.userName!
-                                                      : 'Lead Admin')
-                                                  : (member.userName ??
-                                                      member.userEmail?.split('@').first ??
-                                                      'Member');
-
-                                              final badgeLabel = isLeadAdmin
-                                                  ? 'LEAD ADMIN · PERMANENT'
-                                                  : (isMemberAdmin
-                                                      ? 'MANAGER'
-                                                      : (role == 'MEMBER' ? 'MEMBER (DEV)' : role));
-                                              return Padding(
-                                                padding: const EdgeInsets.symmetric(
-                                                    vertical: 7, horizontal: 4),
-                                                child: Row(
-                                                  children: [
-                                                    // Avatar
-                                                    Container(
-                                                      width: 32,
-                                                      height: 32,
-                                                      decoration: BoxDecoration(
-                                                        color: roleColor
-                                                            .withValues(alpha: 0.12),
-                                                        border: Border.all(
-                                                          color: roleColor
-                                                              .withValues(alpha: 0.25),
-                                                        ),
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                      child: Center(
-                                                        child: Text(
-                                                          initials,
-                                                          style: UnoTypography.mono(
-                                                            color: roleColor,
-                                                            fontSize: 11,
-                                                            fontWeight:
-                                                                FontWeight.w700,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    // Info
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment.start,
-                                                        children: [
-                                                          Row(
-                                                            children: [
-                                                              Text(
-                                                                displayName,
-                                                                style: UnoTypography.body(
-                                                                  color: palette.text,
-                                                                  fontSize: 13,
-                                                                  fontWeight:
-                                                                      FontWeight.w600,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(width: 8),
-                                                              // Role badge
-                                                              Container(
-                                                                padding:
-                                                                    const EdgeInsets
-                                                                        .symmetric(
-                                                                        horizontal: 6,
-                                                                        vertical: 1.5),
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: roleColor
-                                                                      .withValues(
-                                                                          alpha: 0.12),
-                                                                  border: Border.all(
-                                                                      color: roleColor
-                                                                          .withValues(
-                                                                              alpha:
-                                                                                  0.3)),
-                                                                  borderRadius:
-                                                                      BorderRadius
-                                                                          .circular(4),
-                                                                ),
-                                                                child: Text(
-                                                                  badgeLabel,
-                                                                  style: UnoTypography
-                                                                      .mono(
-                                                                    color: roleColor,
-                                                                    fontSize: 9.5,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w700,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            member.userEmail ??
-                                                                member.userId,
-                                                            style: UnoTypography.body(
-                                                              color: palette.textSec,
-                                                              fontSize: 11.5,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    // Remove or permanent shield
-                                                    if (isLeadAdmin)
-                                                      Tooltip(
-                                                        message:
-                                                            'Permanent Lead Admin · Full Access to All Repos',
-                                                        child: Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                              horizontal: 7, vertical: 3),
-                                                          decoration: BoxDecoration(
-                                                            color: palette.accent
-                                                                .withValues(alpha: 0.12),
-                                                            borderRadius:
-                                                                BorderRadius.circular(5),
-                                                            border: Border.all(
-                                                              color: palette.accent
-                                                                  .withValues(alpha: 0.25),
-                                                            ),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              Icon(Icons.shield,
-                                                                  size: 12,
-                                                                  color: palette.accent),
-                                                              const SizedBox(width: 4),
-                                                              Text(
-                                                                'PERMANENT',
-                                                                style: UnoTypography.mono(
-                                                                  color: palette.accent,
-                                                                  fontSize: 9,
-                                                                  fontWeight:
-                                                                      FontWeight.w700,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      )
-                                                    else
-                                                      Tooltip(
-                                                        message:
-                                                            'Remove employee from project',
-                                                        child: InkWell(
-                                                          onTap: () =>
-                                                              _handleRemoveMember(member),
-                                                          borderRadius:
-                                                              BorderRadius.circular(6),
-                                                          child: Padding(
-                                                            padding:
-                                                                const EdgeInsets.all(6),
-                                                            child: Icon(
-                                                              Icons.close,
-                                                              size: 15,
-                                                              color: palette.textSec,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
+                                          PopupMenuItem(
+                                            value: 'ADMIN',
+                                            height: 36,
+                                            child: Text('Manager',
+                                                style: UnoTypography.body(
+                                                    color: palette.accent, fontSize: 12)),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'VIEWER',
+                                            height: 36,
+                                            child: Text('Viewer',
+                                                style: UnoTypography.body(
+                                                    color: palette.textSec, fontSize: 12)),
+                                          ),
+                                        ],
+                                        child: Container(
+                                          height: 29,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          decoration: BoxDecoration(
+                                            color: palette.bgBase,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: palette.div),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                selectedRole == 'ADMIN'
+                                                    ? 'Manager'
+                                                    : (selectedRole == 'VIEWER'
+                                                        ? 'Viewer'
+                                                        : 'Member'),
+                                                style: UnoTypography.body(
+                                                  color: palette.text,
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w500,
                                                 ),
-                                              );
-                                            },
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Icon(Icons.keyboard_arrow_down,
+                                                  size: 13, color: palette.textSec),
+                                            ],
                                           ),
                                         ),
-                        ),
-                      );
-                    },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // + Assign Button
+                                      InkWell(
+                                        onTap: isAssigning
+                                            ? null
+                                            : () => _handleAssignEmployee(employee,
+                                                role: selectedRole),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          height: 29,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10),
+                                          decoration: BoxDecoration(
+                                            color: palette.accent,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Center(
+                                            child: isAssigning
+                                                ? const SizedBox(
+                                                    width: 12,
+                                                    height: 12,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                                  )
+                                                : Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.add,
+                                                          size: 13, color: Colors.white),
+                                                      const SizedBox(width: 3),
+                                                      Text(
+                                                        'Assign',
+                                                        style: UnoTypography.body(
+                                                          color: Colors.white,
+                                                          fontSize: 11.5,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          }
+
+                          // Assigned Tab
+                          final filteredMembers = _projectMembers.where((m) {
+                            if (rawQuery.isEmpty) return true;
+                            final name = (m.userName ?? '').toLowerCase();
+                            final email = (m.userEmail ?? '').toLowerCase();
+                            return name.contains(rawQuery) || email.contains(rawQuery);
+                          }).toList();
+
+                          if (_isLoadingMembers && _projectMembers.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: palette.accent,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Fetching project members...',
+                                      style: UnoTypography.body(
+                                        color: palette.textSec,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+
+                          if (filteredMembers.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  rawQuery.isEmpty
+                                      ? 'No employees assigned to this project yet.'
+                                      : 'No members found matching "$rawQuery"',
+                                  textAlign: TextAlign.center,
+                                  style: UnoTypography.body(
+                                    color: palette.textSec,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return AnimatedOpacity(
+                            opacity: _isReloadingMembers ? 0.75 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 8),
+                              itemCount: filteredMembers.length,
+                              separatorBuilder: (_, unused) => Divider(
+                                height: 1,
+                                color: palette.div,
+                              ),
+                              itemBuilder: (context, idx) {
+                                final member = filteredMembers[idx];
+                                final role = member.role.toUpperCase();
+                                final isMemberAdmin = role == 'ADMIN' ||
+                                    role == 'MANAGER' ||
+                                    role == 'LEAD';
+                                final isMemberViewer = role == 'VIEWER';
+
+                                final roleColor = isMemberAdmin
+                                    ? palette.accent
+                                    : (isMemberViewer
+                                        ? palette.textSec
+                                        : palette.live);
+
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 7, horizontal: 6),
+                                  child: Row(
+                                    children: [
+                                      // Avatar
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: roleColor
+                                              .withValues(alpha: 0.15),
+                                          border: Border.all(
+                                            color: roleColor
+                                                .withValues(alpha: 0.35),
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          _getMemberInitials(
+                                              member.userName, member.userEmail),
+                                          style: UnoTypography.mono(
+                                            color: roleColor,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      // Name and Email
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  member.userName ??
+                                                      member.userEmail ??
+                                                      'Employee',
+                                                  style: UnoTypography.body(
+                                                    color: palette.text,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                // Role badge
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 1.5),
+                                                  decoration: BoxDecoration(
+                                                    color: roleColor
+                                                        .withValues(alpha: 0.12),
+                                                    border: Border.all(
+                                                        color: roleColor
+                                                            .withValues(
+                                                                alpha: 0.3)),
+                                                    borderRadius:
+                                                        BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    isMemberAdmin
+                                                        ? 'MANAGER'
+                                                        : role,
+                                                    style: UnoTypography.mono(
+                                                      color: roleColor,
+                                                      fontSize: 9.5,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              member.userEmail ?? member.userId,
+                                              style: UnoTypography.body(
+                                                color: palette.textSec,
+                                                fontSize: 11.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Remove button
+                                      if (member.userEmail?.toLowerCase() != 'admin@acme.com' &&
+                                          member.userName?.toLowerCase() != 'lead admin')
+                                        Tooltip(
+                                          message:
+                                              'Remove employee from project',
+                                          child: InkWell(
+                                            onTap: () =>
+                                                _handleRemoveMember(member),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(6),
+                                              child: Icon(
+                                                LucideIcons.userMinus,
+                                                size: 15,
+                                                color: palette.textSec
+                                                    .withValues(alpha: 0.7),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 16),
@@ -2146,27 +2233,31 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           ),
                         ],
                       ),
-                      InkWell(
-                        onTap: () =>
-                            setState(() => _managingWorkspaceProject = null),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: palette.bgElevated,
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () =>
+                                setState(() => _managingWorkspaceProject = null),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: palette.div),
-                          ),
-                          child: Text(
-                            'Done',
-                            style: UnoTypography.body(
-                              color: palette.text,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: palette.bgElevated,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: palette.div),
+                              ),
+                              child: Text(
+                                'Done',
+                                style: UnoTypography.body(
+                                  color: palette.text,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -2178,7 +2269,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       ),
     );
   }
-
   Widget _buildInputField({
     required TextEditingController controller,
     required String hint,
@@ -2651,6 +2741,48 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           // Ready Green Button / Status badge
           Builder(
             builder: (context) {
+              final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                  project.upsStatus.toUpperCase() == 'DELETED' ||
+                  project.upsStatus.toUpperCase() == 'OFFLINE' ||
+                  project.ingestionStatus.toLowerCase() == 'stopped' ||
+                  project.ingestionStatus.toLowerCase() == 'deleted';
+
+              if (isStopped) {
+                return Tooltip(
+                  message: 'Server Stopped on Backend',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.12),
+                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'STOPPED',
+                          style: UnoTypography.mono(
+                            color: Colors.redAccent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               final isReady = project.upsStatus.toUpperCase() == 'READY' ||
                   project.upsStatus.toUpperCase() == 'ACTIVE' ||
                   project.ingestionStatus.toLowerCase() == 'live';
@@ -2745,32 +2877,69 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             const SizedBox(width: 10),
           ],
 
-          // Open button
-          InkWell(
-            onTap: () => widget.onOpenProject(project),
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Open',
-                    style: UnoTypography.body(
-                      color: palette.accent,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+          // Open button / Server Stopped indicator
+          Builder(
+            builder: (context) {
+              final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                  project.upsStatus.toUpperCase() == 'DELETED' ||
+                  project.upsStatus.toUpperCase() == 'OFFLINE';
+
+              if (isStopped) {
+                return Tooltip(
+                  message: 'Cannot open: Project server is stopped on backend',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: palette.div),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.power_off, size: 13, color: palette.textSec),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Server Stopped',
+                          style: UnoTypography.body(
+                            color: palette.textSec,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_forward,
-                    size: 15,
-                    color: palette.accent,
+                );
+              }
+
+              return InkWell(
+                onTap: () => widget.onOpenProject(project),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Open',
+                        style: UnoTypography.body(
+                          color: palette.accent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 15,
+                        color: palette.accent,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),
