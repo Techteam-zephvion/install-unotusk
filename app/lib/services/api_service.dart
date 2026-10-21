@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import '../models/workspace_models.dart';
+import '../features/connection/data/local_registry_service.dart';
 
 /// Centralized API Service for Unotusk.
 /// Strictly wired to the real backend server at port 28000 (Control Plane) and 28100 series (Data Plane).
@@ -226,27 +228,13 @@ class ApiService {
   //  Authentication & User Profile
   // ─────────────────────────────────────────────────────────
 
-  static String _extractErrorMessage(http.Response res, {String defaultMsg = 'Request failed'}) {
-    try {
-      final data = jsonDecode(res.body);
-      if (data is Map) {
-        if (data['error'] is Map && data['error']['message'] != null) {
-          return data['error']['message'].toString();
-        }
-        if (data['message'] != null) return data['message'].toString();
-        if (data['detail'] != null) return data['detail'].toString();
-      }
-    } catch (_) {}
-    return '$defaultMsg (${res.statusCode})';
-  }
-
   /// Probes server connectivity for the provided work email
   static Future<Map<String, dynamic>> checkOrganisationMembership(
       String email) async {
     final healthOk = await checkHealth();
     if (!healthOk) {
       throw Exception(
-          lastError ?? 'Cannot reach backend server at $baseUrl');
+          lastError ?? 'Cannot reach backend server at http://10.0.0.59:28000');
     }
 
     try {
@@ -264,7 +252,7 @@ class ApiService {
     };
   }
 
-  /// Authenticates against $baseUrl/api/v1/auth/login
+  /// Authenticates against http://10.0.0.59:28000/api/v1/auth/login
   static Future<UserModel> login({
     required String email,
     required String password,
@@ -275,7 +263,7 @@ class ApiService {
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'email': email.trim().toLowerCase(),
+            'email': email,
             'password': password,
           }),
         )
@@ -317,13 +305,14 @@ class ApiService {
 
       return user;
     } else if (res.statusCode == 401) {
-      throw Exception(_extractErrorMessage(res, defaultMsg: 'Invalid email or password. Please verify credentials.'));
+      throw Exception(
+          'Invalid email or password on http://10.0.0.59:28000. Please verify credentials.');
     } else {
-      throw Exception(_extractErrorMessage(res, defaultMsg: 'Sign in failed'));
+      throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
     }
   }
 
-  /// Creates a new workspace / user on $baseUrl/api/v1/auth/signup
+  /// Creates a new workspace / user on http://10.0.0.59:28000/api/v1/auth/signup
   static Future<UserModel> createOrganisation({
     required String fullName,
     required String orgName,
@@ -331,10 +320,9 @@ class ApiService {
     required String role,
     String? email,
   }) async {
-    final cleanOrg = orgName.trim().isNotEmpty ? orgName.trim() : 'Acme Corporation';
-    final userEmail = (email != null && email.trim().isNotEmpty)
-        ? email.trim().toLowerCase()
-        : '${fullName.toLowerCase().replaceAll(' ', '.')}@acme.com';
+    final userEmail = (email != null && email.isNotEmpty)
+        ? email
+        : '${fullName.toLowerCase().replaceAll(' ', '.')}@${orgName.toLowerCase().replaceAll(' ', '')}.com';
 
     final uri = Uri.parse('$baseUrl/api/v1/auth/signup');
     final res = await _client
@@ -342,11 +330,9 @@ class ApiService {
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'name': fullName.trim(),
+            'name': fullName,
             'email': userEmail,
             'password': password.length >= 8 ? password : '${password}123',
-            'organization_name': cleanOrg,
-            'role': role,
           }),
         )
         .timeout(_timeout);
@@ -360,7 +346,7 @@ class ApiService {
       final user = UserModel(
         id: userData['id']?.toString(),
         name: userData['name']?.toString() ?? fullName,
-        org: cleanOrg,
+        org: orgName,
         email: userEmail,
         role: role,
       );
@@ -375,7 +361,8 @@ class ApiService {
 
       return user;
     } else {
-      throw Exception(_extractErrorMessage(res, defaultMsg: 'Failed to create account'));
+      throw Exception(
+          'Failed to create account on server (${res.statusCode}): ${res.body}');
     }
   }
 
@@ -402,7 +389,7 @@ class ApiService {
 
   /// Fetches project list from http://10.0.0.59:28000/api/v1/projects
   static Future<List<ProjectItem>> fetchProjects() async {
-    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
       final mock = [
         const ProjectItem(
           id: 'proj-1',
@@ -469,13 +456,13 @@ class ApiService {
           final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
           final days = DateTime.now().difference(createdAt).inDays;
 
-          final isRunning = status.toUpperCase() == 'READY' || status.toUpperCase() == 'ACTIVE';
-
           return ProjectItem(
             id: id,
             name: name,
-            upsStatus: status.toUpperCase(),
-            ingestionStatus: isRunning ? 'live' : 'stopped',
+            upsStatus: status,
+            ingestionStatus: status.toUpperCase() == 'READY'
+                ? 'live'
+                : (status.toUpperCase() == 'CREATED' ? 'ready' : 'ingesting'),
             lastIngestion: _formatTimeAgo(createdAt),
             fpr: 0.04,
             days: days > 0 ? days : 1,
@@ -491,17 +478,162 @@ class ApiService {
           );
         }).toList();
 
+        // Deep verification against actual project container / data plane
+        final currentHost = Uri.parse(baseUrl).host;
+        final verifiedProjects = await Future.wait(projects.map((proj) async {
+          if (accessToken == null) return proj;
+          try {
+            // 1. If project has a designated data-plane port, probe it directly
+            if (proj.port != null && proj.port! > 0) {
+              try {
+                final portHealthUri = Uri.parse('http://$currentHost:${proj.port}/health');
+                final portRes = await _client.get(portHealthUri).timeout(const Duration(seconds: 2));
+                if (portRes.statusCode == 200) {
+                  return proj.copyWith(
+                    upsStatus: 'READY',
+                    ingestionStatus: 'live',
+                  );
+                }
+              } catch (_) {}
+            }
+
+            final dp = await fetchDataPlaneStatus(proj.id);
+            if (dp.port != null && dp.port! > 0) {
+              try {
+                final portHealthUri = Uri.parse('http://$currentHost:${dp.port}/health');
+                final portRes = await _client.get(portHealthUri).timeout(const Duration(seconds: 2));
+                if (portRes.statusCode == 200) {
+                  return proj.copyWith(
+                    upsStatus: 'READY',
+                    ingestionStatus: 'live',
+                    port: dp.port,
+                  );
+                }
+              } catch (_) {}
+            }
+
+            if (!dp.isRunning) {
+              return proj.copyWith(
+                upsStatus: 'STOPPED',
+                ingestionStatus: 'stopped',
+                port: dp.port ?? proj.port,
+              );
+            } else {
+              return proj.copyWith(
+                upsStatus: 'READY',
+                ingestionStatus: 'live',
+                port: dp.port ?? proj.port,
+              );
+            }
+          } catch (_) {
+            return proj.copyWith(
+              upsStatus: 'STOPPED',
+              ingestionStatus: 'stopped',
+            );
+          }
+        }));
+        projects
+          ..clear()
+          ..addAll(verifiedProjects);
+
+        try {
+          final localRegistry = LocalRegistryService();
+          final localServers = await localRegistry.getRunningServers();
+          for (final ls in localServers) {
+            final isRunning = ls.state == 'running' || ls.state == 'degraded' || ls.state == 'active';
+            final fallbackProj = ProjectItem(
+              id: ls.id,
+              name: ls.name,
+              upsStatus: isRunning ? 'READY' : 'STOPPED',
+              ingestionStatus: isRunning ? 'live' : 'stopped',
+              lastIngestion: 'Just now',
+              fpr: 0.0,
+              days: 1,
+              port: ls.apiPort,
+              repositoryName: ls.repoUrl,
+            );
+            
+            bool mappedFromApi = false;
+            try {
+              if (isRunning) {
+                final currentHost = Uri.parse(ApiService.baseUrl).host;
+                final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
+                final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
+                if (localRes.statusCode == 200) {
+                  final localDecoded = jsonDecode(localRes.body);
+                  List<dynamic> localList = [];
+                  if (localDecoded is List) {
+                    localList = localDecoded;
+                  } else if (localDecoded is Map && localDecoded['projects'] is List) {
+                    localList = localDecoded['projects'];
+                  }
+                
+                for (final p in localList) {
+                  final pm = Map<String, dynamic>.from(p as Map);
+                  final pName = pm['name']?.toString() ?? ls.name;
+                  
+                  final localProj = ProjectItem(
+                    id: pm['id']?.toString() ?? ls.id,
+                    name: pName,
+                    upsStatus: pm['status']?.toString() ?? 'READY',
+                    ingestionStatus: 'live',
+                    lastIngestion: 'Just now',
+                    fpr: 0.0,
+                    days: 1,
+                    port: ls.apiPort,
+                    organizationId: pm['organization_id']?.toString(),
+                    slug: pm['slug']?.toString(),
+                    description: pm['description']?.toString(),
+                    role: pm['role']?.toString(),
+                    repositoryName: pm['repository'] is Map
+                        ? (pm['repository']['full_name']?.toString() ?? pm['repository']['name']?.toString())
+                        : ls.repoUrl,
+                  );
+
+                  mappedFromApi = true;
+                  if (!projects.any((p) => p.name == localProj.name || p.id == localProj.id)) {
+                    projects.add(localProj);
+                  } else {
+                    final idx = projects.indexWhere((p) => p.name == localProj.name || p.id == localProj.id);
+                    projects[idx] = localProj;
+                  }
+                }
+              }
+              }
+            } catch (_) {}
+            
+            if (!mappedFromApi) {
+              // Only augment an EXISTING project that matches by name or id, NEVER resurrect a deleted server
+              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              if (idx != -1) {
+                final existing = projects[idx];
+                projects[idx] = existing.copyWith(
+                  port: existing.port ?? fallbackProj.port,
+                  repositoryName: existing.repositoryName ?? fallbackProj.repositoryName,
+                );
+              }
+            }
+          }
+        } catch (_) {}
+
         cachedProjects = projects;
         if (connectedProjectIds.isEmpty) {
           loadPersistedConnectedProjects();
         }
-        if (connectedProjectIds.isNotEmpty) {
-          connectedWorkspaceProjects.clear();
-          for (final p in projects) {
-            if (connectedProjectIds.contains(p.id) ||
-                connectedProjectIds.contains(p.name)) {
-              connectedWorkspaceProjects.add(p);
-            }
+
+        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects
+        final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
+        final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
+        connectedProjectIds.removeWhere(
+          (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
+        );
+        savePersistedConnectedProjects();
+
+        connectedWorkspaceProjects.clear();
+        for (final p in projects) {
+          if (connectedProjectIds.contains(p.id) ||
+              connectedProjectIds.contains(p.name)) {
+            connectedWorkspaceProjects.add(p);
           }
         }
         if (activeProject == null && projects.isNotEmpty) {
@@ -515,14 +647,6 @@ class ApiService {
           final updated = projects.where((p) => p.id == activeProject!.id);
           if (updated.isNotEmpty) {
             activeProject = updated.first;
-          } else if (projects.isNotEmpty) {
-            // Previous active project is no longer valid; reselect a valid one
-            activeProject = projects.firstWhere(
-              (p) => p.upsStatus.toUpperCase() == 'READY',
-              orElse: () => projects.first,
-            );
-          } else {
-            activeProject = null;
           }
         }
         return projects;
@@ -698,27 +822,14 @@ class ApiService {
           'Ontology Graph',
           'Synthesized Verification',
         ],
-        ontologyEdges: relatedEntities.isNotEmpty && relatedEntities.any((e) => e.contains(':'))
+        ontologyEdges: relatedEntities.isNotEmpty
             ? relatedEntities
-            : const [
-                'Service:Auth',
-                'Decision:ADR-7',
-                'Commit:GH-7210',
-                'Ticket:ENG-2847',
-              ],
+            : const [],
         citations: citations.isNotEmpty
             ? citations
-            : const [
-                'tests/test_audio_preprocessing.py',
-                'tests/test_models_audio.py',
-                'tests/test_models_audio.py',
-                'tests/test_lavdf_manifest.py',
-                'tests/test_lavdf_manifest.py',
-                'tests/test_app.py',
-                'src/config.py',
-                'src/features/mel_spectrogram.py',
-                'src/preprocessing/augment.py',
-              ],
+            : (evidenceItems.isNotEmpty
+                ? evidenceItems.map((e) => e.file).where((f) => f.isNotEmpty).toSet().toList()
+                : const []),
         evidence: evidenceItems,
         debugSignals: debugSignals,
       );
@@ -1064,25 +1175,12 @@ class ApiService {
                 'Ontology Graph',
                 'Synthesized Verification',
               ],
-              ontologyEdges: const [
-                'Service:Auth',
-                'Decision:ADR-7',
-                'Commit:GH-7210',
-                'Ticket:ENG-2847',
-              ],
+              ontologyEdges: const [],
               citations: citations.isNotEmpty
                   ? citations
-                  : const [
-                      'tests/test_audio_preprocessing.py',
-                      'tests/test_models_audio.py',
-                      'tests/test_models_audio.py',
-                      'tests/test_lavdf_manifest.py',
-                      'tests/test_lavdf_manifest.py',
-                      'tests/test_app.py',
-                      'src/config.py',
-                      'src/features/mel_spectrogram.py',
-                      'src/preprocessing/augment.py',
-                    ],
+                  : (evidenceItems.isNotEmpty
+                      ? evidenceItems.map((e) => e.file).where((f) => f.isNotEmpty).toSet().toList()
+                      : const []),
               evidence: evidenceItems,
               debugSignals: debugSignals,
             );
@@ -1218,108 +1316,83 @@ class ApiService {
   //  Live Ontology Graph (SyncGuard Knowledge Graph Entities)
   // ─────────────────────────────────────────────────────────
 
-  /// Builds live knowledge graph nodes matching the repository ontology on http://10.0.0.59:28000
-  static Future<List<OntologyNode>> fetchOntologyNodes({String? projectId}) async {
+  static List<OntologyNode> _cachedGraphNodes = [];
+  static List<List<int>> _cachedGraphEdges = [];
+  static String? _cachedGraphPid;
+
+  /// Loads live repository graph nodes and edges from http://10.0.0.59:28000
+  static Future<void> _loadProjectGraph([String? projectId]) async {
     try {
       final pid = _resolveProjectId(projectId);
-      // Query server to verify project heartbeat
-      final pUri = Uri.parse('$baseUrl/api/v1/projects/$pid');
-      await _client.get(pUri, headers: _headers).timeout(const Duration(seconds: 3));
-    } catch (e) {
-      debugPrint('[ApiService] fetchOntologyNodes ping: $e');
-    }
+      if (_cachedGraphPid == pid && _cachedGraphNodes.isNotEmpty) return;
 
-    return const [
-      OntologyNode(
-        id: 0,
-        cx: 440.0,
-        cy: 155.0,
-        label: 'OIDC Decis…',
-        type: 'Decision',
-        subtitle: 'ADR-7: OIDC Authentication Migration',
-      ),
-      OntologyNode(
-        id: 1,
-        cx: 260.0,
-        cy: 280.0,
-        label: 'Auth Servi…',
-        type: 'Service',
-        subtitle: 'Core Authentication & Session Service',
-      ),
-      OntologyNode(
-        id: 2,
-        cx: 650.0,
-        cy: 130.0,
-        label: 'GH #7210',
-        type: 'Commit',
-        subtitle: 'Commit 7210: Migrate JWT verification to OIDC',
-      ),
-      OntologyNode(
-        id: 3,
-        cx: 650.0,
-        cy: 260.0,
-        label: 'ENG-1042',
-        type: 'Ticket',
-        subtitle: 'Jira ENG-1042: Implement Token Refresh Handler',
-      ),
-      OntologyNode(
-        id: 4,
-        cx: 440.0,
-        cy: 390.0,
-        label: 'Postgres D…',
-        type: 'Decision',
-        subtitle: 'PostgreSQL Session Store',
-      ),
-      OntologyNode(
-        id: 5,
-        cx: 650.0,
-        cy: 390.0,
-        label: 'ADR #7',
-        type: 'Decision',
-        subtitle: 'Architecture Decision: Database Session Caching',
-      ),
-      OntologyNode(
-        id: 6,
-        cx: 860.0,
-        cy: 200.0,
-        label: '@sam',
-        type: 'Person',
-        subtitle: 'Samir Patel (Security Engineering)',
-      ),
-      OntologyNode(
-        id: 7,
-        cx: 860.0,
-        cy: 390.0,
-        label: 'Billing Se…',
-        type: 'Service',
-        subtitle: 'Downstream Consumer: Billing Service',
-      ),
-      OntologyNode(
-        id: 8,
-        cx: 650.0,
-        cy: 500.0,
-        label: '@arch-deci…',
-        type: 'Ticket',
-        subtitle: '#arch-decisions Slack Channel Discussion',
-      ),
-    ];
+      final gUri = Uri.parse('$baseUrl/api/v1/projects/$pid/graph');
+      final res = await _client.get(gUri, headers: _headers).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final rawNodes = data['nodes'] as List<dynamic>? ?? [];
+        final rawEdges = data['edges'] as List<dynamic>? ?? [];
+
+        final idToIndex = <String, int>{};
+        final List<OntologyNode> nodes = [];
+
+        final displayNodes = rawNodes.take(24).toList();
+        final total = displayNodes.length;
+
+        for (int i = 0; i < total; i++) {
+          final m = displayNodes[i] as Map<String, dynamic>;
+          final rawId = m['id']?.toString() ?? '$i';
+          idToIndex[rawId] = i;
+
+          final type = m['type']?.toString() ?? 'File';
+          final label = m['label']?.toString() ?? m['name']?.toString() ?? 'Node $i';
+          final metadata = m['metadata'] as Map<String, dynamic>? ?? {};
+          final subtitle = metadata['path']?.toString() ?? metadata['language']?.toString();
+
+          final double angle = (i * 2 * math.pi) / (total > 0 ? total : 1);
+          final double radius = (i % 2 == 0) ? 220.0 : 150.0;
+          final double cx = 550.0 + radius * math.cos(angle);
+          final double cy = 300.0 + radius * math.sin(angle);
+
+          nodes.add(OntologyNode(
+            id: i,
+            cx: cx,
+            cy: cy,
+            label: label.length > 14 ? '${label.substring(0, 12)}…' : label,
+            type: type,
+            subtitle: subtitle ?? label,
+          ));
+        }
+
+        final List<List<int>> edges = [];
+        for (final e in rawEdges) {
+          final em = e as Map<String, dynamic>;
+          final src = em['source']?.toString();
+          final tgt = em['target']?.toString();
+          if (src != null && tgt != null && idToIndex.containsKey(src) && idToIndex.containsKey(tgt)) {
+            edges.add([idToIndex[src]!, idToIndex[tgt]!]);
+          }
+        }
+
+        _cachedGraphNodes = nodes;
+        _cachedGraphEdges = edges;
+        _cachedGraphPid = pid;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] _loadProjectGraph error: $e');
+    }
+  }
+
+  /// Builds live knowledge graph nodes matching the repository ontology on http://10.0.0.59:28000
+  static Future<List<OntologyNode>> fetchOntologyNodes({String? projectId}) async {
+    await _loadProjectGraph(projectId);
+    return _cachedGraphNodes;
   }
 
   /// Builds live knowledge graph edges connecting entities from http://10.0.0.59:28000
   static Future<List<List<int>>> fetchOntologyEdges({String? projectId}) async {
-    return const [
-      [0, 1], // OIDC Decis… <-> Auth Servi…
-      [0, 2], // OIDC Decis… <-> GH #7210
-      [0, 3], // OIDC Decis… <-> ENG-1042
-      [1, 4], // Auth Servi… <-> Postgres D…
-      [4, 5], // Postgres D… <-> ADR #7
-      [3, 5], // ENG-1042 <-> ADR #7
-      [3, 7], // ENG-1042 <-> Billing Se…
-      [2, 6], // GH #7210 <-> @sam
-      [6, 7], // @sam <-> Billing Se…
-      [5, 7], // ADR #7 <-> Billing Se…
-      [5, 8], // ADR #7 <-> @arch-deci…
-    ];
+    await _loadProjectGraph(projectId);
+    return _cachedGraphEdges;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1730,6 +1803,23 @@ class ApiService {
     throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
   }
 
+  /// Lists all registered employees across the workspace organization from http://10.0.0.59:28000
+  static Future<List<ProjectMember>> fetchOrganizationEmployees([String? orgId]) async {
+    final oid = (orgId != null && orgId.trim().isNotEmpty)
+        ? orgId.trim()
+        : (defaultOrganizationId ?? '34b9ce85-b374-426b-ac04-864c4c2bd533');
+    final uri = Uri.parse('$baseUrl/api/v1/organizations/$oid/members');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body);
+      final list = decoded is List ? decoded : [];
+      return list
+          .map((item) => ProjectMember.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+    }
+    return [];
+  }
+
   /// Adds a member to a workspace project with role (ADMIN, MEMBER, VIEWER)
   static Future<ProjectMember> addProjectMember({
     String? projectId,
@@ -1768,6 +1858,19 @@ class ApiService {
     if (res.statusCode != 200 && res.statusCode != 204 && res.statusCode != 202) {
       throw Exception('Failed to remove project member (HTTP ${res.statusCode}): ${res.body}');
     }
+  }
+
+  /// Deletes a project from the backend database
+  static Future<void> deleteProject(String projectId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$projectId');
+    final res = await _client.delete(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode != 200 && res.statusCode != 204 && res.statusCode != 202) {
+      throw Exception('Failed to delete project (HTTP ${res.statusCode}): ${res.body}');
+    }
+    cachedProjects.removeWhere((p) => p.id == projectId);
+    connectedProjectIds.remove(projectId);
+    connectedWorkspaceProjects.removeWhere((p) => p.id == projectId);
+    savePersistedConnectedProjects();
   }
 
   // ─────────────────────────────────────────────────────────

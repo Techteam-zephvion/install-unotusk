@@ -661,44 +661,7 @@ class ProjectService:
                         message="You do not have access to this project",
                     )
 
-        # In single-tenant MVP, ensure organization users are synchronized into ProjectMembership
-        # for this project so the Lead Admin can immediately see, search, and manage workspace employees.
-        org_users_query = (
-            select(User)
-            .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
-            .where(OrganizationMembership.organization_id == project.organization_id)
-        )
-        org_users_res = await session.execute(org_users_query)
-        org_users = org_users_res.scalars().all()
-
-        existing_pms_query = select(ProjectMembership.user_id).where(
-            ProjectMembership.project_id == resolved_id
-        )
-        existing_pm_user_ids = set((await session.execute(existing_pms_query)).scalars().all())
-
-        for u in org_users:
-            if u.id not in existing_pm_user_ids:
-                is_u_admin = u.email.lower() == "admin@acme.com"
-                om_res = await session.execute(
-                    select(OrganizationMembership.role).where(
-                        OrganizationMembership.user_id == u.id,
-                        OrganizationMembership.organization_id == project.organization_id,
-                    ).limit(1)
-                )
-                om_role = om_res.scalar_one_or_none()
-                if is_u_admin or om_role in (MembershipRole.OWNER, MembershipRole.ADMIN):
-                    u_role = MembershipRole.ADMIN
-                else:
-                    u_role = MembershipRole.MEMBER
-
-                session.add(ProjectMembership(
-                    project_id=resolved_id,
-                    user_id=u.id,
-                    role=u_role,
-                ))
-                existing_pm_user_ids.add(u.id)
-
-        await session.commit()
+        # Only return explicitly assigned project members (Lead Admin can manually assign employees from available list)
 
         members_query = (
             select(ProjectMembership, User.name, User.email)
