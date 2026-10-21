@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -8,6 +9,12 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 from apps.api.src.config.settings import settings
+
+try:
+    from pgvector.asyncpg import register_vector
+    _HAS_PGVECTOR_ASYNCPG = True
+except ImportError:
+    _HAS_PGVECTOR_ASYNCPG = False
 
 engine_kwargs = {"echo": settings.DEBUG}
 if settings.APP_ENV == "test":
@@ -23,6 +30,20 @@ try:
         settings.DATABASE_URL,
         **engine_kwargs,
     )
+
+    if _HAS_PGVECTOR_ASYNCPG and hasattr(engine, "sync_engine"):
+        @event.listens_for(engine.sync_engine, "connect")
+        def _register_pgvector_codecs(dbapi_connection, connection_record):
+            if hasattr(dbapi_connection, "run_async"):
+                async def _register(conn):
+                    try:
+                        await register_vector(conn)
+                    except Exception:
+                        pass
+                try:
+                    dbapi_connection.run_async(_register)
+                except Exception:
+                    pass
 
     # Async session factory
     AsyncSessionLocal = async_sessionmaker(

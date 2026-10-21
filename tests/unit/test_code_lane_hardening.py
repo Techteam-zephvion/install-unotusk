@@ -77,6 +77,15 @@ def test_2_compatible_vector_bind_param_sanitization():
     result = cv.process_bind_param([1, 2.5, 3], pg_dialect)
     assert result == [1.0, 2.5, 3.0]
 
+    try:
+        from pgvector import Vector
+
+        pv = Vector([1.5, 2.5])
+        assert cv.process_bind_param(pv, pg_dialect) == [1.5, 2.5]
+        assert cv.process_result_value(pv, pg_dialect) == [1.5, 2.5]
+    except ImportError:
+        pass
+
 
 @pytest.mark.asyncio
 async def test_3_retriever_native_pgvector_path():

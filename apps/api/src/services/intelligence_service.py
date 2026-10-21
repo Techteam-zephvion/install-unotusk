@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,10 +18,14 @@ from apps.api.src.schemas.intelligence import (
     ContextSearchResponse,
     ConversationRead,
     EvidenceItem,
+    FeatureSpecificationResponse,
     GroundedAnswerResponse,
     MessageRead,
 )
 from apps.api.src.services.context_engine.engine import ProjectContextEngine
+from apps.api.src.services.context_engine.feature_spec_generator import (
+    FeatureSpecificationGenerator,
+)
 from apps.api.src.services.context_engine.graph_expander import RelationshipExpander
 from apps.api.src.services.context_engine.query_analyzer import analyze_query_async
 from apps.api.src.services.context_engine.ranker import MultiSignalRanker
@@ -29,6 +34,44 @@ from apps.api.src.services.context_engine.retriever import MultiSignalRetriever
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _build_evidence_item(e: dict[str, Any]) -> EvidenceItem:
+    if not isinstance(e, dict):
+        return EvidenceItem(type="file", file=str(e), relevance=0.0)
+    return EvidenceItem(
+        type=e.get("type", "file"),
+        file=e.get("file", ""),
+        symbol=e.get("symbol"),
+        lines=e.get("lines"),
+        relevance=float(e.get("relevance", 0.0) or 0.0),
+        snippet=e.get("snippet"),
+        commit_sha=e.get("commit_sha"),
+        commit_message=e.get("commit_message"),
+        repository_id=str(e["repository_id"]) if e.get("repository_id") is not None else None,
+        snapshot_id=str(e["snapshot_id"]) if e.get("snapshot_id") is not None else None,
+        file_id=str(e["file_id"]) if e.get("file_id") is not None else None,
+        symbol_id=str(e["symbol_id"]) if e.get("symbol_id") is not None else None,
+        fingerprint=e.get("fingerprint"),
+        chunk_type=e.get("chunk_type"),
+        committed_at=str(e["committed_at"]) if e.get("committed_at") is not None else None,
+        is_current=e.get("is_current"),
+        is_superseded=e.get("is_superseded"),
+        is_deleted=e.get("is_deleted"),
+        superseded_by_sha=e.get("superseded_by_sha"),
+        superseded_by_date=str(e["superseded_by_date"]) if e.get("superseded_by_date") is not None else None,
+        renamed_from=e.get("renamed_from"),
+        renamed_to=e.get("renamed_to"),
+        relationship_path=e.get("relationship_path"),
+        relationship_type=e.get("relationship_type"),
+        relationship_hop=e.get("relationship_hop"),
+        connected_from=e.get("connected_from"),
+        retrieval_reason=e.get("retrieval_reason"),
+        alternative_paths=e.get("alternative_paths"),
+        provenance=e.get("provenance"),
+        atomic_code_facts=e.get("atomic_code_facts"),
+        temporal_relations=e.get("temporal_relations"),
+    )
 
 
 class IntelligenceService:
@@ -190,16 +233,10 @@ class IntelligenceService:
         await session.commit()
 
         evidence_items = [
-            EvidenceItem(
-                type=e.get("type", "file"),
-                file=e.get("file", ""),
-                symbol=e.get("symbol"),
-                lines=e.get("lines"),
-                relevance=e.get("relevance", 0.0),
-                snippet=e.get("snippet"),
-            )
+            _build_evidence_item(e)
             for e in grounded_answer.evidence
         ]
+
 
         return GroundedAnswerResponse(
             conversation_id=conversation.id,
@@ -212,6 +249,46 @@ class IntelligenceService:
             debug_signals=grounded_answer.debug_signals,
             created_at=assistant_msg.created_at,
         )
+
+    @classmethod
+    async def generate_feature_specification(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        feature_request: str,
+        thinking_tier: str | None = "warm",
+    ) -> FeatureSpecificationResponse:
+        project = await cls._verify_project_access(session, user_id, project_id)
+        snapshot = await cls._get_active_snapshot(session, project_id)
+
+        # 1. Run Grounded Code Lane Investigation via ProjectContextEngine
+        # (Multi-signal retrieval, graph relationship expansion, temporal ranking, context assembly)
+        engine = ProjectContextEngine()
+        grounded_answer = await engine.investigate(
+            session=session,
+            snapshot_id=snapshot.id,
+            question=feature_request,
+            project_id=project.id,
+            thinking_tier=thinking_tier,
+        )
+
+        # 2. Build EvidenceItem list preserving full provenance
+        evidence_items = [
+            _build_evidence_item(e)
+            for e in grounded_answer.evidence
+        ]
+
+        # 3. Pass assembled evidence into FeatureSpecificationGenerator
+        spec = FeatureSpecificationGenerator.generate_from_evidence(
+            project_id=project.id,
+            feature_request=feature_request,
+            evidence_items=evidence_items,
+            debug_signals=grounded_answer.debug_signals,
+            thinking_tier=thinking_tier,
+        )
+
+        return spec
 
     @classmethod
     async def create_conversation(
@@ -311,16 +388,10 @@ class IntelligenceService:
         output = []
         for m in messages:
             ev_items = [
-                EvidenceItem(
-                    type=e.get("type", "file"),
-                    file=e.get("file", ""),
-                    symbol=e.get("symbol"),
-                    lines=e.get("lines"),
-                    relevance=e.get("relevance", 0.0),
-                    snippet=e.get("snippet"),
-                )
+                _build_evidence_item(e)
                 for e in (m.evidence or [])
             ]
+
             output.append(
                 MessageRead(
                     id=m.id,

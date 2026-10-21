@@ -460,8 +460,8 @@ class MultiSignalRetriever:
                 except Exception:
                     scored_vector_chunks = []
 
-            # 2. In-memory fallback if not PostgreSQL or if native query failed
-            if not scored_vector_chunks and dialect_name != "postgresql":
+            # 2. In-memory fallback if native query did not execute, failed, or yielded no matches
+            if not scored_vector_chunks:
                 vec_stmt = (
                     select(CodeChunk)
                     .where(

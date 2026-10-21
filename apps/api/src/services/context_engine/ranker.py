@@ -136,7 +136,7 @@ class MultiSignalRanker:
         # 2. Resolve temporal supersession across candidates
         resolve_temporal_supersession(unique_candidates)
 
-        ranked: list[RankedCandidate] = []
+        intermediate: list[tuple[float, float, RetrievedCandidate, list[str]]] = []
 
         for cand in unique_candidates:
             score = 0.0
@@ -195,6 +195,10 @@ class MultiSignalRanker:
                     reasons.append(f"Exact symbol match for '{sym}'")
                 elif sym.lower() in path_lower:
                     score += 0.8
+            for path_cand in analyzed_query.path_candidates:
+                if path_cand.lower() in path_lower:
+                    score += 0.8
+                    reasons.append(f"Path candidate match for '{path_cand}'")
 
             # 4. Keyword density in name vs content vs commit message
             content_lower = cand.content.lower()
@@ -215,6 +219,18 @@ class MultiSignalRanker:
                     reasons.append(f"Semantic concept match for '{concept}'")
                 elif concept in content_lower:
                     score += 0.2
+
+            # 5b. Test/mock/fixture demotion when query is not asking for tests
+            is_test_query = any(k in ("test", "tests", "mock", "mocks", "fixture", "fixtures") for k in analyzed_query.keywords)
+            path_normalized = path_lower.replace("\\", "/")
+            is_test_file = any(
+                part in path_normalized
+                for part in ("/tests/", "/test/", "/mocks/", "/fixtures/", "tests/", "mocks/", "fixtures/")
+            ) or path_normalized.split("/")[-1].startswith("test_") or "_test." in path_normalized
+            if is_test_file and not is_test_query:
+                score *= 0.7
+                reasons.append("Test/mock file demoted for non-test query")
+
 
             # 6. Temporal adjustments based on query intent and code change lifecycle
             if not analyzed_query.is_temporal:
@@ -251,17 +267,20 @@ class MultiSignalRanker:
 
             # Normalize score (capped at 1.0)
             normalized_score = min(1.0, round(score / 3.0, 2))
+            intermediate.append((score, normalized_score, cand, reasons))
 
-            ranked.append(
-                RankedCandidate(
-                    candidate=cand,
-                    score=normalized_score,
-                    matched_reasons=reasons,
-                )
+        # Sort descending by raw score to preserve discrimination between strong candidates
+        intermediate.sort(key=lambda item: item[0], reverse=True)
+
+        ranked = [
+            RankedCandidate(
+                candidate=cand,
+                score=norm_s,
+                matched_reasons=reasons,
             )
+            for _, norm_s, cand, reasons in intermediate
+        ]
 
-        # Sort descending by score
-        ranked.sort(key=lambda r: r.score, reverse=True)
 
         # 6. Filter out negligible relevance candidates (noise threshold)
         # Ensure we keep at least 3 candidates (floor guarantee) if candidates exist
