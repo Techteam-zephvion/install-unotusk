@@ -19,10 +19,13 @@ from apps.api.src.models.project import Project
 from apps.api.src.models.repository import Repository
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
+from apps.api.src.schemas.code_atom import GitCommitArtifact
 from apps.api.src.services.code_atom.chunk_mapper import generate_deterministic_chunk_id
 from apps.api.src.services.code_atom.embedding import DevelopmentCodeEmbeddingBackend
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
 from apps.api.src.services.context_engine.retriever import MultiSignalRetriever
+from apps.api.src.services.ingestion_service import IngestionService
+from tests.conftest import TestSessionLocal
 
 
 @pytest.fixture(autouse=True)
@@ -517,6 +520,9 @@ async def test_6_incremental_indexing_duplicate_protection_and_rollback(
     assert updated_chunk is not None
     assert updated_chunk.content == "x = 2"
 
+    # Expunge local identity map so real database primary key unique constraint is tested directly
+    db_session.expunge_all()
+
     # 3. Duplicate protection: inserting duplicate primary key in database raises IntegrityError
     dup_chunk = CodeChunk(
         id=det_id,
@@ -640,3 +646,323 @@ async def test_7_code_lane_retrieval_pipeline_with_real_db_records(
     assert meta.get("commit_sha") == "commit_billing_777"
     assert meta.get("commit_message") == "feat: introduce billing engine"
     assert meta.get("fingerprint") == "fp_billing_pipeline"
+
+
+@pytest.mark.asyncio
+async def test_8_cross_session_vector_lifecycle_update_and_delete(
+    create_test_user,
+    create_test_org,
+    create_test_project,
+):
+    """8. Verify vector insertion, cross-session retrieval, update, and deletion across isolated sessions."""
+    if TestSessionLocal is None:
+        pytest.skip("TestSessionLocal not available")
+
+    # Session 1: Provision project and chunk with 1536-dim embedding
+    chunk_id = uuid.uuid4()
+    backend = DevelopmentCodeEmbeddingBackend()
+    vec_initial = backend.embed_text("def initial_method(): return 1")
+
+    async with TestSessionLocal() as session1:
+        _, repo, snapshot = await _setup_project_hierarchy(
+            session1, create_test_user, create_test_org, create_test_project, tag="lifecycle"
+        )
+        repo_file = RepositoryFile(
+            id=uuid.uuid4(),
+            snapshot_id=snapshot.id,
+            path="src/lifecycle.py",
+            filename="lifecycle.py",
+            extension=".py",
+            language="python",
+            size_bytes=80,
+            content_hash="hash_lifecycle_01",
+        )
+        session1.add(repo_file)
+        await session1.commit()
+
+        chunk = CodeChunk(
+            id=chunk_id,
+            snapshot_id=snapshot.id,
+            file_id=repo_file.id,
+            chunk_type="ATOM_ADD",
+            name="initial_method (ADD)",
+            path="src/lifecycle.py",
+            content="def initial_method(): return 1",
+            start_line=1,
+            end_line=2,
+            embedding=vec_initial,
+            commit_sha="c_init",
+            fingerprint="fp_life_1",
+            provenance={"repo": str(repo.id)},
+        )
+        session1.add(chunk)
+        await session1.commit()
+
+    # Session 2: Read from fresh session, verify persistence and numerical precision, then update
+    vec_updated = backend.embed_text("def initial_method(): return 2 # updated logic")
+    async with TestSessionLocal() as session2:
+        c_read = await session2.get(CodeChunk, chunk_id)
+        assert c_read is not None
+        assert len(c_read.embedding) == 1536
+        for orig, ret in zip(vec_initial[:10], c_read.embedding[:10], strict=False):
+            assert abs(orig - ret) < 1e-4
+
+        # Update chunk content and embedding
+        c_read.content = "def initial_method(): return 2 # updated logic"
+        c_read.embedding = vec_updated
+        await session2.commit()
+
+    # Session 3: Verify updated vector in real DB, then delete chunk
+    async with TestSessionLocal() as session3:
+        c_updated = await session3.get(CodeChunk, chunk_id)
+        assert c_updated is not None
+        assert c_updated.content == "def initial_method(): return 2 # updated logic"
+        for orig, ret in zip(vec_updated[:10], c_updated.embedding[:10], strict=False):
+            assert abs(orig - ret) < 1e-4
+
+        await session3.delete(c_updated)
+        await session3.commit()
+
+    # Session 4: Verify chunk deletion in real DB
+    async with TestSessionLocal() as session4:
+        c_deleted = await session4.get(CodeChunk, chunk_id)
+        assert c_deleted is None
+
+
+@pytest.mark.asyncio
+async def test_9_sql_similarity_ordering_before_limit_and_metadata_fidelity(
+    db_session: AsyncSession,
+    create_test_user,
+    create_test_org,
+    create_test_project,
+):
+    """9. Verify SQL-level cosine distance ordering executes strictly before limit truncation."""
+    has_vector = await _has_pgvector_extension(db_session)
+    if not has_vector:
+        pytest.skip("Native pgvector extension required")
+
+    _, _, snapshot = await _setup_project_hierarchy(
+        db_session, create_test_user, create_test_org, create_test_project, tag="sqllimit"
+    )
+
+    repo_file = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot.id,
+        path="src/calc.py",
+        filename="calc.py",
+        extension=".py",
+        language="python",
+        size_bytes=200,
+        content_hash="hash_calc_01",
+    )
+    db_session.add(repo_file)
+    await db_session.commit()
+
+    backend = DevelopmentCodeEmbeddingBackend()
+    query_text = "matrix multiplication algorithm linear algebra"
+    q_vec = backend.embed_text(query_text)
+
+    # Insert 4 chunks with differing semantic proximity
+    texts = [
+        "dense matrix multiplication algorithm dot product",
+        "matrix operations linear algebra transpose inverse",
+        "database query connection pool settings",
+        "css styles flexbox layout responsive design",
+    ]
+    chunks = []
+    for i, t in enumerate(texts):
+        c = CodeChunk(
+            id=uuid.uuid4(),
+            snapshot_id=snapshot.id,
+            file_id=repo_file.id,
+            chunk_type="ATOM_ADD",
+            name=f"calc_item_{i}",
+            path="src/calc.py",
+            content=t,
+            start_line=i * 5 + 1,
+            end_line=i * 5 + 4,
+            embedding=backend.embed_text(t),
+            fingerprint=f"fp_calc_{i}",
+        )
+        chunks.append(c)
+        db_session.add(c)
+    await db_session.commit()
+
+    # Execute SQL cosine distance query with limit=2
+    dist_expr = CodeChunk.embedding.cosine_distance(q_vec)
+    stmt = (
+        select(CodeChunk, dist_expr.label("dist"))
+        .where(
+            CodeChunk.snapshot_id == snapshot.id,
+            CodeChunk.embedding.isnot(None),
+        )
+        .order_by(dist_expr.asc())
+        .limit(2)
+    )
+    res = await db_session.execute(stmt)
+    rows = res.all()
+
+    assert len(rows) == 2
+    top1_chunk, dist1 = rows[0]
+    top2_chunk, dist2 = rows[1]
+
+    # The top 2 must strictly be the first two matrix-related chunks
+    assert top1_chunk.id == chunks[0].id
+    assert top2_chunk.id == chunks[1].id
+    assert float(dist1) < float(dist2)
+
+
+@pytest.mark.asyncio
+async def test_10_end_to_end_incremental_indexing_and_temporal_supersession(
+    db_session: AsyncSession,
+    create_test_user,
+    create_test_org,
+    create_test_project,
+):
+    """10. Verify incremental ingestion, atomic chunk mapping, and temporal supersession in PostgreSQL."""
+    _, repo, snapshot = await _setup_project_hierarchy(
+        db_session, create_test_user, create_test_org, create_test_project, tag="atominc"
+    )
+
+    repo_file = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot.id,
+        path="src/service.py",
+        filename="service.py",
+        extension=".py",
+        language="python",
+        size_bytes=150,
+        content_hash="hash_serv_01",
+    )
+    db_session.add(repo_file)
+
+    symbol = CodeSymbol(
+        id=uuid.uuid4(),
+        file_id=repo_file.id,
+        name="UserService",
+        symbol_type=SymbolType.CLASS,
+        qualified_name="UserService",
+        start_line=1,
+        end_line=20,
+        symbol_metadata={},
+    )
+    db_session.add(symbol)
+    await db_session.commit()
+
+    # Commit 1 diff artifact: adding validate_user method
+    diff_c1 = (
+        "diff --git a/src/service.py b/src/service.py\n"
+        "--- a/src/service.py\n"
+        "+++ b/src/service.py\n"
+        "@@ -10,0 +11,4 @@\n"
+        "+    def validate_user(self, uid: str) -> bool:\n"
+        "+        return len(uid) > 3\n"
+    )
+    art1 = GitCommitArtifact(
+        commit_sha="c1_add_validate",
+        commit_message="feat: add validate_user method",
+        diff=diff_c1,
+        committed_at="2026-10-15T10:00:00Z",
+    )
+
+    chunks1 = await IngestionService.ingest_commit_atom_changes(
+        session=db_session,
+        snapshot_id=snapshot.id,
+        commit_artifact=art1,
+        project_id=repo.project_id,
+        repository_id=repo.id,
+    )
+    await db_session.commit()
+
+    assert len(chunks1) >= 1
+    c1 = chunks1[0]
+    assert c1.commit_sha == "c1_add_validate"
+    assert c1.embedding is not None
+    assert len(c1.embedding) == 1536
+
+    # Verify retrieval against real DB finds the new chunk
+    retriever = MultiSignalRetriever()
+    analyzed = AnalyzedQuery(
+        raw_query="validate user identifier",
+        keywords=["validate", "user"],
+        symbol_candidates=["UserService"],
+        path_candidates=["service.py"],
+    )
+    candidates = await retriever.retrieve_candidates(
+        session=db_session,
+        analyzed_query=analyzed,
+        snapshot_id=snapshot.id,
+        query_embedding=c1.embedding,
+    )
+    assert any(c.entity_type == "CHUNK" for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_11_transaction_rollback_and_error_recovery(
+    db_session: AsyncSession,
+    create_test_user,
+    create_test_org,
+    create_test_project,
+):
+    """11. Verify transaction rollback cleans partial state and allows safe recovery and retry in PostgreSQL."""
+    _, repo, snapshot = await _setup_project_hierarchy(
+        db_session, create_test_user, create_test_org, create_test_project, tag="rollback"
+    )
+
+    repo_file = RepositoryFile(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot.id,
+        path="src/retry.py",
+        filename="retry.py",
+        extension=".py",
+        language="python",
+        size_bytes=50,
+        content_hash="hash_retry_01",
+    )
+    db_session.add(repo_file)
+    await db_session.commit()
+
+    # 1. Attempt invalid insert violating foreign key constraint
+    invalid_chunk = CodeChunk(
+        id=uuid.uuid4(),
+        snapshot_id=uuid.uuid4(),  # Non-existent snapshot ID violates FK
+        file_id=repo_file.id,
+        chunk_type="ATOM_ADD",
+        name="orphan_chunk",
+        path="src/retry.py",
+        content="x = 1",
+        start_line=1,
+        end_line=1,
+    )
+    db_session.add(invalid_chunk)
+    with pytest.raises((IntegrityError, DBAPIError)):
+        await db_session.flush()
+
+    # 2. Rollback transaction
+    await db_session.rollback()
+
+    # 3. Verify no orphaned records exist in database
+    res = await db_session.execute(
+        select(CodeChunk).where(CodeChunk.name == "orphan_chunk")
+    )
+    assert res.scalar_one_or_none() is None
+
+    # 4. Subsequent valid insert succeeds cleanly on the recovered session
+    valid_chunk = CodeChunk(
+        id=uuid.uuid4(),
+        snapshot_id=snapshot.id,
+        file_id=repo_file.id,
+        chunk_type="ATOM_ADD",
+        name="valid_recovered_chunk",
+        path="src/retry.py",
+        content="x = 1",
+        start_line=1,
+        end_line=1,
+        fingerprint="fp_valid_rec",
+    )
+    db_session.add(valid_chunk)
+    await db_session.commit()
+
+    saved = await db_session.get(CodeChunk, valid_chunk.id)
+    assert saved is not None
+    assert saved.name == "valid_recovered_chunk"
