@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 import pytest
 from sqlalchemy import inspect as sa_inspect
@@ -854,15 +855,15 @@ async def test_10_end_to_end_incremental_indexing_and_temporal_supersession(
         "diff --git a/src/service.py b/src/service.py\n"
         "--- a/src/service.py\n"
         "+++ b/src/service.py\n"
-        "@@ -10,0 +11,4 @@\n"
+        "@@ -10,0 +11,2 @@\n"
         "+    def validate_user(self, uid: str) -> bool:\n"
         "+        return len(uid) > 3\n"
     )
     art1 = GitCommitArtifact(
         commit_sha="c1_add_validate",
         commit_message="feat: add validate_user method",
-        diff=diff_c1,
-        committed_at="2026-10-15T10:00:00Z",
+        raw_diff=diff_c1,
+        committed_at=datetime.fromisoformat("2026-10-15T10:00:00+00:00"),
     )
 
     chunks1 = await IngestionService.ingest_commit_atom_changes(
@@ -922,11 +923,14 @@ async def test_11_transaction_rollback_and_error_recovery(
     db_session.add(repo_file)
     await db_session.commit()
 
+    snap_id = snapshot.id
+    f_id = repo_file.id
+
     # 1. Attempt invalid insert violating foreign key constraint
     invalid_chunk = CodeChunk(
         id=uuid.uuid4(),
         snapshot_id=uuid.uuid4(),  # Non-existent snapshot ID violates FK
-        file_id=repo_file.id,
+        file_id=f_id,
         chunk_type="ATOM_ADD",
         name="orphan_chunk",
         path="src/retry.py",
@@ -950,8 +954,8 @@ async def test_11_transaction_rollback_and_error_recovery(
     # 4. Subsequent valid insert succeeds cleanly on the recovered session
     valid_chunk = CodeChunk(
         id=uuid.uuid4(),
-        snapshot_id=snapshot.id,
-        file_id=repo_file.id,
+        snapshot_id=snap_id,
+        file_id=f_id,
         chunk_type="ATOM_ADD",
         name="valid_recovered_chunk",
         path="src/retry.py",
