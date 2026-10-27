@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -76,7 +76,9 @@ class GroundedAnswerResponse(BaseModel):
     related_entities: list[str] = Field(default_factory=list)
     confidence: str = Field(default="HIGH", description="Confidence level: HIGH, MEDIUM, LOW")
     debug_signals: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Specification creation timestamp"
+    )
 
 
 class ConversationCreate(BaseModel):
@@ -181,5 +183,7 @@ class FeatureSpecificationResponse(BaseModel):
     debug_signals: dict[str, Any] = Field(
         default_factory=dict, description="Retriever and ranker telemetry signals"
     )
-    created_at: datetime
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Specification creation timestamp"
+    )
 

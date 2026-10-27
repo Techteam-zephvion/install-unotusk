@@ -24,6 +24,12 @@ class BDDContractData {
   final String? kpiNote;
   final List<BDDTestCase> testCases;
   final List<BDDRiskItem> risks;
+  final String tier;
+  final String confidence;
+  final String? warning;
+  final String? featureName;
+  final List<String> citedFiles;
+  final List<String> citedSymbols;
 
   const BDDContractData({
     required this.given,
@@ -34,6 +40,12 @@ class BDDContractData {
     this.kpiNote,
     required this.testCases,
     required this.risks,
+    this.tier = 'WARM TIER',
+    this.confidence = 'CONFIRMED',
+    this.warning,
+    this.featureName,
+    this.citedFiles = const [],
+    this.citedSymbols = const [],
   });
 }
 
@@ -81,17 +93,35 @@ class BDDContractCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Text(
-                    'BDD Intent Contract',
-                    style: AppTextStyles.instrumentSerif(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      bdd.featureName != null && bdd.featureName!.isNotEmpty
+                          ? 'BDD Spec: ${bdd.featureName}'
+                          : 'BDD Intent Contract',
+                      style: AppTextStyles.instrumentSerif(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  _buildBadge('COLD TIER', AppColors.modeCold, AppColors.modeCold.withValues(alpha: 0.15)),
+                  _buildBadge(
+                    bdd.tier.toUpperCase().contains('TIER') ? bdd.tier.toUpperCase() : '${bdd.tier.toUpperCase()} TIER',
+                    AppColors.modeCold,
+                    AppColors.modeCold.withValues(alpha: 0.15),
+                  ),
                   const SizedBox(width: 8),
-                  _buildBadge('CONFIRMED', AppColors.confirmed, AppColors.confirmed.withValues(alpha: 0.15)),
+                  _buildBadge(
+                    bdd.confidence.toUpperCase() == 'HIGH' ? 'CONFIRMED' : (bdd.confidence.toUpperCase() == 'LOW' ? 'INFERRED' : bdd.confidence.toUpperCase()),
+                    (bdd.confidence.toUpperCase() == 'CONFIRMED' || bdd.confidence.toUpperCase() == 'HIGH')
+                        ? AppColors.confirmed
+                        : AppColors.inferred,
+                    ((bdd.confidence.toUpperCase() == 'CONFIRMED' || bdd.confidence.toUpperCase() == 'HIGH')
+                            ? AppColors.confirmed
+                            : AppColors.inferred)
+                        .withValues(alpha: 0.15),
+                  ),
                   const Spacer(),
                   Text(
                     'Verified Artifact',
@@ -100,6 +130,27 @@ class BDDContractCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (bdd.warning != null && bdd.warning!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.inferred.withValues(alpha: 0.08),
+                  border: const Border(bottom: BorderSide(color: AppColors.divider)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.inferred),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        bdd.warning!,
+                        style: AppTextStyles.inter(fontSize: 12, color: AppColors.inferred, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Given section
             _buildSection('GIVEN', bdd.given),

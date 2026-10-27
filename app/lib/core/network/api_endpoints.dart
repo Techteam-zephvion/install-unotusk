@@ -45,6 +45,7 @@ class ApiEndpoints {
 
   // Grounded Ask & Intelligence
   static String projectAsk(String projectId) => '/projects/$projectId/ask';
+  static String projectSpec(String projectId) => '/projects/$projectId/spec';
   static String projectConversations(String projectId) => '/projects/$projectId/conversations';
   static String projectConversationDetail(String projectId, String conversationId) => '/projects/$projectId/conversations/$conversationId';
   static String projectConversationMessages(String projectId, String conversationId) => '/projects/$projectId/conversations/$conversationId/messages';
