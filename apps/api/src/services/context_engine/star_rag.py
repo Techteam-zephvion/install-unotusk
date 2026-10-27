@@ -837,8 +837,23 @@ class StarRagContextService:
             )
 
             # 5. Determine query anchors
-            # Top-K1 anchor events drawn from initial candidate order
-            anchor_candidates = candidates[:k1]
+            # Prioritize candidates by query relevance signals (score, vector similarity, lexical matches)
+            def candidate_relevance(c: RetrievedCandidate) -> float:
+                rel = (
+                    c.signals.get("score", 0.0)
+                    or c.signals.get("vector_similarity", 0.0)
+                    or c.signals.get("semantic_match", 0.0)
+                )
+                if analyzed_query:
+                    c_name_lower = c.name.lower()
+                    if any(sym.lower() in c_name_lower for sym in analyzed_query.symbol_candidates):
+                        rel += 2.0
+                    if any(kw.lower() in c_name_lower for kw in analyzed_query.keywords):
+                        rel += 0.5
+                return rel
+
+            ranked_anchor_candidates = sorted(candidates, key=candidate_relevance, reverse=True)
+            anchor_candidates = ranked_anchor_candidates[:k1]
             anchor_cids = {c.candidate_id for c in anchor_candidates}
             anchor_events = [ev for ev in events if ev.candidate_id in anchor_cids]
 
