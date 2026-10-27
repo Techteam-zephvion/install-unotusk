@@ -1,5 +1,7 @@
 import logging
+import math
 import os
+import time
 import uuid
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
@@ -88,13 +90,26 @@ class DevelopmentCodeEmbeddingBackend(CodeEmbeddingBackend):
 
 class VoyageCodeEmbeddingBackend(CodeEmbeddingBackend):
     """
-    Production Code-Lane embedding backend using Voyage AI (voyage-code-2).
+    Production Code-Lane embedding backend using Voyage AI (defaulting to voyage-code-2).
     Generates 1536-dimensional normalized vectors via Voyage REST API.
     """
 
-    def __init__(self, api_key: str, model: str = "voyage-code-2"):
-        self.api_key = api_key
-        self._model = model
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "voyage-code-2",
+        dimension: int = DEFAULT_VECTOR_DIM,
+        timeout: float = 15.0,
+        max_retries: int = 2,
+        timeout_seconds: float | None = None,
+    ):
+        if not api_key or not isinstance(api_key, str) or not api_key.strip():
+            raise ValueError("VoyageCodeEmbeddingBackend requires a valid, non-empty API key.")
+        self.api_key = api_key.strip()
+        self._model = model.strip() if model else "voyage-code-2"
+        self._dimension = dimension
+        self.timeout = float(timeout_seconds if timeout_seconds is not None else timeout)
+        self.max_retries = max(0, int(max_retries))
 
     @property
     def provider_name(self) -> str:
@@ -106,7 +121,13 @@ class VoyageCodeEmbeddingBackend(CodeEmbeddingBackend):
 
     @property
     def dimension(self) -> int:
-        return DEFAULT_VECTOR_DIM
+        return self._dimension
+
+    def _redact_key(self, text: str) -> str:
+        """Sanitizes text by replacing the active API key with [REDACTED]."""
+        if not text or not self.api_key:
+            return text
+        return text.replace(self.api_key, "[REDACTED]")
 
     def generate_embedding(
         self,
@@ -116,43 +137,151 @@ class VoyageCodeEmbeddingBackend(CodeEmbeddingBackend):
         if not text or not text.strip():
             return None
 
+        clean_input = text.strip()
+        effective_input_type = "query" if input_type == "query" else "document"
+
         url = "https://api.voyageai.com/v1/embeddings"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
         payload = {
-            "input": [text],
+            "input": [clean_input],
             "model": self.model_name,
-            "input_type": input_type or "document",
+            "input_type": effective_input_type,
         }
 
-        try:
-            with httpx.Client(timeout=15.0) as client:
-                resp = client.post(url, json=payload, headers=headers)
-                if resp.status_code != 200:
+        attempts = 0
+        max_attempts = 1 + self.max_retries
+
+        while attempts < max_attempts:
+            attempts += 1
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    resp = client.post(url, json=payload, headers=headers)
+
+                    if resp.status_code == 200:
+                        try:
+                            data = resp.json()
+                        except Exception as json_err:
+                            logger.warning(
+                                "Voyage AI returned invalid JSON payload: %s",
+                                self._redact_key(str(json_err)),
+                            )
+                            return None
+
+                        raw_data = data.get("data", [])
+                        if not isinstance(raw_data, list) or not raw_data or "embedding" not in raw_data[0]:
+                            logger.warning("Voyage AI response missing embedding data field")
+                            return None
+
+                        # Model agreement check (warn on mismatch)
+                        returned_model = data.get("model")
+                        if returned_model and not (
+                            returned_model.startswith(self.model_name)
+                            or self.model_name.startswith(returned_model)
+                        ):
+                            logger.warning(
+                                "Voyage AI model discrepancy: requested '%s', received '%s'",
+                                self.model_name,
+                                returned_model,
+                            )
+
+                        vec = raw_data[0]["embedding"]
+                        if not isinstance(vec, list) or len(vec) != self.dimension:
+                            logger.warning(
+                                "Voyage AI dimension mismatch: expected %d, got %s",
+                                self.dimension,
+                                len(vec) if isinstance(vec, list) else type(vec),
+                            )
+                            return None
+
+                        # Numeric & finite validation (reject NaN, Inf, non-numeric)
+                        clean_vec: list[float] = []
+                        for x in vec:
+                            try:
+                                f_val = float(x)
+                                if math.isnan(f_val) or math.isinf(f_val):
+                                    logger.warning("Voyage AI returned non-finite embedding element (NaN/Inf)")
+                                    return None
+                                clean_vec.append(round(f_val, 6))
+                            except (TypeError, ValueError):
+                                logger.warning("Voyage AI returned non-numeric embedding element: %s", type(x))
+                                return None
+
+                        return clean_vec
+
+                    # Handle HTTP Status Errors
+                    if resp.status_code in (401, 403):
+                        logger.warning(
+                            "Voyage AI authentication failure (%d): Invalid or unauthorized credentials.",
+                            resp.status_code,
+                        )
+                        return None  # Permanent auth failure, do not retry
+
+                    if resp.status_code == 429:
+                        logger.warning(
+                            "Voyage AI rate limit reached (429) on attempt %d/%d.",
+                            attempts,
+                            max_attempts,
+                        )
+                        if attempts < max_attempts:
+                            time.sleep(0.5 * (2 ** (attempts - 1)))
+                            continue
+                        return None
+
+                    if resp.status_code >= 500:
+                        logger.warning(
+                            "Voyage AI server error (%d) on attempt %d/%d: %s",
+                            resp.status_code,
+                            attempts,
+                            max_attempts,
+                            self._redact_key(resp.text[:200]),
+                        )
+                        if attempts < max_attempts:
+                            time.sleep(0.5 * (2 ** (attempts - 1)))
+                            continue
+                        return None
+
                     logger.warning(
-                        f"Voyage AI API returned status {resp.status_code}: {resp.text}"
+                        "Voyage AI unexpected status code (%d): %s",
+                        resp.status_code,
+                        self._redact_key(resp.text[:200]),
                     )
                     return None
 
-                data = resp.json()
-                raw_data = data.get("data", [])
-                if not raw_data or "embedding" not in raw_data[0]:
-                    logger.warning("Voyage AI response missing embedding data")
-                    return None
+            except httpx.TimeoutException:
+                logger.warning(
+                    "Voyage AI request timed out after %.1f seconds on attempt %d/%d.",
+                    self.timeout,
+                    attempts,
+                    max_attempts,
+                )
+                if attempts < max_attempts:
+                    time.sleep(0.5 * (2 ** (attempts - 1)))
+                    continue
+                return None
 
-                vec = raw_data[0]["embedding"]
-                if not isinstance(vec, list) or len(vec) != self.dimension:
-                    logger.warning(
-                        f"Voyage AI dimension mismatch: expected {self.dimension}, got {len(vec) if isinstance(vec, list) else type(vec)}"
-                    )
-                    return None
+            except httpx.RequestError as req_err:
+                logger.warning(
+                    "Voyage AI network request error on attempt %d/%d: %s",
+                    attempts,
+                    max_attempts,
+                    self._redact_key(str(req_err)),
+                )
+                if attempts < max_attempts:
+                    time.sleep(0.5 * (2 ** (attempts - 1)))
+                    continue
+                return None
 
-                return [round(float(x), 6) for x in vec]
-        except Exception as exc:
-            logger.warning(f"Voyage AI embedding request error: {exc}", exc_info=True)
-            return None
+            except Exception as exc:
+                logger.warning(
+                    "Unexpected error during Voyage AI embedding generation: %s",
+                    self._redact_key(str(exc)),
+                )
+                return None
+
+        return None
 
 
 def get_code_embedding_backend() -> CodeEmbeddingBackend:
@@ -161,23 +290,48 @@ def get_code_embedding_backend() -> CodeEmbeddingBackend:
 
     - If VOYAGE_API_KEY is configured and provider is set to 'voyage' / 'production',
       activates the Voyage AI production backend.
-    - Otherwise, falls back cleanly to the development deterministic synthesizer backend.
+    - If provider is set to 'voyage' / 'production' but key is missing:
+      - In production (APP_ENV == 'production'), raises ValueError (fail-fast policy).
+      - In non-production, logs a clear warning and falls back to DevelopmentCodeEmbeddingBackend.
+    - If provider is set to 'development', 'offline', or 'test', uses DevelopmentCodeEmbeddingBackend.
+    - If an unsupported provider is requested, raises ValueError.
     """
     voyage_key = getattr(settings, "VOYAGE_API_KEY", None) or os.environ.get("VOYAGE_API_KEY")
-    provider = (getattr(settings, "EMBEDDING_PROVIDER", None) or "development").lower().strip()
+    raw_provider = getattr(settings, "EMBEDDING_PROVIDER", None) or "development"
+    provider = raw_provider.lower().strip()
+    app_env = (getattr(settings, "APP_ENV", None) or "development").lower().strip()
 
-    if (provider in ("voyage", "production")) and voyage_key and voyage_key.strip():
-        model_name = getattr(settings, "VOYAGE_MODEL", "voyage-code-2")
-        return VoyageCodeEmbeddingBackend(api_key=voyage_key.strip(), model=model_name)
+    if provider in ("voyage", "production"):
+        if voyage_key and voyage_key.strip():
+            model_name = getattr(settings, "VOYAGE_MODEL", "voyage-code-2")
+            dimension = getattr(settings, "EMBEDDING_DIMENSION", DEFAULT_VECTOR_DIM)
+            return VoyageCodeEmbeddingBackend(
+                api_key=voyage_key.strip(),
+                model=model_name,
+                dimension=dimension,
+            )
 
-    if provider in ("voyage", "production") and (not voyage_key or not voyage_key.strip()):
+        # Provider requested as voyage/production, but key is missing
+        if app_env == "production":
+            raise ValueError(
+                f"Production embedding provider '{provider}' requested, but VOYAGE_API_KEY is not configured."
+            )
+
         logger.warning(
-            "Production embedding provider '%s' requested, but VOYAGE_API_KEY is not configured. "
+            "Embedding provider '%s' requested, but VOYAGE_API_KEY is not configured. "
             "Falling back to development deterministic synthesizer.",
             provider,
         )
+        return DevelopmentCodeEmbeddingBackend()
 
-    return DevelopmentCodeEmbeddingBackend()
+    if provider in ("development", "offline", "test"):
+        return DevelopmentCodeEmbeddingBackend()
+
+    logger.error("Unsupported embedding provider: '%s'", provider)
+    raise ValueError(
+        f"Unsupported embedding provider: '{provider}'. "
+        f"Supported providers are: 'voyage', 'production', 'development', 'offline', 'test'."
+    )
 
 
 def generate_code_embedding(
