@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     # Context Budget
     CONTEXT_BUDGET_TOKENS: int = Field(default=3500)
 
+    # STAR-RAG Temporal Retrieval Settings
+    STAR_RAG_ENABLED: bool = Field(default=True)
+    STAR_RAG_TOP_K1: int = Field(default=10)
+    STAR_RAG_TOP_K2: int = Field(default=5)
+    STAR_RAG_PPR_ALPHA: float = Field(default=0.2)
+    STAR_RAG_PPR_EPSILON: float = Field(default=1e-6)
+    STAR_RAG_MIN_SUPPORT: int = Field(default=2)
+
     # Code-Lane Embedding Settings ('voyage' or 'development')
     EMBEDDING_PROVIDER: str = Field(default="development")
     VOYAGE_API_KEY: str | None = Field(default=None)

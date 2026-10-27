@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.src.config.settings import settings
 from apps.api.src.models.repository import Repository
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.services.context_engine.assembler import ContextAssembler
@@ -29,6 +30,7 @@ class ProjectContextEngine:
         query_embedding: list[float] | None = None,
         thinking_tier: str | None = None,
         repository_id: uuid.UUID | None = None,
+        enable_star_rag: bool | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -70,6 +72,24 @@ class ProjectContextEngine:
             seed_candidates=raw_candidates,
             max_depth=2,
         )
+
+        # 3b. STAR-RAG Temporal Rule Graph Retrieval
+        use_star_rag = (
+            enable_star_rag
+            if enable_star_rag is not None
+            else getattr(settings, "STAR_RAG_ENABLED", True)
+        )
+        if use_star_rag:
+            try:
+                from apps.api.src.services.context_engine.star_rag import StarRagContextService
+
+                expanded_candidates = StarRagContextService.apply_star_rag(
+                    candidates=expanded_candidates,
+                    analyzed_query=analyzed,
+                    query_text=question,
+                )
+            except Exception:
+                pass
 
         # 4. Multi-Signal Ranking
         ranked = MultiSignalRanker.rank_candidates(

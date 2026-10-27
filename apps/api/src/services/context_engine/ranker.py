@@ -168,6 +168,9 @@ class MultiSignalRanker:
                 elif sig == "graph_expansion_hop2":
                     score += val * 0.5
                     reasons.append("Graph transitive 2-hop neighbor")
+                elif sig == "star_rag_ppr":
+                    score += val * 1.6
+                    reasons.append(f"STAR-RAG temporal rule propagation ({round(val, 3)})")
                 elif sig.startswith("graph_expansion_hop"):
                     try:
                         hop_num = int(sig.replace("graph_expansion_hop", ""))
