@@ -399,8 +399,10 @@ class MdlGraphSelector:
         n = u.support * v.support
         k_eff = min(k, n)
 
-        # Coverage compression gain relative to uncompressed null pairs
-        cov_cost = cls.compute_log2_binom(n, k_eff) - k_eff * math.log2(max(n, 1))
+        # Pure Paper Equation 5: log2(binom(N, K))
+        # High conversion (K -> N) yields log2(binom(N, K)) -> 0 bits.
+        # Negative temporal code length (mean_d < 1/e days) drives net Delta L < 0.
+        cov_cost = cls.compute_log2_binom(n, k_eff)
 
         # Temporal cost
         mean_d = sum(spans) / k
