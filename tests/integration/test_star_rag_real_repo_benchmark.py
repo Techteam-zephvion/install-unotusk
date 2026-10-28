@@ -22,6 +22,7 @@ Evaluates:
 
 import copy
 import statistics
+import subprocess
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -57,6 +58,22 @@ class BenchmarkQuerySpec:
 
 def build_real_repo_corpus() -> list[RetrievedCandidate]:
     """Extracts and decomposes real commit history into RetrievedCandidate objects."""
+    # Ensure git history is available if running in a shallow clone (e.g. CI default checkout)
+    try:
+        is_shallow = (
+            subprocess.run(
+                ["git", "rev-parse", "--is-shallow-repository"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout.strip()
+            == "true"
+        )
+        if is_shallow:
+            subprocess.run(["git", "fetch", "--unshallow"], capture_output=True, timeout=30)
+    except Exception:
+        pass
+
     commits = ["b094f01", "be1b5b5", "773b740", "42096a5"]
     decomposer = CodeAtomDecomposer()
     all_candidates: list[RetrievedCandidate] = []
