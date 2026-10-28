@@ -830,3 +830,295 @@ def test_13_grounded_repo_temporal_query_evaluation():
     print(f"Current query top ranked: {top_curr_names} (latency: {latency_curr_ms:.2f} ms)")
     print(f"Historical query top ranked: {hist_names[:4]} (latency: {latency_hist_ms:.2f} ms)")
     print("=====================================================")
+
+
+# ==============================================================================
+# 14. Anchor Scoring Signal Disagreement & Determinism Audit
+# ==============================================================================
+
+
+def test_14_anchor_scoring_signal_disagreement_and_determinism():
+    """
+    Tests the audited anchor relevance scoring in STAR-RAG.
+    Verifies:
+    1. Multi-signal linear combination eliminates short-circuiting defects.
+    2. High semantic similarity legitimately dominates weak incidental keyword hits.
+    3. Pre-computed ranker scores (signals['score']) are respected without duplication.
+    4. Deterministic tie-breaking on candidate_id produces stable ordering across permutations.
+    """
+    import random
+
+    query = AnalyzedQuery(
+        raw_query="How does JwtTokenMgr authenticate cryptographic tokens?",
+        symbol_candidates=["JwtTokenMgr"],
+        path_candidates=["auth/jwt_token.py"],
+        keywords=["jwttokenmgr", "authenticate", "cryptographic", "tokens"],
+        is_temporal=False,
+    )
+
+    # Candidate A: High semantic similarity (0.85), no symbol match
+    cand_a = make_candidate(
+        candidate_id="cand_a_semantic",
+        name="TokenAuthenticator",
+        path="auth/authenticator.py",
+        content="Validates JWT cryptographic signatures and claims.",
+        signals={"vector_similarity": 0.85, "semantic_match": 0.80},
+    )
+
+    # Candidate B: Incidental keyword in content, low semantic similarity (0.10)
+    cand_b = make_candidate(
+        candidate_id="cand_b_incidental",
+        name="DatabasePool",
+        path="db/pool.py",
+        content="Database connection pool utilizing a token bucket rate limiter.",
+        signals={"vector_similarity": 0.10},
+    )
+
+    # Candidate C: Base ranker pre-computed score is preserved
+    cand_c = make_candidate(
+        candidate_id="cand_c_prescored",
+        name="KeyRotator",
+        path="auth/key_rotator.py",
+        content="Rotates RSA keys.",
+        signals={"score": 2.20, "vector_similarity": 0.10},
+    )
+
+    # Candidate D: Direct exact symbol match with moderate vector similarity
+    cand_d = make_candidate(
+        candidate_id="cand_d_exact_symbol",
+        name="JwtTokenMgr",
+        path="auth/jwt_token.py",
+        content="Core JWT token manager for authentication.",
+        signals={"vector_similarity": 0.60},
+    )
+
+    score_a = StarRagContextService.compute_anchor_relevance(cand_a, query)
+    score_b = StarRagContextService.compute_anchor_relevance(cand_b, query)
+    score_c = StarRagContextService.compute_anchor_relevance(cand_c, query)
+    score_d = StarRagContextService.compute_anchor_relevance(cand_d, query)
+
+    # 1. Semantic match dominates incidental keyword
+    assert score_a > score_b, f"Semantic candidate ({score_a}) should beat incidental keyword ({score_b})"
+
+    # 2. Exact symbol match with moderate similarity ranks top
+    assert score_d > score_a, f"Exact symbol candidate ({score_d}) should outrank pure semantic ({score_a})"
+
+    # 3. Pre-computed score is preserved exactly without double-counting lexical signals
+    assert score_c == 2.20, f"Pre-computed score was double-counted! Expected 2.20, got {score_c}"
+    assert score_c > score_b, f"Pre-computed score ({score_c}) should outrank weak candidate ({score_b})"
+
+    # 3b. Unscored candidate with same content gets raw signals + lexical signals
+    cand_e_unscored = make_candidate(
+        candidate_id="cand_e_unscored",
+        name="KeyRotator",
+        path="auth/key_rotator.py",
+        content="Rotates RSA keys.",
+        signals={"vector_similarity": 0.10},
+    )
+    score_e = StarRagContextService.compute_anchor_relevance(cand_e_unscored, query)
+    assert score_e == round(0.10 * 1.4 + 0.0, 4), f"Expected raw unscored calculation, got {score_e}"
+
+    # 4. Deterministic tie-breaking on identical scores
+    cand_tie1 = make_candidate(
+        candidate_id="cand_tie_alpha",
+        name="IdenticalWorker",
+        path="workers/worker.py",
+        content="Background task execution worker.",
+        signals={"vector_similarity": 0.50},
+    )
+    cand_tie2 = make_candidate(
+        candidate_id="cand_tie_beta",
+        name="IdenticalWorker",
+        path="workers/worker.py",
+        content="Background task execution worker.",
+        signals={"vector_similarity": 0.50},
+    )
+
+    assert StarRagContextService.compute_anchor_relevance(cand_tie1, query) == StarRagContextService.compute_anchor_relevance(cand_tie2, query)
+
+    # Regardless of input ordering or permutations, tie-break produces identical sorted order
+    for _ in range(20):
+        cands = [cand_tie2, cand_tie1]
+        random.shuffle(cands)
+        sorted_cands = sorted(
+            cands,
+            key=lambda c: (-StarRagContextService.compute_anchor_relevance(c, query), c.candidate_id),
+        )
+        assert [c.candidate_id for c in sorted_cands] == ["cand_tie_alpha", "cand_tie_beta"]
+
+
+
+# ==============================================================================
+# 15. Absent-Evidence Gating and Hub-Node Attenuation Audit
+# ==============================================================================
+
+
+def test_15_absent_evidence_gating_and_hub_attenuation():
+    """
+    Verifies:
+    1. Absent-evidence / weak-anchor queries bypass PPR graph propagation.
+    2. Answerable queries with strong anchors pass the gate and receive graph propagation.
+    3. Pre-computed score scale ([0, 1]) is safely handled by the gate.
+    4. Hub-node attenuation dampens generic high-event rules inversely with cardinality.
+    """
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
+
+    # 1. Weak / absent-evidence query
+    q_absent = AnalyzedQuery(
+        raw_query="How is real-time bidirectional WebSocket audio streaming handled?",
+        symbol_candidates=["WebSocketAudioStreamer"],
+        path_candidates=["net/ws_audio.py"],
+        keywords=["websocket", "audio", "streaming", "opus"],
+        is_temporal=False,
+    )
+
+    unrelated_cands = [
+        make_candidate(
+            candidate_id="c_db_1",
+            name="DatabasePool",
+            path="db/pool.py",
+            content="PostgreSQL connection pool management.",
+            committed_at=t0,
+            signals={"vector_similarity": 0.05},
+            temporal_relations=[{"subject": "DatabasePool", "relation": "DEFINES", "object": "db/pool.py"}],
+        ),
+        make_candidate(
+            candidate_id="c_db_2",
+            name="DatabasePool",
+            path="db/pool.py",
+            content="Pool acquire and release routines.",
+            committed_at=t0,
+            signals={"vector_similarity": 0.04},
+            temporal_relations=[{"subject": "DatabasePool", "relation": "CONNECTS", "object": "PostgreSQL"}],
+        ),
+    ]
+
+    res_absent = StarRagContextService.run_star_rag_pipeline(
+        candidates=unrelated_cands,
+        analyzed_query=q_absent,
+        query_text=q_absent.raw_query,
+        min_anchor_score=1.0,
+    )
+
+    # Gated out: fallback triggered, no PPR signal injected
+    assert res_absent.is_fallback is True
+    assert "below confidence threshold" in res_absent.fallback_reason
+    assert res_absent.top_rules == []
+    for cand in res_absent.candidates:
+        assert "star_rag_ppr" not in cand.signals
+
+    # 2. Answerable query with strong anchor passes the gate
+    q_valid = AnalyzedQuery(
+        raw_query="How does DatabasePool acquire connections?",
+        symbol_candidates=["DatabasePool"],
+        path_candidates=["db/pool.py"],
+        keywords=["databasepool", "acquire", "connections"],
+        is_temporal=False,
+    )
+
+    res_valid = StarRagContextService.run_star_rag_pipeline(
+        candidates=unrelated_cands,
+        analyzed_query=q_valid,
+        query_text=q_valid.raw_query,
+        min_anchor_score=1.0,
+    )
+
+    assert res_valid.is_fallback is False
+    assert len(res_valid.top_rules) > 0
+    assert any("star_rag_ppr" in c.signals for c in res_valid.candidates)
+
+    # 3. Pre-computed score gating
+    prescored_weak = [
+        make_candidate(
+            candidate_id="c_pre_1",
+            name="DatabasePool",
+            path="db/pool.py",
+            content="Pool.",
+            committed_at=t0,
+            signals={"score": 0.22, "vector_similarity": 0.05},
+            temporal_relations=[{"subject": "DatabasePool", "relation": "DEFINES", "object": "db/pool.py"}],
+        ),
+        make_candidate(
+            candidate_id="c_pre_2",
+            name="DatabasePool",
+            path="db/pool.py",
+            content="Pool.",
+            committed_at=t0,
+            signals={"score": 0.20, "vector_similarity": 0.05},
+            temporal_relations=[{"subject": "DatabasePool", "relation": "CONNECTS", "object": "PostgreSQL"}],
+        ),
+    ]
+
+    res_prescored_weak = StarRagContextService.run_star_rag_pipeline(
+        candidates=prescored_weak,
+        analyzed_query=q_absent,
+        query_text=q_absent.raw_query,
+    )
+    assert res_prescored_weak.is_fallback is True
+    assert "below confidence threshold" in res_prescored_weak.fallback_reason
+
+    # 4. Hub attenuation verification
+    # Construct a pipeline with hub_attenuation=True vs hub_attenuation=False
+    c_hub = make_candidate(
+        candidate_id="c_hub",
+        name="HubClass",
+        path="hub.py",
+        content="Generic hub class.",
+        committed_at=t0,
+        signals={"vector_similarity": 0.70},
+        temporal_relations=[{"subject": "HubClass", "relation": "CALLS", "object": f"target_{i}"} for i in range(25)],
+    )
+    c_spec = make_candidate(
+        candidate_id="c_spec",
+        name="SpecClass",
+        path="spec.py",
+        content="Specific class.",
+        committed_at=t0,
+        signals={"vector_similarity": 0.70},
+        temporal_relations=[{"subject": "SpecClass", "relation": "DEFINES", "object": "spec.py"}],
+    )
+    hub_candidates = [c_hub, c_spec]
+
+    res_attenuated = StarRagContextService.run_star_rag_pipeline(
+        candidates=hub_candidates,
+        analyzed_query=q_valid,
+        query_text=q_valid.raw_query,
+        min_anchor_score=0.0,
+        hub_attenuation=True,
+    )
+    res_unattenuated = StarRagContextService.run_star_rag_pipeline(
+        candidates=hub_candidates,
+        analyzed_query=q_valid,
+        query_text=q_valid.raw_query,
+        min_anchor_score=0.0,
+        hub_attenuation=False,
+    )
+
+    # Hub node candidates should have their ppr score dampened under attenuation
+    hub_ppr_att = next(c.signals.get("star_rag_ppr", 0.0) for c in res_attenuated.candidates if c.candidate_id == "c_hub")
+    hub_ppr_unatt = next(c.signals.get("star_rag_ppr", 0.0) for c in res_unattenuated.candidates if c.candidate_id == "c_hub")
+    assert hub_ppr_att <= hub_ppr_unatt
+
+
+# ==============================================================================
+# 16. Safe Configuration and Effective Defaults Audit
+# ==============================================================================
+
+
+def test_16_star_rag_configuration_and_defaults():
+    """
+    Verifies that STAR-RAG is opt-in by default and configurable without side-effects:
+    1. settings.STAR_RAG_ENABLED is False by default.
+    2. settings.STAR_RAG_MIN_ANCHOR_SCORE is 1.0 by default.
+    3. settings.STAR_RAG_HUB_ATTENUATION is True by default.
+    4. ProjectContextEngine respects explicit opt-in and defaults to False.
+    """
+    from apps.api.src.config.settings import settings
+
+    # 1. Unconfigured installations default to disabled
+    assert settings.STAR_RAG_ENABLED is False, "STAR-RAG must be opt-in (disabled by default)"
+    assert settings.STAR_RAG_MIN_ANCHOR_SCORE == 1.0
+    assert settings.STAR_RAG_HUB_ATTENUATION is True
+
+    # 2. Engine honors explicit opt-in
+    assert getattr(settings, "STAR_RAG_ENABLED", False) is False

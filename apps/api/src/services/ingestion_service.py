@@ -155,7 +155,7 @@ class IngestionService:
                     for filename in files:
                         file_rel_path = os.path.normpath(
                             os.path.join(rel_dir, filename) if rel_dir != "." else filename
-                        )
+                        ).replace("\\", "/")
                         if is_path_excluded(file_rel_path):
                             continue
 
@@ -425,7 +425,7 @@ class IngestionService:
                         rel_path = dep.raw_target.lstrip(".")
                         if not rel_path.startswith("/"):
                             rel_path = "/" + rel_path
-                        norm_target = os.path.normpath(src_dir + rel_path)
+                        norm_target = os.path.normpath(src_dir + rel_path).replace("\\", "/")
 
                         for p, rf in created_files_map.items():
                             p_no_ext = os.path.splitext(p)[0]

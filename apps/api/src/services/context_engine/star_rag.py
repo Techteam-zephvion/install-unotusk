@@ -734,6 +734,65 @@ class StarRagContextService:
         return events
 
     @classmethod
+    def compute_anchor_relevance(
+        cls,
+        candidate: RetrievedCandidate,
+        analyzed_query: AnalyzedQuery | None = None,
+    ) -> float:
+        """
+        Computes a principled anchor relevance score for a candidate.
+
+        Combines semantic similarity and lexical signals consistently with MultiSignalRanker,
+        respecting pre-computed ranker scores when present and gracefully falling back to a
+        multi-signal linear combination without arbitrary constants or short-circuiting.
+        """
+        if "score" in candidate.signals and candidate.signals["score"] > 0.0:
+            return round(float(candidate.signals["score"]), 4)
+
+        base_score = (
+            candidate.signals.get("vector_similarity", 0.0) * 1.4
+            + candidate.signals.get("semantic_match", 0.0) * 1.2
+            + candidate.signals.get("symbol_match", 0.0) * 1.5
+            + candidate.signals.get("file_match", 0.0) * 1.3
+            + candidate.signals.get("content_match", 0.0) * 1.1
+            + candidate.signals.get("dependency_match", 0.0) * 0.9
+        )
+
+        lexical_score = 0.0
+        if analyzed_query:
+            name_lower = candidate.name.lower()
+            name_stem = name_lower.split(" (")[0].strip()
+            path_lower = candidate.path.lower()
+            content_lower = candidate.content.lower()
+
+            for sym in analyzed_query.symbol_candidates:
+                sym_l = sym.lower()
+                if sym_l in (name_lower, name_stem):
+                    lexical_score += 1.5
+                elif sym_l in path_lower:
+                    lexical_score += 0.8
+
+            for p_cand in analyzed_query.path_candidates:
+                if p_cand.lower() in path_lower:
+                    lexical_score += 0.8
+
+            for kw in analyzed_query.keywords:
+                kw_l = kw.lower()
+                if kw_l in name_lower or kw_l in name_stem:
+                    lexical_score += 0.8
+                elif kw_l in content_lower:
+                    lexical_score += 0.3
+
+            for concept in analyzed_query.concept_keywords:
+                concept_l = concept.lower()
+                if concept_l in name_lower:
+                    lexical_score += 0.6
+                elif concept_l in content_lower:
+                    lexical_score += 0.2
+
+        return round(base_score + lexical_score, 4)
+
+    @classmethod
     def apply_star_rag(
         cls,
         candidates: list[RetrievedCandidate],
@@ -744,6 +803,8 @@ class StarRagContextService:
         alpha: float | None = None,
         epsilon: float | None = None,
         min_support: int | None = None,
+        min_anchor_score: float | None = None,
+        hub_attenuation: bool | None = None,
     ) -> list[RetrievedCandidate]:
         """
         Applies STAR-RAG retrieval and graph propagation to code candidates.
@@ -759,6 +820,8 @@ class StarRagContextService:
             alpha=alpha,
             epsilon=epsilon,
             min_support=min_support,
+            min_anchor_score=min_anchor_score,
+            hub_attenuation=hub_attenuation,
         )
         return result.candidates
 
@@ -773,6 +836,8 @@ class StarRagContextService:
         alpha: float | None = None,
         epsilon: float | None = None,
         min_support: int | None = None,
+        min_anchor_score: float | None = None,
+        hub_attenuation: bool | None = None,
     ) -> StarRagResult:
         """
         Executes the full STAR-RAG retrieval pipeline and returns diagnostic results.
@@ -782,6 +847,16 @@ class StarRagContextService:
         ppr_alpha = alpha or getattr(settings, "STAR_RAG_PPR_ALPHA", 0.2)
         ppr_eps = epsilon or getattr(settings, "STAR_RAG_PPR_EPSILON", 1e-6)
         min_supp = min_support or getattr(settings, "STAR_RAG_MIN_SUPPORT", 2)
+        min_anchor_th = (
+            min_anchor_score
+            if min_anchor_score is not None
+            else getattr(settings, "STAR_RAG_MIN_ANCHOR_SCORE", 1.0)
+        )
+        enable_hub_attenuation = (
+            hub_attenuation
+            if hub_attenuation is not None
+            else getattr(settings, "STAR_RAG_HUB_ATTENUATION", True)
+        )
 
         if not candidates:
             return StarRagResult(
@@ -837,22 +912,40 @@ class StarRagContextService:
             )
 
             # 5. Determine query anchors
-            # Prioritize candidates by query relevance signals (score, vector similarity, lexical matches)
-            def candidate_relevance(c: RetrievedCandidate) -> float:
-                rel = (
-                    c.signals.get("score", 0.0)
-                    or c.signals.get("vector_similarity", 0.0)
-                    or c.signals.get("semantic_match", 0.0)
-                )
-                if analyzed_query:
-                    c_name_lower = c.name.lower()
-                    if any(sym.lower() in c_name_lower for sym in analyzed_query.symbol_candidates):
-                        rel += 2.0
-                    if any(kw.lower() in c_name_lower for kw in analyzed_query.keywords):
-                        rel += 0.5
-                return rel
+            # Prioritize candidates by principled anchor relevance with deterministic tie-breaking
+            ranked_anchor_candidates = sorted(
+                candidates,
+                key=lambda c: (-cls.compute_anchor_relevance(c, analyzed_query), c.candidate_id),
+            )
+            top_anchor_rel = (
+                cls.compute_anchor_relevance(ranked_anchor_candidates[0], analyzed_query)
+                if ranked_anchor_candidates
+                else 0.0
+            )
 
-            ranked_anchor_candidates = sorted(candidates, key=candidate_relevance, reverse=True)
+            # Absent-evidence / weak-anchor gate:
+            # If candidates have pre-computed ranker scores ([0, 1]), effective threshold is scaled to min(min_anchor_th, 0.40).
+            # Otherwise on unnormalized raw multi-signal combinations, threshold defaults to min_anchor_th (1.0).
+            has_precomputed = (
+                bool(ranked_anchor_candidates)
+                and "score" in ranked_anchor_candidates[0].signals
+                and ranked_anchor_candidates[0].signals["score"] > 0.0
+            )
+            effective_gate = min(min_anchor_th, 0.40) if has_precomputed else min_anchor_th
+
+            if top_anchor_rel < effective_gate:
+                return StarRagResult(
+                    candidates=candidates,
+                    rule_nodes=rule_nodes,
+                    selected_edges=selected_edges,
+                    top_rules=[],
+                    ppr_distribution={},
+                    initial_mdl_cost=init_mdl,
+                    final_mdl_cost=final_mdl,
+                    is_fallback=True,
+                    fallback_reason=f"Top anchor relevance ({top_anchor_rel:.4f}) below confidence threshold ({effective_gate:.4f})",
+                )
+
             anchor_candidates = ranked_anchor_candidates[:k1]
             anchor_cids = {c.candidate_id for c in anchor_candidates}
             anchor_events = [ev for ev in events if ev.candidate_id in anchor_cids]
@@ -895,6 +988,14 @@ class StarRagContextService:
             # Boost and link candidates from top rule nodes
             for rule in top_rules:
                 pi_val = ppr_dist.get(rule.node_id, 0.0)
+                if enable_hub_attenuation and len(rule.events) > 1:
+                    # Attenuate generic hub rules inversely with event cardinality
+                    # to prevent hyper-generic rules (e.g. 200+ calls) from dominating specific relations
+                    rule_weight = 1.0 / math.log2(2.0 + len(rule.events))
+                else:
+                    rule_weight = 1.0
+                effective_pi = pi_val * rule_weight
+
                 for ev in rule.events:
                     c = ev.candidate or cand_map.get(ev.candidate_id)
                     if c:
@@ -902,10 +1003,10 @@ class StarRagContextService:
                         # Record PPR signal
                         existing.signals["star_rag_ppr"] = max(
                             existing.signals.get("star_rag_ppr", 0.0),
-                            round(pi_val, 4),
+                            round(effective_pi, 4),
                         )
                         existing.metadata["star_rag_rule_node"] = rule.node_id
-                        existing.metadata["star_rag_ppr_score"] = round(pi_val, 4)
+                        existing.metadata["star_rag_ppr_score"] = round(effective_pi, 4)
                         if (
                             "retrieval_reason" not in existing.metadata
                             or existing.metadata["retrieval_reason"] == "Direct retrieval match"

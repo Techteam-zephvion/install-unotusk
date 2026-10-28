@@ -77,7 +77,7 @@ class ProjectContextEngine:
         use_star_rag = (
             enable_star_rag
             if enable_star_rag is not None
-            else getattr(settings, "STAR_RAG_ENABLED", True)
+            else getattr(settings, "STAR_RAG_ENABLED", False)
         )
         if use_star_rag:
             try:
