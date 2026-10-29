@@ -1462,3 +1462,127 @@ def test_17_lexical_matching_and_false_positive_prevention():
     tokens_v2 = StarRagContextService._get_candidate_tokens(cand_mutable)
     assert "updated_func" in tokens_v2[3]
     assert "initial_func" not in tokens_v2[3]
+
+
+# ==============================================================================
+# 18. Seeded PPR Probability Conservation and Dangling Node Mass
+# ==============================================================================
+
+
+def test_18_ppr_probability_conservation_and_dangling_nodes():
+    """
+    Verifies that Seeded Personalized PageRank strictly conserves total probability mass (sum(pi) == 1.0)
+    even in the presence of isolated nodes, dangling chains, disconnected components, and empty edges:
+    1. sum(pi) == 1.0 on a graph with dangling nodes (degree 0).
+    2. Edge-less graph terminates with pi == gamma.
+    3. Multi-component disconnected graph distributes mass correctly according to personalization.
+    """
+    from apps.api.src.services.context_engine.star_rag import (
+        RuleNode,
+        SeededPprRetriever,
+        TemporalCodeEvent,
+    )
+
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
+    # Create 3 rule nodes: node_1, node_2 connected by 1 edge, and node_3 isolated (dangling)
+    ev1 = TemporalCodeEvent(
+        event_id="e1", subject="Auth", relation="CALLS", object="DB", timestamp=t0
+    )
+    ev2 = TemporalCodeEvent(
+        event_id="e2", subject="DB", relation="CALLS", object="Driver", timestamp=t0
+    )
+    ev3 = TemporalCodeEvent(
+        event_id="e3", subject="Logger", relation="DEFINES", object="logger.py", timestamp=t0
+    )
+
+    node_1 = RuleNode(node_id="r1", subject_type="T1", relation="CALLS", object_type="T2", events=[ev1])
+    node_2 = RuleNode(node_id="r2", subject_type="T2", relation="CALLS", object_type="T3", events=[ev2])
+    node_3 = RuleNode(node_id="r3", subject_type="T4", relation="DEFINES", object_type="T5", events=[ev3])
+
+    rule_nodes = {"r1": node_1, "r2": node_2, "r3": node_3}
+    # Edge between r1 and r2 only; r3 is dangling
+    selected_edges = {("r1", "r2")}
+
+    # Case 1: All nodes seeded
+    gamma, seeds = SeededPprRetriever.compute_personalization_vector(
+        rule_nodes=rule_nodes,
+        anchor_events=[ev1, ev2, ev3],
+    )
+    assert len(seeds) == 3
+    assert abs(sum(gamma.values()) - 1.0) < 1e-6
+
+    ppr = SeededPprRetriever.run_seeded_ppr(
+        rule_nodes=rule_nodes,
+        selected_edges=selected_edges,
+        gamma=gamma,
+        alpha=0.2,
+        epsilon=1e-6,
+        max_iter=50,
+    )
+    total_mass = sum(ppr.values())
+    assert abs(total_mass - 1.0) < 1e-5, f"Expected total probability mass == 1.0, got {total_mass}"
+    assert all(val >= 0.0 for val in ppr.values())
+
+    # Case 2: Only r1 seeded (r3 dangling and unseeded)
+    gamma_r1, seeds_r1 = SeededPprRetriever.compute_personalization_vector(
+        rule_nodes=rule_nodes,
+        anchor_events=[ev1],
+    )
+    assert seeds_r1 == {"r1"}
+    ppr_r1 = SeededPprRetriever.run_seeded_ppr(
+        rule_nodes=rule_nodes,
+        selected_edges=selected_edges,
+        gamma=gamma_r1,
+        alpha=0.2,
+    )
+    total_mass_r1 = sum(ppr_r1.values())
+    assert abs(total_mass_r1 - 1.0) < 1e-5, f"Expected total probability mass == 1.0, got {total_mass_r1}"
+
+    # Case 3: Edge-less graph (selected_edges empty)
+    ppr_no_edges = SeededPprRetriever.run_seeded_ppr(
+        rule_nodes=rule_nodes,
+        selected_edges=set(),
+        gamma=gamma,
+        alpha=0.2,
+    )
+    assert abs(sum(ppr_no_edges.values()) - 1.0) < 1e-5
+    for nid, val in ppr_no_edges.items():
+        assert abs(val - gamma[nid]) < 1e-5, f"On edge-less graph, ppr[{nid}] ({val}) must equal gamma ({gamma[nid]})"
+
+
+# ==============================================================================
+# 19. Empty and Disconnected Graph MDL Pruning Safety
+# ==============================================================================
+
+
+def test_19_empty_and_disconnected_graph_mdl_safety():
+    """
+    Verifies MDL model selection and graph builder safety:
+    1. Single candidate input falls back cleanly without crash.
+    2. Self-loops and duplicate edges are ignored in greedy selection.
+    3. Empty spans map produces empty selected edges safely.
+    """
+    from apps.api.src.services.context_engine.star_rag import MdlGraphSelector, RuleNode
+
+    # 1. Single candidate pipeline fallback
+    c_single = make_candidate(candidate_id="c_one", name="One", path="one.py", content="pass")
+    res_single = StarRagContextService.run_star_rag_pipeline(candidates=[c_single])
+    assert res_single.is_fallback is True
+    assert "Insufficient temporal events" in (res_single.fallback_reason or "")
+
+    # 2. Self-loops and duplicate edges ignored
+    rn_a = RuleNode(node_id="A", subject_type="TA", relation="CALLS", object_type="TB")
+    rn_b = RuleNode(node_id="B", subject_type="TB", relation="CALLS", object_type="TC")
+    rule_nodes = {"A": rn_a, "B": rn_b}
+    candidate_edges = [("A", "A"), ("A", "B"), ("A", "B")]  # self-loop and duplicate
+    spans_map = {("A", "A"): [1.0], ("A", "B"): [0.01]}
+
+    selected, init_mdl, final_mdl = MdlGraphSelector.select_edges(
+        rule_nodes=rule_nodes,
+        candidate_edges=candidate_edges,
+        spans_map=spans_map,
+        total_events=2,
+        num_types=3,
+        num_relations=1,
+    )
+    assert ("A", "A") not in selected, "Self-loops must never be selected"

@@ -465,6 +465,8 @@ class MdlGraphSelector:
 
         for edge in sorted_candidates:
             u_id, v_id = edge
+            if u_id == v_id or edge in selected_edges or (v_id, u_id) in selected_edges:
+                continue
             u = rule_nodes[u_id]
             v = rule_nodes[v_id]
             spans = spans_map[edge]
@@ -602,8 +604,10 @@ class SeededPprRetriever:
                     for j in adj[i]:
                         next_pi[j] += alloc
                 else:
-                    # Dangling / isolated node retains or diffuses to self
-                    next_pi[i] += cur_prob
+                    # Dangling / isolated node redistributes according to personalization vector gamma
+                    # to strictly conserve total probability mass (sum(pi) == 1.0) and prevent leakage
+                    for j in range(n):
+                        next_pi[j] += cur_prob * gamma_vec[j]
 
             # Apply restart alpha * gamma + (1 - alpha) * next_pi
             new_pi = [

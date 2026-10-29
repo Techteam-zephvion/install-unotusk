@@ -23,10 +23,12 @@ from apps.api.src.services.context_engine.memotime import (
     AllenIntervalRelation,
     MemoTimeService,
     ResolutionStatus,
+    StructuredTemporalIntent,
     TemporalBound,
     TemporalConstraint,
     TemporalIntentType,
     TimeTreeNode,
+    TreeOfTime,
 )
 from apps.api.src.services.context_engine.query_analyzer import analyze_query
 from apps.api.src.services.context_engine.retriever import RetrievedCandidate
@@ -1292,3 +1294,279 @@ async def test_30_engine_error_isolation_and_diagnostics():
         enable_memotime=False,
     )
     assert ans_disabled.debug_signals.get("memotime_used") is False
+
+
+# ==============================================================================
+# 31. Two-Commit Comparative Diff Intent, Tree Decomposition & Retrieval
+# ==============================================================================
+
+
+def test_31_two_commit_comparative_diff_intent_and_retrieval():
+    """
+    Verifies two-commit revision comparison:
+    1. parse_temporal_intent identifies 'compare commit A and commit B' as DIFF with both reference commits.
+    2. build_tree_of_time decomposes into node_diff_base (HISTORICAL) and node_diff_target (DIFF).
+    3. run_memotime_pipeline partitions candidates into target (diff_role='target') and base (diff_role='base').
+    """
+    sha_a = "b094f01"
+    sha_b = "be1b5b5"
+    query = f"Compare commit {sha_a} and commit {sha_b} for ast scope resolution"
+
+    intent = MemoTimeService.parse_temporal_intent(query, target_symbols=["ast_scope"])
+    assert intent.intent_type == TemporalIntentType.DIFF
+    assert intent.is_temporal is True
+    assert intent.reference_commits == [sha_a, sha_b]
+
+    tree = MemoTimeService.build_tree_of_time(query, target_symbols=["ast_scope"])
+    assert "node_diff_base" in tree.nodes
+    assert "node_diff_target" in tree.nodes
+    assert tree.nodes["node_diff_base"].intent_type == TemporalIntentType.HISTORICAL
+    assert tree.nodes["node_diff_target"].intent_type == TemporalIntentType.DIFF
+
+    # Candidate retrieval with base and target
+    c_base = _create_candidate(
+        candidate_id="c_base",
+        name="resolve_scope",
+        path="decomposer.py",
+        commit_sha=sha_a,
+        commit_msg="base commit",
+        committed_at="2026-01-01T00:00:00Z",
+        content="def resolve_scope(): pass",
+    )
+    c_target = _create_candidate(
+        candidate_id="c_target",
+        name="resolve_scope",
+        path="decomposer.py",
+        commit_sha=sha_b,
+        commit_msg="target commit",
+        committed_at="2026-02-01T00:00:00Z",
+        content="def resolve_scope(ast_tree): pass",
+    )
+    c_target.metadata["added_lines"] = ["def resolve_scope(ast_tree): pass"]
+    c_other = _create_candidate(
+        candidate_id="c_other",
+        name="other_util",
+        path="util.py",
+        commit_sha="4e5af91",
+        commit_msg="other commit",
+        committed_at="2026-01-15T00:00:00Z",
+        content="pass",
+    )
+
+    res = MemoTimeService.run_memotime_pipeline(
+        candidates=[c_base, c_target, c_other],
+        query_text=query,
+    )
+    assert res.is_fallback is False
+    assert res.strategy_used == TemporalIntentType.DIFF
+    assert res.applied_signals_count >= 2
+
+    # Verify candidate tagging
+    c_tgt_res = next(c for c in res.candidates if c.candidate_id == "c_target")
+    assert c_tgt_res.metadata.get("memotime_diff_role") == "target"
+    assert c_tgt_res.signals.get("memotime_diff_match") == 1.0
+
+    c_base_res = next(c for c in res.candidates if c.candidate_id == "c_base")
+    assert c_base_res.metadata.get("memotime_diff_role") == "base"
+    assert c_base_res.signals.get("memotime_temporal_match") == 0.8
+
+    # Target candidate ranks above base candidate
+    c_ids = [c.candidate_id for c in res.candidates]
+    assert c_ids.index("c_target") < c_ids.index("c_base") < c_ids.index("c_other")
+
+
+# ==============================================================================
+# 32. After-Before Compound Query Contradiction and Bounded Interval
+# ==============================================================================
+
+
+def test_32_after_before_compound_query_contradiction_and_interval():
+    """
+    Verifies compound queries containing both 'after' and 'before':
+    1. Inverted bounds ('after 2026-06-01 and before 2026-01-01') detect contradiction (is_contradictory=True).
+    2. Valid bounds ('after 2026-01-01 and before 2026-06-01') resolve to bounded INTERVAL.
+    """
+    # 1. Contradiction
+    q_contra = "What was the AuthService implementation after 2026-06-01 and before 2026-01-01?"
+    intent_contra = MemoTimeService.parse_temporal_intent(q_contra)
+    assert intent_contra.intent_type == TemporalIntentType.AMBIGUOUS
+    assert intent_contra.is_contradictory is True
+    assert "start bound" in (intent_contra.contradiction_reason or "")
+    assert "after end bound" in (intent_contra.contradiction_reason or "")
+
+    tree_contra = MemoTimeService.build_tree_of_time(q_contra)
+    assert tree_contra.is_valid is False
+    assert len(tree_contra.validation_errors) > 0
+
+    # 2. Valid interval
+    q_valid = "What was the AuthService implementation after 2026-01-01 and before 2026-06-01?"
+    intent_valid = MemoTimeService.parse_temporal_intent(q_valid)
+    assert intent_valid.intent_type == TemporalIntentType.INTERVAL
+    assert intent_valid.is_contradictory is False
+    assert len(intent_valid.constraints) == 1
+    assert intent_valid.constraints[0].bound is not None
+    assert intent_valid.constraints[0].bound.start == datetime(2026, 1, 1, tzinfo=UTC)
+    assert intent_valid.constraints[0].bound.end == datetime(2026, 6, 1, tzinfo=UTC)
+
+
+# ==============================================================================
+# 33. All 13 Allen Interval Relations with matches_allen_relation and Open Bounds
+# ==============================================================================
+
+
+def test_33_all_13_allen_relations_with_matches_allen_relation_and_open_bounds():
+    """
+    Verifies all 13 Allen interval algebra relations using matches_allen_relation,
+    testing inverse consistency and open-ended ongoing bounds (end=None).
+    """
+    from datetime import timedelta
+
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
+    t1 = t0 + timedelta(days=10)
+    t2 = t0 + timedelta(days=20)
+    t3 = t0 + timedelta(days=30)
+
+    # 1. EQUALS
+    b_eq1 = TemporalBound(start=t1, end=t2)
+    b_eq2 = TemporalBound(start=t1, end=t2)
+    assert MemoTimeService.matches_allen_relation(b_eq1, b_eq2, AllenIntervalRelation.EQUALS)
+
+    # 2. BEFORE / AFTER
+    b_bef1 = TemporalBound(start=t0, end=t1)
+    b_bef2 = TemporalBound(start=t2, end=t3)
+    assert MemoTimeService.matches_allen_relation(b_bef1, b_bef2, AllenIntervalRelation.BEFORE)
+    assert MemoTimeService.matches_allen_relation(b_bef2, b_bef1, AllenIntervalRelation.AFTER)
+
+    # 3. MEETS / MET_BY
+    b_m1 = TemporalBound(start=t0, end=t1)
+    b_m2 = TemporalBound(start=t1, end=t2)
+    assert MemoTimeService.matches_allen_relation(b_m1, b_m2, AllenIntervalRelation.MEETS)
+    assert MemoTimeService.matches_allen_relation(b_m2, b_m1, AllenIntervalRelation.MET_BY)
+
+    # 4. OVERLAPS / OVERLAPPED_BY
+    b_o1 = TemporalBound(start=t0, end=t2)
+    b_o2 = TemporalBound(start=t1, end=t3)
+    assert MemoTimeService.matches_allen_relation(b_o1, b_o2, AllenIntervalRelation.OVERLAPS)
+    assert MemoTimeService.matches_allen_relation(b_o2, b_o1, AllenIntervalRelation.OVERLAPPED_BY)
+
+    # 5. DURING / CONTAINS
+    b_d1 = TemporalBound(start=t1, end=t2)
+    b_d2 = TemporalBound(start=t0, end=t3)
+    assert MemoTimeService.matches_allen_relation(b_d1, b_d2, AllenIntervalRelation.DURING)
+    assert MemoTimeService.matches_allen_relation(b_d2, b_d1, AllenIntervalRelation.CONTAINS)
+
+    # 6. STARTS / STARTED_BY
+    b_s1 = TemporalBound(start=t0, end=t1)
+    b_s2 = TemporalBound(start=t0, end=t2)
+    assert MemoTimeService.matches_allen_relation(b_s1, b_s2, AllenIntervalRelation.STARTS)
+    assert MemoTimeService.matches_allen_relation(b_s2, b_s1, AllenIntervalRelation.STARTED_BY)
+
+    # 7. FINISHES / FINISHED_BY
+    b_f1 = TemporalBound(start=t1, end=t2)
+    b_f2 = TemporalBound(start=t0, end=t2)
+    assert MemoTimeService.matches_allen_relation(b_f1, b_f2, AllenIntervalRelation.FINISHES)
+    assert MemoTimeService.matches_allen_relation(b_f2, b_f1, AllenIntervalRelation.FINISHED_BY)
+
+    # Open-ended bounds (ongoing active code)
+    b_open1 = TemporalBound(start=t0, end=None)
+    b_open2 = TemporalBound(start=t0, end=None)
+    assert MemoTimeService.matches_allen_relation(b_open1, b_open2, AllenIntervalRelation.EQUALS)
+
+    b_open_earlier = TemporalBound(start=t0, end=None)
+    b_open_later = TemporalBound(start=t1, end=None)
+    assert MemoTimeService.matches_allen_relation(b_open_earlier, b_open_later, AllenIntervalRelation.OVERLAPS)
+    assert MemoTimeService.matches_allen_relation(b_open_later, b_open_earlier, AllenIntervalRelation.OVERLAPPED_BY)
+
+
+# ==============================================================================
+# 34. Tree of Time Child Interval Encapsulation Check
+# ==============================================================================
+
+
+def test_34_tree_of_time_child_interval_encapsulation_check():
+    """
+    Verifies that validate_temporal_constraints detects child interval encapsulation violations
+    when a child node's start or end boundary escapes the parent root node's interval.
+    """
+    t_start = datetime(2026, 1, 1, tzinfo=UTC)
+    t_end = datetime(2026, 6, 1, tzinfo=UTC)
+    t_escaped = datetime(2026, 7, 1, tzinfo=UTC)
+
+    tree = TreeOfTime(
+        root_query="Bounded analysis",
+        root_intent=StructuredTemporalIntent(
+            intent_type=TemporalIntentType.INTERVAL,
+            is_temporal=True,
+            constraints=[
+                TemporalConstraint(
+                    constraint_id="c0",
+                    operator="INTERVAL",
+                    target_entity="system",
+                    bound=TemporalBound(start=t_start, end=t_end),
+                )
+            ],
+        ),
+    )
+    root = TimeTreeNode(
+        node_id="root",
+        query_subquestion="Root",
+        intent_type=TemporalIntentType.INTERVAL,
+        temporal_bound=TemporalBound(start=t_start, end=t_end),
+    )
+    # Child interval escapes parent end (t_escaped > t_end)
+    child = TimeTreeNode(
+        node_id="child_escaped",
+        query_subquestion="Child",
+        intent_type=TemporalIntentType.INTERVAL,
+        temporal_bound=TemporalBound(start=t_start, end=t_escaped),
+        parent_id="root",
+    )
+    tree.add_node(root)
+    tree.add_node(child)
+
+    is_valid, errors = MemoTimeService.validate_temporal_constraints(tree)
+    assert is_valid is False
+    assert any("escapes parent" in e for e in errors)
+
+
+# ==============================================================================
+# 35. Multi-Hop Cross-Entity Provenance and Relationship Types
+# ==============================================================================
+
+
+def test_35_multi_hop_cross_entity_provenance_and_relationship_types():
+    """
+    Verifies that multi-hop cross-entity constraint validation traces relationships,
+    formats provenance with explicit edge types (e.g., A -[CALLS]-> B -[IMPORTS]-> C),
+    and enforces maximum traversal depth.
+    """
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
+    t1 = datetime(2026, 3, 1, tzinfo=UTC)
+    t2 = datetime(2026, 6, 1, tzinfo=UTC)
+
+    # ServiceA ends at t0. ServiceB ends at t1. ServiceC starts at t2 (> t0).
+    bounds = {
+        "servicea": TemporalBound(start=datetime(2025, 1, 1, tzinfo=UTC), end=t0),
+        "serviceb": TemporalBound(start=t0, end=t1),
+        "servicec": TemporalBound(start=t2, end=None),
+    }
+
+    # Explicit 2-hop dependencies with relationship types
+    deps = [
+        ("ServiceA", "ServiceB", "CALLS"),
+        ("ServiceB", "ServiceC", "IMPORTS"),
+    ]
+
+    is_valid, errors = MemoTimeService.validate_multi_entity_bounds(
+        entity_bounds=bounds,
+        dependencies=deps,
+        max_depth=3,
+    )
+    assert is_valid is False
+    assert len(errors) >= 1
+    # Check provenance format includes relationship type
+    err = errors[0]
+    assert "-[CALLS]->" in err or "-[IMPORTS]->" in err
+    assert "ServiceA" in err
+    assert "ServiceC" in err
+    assert "introduced later at" in err

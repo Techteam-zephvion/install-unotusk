@@ -71,6 +71,7 @@ class Settings(BaseSettings):
 
     # MemoTime Temporal Retrieval Settings (arXiv:2510.13614)
     MEMOTIME_ENABLED: bool = Field(default=False)
+    MEMOTIME_MAX_PROPAGATION_HOPS: int = Field(default=5)
 
     # Code-Lane Embedding Settings ('voyage' or 'development')
     EMBEDDING_PROVIDER: str = Field(default="development")

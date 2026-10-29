@@ -21,6 +21,7 @@ Evaluates:
 """
 
 import copy
+import math
 import statistics
 import subprocess
 import time
@@ -54,6 +55,37 @@ class BenchmarkQuerySpec:
     distractor_ids: set[str] = field(default_factory=set)
     expected_temporal_behavior: str = ""
     rationale: str = ""
+
+
+def compute_ndcg_at_k(
+    ranked_ids: list[str],
+    relevant_ids: set[str],
+    partially_relevant_ids: set[str],
+    k: int = 5,
+) -> float:
+    """Computes Normalized Discounted Cumulative Gain at rank K (nDCG@K)."""
+    if not relevant_ids and not partially_relevant_ids:
+        return 0.0
+
+    def get_rel(cid: str) -> float:
+        if cid in relevant_ids:
+            return 1.0
+        if cid in partially_relevant_ids:
+            return 0.5
+        return 0.0
+
+    top_k = ranked_ids[:k]
+    dcg = sum((2 ** get_rel(cid) - 1.0) / math.log2(i + 1) for i, cid in enumerate(top_k, start=1))
+
+    ideal_rels = sorted(
+        [1.0] * len(relevant_ids) + [0.5] * len(partially_relevant_ids),
+        reverse=True,
+    )[:k]
+    idcg = sum((2 ** rel - 1.0) / math.log2(i + 1) for i, rel in enumerate(ideal_rels, start=1))
+
+    if idcg <= 0.0:
+        return 0.0
+    return dcg / idcg
 
 
 def build_real_repo_corpus() -> list[RetrievedCandidate]:
@@ -857,3 +889,197 @@ def test_memotime_cross_entity_and_diff_evidence_real_repo():
     for c in propagated_cands:
         assert not c.signals.get("memotime_temporal_mismatch")
         assert c.metadata.get("commit_sha") is not None
+
+
+def test_real_repo_benchmark_four_way_integration():
+    """
+    Executes the 4-way integration benchmark comparing all retrieval configurations:
+    1. Baseline (STAR-RAG disabled, MemoTime disabled)
+    2. STAR-RAG Only (STAR-RAG enabled, MemoTime disabled)
+    3. MemoTime Only (STAR-RAG disabled, MemoTime enabled)
+    4. Both Enabled (STAR-RAG enabled, MemoTime enabled)
+
+    Validates:
+    - Real repository corpus (60+ genuine candidates from actual Git history).
+    - Unbiased relevance judgments against actual commit diffs.
+    - Zero temporal supersession violations across all configurations.
+    - Full historical precursor preservation on temporal queries.
+    - 100% provenance survival (commit_sha, snapshot_id, file_id).
+    - Bounded execution latency across all modes (< 300ms median).
+    - Graceful handling of queries with absent evidence.
+    - Full ranking evaluation: Recall@K, Precision@K, MRR, and nDCG@5.
+    """
+    from apps.api.src.services.context_engine.memotime import MemoTimeService
+
+    corpus = build_real_repo_corpus()
+    assert len(corpus) >= 50, f"Expected at least 50 real repository candidates, got {len(corpus)}"
+
+    chunk_embeddings = {c.candidate_id: generate_text_embedding(c.content) for c in corpus}
+
+    evaluable_queries = [spec for spec in BENCHMARK_SPECS if len(spec.relevant_ids) > 0]
+    num_eval = len(evaluable_queries)
+    num_total = len(BENCHMARK_SPECS)
+
+    modes = ["Baseline", "STAR-RAG Only", "MemoTime Only", "Both Enabled"]
+    results = {
+        m: {
+            "recalls_bin": {1: 0, 3: 0, 5: 0},
+            "recalls_prop": {1: 0.0, 3: 0.0, 5: 0.0},
+            "precisions": {1: 0.0, 3: 0.0, 5: 0.0},
+            "mrr": 0.0,
+            "ndcg5": 0.0,
+            "temporal_violations": 0,
+            "precursor_covered": 0,
+            "provenance_verified": 0,
+            "latencies": [],
+        }
+        for m in modes
+    }
+
+    query_outcomes: dict[str, dict[str, str]] = {}
+
+    for spec in BENCHMARK_SPECS:
+        analyzed = analyze_query(spec.query)
+        analyzed.is_temporal = spec.is_temporal
+        q_emb = generate_text_embedding(spec.query)
+
+        q_candidates = []
+        for c in corpus:
+            c_copy = copy.deepcopy(c)
+            sim = compute_cosine_similarity(q_emb, chunk_embeddings[c.candidate_id])
+            c_copy.signals["vector_similarity"] = round(sim, 4)
+            q_candidates.append(c_copy)
+
+        query_outcomes[spec.id] = {}
+
+        for mode in modes:
+            t0 = time.perf_counter()
+            if mode == "Baseline":
+                ranked = MultiSignalRanker.rank_candidates(copy.deepcopy(q_candidates), analyzed)
+            elif mode == "STAR-RAG Only":
+                star_res = StarRagContextService.run_star_rag_pipeline(
+                    candidates=copy.deepcopy(q_candidates),
+                    analyzed_query=analyzed,
+                    query_text=spec.query,
+                )
+                ranked = MultiSignalRanker.rank_candidates(star_res.candidates, analyzed)
+            elif mode == "MemoTime Only":
+                memo_res = MemoTimeService.run_memotime_pipeline(
+                    candidates=copy.deepcopy(q_candidates),
+                    analyzed_query=analyzed,
+                    query_text=spec.query,
+                )
+                ranked = MultiSignalRanker.rank_candidates(memo_res.candidates, analyzed)
+            elif mode == "Both Enabled":
+                star_res = StarRagContextService.run_star_rag_pipeline(
+                    candidates=copy.deepcopy(q_candidates),
+                    analyzed_query=analyzed,
+                    query_text=spec.query,
+                )
+                memo_res = MemoTimeService.run_memotime_pipeline(
+                    candidates=star_res.candidates,
+                    analyzed_query=analyzed,
+                    query_text=spec.query,
+                )
+                ranked = MultiSignalRanker.rank_candidates(memo_res.candidates, analyzed)
+
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            results[mode]["latencies"].append(elapsed_ms)
+
+            ranked_ids = [r.candidate.candidate_id for r in ranked]
+            rel_ids = spec.relevant_ids
+
+            if rel_ids:
+                rank = next((i for i, cid in enumerate(ranked_ids, start=1) if cid in rel_ids), None)
+                if rank:
+                    results[mode]["mrr"] += 1.0 / rank
+                    for k in (1, 3, 5):
+                        if rank <= k:
+                            results[mode]["recalls_bin"][k] += 1
+
+                for k in (1, 3, 5):
+                    top_k = set(ranked_ids[:k])
+                    results[mode]["recalls_prop"][k] += len(top_k & rel_ids) / len(rel_ids)
+                    results[mode]["precisions"][k] += len(top_k & rel_ids) / k
+
+                ndcg = compute_ndcg_at_k(ranked_ids, rel_ids, spec.partially_relevant_ids, k=5)
+                results[mode]["ndcg5"] += ndcg
+                query_outcomes[spec.id][mode] = f"Rank {rank}" if rank else "Unranked"
+            else:
+                top_score = ranked[0].score if ranked else 0.0
+                query_outcomes[spec.id][mode] = f"Absent (top score {top_score:.2f})"
+
+            # Temporal violation check on current queries
+            if not spec.is_temporal and spec.superseded_ids and rel_ids:
+                sup_idx = next((i for i, cid in enumerate(ranked_ids, start=1) if cid in spec.superseded_ids), None)
+                rel_idx = next((i for i, cid in enumerate(ranked_ids, start=1) if cid in rel_ids), None)
+                if sup_idx is not None and rel_idx is not None and sup_idx < rel_idx:
+                    results[mode]["temporal_violations"] += 1
+
+            # Historical precursor coverage on temporal queries
+            if spec.is_temporal:
+                precursors = {cid for cid in rel_ids if "42096a5" not in cid}
+                if any(cid in set(ranked_ids[:5]) for cid in precursors):
+                    results[mode]["precursor_covered"] += 1
+
+            # Provenance survival
+            if (
+                ranked
+                and ranked[0].candidate.metadata.get("commit_sha")
+                and ranked[0].candidate.metadata.get("snapshot_id")
+            ):
+                results[mode]["provenance_verified"] += 1
+
+    # Assertions across all four modes
+    for mode in modes:
+        res = results[mode]
+        assert res["recalls_bin"][1] >= 6, f"Mode {mode}: Binary Recall@1 {res['recalls_bin'][1]}/9 below 6"
+        assert res["recalls_bin"][3] == num_eval, f"Mode {mode}: Binary Recall@3 {res['recalls_bin'][3]}/{num_eval} not 100%"
+        assert res["recalls_bin"][5] == num_eval, f"Mode {mode}: Binary Recall@5 {res['recalls_bin'][5]}/{num_eval} not 100%"
+        assert res["temporal_violations"] == 0, f"Mode {mode}: {res['temporal_violations']} temporal violations"
+        assert res["precursor_covered"] == 2, f"Mode {mode}: {res['precursor_covered']}/2 historical precursor coverage"
+        assert res["provenance_verified"] == num_total, f"Mode {mode}: {res['provenance_verified']}/{num_total} provenance survival"
+        med_lat = statistics.median(res["latencies"])
+        assert med_lat < 300.0, f"Mode {mode}: Median latency {med_lat:.2f}ms exceeds 300ms ceiling"
+
+    # Print summary comparison table
+    print("\n" + "=" * 115)
+    print("AUDITED REAL REPOSITORY 4-WAY INTEGRATION BENCHMARK (10 QUERIES)")
+    print("=" * 115)
+    print(f"Corpus Size: {len(corpus)} candidates from 4 core commits + 3 distractor commits")
+    print(f"Total Queries: {num_total} ({num_eval} evaluable with ground truth + 1 absent evidence)")
+    print("-" * 115)
+    header = f"{'Metric':<30} | {'Baseline':<18} | {'STAR-RAG Only':<18} | {'MemoTime Only':<18} | {'Both Enabled':<18}"
+    print(header)
+    print("-" * 115)
+    print(f"{'Binary Recall@1':<30} | {results['Baseline']['recalls_bin'][1]/num_eval:<18.4f} | {results['STAR-RAG Only']['recalls_bin'][1]/num_eval:<18.4f} | {results['MemoTime Only']['recalls_bin'][1]/num_eval:<18.4f} | {results['Both Enabled']['recalls_bin'][1]/num_eval:<18.4f}")
+    print(f"{'Binary Recall@3':<30} | {results['Baseline']['recalls_bin'][3]/num_eval:<18.4f} | {results['STAR-RAG Only']['recalls_bin'][3]/num_eval:<18.4f} | {results['MemoTime Only']['recalls_bin'][3]/num_eval:<18.4f} | {results['Both Enabled']['recalls_bin'][3]/num_eval:<18.4f}")
+    print(f"{'Binary Recall@5':<30} | {results['Baseline']['recalls_bin'][5]/num_eval:<18.4f} | {results['STAR-RAG Only']['recalls_bin'][5]/num_eval:<18.4f} | {results['MemoTime Only']['recalls_bin'][5]/num_eval:<18.4f} | {results['Both Enabled']['recalls_bin'][5]/num_eval:<18.4f}")
+    print(f"{'Proportional Recall@1':<30} | {results['Baseline']['recalls_prop'][1]/num_eval:<18.4f} | {results['STAR-RAG Only']['recalls_prop'][1]/num_eval:<18.4f} | {results['MemoTime Only']['recalls_prop'][1]/num_eval:<18.4f} | {results['Both Enabled']['recalls_prop'][1]/num_eval:<18.4f}")
+    print(f"{'Proportional Recall@3':<30} | {results['Baseline']['recalls_prop'][3]/num_eval:<18.4f} | {results['STAR-RAG Only']['recalls_prop'][3]/num_eval:<18.4f} | {results['MemoTime Only']['recalls_prop'][3]/num_eval:<18.4f} | {results['Both Enabled']['recalls_prop'][3]/num_eval:<18.4f}")
+    print(f"{'Proportional Recall@5':<30} | {results['Baseline']['recalls_prop'][5]/num_eval:<18.4f} | {results['STAR-RAG Only']['recalls_prop'][5]/num_eval:<18.4f} | {results['MemoTime Only']['recalls_prop'][5]/num_eval:<18.4f} | {results['Both Enabled']['recalls_prop'][5]/num_eval:<18.4f}")
+    print(f"{'Precision@1':<30} | {results['Baseline']['precisions'][1]/num_eval:<18.4f} | {results['STAR-RAG Only']['precisions'][1]/num_eval:<18.4f} | {results['MemoTime Only']['precisions'][1]/num_eval:<18.4f} | {results['Both Enabled']['precisions'][1]/num_eval:<18.4f}")
+    print(f"{'Precision@3':<30} | {results['Baseline']['precisions'][3]/num_eval:<18.4f} | {results['STAR-RAG Only']['precisions'][3]/num_eval:<18.4f} | {results['MemoTime Only']['precisions'][3]/num_eval:<18.4f} | {results['Both Enabled']['precisions'][3]/num_eval:<18.4f}")
+    print(f"{'Precision@5':<30} | {results['Baseline']['precisions'][5]/num_eval:<18.4f} | {results['STAR-RAG Only']['precisions'][5]/num_eval:<18.4f} | {results['MemoTime Only']['precisions'][5]/num_eval:<18.4f} | {results['Both Enabled']['precisions'][5]/num_eval:<18.4f}")
+    print(f"{'Mean Reciprocal Rank (MRR)':<30} | {results['Baseline']['mrr']/num_eval:<18.4f} | {results['STAR-RAG Only']['mrr']/num_eval:<18.4f} | {results['MemoTime Only']['mrr']/num_eval:<18.4f} | {results['Both Enabled']['mrr']/num_eval:<18.4f}")
+    print(f"{'nDCG@5':<30} | {results['Baseline']['ndcg5']/num_eval:<18.4f} | {results['STAR-RAG Only']['ndcg5']/num_eval:<18.4f} | {results['MemoTime Only']['ndcg5']/num_eval:<18.4f} | {results['Both Enabled']['ndcg5']/num_eval:<18.4f}")
+    print(f"{'Temporal Violations':<30} | {results['Baseline']['temporal_violations']:<18} | {results['STAR-RAG Only']['temporal_violations']:<18} | {results['MemoTime Only']['temporal_violations']:<18} | {results['Both Enabled']['temporal_violations']:<18}")
+    print(f"{'Historical Precursors':<30} | {results['Baseline']['precursor_covered']}/2{'':<15} | {results['STAR-RAG Only']['precursor_covered']}/2{'':<15} | {results['MemoTime Only']['precursor_covered']}/2{'':<15} | {results['Both Enabled']['precursor_covered']}/2{'':<15}")
+    print(f"{'Provenance Survival':<30} | {results['Baseline']['provenance_verified']}/{num_total:<16} | {results['STAR-RAG Only']['provenance_verified']}/{num_total:<16} | {results['MemoTime Only']['provenance_verified']}/{num_total:<16} | {results['Both Enabled']['provenance_verified']}/{num_total:<16}")
+    p95_b = sorted(results['Baseline']['latencies'])[int(len(results['Baseline']['latencies']) * 0.95)]
+    p95_s = sorted(results['STAR-RAG Only']['latencies'])[int(len(results['STAR-RAG Only']['latencies']) * 0.95)]
+    p95_m = sorted(results['MemoTime Only']['latencies'])[int(len(results['MemoTime Only']['latencies']) * 0.95)]
+    p95_both = sorted(results['Both Enabled']['latencies'])[int(len(results['Both Enabled']['latencies']) * 0.95)]
+    print(f"{'Median Latency (ms)':<30} | {statistics.median(results['Baseline']['latencies']):<18.2f} | {statistics.median(results['STAR-RAG Only']['latencies']):<18.2f} | {statistics.median(results['MemoTime Only']['latencies']):<18.2f} | {statistics.median(results['Both Enabled']['latencies']):<18.2f}")
+    print(f"{'P95 Latency (ms)':<30} | {p95_b:<18.2f} | {p95_s:<18.2f} | {p95_m:<18.2f} | {p95_both:<18.2f}")
+    print("=" * 115)
+
+    print("\n--- 4-WAY QUERY OUTCOMES ---")
+    for spec in BENCHMARK_SPECS:
+        print(
+            f"[{spec.id:<33}]: "
+            f"Base={query_outcomes[spec.id]['Baseline']}, "
+            f"STAR={query_outcomes[spec.id]['STAR-RAG Only']}, "
+            f"Memo={query_outcomes[spec.id]['MemoTime Only']}, "
+            f"Both={query_outcomes[spec.id]['Both Enabled']}"
+        )

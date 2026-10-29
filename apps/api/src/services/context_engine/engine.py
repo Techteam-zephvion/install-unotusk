@@ -81,17 +81,36 @@ class ProjectContextEngine:
             if enable_star_rag is not None
             else getattr(settings, "STAR_RAG_ENABLED", False)
         )
+        star_rag_diagnostics: dict[str, Any] = {}
+        star_rag_applied = False
         if use_star_rag:
             try:
                 from apps.api.src.services.context_engine.star_rag import StarRagContextService
 
-                expanded_candidates = StarRagContextService.apply_star_rag(
+                star_res = StarRagContextService.run_star_rag_pipeline(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
                     query_text=question,
                 )
-            except Exception:
-                pass
+                expanded_candidates = star_res.candidates
+                star_rag_applied = not star_res.is_fallback
+                star_rag_diagnostics = {
+                    "is_fallback": star_res.is_fallback,
+                    "fallback_reason": star_res.fallback_reason,
+                    "top_rules_count": len(star_res.top_rules),
+                    "rule_nodes_count": len(star_res.rule_nodes),
+                    "selected_edges_count": len(star_res.selected_edges),
+                    "initial_mdl_cost": round(star_res.initial_mdl_cost, 2),
+                    "final_mdl_cost": round(star_res.final_mdl_cost, 2),
+                }
+            except Exception as exc:
+                star_rag_applied = False
+                star_rag_diagnostics = {
+                    "exception_occurred": True,
+                    "is_fallback": True,
+                    "fallback_reason": str(exc),
+                    "error": str(exc),
+                }
 
         # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614)
         use_memotime = (
@@ -196,7 +215,8 @@ class ProjectContextEngine:
                 "top_score": ranked[0].score if ranked else 0.0,
                 "memotime_used": memotime_success if use_memotime else False,
                 "memotime_diagnostics": memotime_diagnostics,
-                "star_rag_used": use_star_rag,
+                "star_rag_used": star_rag_applied if use_star_rag else False,
+                "star_rag_diagnostics": star_rag_diagnostics,
             }
         )
 

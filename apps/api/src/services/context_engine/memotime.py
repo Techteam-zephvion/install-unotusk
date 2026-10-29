@@ -173,7 +173,12 @@ class TemporalBound:
         if e2.tzinfo is None:
             e2 = e2.replace(tzinfo=UTC)
 
-        return max(s1, s2) <= min(e1, e2)
+        if max(s1, s2) == min(e1, e2):
+            if e1 <= s2:
+                return self.is_end_inclusive and other.is_start_inclusive
+            else:
+                return other.is_end_inclusive and self.is_start_inclusive
+        return max(s1, s2) < min(e1, e2)
 
 
 @dataclass
@@ -527,85 +532,155 @@ class MemoTimeService:
                 for match in _COMMIT_SHA_REGEX.finditer(q_text):
                     ref_commits.append(match.group(1))
 
-            ref_commit = ref_commits[0].strip().lower() if ref_commits else None
-            if not ref_commit:
-                diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
-                return MemoTimeRetrievalResult(
-                    candidates=resolved,
-                    strategy_used=strategy,
-                    tree_of_time=tree,
-                    is_fallback=True,
-                    fallback_reason="No commit SHA specified for diff retrieval",
-                    diagnostics=diagnostics,
-                )
+            if len(ref_commits) >= 2:
+                base_sha = ref_commits[0].strip().lower()
+                target_sha = ref_commits[1].strip().lower()
 
-            # Match candidates against commit SHA (exact or prefix)
-            matching_shas: dict[str, list[RetrievedCandidate]] = {}
-            for c in resolved:
-                c_sha = str(
-                    c.metadata.get("commit_sha")
-                    or (c.metadata.get("provenance") or {}).get("commit_sha")
-                    or ""
-                ).strip().lower()
-                if c_sha and (c_sha == ref_commit or c_sha.startswith(ref_commit)):
-                    matching_shas.setdefault(c_sha, []).append(c)
+                target_cands = []
+                base_cands = []
+                other_cands = []
 
-            # Ambiguous commit SHA prefix check
-            if len(matching_shas) > 1:
-                diagnostics["ambiguous_commits"] = sorted(matching_shas.keys())
-                return MemoTimeRetrievalResult(
-                    candidates=resolved,
-                    strategy_used=strategy,
-                    tree_of_time=tree,
-                    is_fallback=True,
-                    fallback_reason=f"Ambiguous commit SHA prefix '{ref_commit}': matches multiple commits ({sorted(matching_shas.keys())[:3]})",
-                    diagnostics=diagnostics,
-                )
+                for c in resolved:
+                    c_sha = str(
+                        c.metadata.get("commit_sha")
+                        or (c.metadata.get("provenance") or {}).get("commit_sha")
+                        or ""
+                    ).strip().lower()
 
-            if len(matching_shas) == 0:
-                diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
-                diagnostics["missing_commit"] = ref_commit
-                return MemoTimeRetrievalResult(
-                    candidates=resolved,
-                    strategy_used=strategy,
-                    tree_of_time=tree,
-                    is_fallback=True,
-                    fallback_reason=f"Commit SHA '{ref_commit}' not found in candidate corpus",
-                    diagnostics=diagnostics,
-                )
+                    if c_sha and (c_sha == target_sha or c_sha.startswith(target_sha)):
+                        diff_ev = cls.extract_diff_evidence(c)
+                        c.metadata["diff_evidence"] = diff_ev
+                        c.metadata["memotime_strategy"] = "DIFF"
+                        c.metadata["memotime_diff_role"] = "target"
+                        c.signals["memotime_diff_match"] = 1.0
+                        c.signals["memotime_temporal_match"] = 1.0
+                        c.signals["memotime_diff_lines"] = float(
+                            len(diff_ev.get("added_lines", [])) + len(diff_ev.get("deleted_lines", []))
+                        )
+                        target_cands.append(c)
+                        applied_count += 1
+                    elif c_sha and (c_sha == base_sha or c_sha.startswith(base_sha)):
+                        diff_ev = cls.extract_diff_evidence(c)
+                        c.metadata["diff_evidence"] = diff_ev
+                        c.metadata["memotime_strategy"] = "DIFF"
+                        c.metadata["memotime_diff_role"] = "base"
+                        c.signals["memotime_temporal_match"] = 0.8
+                        base_cands.append(c)
+                        applied_count += 1
+                    else:
+                        other_cands.append(c)
 
-            target_sha = next(iter(matching_shas.keys()))
-            matched_cands = []
-            unmatched_cands = []
-
-            for c in resolved:
-                c_sha = str(
-                    c.metadata.get("commit_sha")
-                    or (c.metadata.get("provenance") or {}).get("commit_sha")
-                    or ""
-                ).strip().lower()
-                if c_sha == target_sha:
-                    diff_ev = cls.extract_diff_evidence(c)
-                    c.metadata["diff_evidence"] = diff_ev
-                    c.metadata["memotime_strategy"] = "DIFF"
-                    c.signals["memotime_diff_match"] = 1.0
-                    c.signals["memotime_temporal_match"] = 1.0
-                    c.signals["memotime_diff_lines"] = float(
-                        len(diff_ev.get("added_lines", [])) + len(diff_ev.get("deleted_lines", []))
+                if not target_cands and not base_cands:
+                    diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
+                    diagnostics["missing_commits"] = [base_sha, target_sha]
+                    return MemoTimeRetrievalResult(
+                        candidates=resolved,
+                        strategy_used=strategy,
+                        tree_of_time=tree,
+                        is_fallback=True,
+                        fallback_reason=f"Neither commit '{base_sha}' nor '{target_sha}' found in candidate corpus",
+                        diagnostics=diagnostics,
                     )
-                    matched_cands.append(c)
-                    applied_count += 1
-                else:
-                    unmatched_cands.append(c)
 
-            diff_node = tree.nodes.get("node_diff")
-            if diff_node:
-                diff_node.evidence_candidates = matched_cands
-                diff_node.resolution_status = ResolutionStatus.RESOLVED
+                n_base = tree.nodes.get("node_diff_base")
+                if n_base:
+                    n_base.evidence_candidates = base_cands
+                    n_base.resolution_status = (
+                        ResolutionStatus.RESOLVED if base_cands else ResolutionStatus.NO_EVIDENCE
+                    )
+                n_target = tree.nodes.get("node_diff_target")
+                if n_target:
+                    n_target.evidence_candidates = target_cands
+                    n_target.resolution_status = (
+                        ResolutionStatus.RESOLVED if target_cands else ResolutionStatus.NO_EVIDENCE
+                    )
 
-            final_cands = matched_cands + unmatched_cands
-            diagnostics["matched_commit_sha"] = target_sha
-            diagnostics["matched_candidates_count"] = len(matched_cands)
+                final_cands = target_cands + base_cands + other_cands
+                diagnostics["matched_base_commit"] = base_sha
+                diagnostics["matched_target_commit"] = target_sha
+                diagnostics["target_candidates_count"] = len(target_cands)
+                diagnostics["base_candidates_count"] = len(base_cands)
+
+            else:
+                ref_commit = ref_commits[0].strip().lower() if ref_commits else None
+                if not ref_commit:
+                    diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
+                    return MemoTimeRetrievalResult(
+                        candidates=resolved,
+                        strategy_used=strategy,
+                        tree_of_time=tree,
+                        is_fallback=True,
+                        fallback_reason="No commit SHA specified for diff retrieval",
+                        diagnostics=diagnostics,
+                    )
+
+                # Match candidates against commit SHA (exact or prefix)
+                matching_shas: dict[str, list[RetrievedCandidate]] = {}
+                for c in resolved:
+                    c_sha = str(
+                        c.metadata.get("commit_sha")
+                        or (c.metadata.get("provenance") or {}).get("commit_sha")
+                        or ""
+                    ).strip().lower()
+                    if c_sha and (c_sha == ref_commit or c_sha.startswith(ref_commit)):
+                        matching_shas.setdefault(c_sha, []).append(c)
+
+                # Ambiguous commit SHA prefix check
+                if len(matching_shas) > 1:
+                    diagnostics["ambiguous_commits"] = sorted(matching_shas.keys())
+                    return MemoTimeRetrievalResult(
+                        candidates=resolved,
+                        strategy_used=strategy,
+                        tree_of_time=tree,
+                        is_fallback=True,
+                        fallback_reason=f"Ambiguous commit SHA prefix '{ref_commit}': matches multiple commits ({sorted(matching_shas.keys())[:3]})",
+                        diagnostics=diagnostics,
+                    )
+
+                if len(matching_shas) == 0:
+                    diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
+                    diagnostics["missing_commit"] = ref_commit
+                    return MemoTimeRetrievalResult(
+                        candidates=resolved,
+                        strategy_used=strategy,
+                        tree_of_time=tree,
+                        is_fallback=True,
+                        fallback_reason=f"Commit SHA '{ref_commit}' not found in candidate corpus",
+                        diagnostics=diagnostics,
+                    )
+
+                target_sha = next(iter(matching_shas.keys()))
+                matched_cands = []
+                unmatched_cands = []
+
+                for c in resolved:
+                    c_sha = str(
+                        c.metadata.get("commit_sha")
+                        or (c.metadata.get("provenance") or {}).get("commit_sha")
+                        or ""
+                    ).strip().lower()
+                    if c_sha == target_sha:
+                        diff_ev = cls.extract_diff_evidence(c)
+                        c.metadata["diff_evidence"] = diff_ev
+                        c.metadata["memotime_strategy"] = "DIFF"
+                        c.signals["memotime_diff_match"] = 1.0
+                        c.signals["memotime_temporal_match"] = 1.0
+                        c.signals["memotime_diff_lines"] = float(
+                            len(diff_ev.get("added_lines", [])) + len(diff_ev.get("deleted_lines", []))
+                        )
+                        matched_cands.append(c)
+                        applied_count += 1
+                    else:
+                        unmatched_cands.append(c)
+
+                diff_node = tree.nodes.get("node_diff")
+                if diff_node:
+                    diff_node.evidence_candidates = matched_cands
+                    diff_node.resolution_status = ResolutionStatus.RESOLVED
+
+                final_cands = matched_cands + unmatched_cands
+                diagnostics["matched_commit_sha"] = target_sha
+                diagnostics["matched_candidates_count"] = len(matched_cands)
 
         elif strategy == TemporalIntentType.EVOLUTION:
             # Sort candidates chronologically to map into ToT phases
@@ -802,6 +877,21 @@ class MemoTimeService:
                     elif "ADD" in change_type:
                         added = [line_item for line_item in lines if line_item.strip()]
 
+        # Fallback to local git repository history if diff lines are empty but commit SHA is available
+        if not added and not deleted and commit_sha and len(commit_sha) >= 7 and path:
+            try:
+                from apps.api.src.services.code_atom.git_extractor import extract_git_patch_lines
+
+                git_added, git_deleted, git_range = extract_git_patch_lines(".", commit_sha, path)
+                if git_added or git_deleted:
+                    added = git_added
+                    deleted = git_deleted
+                    if git_range and line_range is None:
+                        line_range = git_range
+                        start_line, end_line = git_range
+            except Exception:
+                pass
+
         is_empty = (len(added) == 0 and len(deleted) == 0)
 
         return {
@@ -843,15 +933,45 @@ class MemoTimeService:
         """
         Computes the exact Allen interval algebra relation between interval A and interval B.
         Returns None if either interval is invalid.
+        Accurately handles open-ended ongoing intervals where end is None.
         """
         if not a.is_valid() or not b.is_valid():
             return None
 
-        # Normalize endpoints with UTC
+        # Handle open-ended intervals (ongoing active code)
+        if a.end is None and b.end is None:
+            s_a = (a.start or datetime.min).replace(tzinfo=UTC) if not a.start or not a.start.tzinfo else a.start
+            s_b = (b.start or datetime.min).replace(tzinfo=UTC) if not b.start or not b.start.tzinfo else b.start
+            if s_a == s_b:
+                return AllenIntervalRelation.EQUALS
+            if s_a < s_b:
+                return AllenIntervalRelation.OVERLAPS
+            return AllenIntervalRelation.OVERLAPPED_BY
+
+        if a.end is None and b.end is not None:
+            s_a = (a.start or datetime.min).replace(tzinfo=UTC) if not a.start or not a.start.tzinfo else a.start
+            s_b = (b.start or datetime.min).replace(tzinfo=UTC) if not b.start or not b.start.tzinfo else b.start
+            e_b = b.end if b.end.tzinfo else b.end.replace(tzinfo=UTC)
+
+            if s_a < s_b:
+                return AllenIntervalRelation.CONTAINS
+            if s_a == s_b:
+                return AllenIntervalRelation.STARTED_BY
+            if s_a < e_b:
+                return AllenIntervalRelation.OVERLAPPED_BY
+            if s_a == e_b:
+                return AllenIntervalRelation.MET_BY
+            return AllenIntervalRelation.AFTER
+
+        if b.end is None and a.end is not None:
+            inv_res = cls.compute_allen_relation(b, a)
+            return inv_res.inverse if inv_res else None
+
+        # Both intervals have explicit end bounds
         s_a = (a.start or datetime.min).replace(tzinfo=UTC) if not a.start or not a.start.tzinfo else a.start
-        e_a = (a.end or datetime.max).replace(tzinfo=UTC) if not a.end or not a.end.tzinfo else a.end
+        e_a = a.end if a.end.tzinfo else a.end.replace(tzinfo=UTC)
         s_b = (b.start or datetime.min).replace(tzinfo=UTC) if not b.start or not b.start.tzinfo else b.start
-        e_b = (b.end or datetime.max).replace(tzinfo=UTC) if not b.end or not b.end.tzinfo else b.end
+        e_b = b.end if b.end.tzinfo else b.end.replace(tzinfo=UTC)
 
         # 1. EQUALS: start_A == start_B and end_A == end_B
         if s_a == s_b and e_a == e_b:
@@ -906,6 +1026,20 @@ class MemoTimeService:
             return AllenIntervalRelation.OVERLAPPED_BY
 
         return None
+
+    @classmethod
+    def matches_allen_relation(
+        cls, a: TemporalBound, b: TemporalBound, relation: AllenIntervalRelation
+    ) -> bool:
+        """
+        Evaluates whether interval A satisfies the designated Allen interval algebra relation with interval B.
+        Supports all 13 relations and handles inverse consistency:
+        matches_allen_relation(a, b, r) == matches_allen_relation(b, a, r.inverse).
+        """
+        computed = cls.compute_allen_relation(a, b)
+        if computed is None:
+            return False
+        return computed == relation
 
     @classmethod
     def parse_temporal_intent(
@@ -986,7 +1120,87 @@ class MemoTimeService:
                     ambiguity_reason="Inverted temporal interval bounds.",
                 )
 
-        # 1. INTERVAL: Bounded date or commit window
+        # Check for compound "after Date1 and before Date2" (or "since Date1 prior to Date2")
+        if has_after and has_before and len(parsed_dates) >= 2:
+            after_pos = min(
+                q_lower.find("after") if "after" in q_lower else 99999,
+                q_lower.find("since") if "since" in q_lower else 99999,
+            )
+            before_pos = min(
+                q_lower.find("before") if "before" in q_lower else 99999,
+                q_lower.find("prior") if "prior" in q_lower else 99999,
+            )
+
+            d1, d2 = parsed_dates[0], parsed_dates[1]
+            d1_str, d2_str = dates_found[0], dates_found[1]
+            pos1 = q_lower.find(d1_str.lower())
+            pos2 = q_lower.find(d2_str.lower())
+
+            if after_pos < before_pos:
+                start_dt, end_dt = (d1, d2) if pos1 < pos2 else (d2, d1)
+            else:
+                end_dt, start_dt = (d1, d2) if pos1 < pos2 else (d2, d1)
+
+            if start_dt > end_dt:
+                return StructuredTemporalIntent(
+                    intent_type=TemporalIntentType.AMBIGUOUS,
+                    is_temporal=True,
+                    confidence=0.3,
+                    raw_query=query_text,
+                    detected_keywords=detected_keywords,
+                    is_ambiguous=True,
+                    is_contradictory=True,
+                    contradiction_reason=f"Temporal constraint contradiction: start bound ({start_dt.date()}) is after end bound ({end_dt.date()}).",
+                    ambiguity_reason="Contradictory inverted temporal bounds (after Date1 before Date2 where Date1 > Date2).",
+                )
+            else:
+                constraint = TemporalConstraint(
+                    constraint_id="c_interval_0",
+                    operator="INTERVAL",
+                    target_entity=entities[0] if entities else "code",
+                    bound=TemporalBound(start=start_dt, end=end_dt),
+                    description=f"Bounded window between {start_dt.date()} and {end_dt.date()}",
+                )
+                return StructuredTemporalIntent(
+                    intent_type=TemporalIntentType.INTERVAL,
+                    is_temporal=True,
+                    confidence=0.95,
+                    constraints=[constraint],
+                    detected_keywords=detected_keywords or ["after", "before", "interval"],
+                    raw_query=query_text,
+                    reference_commits=commits_found,
+                    target_entities=entities,
+                )
+
+        # 1. DIFF: Multi-commit revision comparison (e.g., "compare A vs B", "what changed between commit A and commit B")
+        has_comparison_cue = has_diff or bool(
+            re.search(
+                r"\b(compare|comparison|changes\s+between|what\s+changed|diff\s+between|vs\.?)\b",
+                q_lower,
+            )
+        )
+        if len(commits_found) >= 2 and (has_comparison_cue or ("commit" in words and has_between)):
+            c_base = commits_found[0]
+            c_target = commits_found[1]
+            constraint = TemporalConstraint(
+                constraint_id="c_diff_0",
+                operator="DIFF",
+                target_entity=entities[0] if entities else "commit",
+                bound=TemporalBound(reference_commit=c_target),
+                description=f"Compare base commit {c_base} to target commit {c_target}",
+            )
+            return StructuredTemporalIntent(
+                intent_type=TemporalIntentType.DIFF,
+                is_temporal=True,
+                confidence=0.98,
+                constraints=[constraint],
+                detected_keywords=detected_keywords or ["diff", "compare"],
+                raw_query=query_text,
+                reference_commits=[c_base, c_target],
+                target_entities=entities,
+            )
+
+        # 2. INTERVAL: Bounded date or commit window
         if has_between and (len(parsed_dates) >= 2 or len(commits_found) >= 2):
             c_start = commits_found[0] if commits_found else None
             c_end = commits_found[1] if len(commits_found) > 1 else None
@@ -1011,13 +1225,13 @@ class MemoTimeService:
                 target_entities=entities,
             )
 
-        # 2. DIFF: Commit or changeset inspection
+        # 3. DIFF: Single commit or changeset inspection
         if (
             (has_diff or ("commit" in words and len(commits_found) >= 1))
             and not has_evolution
             and not has_between
-            and not has_before
-            and not has_after
+            and not (has_before and not has_diff)
+            and not (has_after and not has_diff)
         ):
             c_sha = commits_found[0] if commits_found else None
             constraint = TemporalConstraint(
@@ -1255,6 +1469,43 @@ class MemoTimeService:
             )
             tree.add_node(n_sub)
 
+        elif intent.intent_type == TemporalIntentType.DIFF:
+            if len(intent.reference_commits) >= 2:
+                c_base = intent.reference_commits[0]
+                c_target = intent.reference_commits[1]
+                n_base = TimeTreeNode(
+                    node_id="node_diff_base",
+                    query_subquestion=f"What was the implementation state in base commit {c_base}?",
+                    intent_type=TemporalIntentType.HISTORICAL,
+                    temporal_bound=TemporalBound(reference_commit=c_base),
+                    target_entities=list(intent.target_entities),
+                    parent_id="root",
+                    ordering_index=0,
+                )
+                n_target = TimeTreeNode(
+                    node_id="node_diff_target",
+                    query_subquestion=f"What changes were introduced in target commit {c_target}?",
+                    intent_type=TemporalIntentType.DIFF,
+                    temporal_bound=TemporalBound(reference_commit=c_target),
+                    target_entities=list(intent.target_entities),
+                    parent_id="root",
+                    ordering_index=1,
+                )
+                tree.add_node(n_base)
+                tree.add_node(n_target)
+            else:
+                c_ref = intent.reference_commits[0] if intent.reference_commits else "designated commit"
+                n_diff = TimeTreeNode(
+                    node_id="node_diff",
+                    query_subquestion=f"What changes were introduced in {entities_str} in commit {c_ref}?",
+                    intent_type=TemporalIntentType.DIFF,
+                    temporal_bound=TemporalBound(reference_commit=c_ref) if intent.reference_commits else None,
+                    target_entities=list(intent.target_entities),
+                    parent_id="root",
+                    ordering_index=0,
+                )
+                tree.add_node(n_diff)
+
         elif intent.intent_type == TemporalIntentType.AMBIGUOUS:
             root_node.resolution_status = (
                 ResolutionStatus.CONTRADICTORY if intent.is_contradictory else ResolutionStatus.AMBIGUOUS
@@ -1282,30 +1533,45 @@ class MemoTimeService:
     def validate_multi_entity_bounds(
         cls,
         entity_bounds: dict[str, TemporalBound],
-        dependencies: list[tuple[str, str]] | None = None,
+        dependencies: list[Any] | None = None,
         coexistence_pairs: list[tuple[str, str]] | None = None,
+        max_depth: int | None = None,
     ) -> tuple[bool, list[str]]:
         """
         Validates multi-entity temporal compatibility:
         1. Dependency introduction: If dependent entity A depends on B, B must exist before A ended.
         2. Transitive dependencies: Computes multi-hop paths (A -> B -> C) and verifies that
-           all transitive dependencies existed before dependent entities ended.
+           all transitive dependencies existed before dependent entities ended, and checks
+           whole-path lifetime intersection across bounded hops.
         3. Coexistence: If entities A and B must coexist, their temporal intervals must overlap.
         """
+        from apps.api.src.config.settings import settings
+
+        max_hops = max_depth or getattr(settings, "MEMOTIME_MAX_PROPAGATION_HOPS", 5)
         errors: list[str] = []
 
         if dependencies:
             dep_graph: dict[str, set[str]] = {}
+            dep_rel_types: dict[tuple[str, str], str] = {}
             name_map: dict[str, str] = {}
-            for dep_ent, ref_ent in dependencies:
-                dep_k = dep_ent.lower().strip()
-                ref_k = ref_ent.lower().strip()
+            for item in dependencies:
+                if isinstance(item, (tuple, list)) and len(item) >= 3:
+                    dep_ent, ref_ent, r_type = item[0], item[1], item[2]
+                elif isinstance(item, (tuple, list)) and len(item) >= 2:
+                    dep_ent, ref_ent = item[0], item[1]
+                    r_type = "DEPENDS_ON"
+                else:
+                    continue
+
+                dep_k = str(dep_ent).lower().strip()
+                ref_k = str(ref_ent).lower().strip()
                 if dep_k and ref_k:
                     dep_graph.setdefault(dep_k, set()).add(ref_k)
-                    name_map.setdefault(dep_k, dep_ent.strip())
-                    name_map.setdefault(ref_k, ref_ent.strip())
+                    dep_rel_types[(dep_k, ref_k)] = str(r_type).strip().upper()
+                    name_map.setdefault(dep_k, str(dep_ent).strip())
+                    name_map.setdefault(ref_k, str(ref_ent).strip())
 
-            # Transitive reachability paths up to 5 hops
+            # Transitive reachability paths up to max_hops
             paths: list[list[str]] = []
             for start_k in dep_graph:
                 queue = [[start_k]]
@@ -1314,7 +1580,7 @@ class MemoTimeService:
                     last = curr_path[-1]
                     if len(curr_path) > 1:
                         paths.append(curr_path)
-                    if len(curr_path) < 5:
+                    if len(curr_path) < max_hops:
                         for nxt in dep_graph.get(last, set()):
                             if nxt not in curr_path:
                                 queue.append(curr_path + [nxt])
@@ -1329,11 +1595,13 @@ class MemoTimeService:
                     if b_dep.end and b_ref.start and b_ref.start > b_dep.end:
                         dep_name = name_map.get(dep_k, dep_k)
                         ref_name = name_map.get(ref_k, ref_k)
-                        hop_str = (
-                            f" ({len(path) - 1}-hop: {' -> '.join(name_map.get(p, p) for p in path)})"
-                            if len(path) > 2
-                            else ""
-                        )
+                        chain_parts = [name_map.get(path[0], path[0])]
+                        for i in range(len(path) - 1):
+                            r_type = dep_rel_types.get((path[i], path[i + 1]), "DEPENDS_ON")
+                            chain_parts.append(f"-[{r_type}]-> {name_map.get(path[i + 1], path[i + 1])}")
+                        path_str = " ".join(chain_parts)
+
+                        hop_str = f" ({len(path) - 1}-hop: {path_str})" if len(path) > 2 else ""
                         msg = (
                             f"Incompatible multi-entity bounds: entity '{dep_name}' (ends {b_dep.end}) "
                             f"depends on '{ref_name}'{hop_str}, but '{ref_name}' was introduced later at {b_ref.start}."
@@ -1360,20 +1628,21 @@ class MemoTimeService:
         candidates: list[RetrievedCandidate],
         tree: TreeOfTime | None = None,
         entity_bounds: dict[str, TemporalBound] | None = None,
-        dependencies: list[tuple[str, str]] | None = None,
+        dependencies: list[Any] | None = None,
         coexistence_pairs: list[tuple[str, str]] | None = None,
+        max_depth: int | None = None,
     ) -> tuple[list[RetrievedCandidate], list[str]]:
         """
         Propagates temporal constraints across connected code entities:
         1. Traces dependency edges via DEPENDENCY candidates, relationship_path,
            connected_from, and explicit dependencies.
-        2. Computes transitive multi-hop dependency paths (A -> B -> C).
+        2. Computes transitive multi-hop dependency paths (A -> B -> C) up to max_depth.
         3. Detects incompatible timelines and sets memotime_temporal_mismatch on violating candidates.
         4. Preserves candidate provenance throughout propagation.
         5. Handles missing timestamps safely as UNBOUNDED_TEMPORAL without fabricating errors.
         """
         bounds: dict[str, TemporalBound] = dict(entity_bounds or {})
-        explicit_deps: list[tuple[str, str]] = list(dependencies or [])
+        explicit_deps: list[Any] = list(dependencies or [])
         explicit_coexist: list[tuple[str, str]] = list(coexistence_pairs or [])
 
         # 1. Extract bounds from Tree of Time nodes and constraints
@@ -1461,20 +1730,23 @@ class MemoTimeService:
                             explicit_deps.append((target, dep))
 
         # Deduplicate dependencies
-        clean_deps: list[tuple[str, str]] = []
+        clean_deps: list[Any] = []
         seen_dep: set[tuple[str, str]] = set()
-        for u, v in explicit_deps:
-            pair = (u.strip(), v.strip())
-            pair_lower = (pair[0].lower(), pair[1].lower())
-            if pair[0] and pair[1] and pair_lower[0] != pair_lower[1] and pair_lower not in seen_dep:
-                seen_dep.add(pair_lower)
-                clean_deps.append(pair)
+        for item in explicit_deps:
+            if isinstance(item, (tuple, list)) and len(item) >= 2:
+                u, v = str(item[0]).strip(), str(item[1]).strip()
+                r_type = str(item[2]).strip() if len(item) >= 3 else "DEPENDS_ON"
+                pair_lower = (u.lower(), v.lower())
+                if u and v and pair_lower[0] != pair_lower[1] and pair_lower not in seen_dep:
+                    seen_dep.add(pair_lower)
+                    clean_deps.append((u, v, r_type))
 
         # 3. Validate bounds across dependency graph (including multi-hop transitive paths)
         is_valid, errors = cls.validate_multi_entity_bounds(
             entity_bounds=bounds,
             dependencies=clean_deps,
             coexistence_pairs=explicit_coexist,
+            max_depth=max_depth,
         )
 
         # 4. Surface mismatch signals on violating candidates
@@ -1485,7 +1757,8 @@ class MemoTimeService:
                 for ent_key in bounds:
                     if f"'{ent_key}'" in err_lower or f"'{ent_key}." in err_lower or f" {ent_key} " in err_lower:
                         mismatched_names.add(ent_key)
-                for u, v in clean_deps:
+                for item in clean_deps:
+                    u, v = str(item[0]), str(item[1])
                     if u.lower() in err_lower:
                         mismatched_names.add(u.lower())
                     if v.lower() in err_lower:
@@ -1538,6 +1811,22 @@ class MemoTimeService:
                         errors.append(
                             f"Non-monotonic temporal progression between node '{curr_n.node_id}' (ends {curr_n.temporal_bound.end}) "
                             f"and '{next_n.node_id}' (starts {next_n.temporal_bound.start})."
+                        )
+
+        # Check child interval encapsulation within parent interval
+        for node in tree.nodes.values():
+            if node.parent_id and node.parent_id in tree.nodes:
+                p_node = tree.nodes[node.parent_id]
+                if p_node.temporal_bound and node.temporal_bound:
+                    pb = p_node.temporal_bound
+                    cb = node.temporal_bound
+                    if pb.start and cb.start and cb.start < pb.start:
+                        errors.append(
+                            f"Child node '{node.node_id}' start ({cb.start}) escapes parent '{p_node.node_id}' start ({pb.start})."
+                        )
+                    if pb.end and cb.end and cb.end > pb.end:
+                        errors.append(
+                            f"Child node '{node.node_id}' end ({cb.end}) escapes parent '{p_node.node_id}' end ({pb.end})."
                         )
 
         # Check cross-entity dependency bounds in constraints
