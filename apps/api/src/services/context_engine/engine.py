@@ -31,6 +31,7 @@ class ProjectContextEngine:
         thinking_tier: str | None = None,
         repository_id: uuid.UUID | None = None,
         enable_star_rag: bool | None = None,
+        enable_memotime: bool | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -84,6 +85,24 @@ class ProjectContextEngine:
                 from apps.api.src.services.context_engine.star_rag import StarRagContextService
 
                 expanded_candidates = StarRagContextService.apply_star_rag(
+                    candidates=expanded_candidates,
+                    analyzed_query=analyzed,
+                    query_text=question,
+                )
+            except Exception:
+                pass
+
+        # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614)
+        use_memotime = (
+            enable_memotime
+            if enable_memotime is not None
+            else getattr(settings, "MEMOTIME_ENABLED", False)
+        )
+        if use_memotime:
+            try:
+                from apps.api.src.services.context_engine.memotime import MemoTimeService
+
+                expanded_candidates = MemoTimeService.apply_memotime_retrieval(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
                     query_text=question,
@@ -153,6 +172,8 @@ class ProjectContextEngine:
                 "candidates_expanded": len(expanded_candidates),
                 "customer_knowledge_count": len(knowledge_records),
                 "top_score": ranked[0].score if ranked else 0.0,
+                "memotime_used": use_memotime,
+                "star_rag_used": use_star_rag,
             }
         )
 

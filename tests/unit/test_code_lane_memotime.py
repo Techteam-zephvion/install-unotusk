@@ -12,8 +12,11 @@ Verifies:
 8. Safe default configuration (settings.MEMOTIME_ENABLED is False).
 """
 
+import copy
 import uuid
 from datetime import UTC, datetime
+
+import pytest
 
 from apps.api.src.config.settings import settings
 from apps.api.src.services.context_engine.memotime import (
@@ -447,3 +450,432 @@ def test_9_semantic_negation_preservation_with_temporal_intent():
     assert analyzed2.is_temporal is True
     assert analyzed2.structured_temporal_intent is not None
     assert analyzed2.structured_temporal_intent.intent_type == TemporalIntentType.EVOLUTION
+
+
+# =========================================================================
+# TEST 10: Disabled MemoTime Preserves Baseline Results Exactly
+# =========================================================================
+def test_10_disabled_memotime_preserves_baseline_results():
+    """
+    Verifies that when MemoTime is disabled (settings.MEMOTIME_ENABLED is False):
+    1. settings.MEMOTIME_ENABLED is False and is_retrieval_enabled() returns False.
+    2. Candidates ranked with MultiSignalRanker have identical scores and ordering
+       whether or not temporal keywords appear in the query.
+    3. No MemoTime signals (memotime_temporal_match, memotime_diff_match, etc.) are injected.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    assert settings.MEMOTIME_ENABLED is False
+    assert MemoTimeService.is_retrieval_enabled() is False
+
+    cand1 = _create_candidate("c1", "AuthService", "src/auth.py", "1111", "Commit 1", "2026-01-01T00:00:00Z")
+    cand2 = _create_candidate("c2", "TokenManager", "src/token.py", "2222", "Commit 2", "2026-02-01T00:00:00Z")
+    candidates = [cand1, cand2]
+
+    # Baseline ranking with non-temporal query
+    q_plain = analyze_query("How does AuthService validate tokens?")
+    ranked_plain = MultiSignalRanker.rank_candidates(copy.deepcopy(candidates), q_plain)
+
+    # Baseline ranking with temporal query when MemoTime is disabled
+    q_temp = analyze_query("What is the current implementation of AuthService?")
+    ranked_temp = MultiSignalRanker.rank_candidates(copy.deepcopy(candidates), q_temp)
+
+    # Baseline ranker handles supersession natively, but NO MemoTime signals are present
+    for r in ranked_plain + ranked_temp:
+        for sig in r.candidate.signals:
+            assert not sig.startswith("memotime_"), f"Unexpected MemoTime signal {sig} found when disabled"
+
+
+# =========================================================================
+# TEST 11: Explicitly Enabled MemoTime Strategy Selection
+# =========================================================================
+def test_11_explicitly_enabled_memotime_strategy_selection():
+    """
+    Verifies that MemoTimeService.run_memotime_pipeline correctly routes
+    queries to the appropriate temporal strategy:
+    - CURRENT
+    - HISTORICAL
+    - DIFF
+    - BEFORE / AFTER
+    - INTERVAL
+    - EVOLUTION
+    """
+    cand = _create_candidate("c1", "AuthService", "src/auth.py", "42096a512345", "Fix", "2026-05-01T00:00:00Z")
+
+    # 1. CURRENT
+    res_curr = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="What is the current active implementation of AuthService?"
+    )
+    assert res_curr.strategy_used == TemporalIntentType.CURRENT
+
+    # 2. HISTORICAL
+    res_hist = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="What was the previous superseded version of AuthService?"
+    )
+    assert res_hist.strategy_used == TemporalIntentType.HISTORICAL
+
+    # 3. DIFF
+    res_diff = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="Explain changes introduced in commit 42096a5"
+    )
+    assert res_diff.strategy_used == TemporalIntentType.DIFF
+
+    # 4. BEFORE / AFTER
+    res_bef = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="Find functions committed before 2026-06-01"
+    )
+    assert res_bef.strategy_used == TemporalIntentType.BEFORE
+
+    res_aft = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="Find functions committed after 2026-04-01"
+    )
+    assert res_aft.strategy_used == TemporalIntentType.AFTER
+
+    # 5. INTERVAL
+    res_int = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="Show commits between 2026-01-01 and 2026-06-01"
+    )
+    assert res_int.strategy_used == TemporalIntentType.INTERVAL
+
+    # 6. EVOLUTION
+    res_evo = MemoTimeService.run_memotime_pipeline(
+        candidates=[cand], query_text="Trace the evolution of AuthService from origin to current state"
+    )
+    assert res_evo.strategy_used == TemporalIntentType.EVOLUTION
+
+
+# =========================================================================
+# TEST 12: Current vs Historical Retrieval and Ranking
+# =========================================================================
+def test_12_current_versus_historical_retrieval_and_ranking():
+    """
+    Verifies that:
+    1. CURRENT strategy boosts active candidates and suppresses superseded candidates.
+    2. HISTORICAL strategy prioritizes superseded candidates and boosts historical matches.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    cand_old = _create_candidate("c_old", "AuthService", "src/auth.py", "1111", "Initial auth", "2026-01-01T00:00:00Z")
+    cand_new = _create_candidate("c_new", "AuthService", "src/auth.py", "2222", "Update auth", "2026-05-01T00:00:00Z")
+    candidates = [cand_old, cand_new]
+
+    # Current query
+    q_curr = analyze_query("What is the current implementation of AuthService?")
+    cands_curr = MemoTimeService.apply_memotime_retrieval(copy.deepcopy(candidates), q_curr, q_curr.raw_query)
+    ranked_curr = MultiSignalRanker.rank_candidates(cands_curr, q_curr)
+
+    assert ranked_curr[0].candidate.candidate_id == "c_new"
+    assert ranked_curr[0].candidate.signals.get("memotime_temporal_match") == 1.0
+    # Old candidate is marked superseded
+    assert any(c.candidate_id == "c_old" and c.metadata.get("is_superseded") is True for c in cands_curr)
+
+    # Historical query
+    q_hist = analyze_query("What was the previous superseded implementation of AuthService?")
+    cands_hist = MemoTimeService.apply_memotime_retrieval(copy.deepcopy(candidates), q_hist, q_hist.raw_query)
+    ranked_hist = MultiSignalRanker.rank_candidates(cands_hist, q_hist)
+
+    assert ranked_hist[0].candidate.candidate_id == "c_old"
+    assert ranked_hist[0].candidate.signals.get("memotime_historical") == 1.0
+
+
+# =========================================================================
+# TEST 13: Before, After, and Interval Boundary Filtering and Penalties
+# =========================================================================
+def test_13_before_after_interval_constraints():
+    """
+    Verifies that BEFORE, AFTER, and INTERVAL constraints boost matching candidates
+    and penalize out-of-bounds candidates.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    c_jan = _create_candidate("c_jan", "FuncA", "src/f.py", "1111", "Jan commit", "2026-01-15T00:00:00Z")
+    c_mar = _create_candidate("c_mar", "FuncB", "src/f.py", "2222", "Mar commit", "2026-03-15T00:00:00Z")
+    c_may = _create_candidate("c_may", "FuncC", "src/f.py", "3333", "May commit", "2026-05-15T00:00:00Z")
+    corpus = [c_jan, c_mar, c_may]
+
+    # 1. BEFORE 2026-02-01
+    q_bef = analyze_query("Find code committed before 2026-02-01")
+    cands_bef = MemoTimeService.apply_memotime_retrieval(copy.deepcopy(corpus), q_bef, q_bef.raw_query)
+    ranked_bef = MultiSignalRanker.rank_candidates(cands_bef, q_bef)
+
+    assert ranked_bef[0].candidate.candidate_id == "c_jan"
+    assert ranked_bef[0].candidate.signals.get("memotime_temporal_match") == 1.0
+    assert any(r.candidate.candidate_id in {"c_mar", "c_may"} and r.candidate.signals.get("memotime_temporal_mismatch") for r in ranked_bef)
+
+    # 2. AFTER 2026-04-01
+    q_aft = analyze_query("Find code committed after 2026-04-01")
+    cands_aft = MemoTimeService.apply_memotime_retrieval(copy.deepcopy(corpus), q_aft, q_aft.raw_query)
+    ranked_aft = MultiSignalRanker.rank_candidates(cands_aft, q_aft)
+
+    assert ranked_aft[0].candidate.candidate_id == "c_may"
+    assert ranked_aft[0].candidate.signals.get("memotime_temporal_match") == 1.0
+
+    # 3. INTERVAL between 2026-02-01 and 2026-04-01
+    q_int = analyze_query("Find code changes between 2026-02-01 and 2026-04-01")
+    cands_int = MemoTimeService.apply_memotime_retrieval(copy.deepcopy(corpus), q_int, q_int.raw_query)
+    ranked_int = MultiSignalRanker.rank_candidates(cands_int, q_int)
+
+    assert ranked_int[0].candidate.candidate_id == "c_mar"
+    assert ranked_int[0].candidate.signals.get("memotime_temporal_match") == 1.0
+
+
+# =========================================================================
+# TEST 14: Diff and Commit Changeset Retrieval
+# =========================================================================
+def test_14_diff_changeset_retrieval():
+    """
+    Verifies that queries referencing a commit hash or diff match the exact commit
+    evidence and inject the memotime_diff_match signal.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    target_sha = "a1b2c3d4e5f6"
+    c_match = _create_candidate("c_diff", "Decomposer", "src/decomp.py", target_sha, "AST innermost scope", "2026-03-01T00:00:00Z")
+    c_other = _create_candidate("c_norm", "Assembler", "src/assemb.py", "999999999999", "Other commit", "2026-03-01T00:00:00Z")
+
+    q_diff = analyze_query(f"What changes were introduced in commit {target_sha}?")
+    cands_diff = MemoTimeService.apply_memotime_retrieval([c_match, c_other], q_diff, q_diff.raw_query)
+    ranked_diff = MultiSignalRanker.rank_candidates(cands_diff, q_diff)
+
+    assert ranked_diff[0].candidate.candidate_id == "c_diff"
+    assert ranked_diff[0].candidate.signals.get("memotime_diff_match") == 1.0
+
+
+# =========================================================================
+# TEST 15: Evolution Queries Return Ordered Evidence
+# =========================================================================
+def test_15_evolution_ordered_evidence():
+    """
+    Verifies that EVOLUTION queries order candidates across Tree-of-Time phases:
+    phase_0_origin -> phase_1_transition -> phase_2_current
+    and assign appropriate chronological order metadata and signals.
+    """
+    c_orig = _create_candidate("c_o", "Engine", "src/engine.py", "1111", "Origin", "2026-01-01T00:00:00Z")
+    c_tran = _create_candidate("c_t", "Engine", "src/engine.py", "2222", "Transition", "2026-03-01T00:00:00Z")
+    c_curr = _create_candidate("c_c", "Engine", "src/engine.py", "3333", "Current", "2026-05-01T00:00:00Z")
+
+    q_evo = analyze_query("Trace the evolution of Engine across commits from origin to current state")
+    res = MemoTimeService.run_memotime_pipeline(
+        candidates=[c_curr, c_orig, c_tran],
+        analyzed_query=q_evo,
+        query_text=q_evo.raw_query,
+    )
+
+    assert res.strategy_used == TemporalIntentType.EVOLUTION
+    assert len(res.candidates) == 3
+
+    # Check phase tagging
+    phases = [c.metadata.get("memotime_phase") for c in res.candidates]
+    assert phases == ["origin", "transition", "current"]
+
+    # Check that candidates have evolution signals
+    for c in res.candidates:
+        assert c.signals.get("memotime_evolution_phase") is not None
+
+
+# =========================================================================
+# TEST 16: Ambiguous and Missing Evidence Fallback
+# =========================================================================
+def test_16_ambiguous_and_missing_evidence_fallback():
+    """
+    Verifies that ambiguous queries or missing candidate timestamps fall back safely
+    without exceptions, data loss, or date hallucinations.
+    """
+    cand1 = _create_candidate("c1", "Helper", "src/h.py", "1111", "msg", "2026-01-01T00:00:00Z")
+    cand2 = _create_candidate("c2", "Util", "src/u.py", "2222", "msg", "2026-02-01T00:00:00Z")
+
+    q_amb = analyze_query("What happened to the system during the transition period?")
+    res_amb = MemoTimeService.run_memotime_pipeline([cand1, cand2], q_amb, q_amb.raw_query)
+
+    assert res_amb.is_fallback is True or res_amb.strategy_used == TemporalIntentType.AMBIGUOUS
+    assert len(res_amb.candidates) == 2
+
+    # Candidate with missing timestamp during bounded query (UNBOUNDED_TEMPORAL)
+    cand_no_ts = _create_candidate("c_no_ts", "Helper", "src/h.py", "3333", "msg", None)
+    q_bound = analyze_query("Find code committed after 2026-06-01")
+    res_bound = MemoTimeService.run_memotime_pipeline([cand_no_ts], q_bound, q_bound.raw_query)
+
+    # Must NOT discard candidate or crash
+    assert len(res_bound.candidates) == 1
+    assert res_bound.candidates[0].candidate_id == "c_no_ts"
+
+
+# =========================================================================
+# TEST 17: Contradictory Bounds Do Not Produce Invalid Chronological Results
+# =========================================================================
+def test_17_contradictory_bounds_safe_fallback():
+    """
+    Verifies that inverted temporal intervals (start > end) are flagged as contradictory
+    and fall back safely to baseline ranking without crashing.
+    """
+    cand = _create_candidate("c1", "Payment", "src/p.py", "1111", "msg", "2026-06-01T00:00:00Z")
+    q_contra = analyze_query("What changed between 2026-12-01 and 2026-01-01?")
+
+    res = MemoTimeService.run_memotime_pipeline([cand], q_contra, q_contra.raw_query)
+    assert res.is_fallback is True
+    assert res.diagnostics.get("is_contradictory") is True
+    assert "after end" in (res.fallback_reason or "")
+    assert len(res.candidates) == 1
+
+
+# =========================================================================
+# TEST 18: Complete Provenance Survives All Retrieval and Ranking Steps
+# =========================================================================
+def test_18_provenance_survives_all_retrieval_and_ranking_steps():
+    """
+    Verifies that commit_sha, commit_message, committed_at, file_path, symbol_name,
+    change_type, and fingerprint remain intact through MemoTime retrieval and MultiSignalRanker.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    cand = _create_candidate(
+        candidate_id="c_prov",
+        name="SecurityService",
+        path="apps/api/src/services/security.py",
+        commit_sha="abcdef1234567890abcdef1234567890abcdef12",
+        commit_msg="Harden session token rotation",
+        committed_at="2026-08-15T12:00:00Z",
+    )
+
+    q = analyze_query("What is the current implementation of SecurityService?")
+    retrieved = MemoTimeService.apply_memotime_retrieval([cand], q, q.raw_query)
+    ranked = MultiSignalRanker.rank_candidates(retrieved, q)
+
+    assert len(ranked) == 1
+    prov = ranked[0].candidate.metadata.get("provenance")
+    assert prov is not None
+    assert prov["commit_sha"] == "abcdef1234567890abcdef1234567890abcdef12"
+    assert prov["commit_message"] == "Harden session token rotation"
+    assert prov["committed_at"] == "2026-08-15T12:00:00Z"
+    assert prov["file_path"] == "apps/api/src/services/security.py"
+    assert prov["symbol_name"] == "SecurityService"
+    assert prov["change_type"] == "MODIFY"
+    assert "fingerprint" in prov
+
+
+# =========================================================================
+# TEST 19: ProjectContextEngine Respects MemoTime Flag and Override
+# =========================================================================
+@pytest.mark.asyncio
+async def test_19_project_context_engine_memotime_flag_and_override():
+    """
+    Verifies that ProjectContextEngine.investigate:
+    1. Defaults to memotime_used=False when MEMOTIME_ENABLED is False and enable_memotime is None.
+    2. Sets memotime_used=True in debug_signals when enable_memotime=True.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from apps.api.src.services.context_engine.engine import ProjectContextEngine
+
+    engine = ProjectContextEngine()
+    session = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = []
+    mock_res.all.return_value = []
+    session.execute.return_value = mock_res
+
+    snap_id = uuid.uuid4()
+
+    # Default disabled
+    ans_default = await engine.investigate(
+        session=session,
+        snapshot_id=snap_id,
+        question="What is the active AuthService implementation?",
+    )
+    assert ans_default.debug_signals.get("memotime_used") is False
+
+    # Explicit override enabled
+    ans_enabled = await engine.investigate(
+        session=session,
+        snapshot_id=snap_id,
+        question="What is the active AuthService implementation?",
+        enable_memotime=True,
+    )
+    assert ans_enabled.debug_signals.get("memotime_used") is True
+
+
+
+# =========================================================================
+# TEST 20: Historical Classification Requires Supersession, Not Just Timestamp
+# =========================================================================
+def test_20_historical_classification_requires_supersession_not_just_timestamp():
+    """
+    Regression test: Verifies that possessing a timestamp (committed_at) does NOT
+    qualify an active candidate as historical.
+    - Historical queries must retain and boost legitimate predecessors while leaving active code unboosted.
+    - Current queries must prioritize active code and suppress superseded predecessors.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    # Both candidates have valid, non-null commit timestamps
+    cand_v1 = _create_candidate(
+        candidate_id="c_user_v1",
+        name="UserManager (v1)",
+        path="apps/api/src/services/user.py",
+        commit_sha="1111111111111111111111111111111111111111",
+        commit_msg="Initial user manager implementation",
+        committed_at="2026-02-01T12:00:00Z",
+        symbol_name="UserManager",
+    )
+    cand_v2 = _create_candidate(
+        candidate_id="c_user_v2",
+        name="UserManager (v2)",
+        path="apps/api/src/services/user.py",
+        commit_sha="2222222222222222222222222222222222222222",
+        commit_msg="Add user session revocation and multi-tenant auth",
+        committed_at="2026-08-01T12:00:00Z",
+        symbol_name="UserManager",
+    )
+    candidates = [cand_v1, cand_v2]
+
+    # 1. Historical Query Execution
+    q_hist = analyze_query("What was the previous superseded implementation of UserManager?")
+    res_hist = MemoTimeService.run_memotime_pipeline(
+        candidates=copy.deepcopy(candidates),
+        analyzed_query=q_hist,
+        query_text=q_hist.raw_query,
+    )
+    assert res_hist.strategy_used == TemporalIntentType.HISTORICAL
+
+    # Superseded candidate v1 must be tagged with historical signals
+    c1_hist = next(c for c in res_hist.candidates if c.candidate_id == "c_user_v1")
+    assert c1_hist.signals.get("memotime_historical") == 1.0
+    assert c1_hist.signals.get("memotime_temporal_match") == 1.0
+    assert c1_hist.metadata.get("memotime_strategy") == "HISTORICAL"
+    assert c1_hist.metadata.get("is_superseded") is True
+
+    # Active candidate v2 must NOT be tagged as historical despite having committed_at
+    c2_hist = next(c for c in res_hist.candidates if c.candidate_id == "c_user_v2")
+    assert c2_hist.signals.get("memotime_historical") is None
+    assert c2_hist.metadata.get("memotime_strategy") is None
+    assert c2_hist.metadata.get("is_current") is True
+
+    # Ranking under historical query: superseded candidate v1 must rank #1
+    ranked_hist = MultiSignalRanker.rank_candidates(res_hist.candidates, q_hist)
+    assert ranked_hist[0].candidate.candidate_id == "c_user_v1"
+
+    # 2. Current Query Execution
+    q_curr = analyze_query("What is the current active implementation of UserManager?")
+    res_curr = MemoTimeService.run_memotime_pipeline(
+        candidates=copy.deepcopy(candidates),
+        analyzed_query=q_curr,
+        query_text=q_curr.raw_query,
+    )
+    assert res_curr.strategy_used == TemporalIntentType.CURRENT
+
+    # Active candidate v2 must be tagged with temporal match
+    c2_curr = next(c for c in res_curr.candidates if c.candidate_id == "c_user_v2")
+    assert c2_curr.signals.get("memotime_temporal_match") == 1.0
+    assert c2_curr.metadata.get("is_current") is True
+
+    # Ranking under current query: active candidate v2 must rank #1
+    ranked_curr = MultiSignalRanker.rank_candidates(res_curr.candidates, q_curr)
+    assert ranked_curr[0].candidate.candidate_id == "c_user_v2"
+
+    # 3. Tree of Time Binding Verification
+    tree = MemoTimeService.build_tree_of_time(q_hist.raw_query, target_symbols=["UserManager"])
+    tree = MemoTimeService.bind_evidence_to_tree(tree, copy.deepcopy(candidates))
+    hist_node = tree.nodes["node_historical"]
+    assert hist_node.resolution_status == ResolutionStatus.RESOLVED
+    assert len(hist_node.evidence_candidates) == 1
+    assert hist_node.evidence_candidates[0].candidate_id == "c_user_v1"

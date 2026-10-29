@@ -249,6 +249,19 @@ class TreeOfTime:
         return leaf_nodes
 
 
+@dataclass
+class MemoTimeRetrievalResult:
+    """Result of executing the MemoTime operator-aware retrieval pipeline."""
+
+    candidates: list[RetrievedCandidate]
+    strategy_used: TemporalIntentType
+    tree_of_time: TreeOfTime | None = None
+    is_fallback: bool = False
+    fallback_reason: str | None = None
+    applied_signals_count: int = 0
+    diagnostics: dict[str, Any] = field(default_factory=dict)
+
+
 class MemoTimeService:
     """
     Deterministic foundation service for MemoTime:
@@ -266,6 +279,396 @@ class MemoTimeService:
         from apps.api.src.config.settings import settings
 
         return bool(settings.MEMOTIME_ENABLED)
+
+    @classmethod
+    def apply_memotime_retrieval(
+        cls,
+        candidates: list[RetrievedCandidate],
+        analyzed_query: Any | None = None,
+        query_text: str = "",
+        tree_of_time: TreeOfTime | None = None,
+    ) -> list[RetrievedCandidate]:
+        """
+        Applies operator-aware temporal retrieval strategy to code candidates
+        based on StructuredTemporalIntent and Tree of Time.
+        Gracefully falls back to baseline candidates if intent is ambiguous,
+        contradictory, or if candidates lack temporal provenance.
+        """
+        result = cls.run_memotime_pipeline(
+            candidates=candidates,
+            analyzed_query=analyzed_query,
+            query_text=query_text,
+            tree_of_time=tree_of_time,
+        )
+        return result.candidates
+
+    @classmethod
+    def run_memotime_pipeline(
+        cls,
+        candidates: list[RetrievedCandidate],
+        analyzed_query: Any | None = None,
+        query_text: str = "",
+        tree_of_time: TreeOfTime | None = None,
+    ) -> MemoTimeRetrievalResult:
+        """
+        Executes the operator-aware temporal retrieval pipeline and returns
+        diagnostic results along with prioritized/filtered candidates.
+        """
+        if not candidates:
+            return MemoTimeRetrievalResult(
+                candidates=[],
+                strategy_used=TemporalIntentType.AMBIGUOUS,
+                is_fallback=True,
+                fallback_reason="No candidates provided",
+            )
+
+        q_text = query_text or (getattr(analyzed_query, "raw_query", "") if analyzed_query else "")
+        target_symbols = getattr(analyzed_query, "symbol_candidates", []) if analyzed_query else []
+
+        intent: StructuredTemporalIntent
+        if analyzed_query and getattr(analyzed_query, "structured_temporal_intent", None):
+            intent = analyzed_query.structured_temporal_intent
+        else:
+            intent = cls.parse_temporal_intent(q_text, target_symbols=target_symbols)
+
+        tree = tree_of_time or cls.build_tree_of_time(q_text, target_symbols=target_symbols)
+
+        # Safety / Contradiction Gate: fall back immediately if ambiguous or contradictory
+        if intent.is_contradictory or not tree.is_valid or intent.intent_type == TemporalIntentType.AMBIGUOUS:
+            reason = (
+                intent.contradiction_reason
+                or intent.ambiguity_reason
+                or ("; ".join(tree.validation_errors) if tree.validation_errors else None)
+                or "Ambiguous temporal intent"
+            )
+            return MemoTimeRetrievalResult(
+                candidates=candidates,
+                strategy_used=intent.intent_type,
+                tree_of_time=tree,
+                is_fallback=True,
+                fallback_reason=reason,
+                diagnostics={
+                    "validation_errors": tree.validation_errors,
+                    "is_contradictory": intent.is_contradictory,
+                },
+            )
+
+        # Non-temporal query safety fallback: baseline ranking preserved
+        if not intent.is_temporal:
+            return MemoTimeRetrievalResult(
+                candidates=candidates,
+                strategy_used=TemporalIntentType.CURRENT,
+                tree_of_time=tree,
+                is_fallback=True,
+                fallback_reason="Non-temporal query: baseline ranking preserved",
+            )
+
+        # Resolve chronological supersession across candidates
+        resolved = resolve_temporal_supersession(candidates)
+        strategy = intent.intent_type
+        applied_count = 0
+        diagnostics: dict[str, Any] = {"strategy": strategy.value}
+
+        if strategy == TemporalIntentType.CURRENT:
+            active_cands: list[RetrievedCandidate] = []
+            other_cands: list[RetrievedCandidate] = []
+            for c in resolved:
+                is_curr = bool(c.metadata.get("is_current", True))
+                is_sup = bool(c.metadata.get("is_superseded", False))
+                is_del = bool(c.metadata.get("is_deleted", False))
+
+                if is_curr and not is_sup and not is_del:
+                    c.signals["memotime_temporal_match"] = 1.0
+                    c.metadata["memotime_strategy"] = "CURRENT"
+                    c.metadata["memotime_active_status"] = "ACTIVE"
+                    active_cands.append(c)
+                    applied_count += 1
+                else:
+                    status_lbl = "DELETED" if is_del else ("SUPERSEDED" if is_sup else "INACTIVE")
+                    c.metadata["memotime_active_status"] = status_lbl
+                    other_cands.append(c)
+
+            final_cands = active_cands + other_cands if active_cands else resolved
+            return MemoTimeRetrievalResult(
+                candidates=final_cands,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        elif strategy == TemporalIntentType.HISTORICAL:
+            hist_cands: list[RetrievedCandidate] = []
+            other_cands: list[RetrievedCandidate] = []
+            for c in resolved:
+                is_sup = bool(c.metadata.get("is_superseded", False))
+                is_del = bool(c.metadata.get("is_deleted", False))
+                is_curr = bool(c.metadata.get("is_current", True))
+
+                # A candidate is genuinely historical if it is superseded, deleted,
+                # or explicitly not current. A timestamp alone does NOT make it historical.
+                if is_sup or is_del or not is_curr:
+                    c.signals["memotime_temporal_match"] = 1.0
+                    c.signals["memotime_historical"] = 1.0
+                    c.metadata["memotime_strategy"] = "HISTORICAL"
+                    hist_cands.append(c)
+                    applied_count += 1
+                else:
+                    other_cands.append(c)
+
+            final_cands = hist_cands + other_cands if hist_cands else resolved
+            return MemoTimeRetrievalResult(
+                candidates=final_cands,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        elif strategy == TemporalIntentType.BEFORE:
+            c_constraint = intent.constraints[0] if intent.constraints else None
+            bound = c_constraint.bound if c_constraint else None
+            end_dt = bound.end if bound else None
+            ref_commit = bound.reference_commit if bound else None
+
+            matched_cands: list[RetrievedCandidate] = []
+            unmatched_cands: list[RetrievedCandidate] = []
+
+            for c in resolved:
+                ts = parse_candidate_timestamp(c)
+                c_sha = str(c.metadata.get("commit_sha") or "")
+                is_sup = bool(c.metadata.get("is_superseded", False))
+
+                is_match = False
+                if ref_commit and c_sha.startswith(ref_commit):
+                    is_match = True
+                elif end_dt and ts and ts < end_dt:
+                    is_match = True
+                elif not end_dt and not ref_commit and is_sup:
+                    is_match = True
+
+                if is_match:
+                    c.signals["memotime_temporal_match"] = 1.0
+                    c.metadata["memotime_strategy"] = "BEFORE"
+                    matched_cands.append(c)
+                    applied_count += 1
+                else:
+                    if end_dt and ts and ts >= end_dt:
+                        c.signals["memotime_temporal_mismatch"] = 1.0
+                    unmatched_cands.append(c)
+
+            if not matched_cands:
+                diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
+                diagnostics["note"] = "No candidates strictly before bound; preserving all evidence."
+                final_cands = resolved
+            else:
+                final_cands = matched_cands + unmatched_cands
+
+            return MemoTimeRetrievalResult(
+                candidates=final_cands,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        elif strategy == TemporalIntentType.AFTER:
+            c_constraint = intent.constraints[0] if intent.constraints else None
+            bound = c_constraint.bound if c_constraint else None
+            start_dt = bound.start if bound else None
+            ref_commit = bound.reference_commit if bound else None
+
+            matched_cands: list[RetrievedCandidate] = []
+            unmatched_cands: list[RetrievedCandidate] = []
+
+            for c in resolved:
+                ts = parse_candidate_timestamp(c)
+                is_curr = bool(c.metadata.get("is_current", True))
+                is_sup = bool(c.metadata.get("is_superseded", False))
+
+                is_match = False
+                if start_dt and ts and ts > start_dt:
+                    is_match = True
+                elif not start_dt and is_curr and not is_sup:
+                    is_match = True
+
+                if is_match:
+                    c.signals["memotime_temporal_match"] = 1.0
+                    c.metadata["memotime_strategy"] = "AFTER"
+                    matched_cands.append(c)
+                    applied_count += 1
+                else:
+                    if start_dt and ts and ts <= start_dt:
+                        c.signals["memotime_temporal_mismatch"] = 1.0
+                    unmatched_cands.append(c)
+
+            if not matched_cands:
+                diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
+                diagnostics["note"] = "No candidates strictly after bound; preserving all evidence."
+                final_cands = resolved
+            else:
+                final_cands = matched_cands + unmatched_cands
+
+            return MemoTimeRetrievalResult(
+                candidates=final_cands,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        elif strategy == TemporalIntentType.INTERVAL:
+            c_constraint = intent.constraints[0] if intent.constraints else None
+            bound = c_constraint.bound if c_constraint else None
+
+            matched_cands: list[RetrievedCandidate] = []
+            unmatched_cands: list[RetrievedCandidate] = []
+
+            for c in resolved:
+                ts = parse_candidate_timestamp(c)
+                if bound and bound.is_valid() and ts:
+                    if bound.contains_point(ts):
+                        c.signals["memotime_temporal_match"] = 1.0
+                        c.metadata["memotime_strategy"] = "INTERVAL"
+                        matched_cands.append(c)
+                        applied_count += 1
+                    else:
+                        c.signals["memotime_temporal_mismatch"] = 1.0
+                        unmatched_cands.append(c)
+                else:
+                    unmatched_cands.append(c)
+
+            if not matched_cands:
+                diagnostics["status"] = ResolutionStatus.UNBOUNDED_TEMPORAL.value
+                diagnostics["note"] = "Evidence lacked explicit timestamps for interval; preserving all evidence."
+                final_cands = resolved
+            else:
+                final_cands = matched_cands + unmatched_cands
+
+            return MemoTimeRetrievalResult(
+                candidates=final_cands,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        elif strategy == TemporalIntentType.DIFF:
+            ref_commit = intent.reference_commits[0] if intent.reference_commits else None
+            matched_cands: list[RetrievedCandidate] = []
+            unmatched_cands: list[RetrievedCandidate] = []
+
+            for c in resolved:
+                c_sha = str(c.metadata.get("commit_sha") or "")
+                if ref_commit and c_sha.startswith(ref_commit):
+                    c.signals["memotime_diff_match"] = 1.0
+                    c.signals["memotime_temporal_match"] = 1.0
+                    c.metadata["memotime_strategy"] = "DIFF"
+                    matched_cands.append(c)
+                    applied_count += 1
+                else:
+                    unmatched_cands.append(c)
+
+            final_cands = matched_cands + unmatched_cands if matched_cands else resolved
+            return MemoTimeRetrievalResult(
+                candidates=final_cands,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        elif strategy == TemporalIntentType.EVOLUTION:
+            # Sort candidates chronologically to map into ToT phases
+            dated_cands = []
+            undated_cands = []
+            for c in resolved:
+                ts = parse_candidate_timestamp(c)
+                if ts:
+                    dated_cands.append((ts, c))
+                else:
+                    undated_cands.append(c)
+
+            dated_cands.sort(key=lambda x: x[0])
+            sorted_cands = [c for _, c in dated_cands] + undated_cands
+
+            n = len(sorted_cands)
+            if n >= 3:
+                origin_cands = [sorted_cands[0]]
+                trans_cands = sorted_cands[1:-1]
+                curr_cands = [sorted_cands[-1]]
+            elif n == 2:
+                origin_cands = [sorted_cands[0]]
+                trans_cands = []
+                curr_cands = [sorted_cands[1]]
+            elif n == 1:
+                origin_cands = []
+                trans_cands = []
+                curr_cands = [sorted_cands[0]]
+            else:
+                origin_cands, trans_cands, curr_cands = [], [], []
+
+            origin_node = tree.nodes.get("phase_0_origin")
+            trans_node = tree.nodes.get("phase_1_transition")
+            curr_node = tree.nodes.get("phase_2_current")
+
+            if origin_node:
+                origin_node.evidence_candidates = origin_cands
+                origin_node.resolution_status = (
+                    ResolutionStatus.RESOLVED if origin_cands else ResolutionStatus.NO_EVIDENCE
+                )
+            if trans_node:
+                trans_node.evidence_candidates = trans_cands
+                trans_node.resolution_status = (
+                    ResolutionStatus.RESOLVED if trans_cands else ResolutionStatus.NO_EVIDENCE
+                )
+            if curr_node:
+                curr_node.evidence_candidates = curr_cands
+                curr_node.resolution_status = (
+                    ResolutionStatus.RESOLVED if curr_cands else ResolutionStatus.NO_EVIDENCE
+                )
+
+            for c in origin_cands:
+                c.signals["memotime_evolution_phase"] = 1.0
+                c.metadata["memotime_phase"] = "origin"
+                c.metadata["memotime_chronological_order"] = 0
+                applied_count += 1
+
+            for c in trans_cands:
+                c.signals["memotime_evolution_phase"] = 0.9
+                c.metadata["memotime_phase"] = "transition"
+                c.metadata["memotime_chronological_order"] = 1
+                applied_count += 1
+
+            for c in curr_cands:
+                c.signals["memotime_evolution_phase"] = 1.0
+                c.signals["memotime_temporal_match"] = 1.0
+                c.metadata["memotime_phase"] = "current"
+                c.metadata["memotime_chronological_order"] = 2
+                applied_count += 1
+
+            ordered_ev = origin_cands + trans_cands + curr_cands
+            seen_ids = {c.candidate_id for c in ordered_ev}
+            for c in resolved:
+                if c.candidate_id not in seen_ids:
+                    seen_ids.add(c.candidate_id)
+                    ordered_ev.append(c)
+
+            return MemoTimeRetrievalResult(
+                candidates=ordered_ev,
+                strategy_used=strategy,
+                tree_of_time=tree,
+                applied_signals_count=applied_count,
+                diagnostics=diagnostics,
+            )
+
+        return MemoTimeRetrievalResult(
+            candidates=resolved,
+            strategy_used=strategy,
+            tree_of_time=tree,
+            is_fallback=True,
+            fallback_reason="Non-temporal or unsupported strategy fallback",
+        )
 
     @classmethod
     def parse_iso_datetime(cls, dt_str: str) -> datetime | None:
@@ -870,7 +1273,7 @@ class MemoTimeService:
                         matched_cands.append(cand)
 
                 elif node.intent_type == TemporalIntentType.HISTORICAL:
-                    if is_sup or is_del or cand.metadata.get("committed_at"):
+                    if is_sup or is_del or not is_curr:
                         matched_cands.append(cand)
 
                 elif node.intent_type == TemporalIntentType.BEFORE:

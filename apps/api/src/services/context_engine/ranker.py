@@ -171,6 +171,18 @@ class MultiSignalRanker:
                 elif sig == "star_rag_ppr":
                     score += val * 1.6
                     reasons.append(f"STAR-RAG temporal rule propagation ({round(val, 3)})")
+                elif sig == "memotime_temporal_match":
+                    score += val * 1.5
+                    reasons.append(f"MemoTime temporal match ({round(val, 2)})")
+                elif sig == "memotime_evolution_phase":
+                    score += val * 1.2
+                    reasons.append("MemoTime evolution phase match")
+                elif sig == "memotime_diff_match":
+                    score += val * 1.4
+                    reasons.append("MemoTime commit changeset match")
+                elif sig == "memotime_historical":
+                    score += val * 1.0
+                    reasons.append("MemoTime historical candidate match")
                 elif sig.startswith("graph_expansion_hop"):
                     try:
                         hop_num = int(sig.replace("graph_expansion_hop", ""))
@@ -233,6 +245,11 @@ class MultiSignalRanker:
             if is_test_file and not is_test_query:
                 score *= 0.7
                 reasons.append("Test/mock file demoted for non-test query")
+
+            # MemoTime temporal boundary penalty
+            if cand.signals.get("memotime_temporal_mismatch"):
+                score *= 0.3
+                reasons.append("Candidate outside requested temporal bound")
 
 
             # 6. Temporal adjustments based on query intent and code change lifecycle
