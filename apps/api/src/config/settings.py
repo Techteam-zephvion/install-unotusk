@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     STAR_RAG_MIN_ANCHOR_SCORE: float = Field(default=1.0)
     STAR_RAG_HUB_ATTENUATION: bool = Field(default=True)
 
+    # MemoTime Temporal Retrieval Settings (arXiv:2510.13614)
+    MEMOTIME_ENABLED: bool = Field(default=False)
+
     # Code-Lane Embedding Settings ('voyage' or 'development')
     EMBEDDING_PROVIDER: str = Field(default="development")
     VOYAGE_API_KEY: str | None = Field(default=None)

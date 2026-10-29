@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -14,6 +15,7 @@ class AnalyzedQuery:
     temporal_keywords: list[str] = field(default_factory=list)
     has_negation: bool = False
     negation_keywords: list[str] = field(default_factory=list)
+    structured_temporal_intent: Any | None = None
 
 
 # Conjunctions that don't flip polarity or provide semantic code discrimination
@@ -181,6 +183,11 @@ def analyze_query(query: str) -> AnalyzedQuery:
 
     is_temporal, temporal_intent, detected_temporal_keywords = classify_temporal_intent(cleaned)
 
+    # MemoTime structured temporal intent (arXiv:2510.13614)
+    from apps.api.src.services.context_engine.memotime import MemoTimeService
+
+    structured_intent = MemoTimeService.parse_temporal_intent(cleaned, target_symbols=dedup_symbols)
+
     return AnalyzedQuery(
         raw_query=cleaned,
         keywords=dedup_keywords,
@@ -192,6 +199,7 @@ def analyze_query(query: str) -> AnalyzedQuery:
         temporal_keywords=detected_temporal_keywords,
         has_negation=len(dedup_negations) > 0,
         negation_keywords=dedup_negations,
+        structured_temporal_intent=structured_intent,
     )
 
 
