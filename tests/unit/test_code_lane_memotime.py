@@ -879,3 +879,416 @@ def test_20_historical_classification_requires_supersession_not_just_timestamp()
     assert hist_node.resolution_status == ResolutionStatus.RESOLVED
     assert len(hist_node.evidence_candidates) == 1
     assert hist_node.evidence_candidates[0].candidate_id == "c_user_v1"
+
+
+# =========================================================================
+# TEST 21: Valid Multi-Entity Temporal Dependency
+# =========================================================================
+def test_21_valid_multi_entity_temporal_dependency():
+    """
+    Verifies that when entity A depends on entity B, and B was introduced
+    before or during A's lifetime (t_start(B) <= t_end(A)), the dependency
+    is validated as compatible and no mismatch penalty is applied.
+    """
+    t_start_a = datetime(2026, 1, 1, tzinfo=UTC)
+    t_end_a = datetime(2026, 12, 31, tzinfo=UTC)
+    t_start_b = datetime(2026, 3, 1, tzinfo=UTC)
+    t_end_b = datetime(2026, 12, 31, tzinfo=UTC)
+
+    bounds = {
+        "paymentservice": TemporalBound(start=t_start_a, end=t_end_a),
+        "stripeconnector": TemporalBound(start=t_start_b, end=t_end_b),
+    }
+
+    valid, errors = MemoTimeService.validate_multi_entity_bounds(
+        entity_bounds=bounds,
+        dependencies=[("PaymentService", "StripeConnector")],
+    )
+    assert valid is True
+    assert errors == []
+
+    c_a = _create_candidate("c_a", "PaymentService", "src/payment.py", "1111", "Payment service", "2026-01-01T00:00:00Z")
+    c_b = _create_candidate("c_b", "StripeConnector", "src/stripe.py", "2222", "Stripe connector", "2026-03-01T00:00:00Z")
+    c_a.metadata["dependencies"] = [("PaymentService", "StripeConnector")]
+
+    cands, errs = MemoTimeService.propagate_cross_entity_temporal_constraints([c_a, c_b], entity_bounds=bounds)
+    assert errs == []
+    assert not c_a.signals.get("memotime_temporal_mismatch")
+    assert not c_b.signals.get("memotime_temporal_mismatch")
+
+
+# =========================================================================
+# TEST 22: Dependency Introduced After Dependent Component Lifetime
+# =========================================================================
+def test_22_dependency_introduced_after_dependent_interval():
+    """
+    Verifies that when entity A depends on entity B, but B was introduced
+    AFTER A ended (t_start(B) > t_end(A)), the timeline is flagged as
+    incompatible and violating candidates receive memotime_temporal_mismatch=1.0.
+    """
+    t_start_a = datetime(2026, 1, 1, tzinfo=UTC)
+    t_end_a = datetime(2026, 6, 30, tzinfo=UTC)
+    t_start_b = datetime(2026, 9, 1, tzinfo=UTC)
+    t_end_b = datetime(2026, 12, 31, tzinfo=UTC)
+
+    bounds = {
+        "legacyauthservice": TemporalBound(start=t_start_a, end=t_end_a),
+        "oidcconnector": TemporalBound(start=t_start_b, end=t_end_b),
+    }
+
+    valid, errors = MemoTimeService.validate_multi_entity_bounds(
+        entity_bounds=bounds,
+        dependencies=[("LegacyAuthService", "OidcConnector")],
+    )
+    assert valid is False
+    assert any("introduced later" in e for e in errors)
+
+    c_a = _create_candidate("c_a", "LegacyAuthService", "src/auth.py", "1111", "Legacy auth", "2026-06-30T00:00:00Z")
+    c_a.metadata["is_superseded"] = True
+    c_a.metadata["valid_end"] = "2026-06-30T00:00:00Z"
+    c_a.metadata["dependencies"] = [("LegacyAuthService", "OidcConnector")]
+
+    c_b = _create_candidate("c_b", "OidcConnector", "src/oidc.py", "2222", "OIDC connector", "2026-09-01T00:00:00Z")
+    c_b.metadata["valid_start"] = "2026-09-01T00:00:00Z"
+
+    cands, errs = MemoTimeService.propagate_cross_entity_temporal_constraints([c_a, c_b], entity_bounds=bounds)
+    assert len(errs) > 0
+    assert c_a.signals.get("memotime_temporal_mismatch") == 1.0
+    assert "introduced later" in c_a.metadata.get("memotime_temporal_error", "")
+
+
+# =========================================================================
+# TEST 23: Multi-Hop Transitive Path Incompatible Bounds
+# =========================================================================
+def test_23_multi_hop_path_incompatible_bounds():
+    """
+    Verifies that multi-hop dependency paths (A -> B -> C) propagate temporal
+    constraints transitively: if C is introduced after A ended, the transitive
+    incompatibility is detected across 2 hops and penalized.
+    """
+    t_start_a = datetime(2026, 1, 1, tzinfo=UTC)
+    t_end_a = datetime(2026, 5, 31, tzinfo=UTC)
+    t_start_b = datetime(2026, 4, 1, tzinfo=UTC)
+    t_end_b = datetime(2026, 7, 31, tzinfo=UTC)
+    t_start_c = datetime(2026, 8, 1, tzinfo=UTC)
+    t_end_c = datetime(2026, 12, 31, tzinfo=UTC)
+
+    bounds = {
+        "servicea": TemporalBound(start=t_start_a, end=t_end_a),
+        "serviceb": TemporalBound(start=t_start_b, end=t_end_b),
+        "servicec": TemporalBound(start=t_start_c, end=t_end_c),
+    }
+
+    # Transitive check: A -> B and B -> C
+    valid, errors = MemoTimeService.validate_multi_entity_bounds(
+        entity_bounds=bounds,
+        dependencies=[("ServiceA", "ServiceB"), ("ServiceB", "ServiceC")],
+    )
+    assert valid is False
+    assert any("2-hop" in e for e in errors)
+    assert any("ServiceA" in e and "ServiceC" in e for e in errors)
+
+    c_a = _create_candidate("c_a", "ServiceA", "src/a.py", "1111", "Service A", "2026-05-31T00:00:00Z")
+    c_a.metadata["is_superseded"] = True
+    c_a.metadata["valid_end"] = "2026-05-31T00:00:00Z"
+    c_a.metadata["relationship_path"] = "ServiceA -> ServiceB -> ServiceC"
+
+    c_b = _create_candidate("c_b", "ServiceB", "src/b.py", "2222", "Service B", "2026-04-01T00:00:00Z")
+    c_c = _create_candidate("c_c", "ServiceC", "src/c.py", "3333", "Service C", "2026-08-01T00:00:00Z")
+    c_c.metadata["valid_start"] = "2026-08-01T00:00:00Z"
+
+    cands, errs = MemoTimeService.propagate_cross_entity_temporal_constraints([c_a, c_b, c_c], entity_bounds=bounds)
+    assert len(errs) > 0
+    assert c_a.signals.get("memotime_temporal_mismatch") == 1.0
+
+
+# =========================================================================
+# TEST 24: Missing Timestamps in Path (UNBOUNDED_TEMPORAL Safe Fallback)
+# =========================================================================
+def test_24_missing_timestamps_in_path_unbounded():
+    """
+    Verifies that when intermediate or leaf entities in a dependency path lack
+    timestamps, MemoTime treats the relationship as UNBOUNDED_TEMPORAL without
+    fabricating dates, raising false contradictions, or dropping candidates.
+    """
+    bounds = {
+        "servicea": TemporalBound(start=datetime(2026, 1, 1, tzinfo=UTC), end=datetime(2026, 5, 31, tzinfo=UTC)),
+    }
+
+    valid, errors = MemoTimeService.validate_multi_entity_bounds(
+        entity_bounds=bounds,
+        dependencies=[("ServiceA", "ServiceB"), ("ServiceB", "ServiceC")],
+    )
+    assert valid is True
+    assert errors == []
+
+    c_a = _create_candidate("c_a", "ServiceA", "src/a.py", "1111", "Service A", "2026-05-31T00:00:00Z")
+    c_b = _create_candidate("c_b", "ServiceB", "src/b.py", "2222", "Service B", "")
+    c_b.metadata.pop("committed_at", None)
+    c_c = _create_candidate("c_c", "ServiceC", "src/c.py", "3333", "Service C", "")
+    c_c.metadata.pop("committed_at", None)
+
+    cands, errs = MemoTimeService.propagate_cross_entity_temporal_constraints(
+        [c_a, c_b, c_c],
+        dependencies=[("ServiceA", "ServiceB"), ("ServiceB", "ServiceC")],
+        entity_bounds=bounds,
+    )
+    assert errs == []
+    assert not c_a.signals.get("memotime_temporal_mismatch")
+    assert not c_b.signals.get("memotime_temporal_mismatch")
+    assert not c_c.signals.get("memotime_temporal_mismatch")
+    assert len(cands) == 3
+
+
+# =========================================================================
+# TEST 25: Disconnected Entities Do Not Form Unjustified Temporal Edges
+# =========================================================================
+def test_25_disconnected_entities_no_unjustified_edge():
+    """
+    Verifies that two entities with non-overlapping or disjoint timestamps
+    that have NO dependency or graph relationship between them are NOT
+    falsely constrained or marked with contradictions.
+    """
+    bounds = {
+        "billingengine": TemporalBound(start=datetime(2026, 1, 1, tzinfo=UTC), end=datetime(2026, 3, 31, tzinfo=UTC)),
+        "reportingservice": TemporalBound(start=datetime(2026, 6, 1, tzinfo=UTC), end=datetime(2026, 12, 31, tzinfo=UTC)),
+    }
+
+    # No dependency edge between BillingEngine and ReportingService
+    valid, errors = MemoTimeService.validate_multi_entity_bounds(
+        entity_bounds=bounds,
+        dependencies=[],
+    )
+    assert valid is True
+    assert errors == []
+
+    c_billing = _create_candidate("c_bill", "BillingEngine", "src/billing.py", "1111", "Billing code", "2026-01-01T00:00:00Z")
+    c_report = _create_candidate("c_rep", "ReportingService", "src/report.py", "2222", "Report code", "2026-06-01T00:00:00Z")
+
+    cands, errs = MemoTimeService.propagate_cross_entity_temporal_constraints([c_billing, c_report], entity_bounds=bounds)
+    assert errs == []
+    assert not c_billing.signals.get("memotime_temporal_mismatch")
+    assert not c_report.signals.get("memotime_temporal_mismatch")
+
+
+# =========================================================================
+# TEST 26: Historical and Current Queries Over Evolving Chains
+# =========================================================================
+def test_26_historical_and_current_queries_evolving_chain():
+    """
+    Verifies that an evolving chain (A_v1 -> B_v1 superseded by A_v2 -> B_v2)
+    correctly routes to active candidates under CURRENT queries and superseded
+    precursors under HISTORICAL queries.
+    """
+    from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+    # v1 (historical/superseded)
+    c_a_v1 = _create_candidate("c_a_v1", "AuthService", "src/auth.py", "1111", "Auth v1", "2026-01-01T00:00:00Z")
+    c_a_v1.metadata["is_superseded"] = True
+    c_a_v1.metadata["is_current"] = False
+    c_b_v1 = _create_candidate("c_b_v1", "TokenManager", "src/token.py", "1111", "Token v1", "2026-01-01T00:00:00Z")
+    c_b_v1.metadata["is_superseded"] = True
+    c_b_v1.metadata["is_current"] = False
+
+    # v2 (current/active)
+    c_a_v2 = _create_candidate("c_a_v2", "AuthService", "src/auth.py", "2222", "Auth v2", "2026-06-01T00:00:00Z")
+    c_a_v2.metadata["is_superseded"] = False
+    c_a_v2.metadata["is_current"] = True
+    c_b_v2 = _create_candidate("c_b_v2", "TokenManager", "src/token.py", "2222", "Token v2", "2026-06-01T00:00:00Z")
+    c_b_v2.metadata["is_superseded"] = False
+    c_b_v2.metadata["is_current"] = True
+
+    candidates = [c_a_v1, c_b_v1, c_a_v2, c_b_v2]
+
+    # CURRENT query
+    q_curr = analyze_query("What is the current active implementation of AuthService and TokenManager?")
+    res_curr = MemoTimeService.run_memotime_pipeline(copy.deepcopy(candidates), q_curr, q_curr.raw_query)
+    assert res_curr.strategy_used == TemporalIntentType.CURRENT
+    ranked_curr = MultiSignalRanker.rank_candidates(res_curr.candidates, q_curr)
+    top_curr_ids = [r.candidate.candidate_id for r in ranked_curr[:2]]
+    assert "c_a_v2" in top_curr_ids
+    assert "c_b_v2" in top_curr_ids
+
+    # HISTORICAL query
+    q_hist = analyze_query("What was the previous superseded implementation of AuthService and TokenManager?")
+    res_hist = MemoTimeService.run_memotime_pipeline(copy.deepcopy(candidates), q_hist, q_hist.raw_query)
+    assert res_hist.strategy_used == TemporalIntentType.HISTORICAL
+    ranked_hist = MultiSignalRanker.rank_candidates(res_hist.candidates, q_hist)
+    top_hist_ids = [r.candidate.candidate_id for r in ranked_hist[:2]]
+    assert "c_a_v1" in top_hist_ids
+    assert "c_b_v1" in top_hist_ids
+
+
+# =========================================================================
+# TEST 27: Provenance Preservation Through Temporal Propagation
+# =========================================================================
+def test_27_provenance_preservation_through_propagation():
+    """
+    Verifies that cross-entity temporal propagation and pipeline execution
+    preserve all provenance metadata: commit_sha, snapshot_id, file_id,
+    relationship_hop, relationship_path, connected_from, and provenance dict.
+    """
+    snap_id = uuid.uuid4()
+    file_id = uuid.uuid4()
+    c = _create_candidate("c_prov", "ServiceA", "src/a.py", "a1b2c3d4e5f6", "Commit message", "2026-04-01T00:00:00Z")
+    c.metadata["snapshot_id"] = str(snap_id)
+    c.metadata["file_id"] = str(file_id)
+    c.metadata["relationship_hop"] = 2
+    c.metadata["relationship_path"] = "ServiceX -> ServiceY -> ServiceA"
+    c.metadata["connected_from"] = "src/y.py"
+    c.metadata["provenance"] = {"atom_id": "atom_123", "symbol_name": "ServiceA"}
+
+    cands, _ = MemoTimeService.propagate_cross_entity_temporal_constraints([c])
+    res_c = cands[0]
+
+    assert res_c.metadata["commit_sha"] == "a1b2c3d4e5f6"
+    assert res_c.metadata["snapshot_id"] == str(snap_id)
+    assert res_c.metadata["file_id"] == str(file_id)
+    assert res_c.metadata["relationship_hop"] == 2
+    assert res_c.metadata["relationship_path"] == "ServiceX -> ServiceY -> ServiceA"
+    assert res_c.metadata["connected_from"] == "src/y.py"
+    assert res_c.metadata["provenance"]["atom_id"] == "atom_123"
+
+
+# =========================================================================
+# TEST 28: Grounded Diff Evidence Extraction (Lines, Symbols, Line Bounds)
+# =========================================================================
+def test_28_precise_diff_evidence_extraction():
+    """
+    Verifies precise extraction of diff evidence attributed to file, symbol,
+    and line level with added and deleted lines.
+    """
+    c = _create_candidate("c_diff", "RankerAudit", "src/ranker.py", "773b740a1b2c", "Audit ranker", "2026-03-01T00:00:00Z")
+    c.metadata["added_lines"] = ["def audit_weights():", "    return 1.5"]
+    c.metadata["deleted_lines"] = ["def old_weights():"]
+    c.metadata["start_line"] = 100
+    c.metadata["end_line"] = 125
+    c.metadata["symbol_name"] = "audit_weights"
+    c.metadata["chunk_type"] = "ATOM_MODIFY"
+
+    ev = MemoTimeService.extract_diff_evidence(c)
+    assert ev["commit_sha"] == "773b740a1b2c"
+    assert ev["path"] == "src/ranker.py"
+    assert ev["symbol"] == "audit_weights"
+    assert ev["change_type"] == "ATOM_MODIFY"
+    assert ev["is_deleted"] is False
+    assert len(ev["added_lines"]) == 2
+    assert len(ev["deleted_lines"]) == 1
+    assert ev["line_range"] == (100, 125)
+    assert ev["is_available"] is True
+    assert ev["is_empty"] is False
+
+    # Test deleted symbol attribution
+    c_del = _create_candidate("c_del", "LegacyHelper (DELETE)", "src/helper.py", "773b740a1b2c", "Remove helper", "2026-03-01T00:00:00Z")
+    c_del.metadata["chunk_type"] = "ATOM_DELETE"
+    c_del.metadata["symbol_name"] = "LegacyHelper"
+    c_del.metadata["is_deleted"] = True
+    c_del.metadata["deleted_lines"] = ["class LegacyHelper:", "    pass"]
+
+    ev_del = MemoTimeService.extract_diff_evidence(c_del)
+    assert ev_del["is_deleted"] is True
+    assert ev_del["symbol"] == "LegacyHelper"
+    assert len(ev_del["deleted_lines"]) == 2
+
+
+# =========================================================================
+# TEST 29: Diff Ambiguous SHA, Missing SHA, and Unavailable Evidence
+# =========================================================================
+def test_29_diff_ambiguous_or_missing_sha():
+    """
+    Verifies that:
+    1. Ambiguous abbreviated commit SHA prefixes match multiple distinct commits
+       and safely fall back without arbitrarily picking one commit.
+    2. Missing commit SHAs fall back safely without fabricating diff hunks.
+    3. Unavailable diff evidence sets is_available=False without fabricating lines.
+    """
+    # 1. Ambiguous commit SHA prefix
+    c1 = _create_candidate("c1", "Mod1", "src/m1.py", "42096a5000000000000000000000000000000001", "C1", "2026-04-01T00:00:00Z")
+    c2 = _create_candidate("c2", "Mod2", "src/m2.py", "42096a5eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2", "C2", "2026-04-01T00:00:00Z")
+
+    res_amb = MemoTimeService.run_memotime_pipeline(
+        candidates=[c1, c2],
+        query_text="What changed in commit 42096a5?",
+    )
+    assert res_amb.is_fallback is True
+    assert "Ambiguous commit SHA prefix" in (res_amb.fallback_reason or "")
+    assert len(res_amb.diagnostics.get("ambiguous_commits", [])) == 2
+
+    # 2. Missing commit SHA
+    res_missing = MemoTimeService.run_memotime_pipeline(
+        candidates=[c1],
+        query_text="Show diff for commit deadbeef0000",
+    )
+    assert res_missing.is_fallback is True
+    assert "not found in candidate corpus" in (res_missing.fallback_reason or "")
+
+    # 3. Unavailable diff evidence
+    c_unavail = _create_candidate("c_unavail", "ArchivedMod", "src/arch.py", "b094f01", "Old commit", "2026-01-01T00:00:00Z")
+    c_unavail.metadata["diff_unavailable"] = True
+
+    ev_unavail = MemoTimeService.extract_diff_evidence(c_unavail)
+    assert ev_unavail["is_available"] is False
+    assert ev_unavail["is_empty"] is False
+    assert "unavailable" in ev_unavail.get("reason", "").lower()
+    assert ev_unavail["added_lines"] == []
+    assert ev_unavail["deleted_lines"] == []
+
+
+# =========================================================================
+# TEST 30: Engine Error Isolation and Diagnostics
+# =========================================================================
+async def test_30_engine_error_isolation_and_diagnostics():
+    """
+    Verifies that ProjectContextEngine.investigate:
+    1. Sets memotime_used=True and records memotime_diagnostics on successful execution.
+    2. When MemoTime raises an unexpected exception, catches it safely without failing the request,
+       sets memotime_used=False, and records exception_occurred in diagnostics.
+    3. When disabled (enable_memotime=False), sets memotime_used=False without running MemoTime.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from apps.api.src.services.context_engine.engine import ProjectContextEngine
+
+    engine = ProjectContextEngine()
+    session = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = []
+    mock_res.all.return_value = []
+    session.execute.return_value = mock_res
+    snap_id = uuid.uuid4()
+
+    # 1. Normal execution with enable_memotime=True
+    ans_ok = await engine.investigate(
+        session=session,
+        snapshot_id=snap_id,
+        question="What is the active AuthService implementation?",
+        enable_memotime=True,
+    )
+    assert ans_ok.debug_signals.get("memotime_used") is True
+    assert "strategy" in ans_ok.debug_signals.get("memotime_diagnostics", {})
+
+    # 2. Exception isolation: unexpected error in MemoTime does not crash the request
+    with patch.object(
+        MemoTimeService,
+        "run_memotime_pipeline",
+        side_effect=RuntimeError("Simulated unexpected graph traversal error"),
+    ):
+        ans_err = await engine.investigate(
+            session=session,
+            snapshot_id=snap_id,
+            question="What is the active AuthService implementation?",
+            enable_memotime=True,
+        )
+        assert ans_err.debug_signals.get("memotime_used") is False
+        diag = ans_err.debug_signals.get("memotime_diagnostics", {})
+        assert diag.get("exception_occurred") is True
+        assert "Simulated unexpected graph traversal error" in diag.get("error", "")
+
+    # 3. Disabled execution: enable_memotime=False
+    ans_disabled = await engine.investigate(
+        session=session,
+        snapshot_id=snap_id,
+        question="What is the active AuthService implementation?",
+        enable_memotime=False,
+    )
+    assert ans_disabled.debug_signals.get("memotime_used") is False

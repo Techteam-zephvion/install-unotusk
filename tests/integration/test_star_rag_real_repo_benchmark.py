@@ -620,6 +620,8 @@ def test_real_repo_benchmark_baseline_vs_memotime():
 
     temporal_violations_base = 0
     temporal_violations_memo = 0
+    cross_entity_violations_base = 0
+    cross_entity_violations_memo = 0
     precursor_covered_base = 0
     precursor_covered_memo = 0
     provenance_verified_base = 0
@@ -714,6 +716,10 @@ def test_real_repo_benchmark_baseline_vs_memotime():
             if sup_m is not None and rel_m is not None and sup_m < rel_m:
                 temporal_violations_memo += 1
 
+        # Cross-entity temporal constraint violations
+        if memo_res.diagnostics.get("cross_entity_violations"):
+            cross_entity_violations_memo += len(memo_res.diagnostics["cross_entity_violations"])
+
         # Historical precursor coverage on temporal queries
         if spec.is_temporal:
             precursors = {cid for cid in rel_ids if "42096a5" not in cid}
@@ -752,6 +758,7 @@ def test_real_repo_benchmark_baseline_vs_memotime():
     assert memo_recalls_bin[3] == num_eval, f"Expected 100% Binary Recall@3 for MemoTime, got {memo_recalls_bin[3]}/{num_eval}"
     assert temporal_violations_base == 0, f"Expected 0 temporal violations for Baseline, got {temporal_violations_base}"
     assert temporal_violations_memo == 0, f"Expected 0 temporal violations for MemoTime, got {temporal_violations_memo}"
+    assert cross_entity_violations_memo == 0, f"Expected 0 cross-entity violations for MemoTime, got {cross_entity_violations_memo}"
     assert precursor_covered_memo == 2, f"Expected both temporal queries to cover historical precursors, got {precursor_covered_memo}/2"
     assert provenance_verified_memo == num_total, f"Expected 100% provenance survival, got {provenance_verified_memo}/{num_total}"
     med_latency = statistics.median(memo_latencies)
@@ -776,6 +783,7 @@ def test_real_repo_benchmark_baseline_vs_memotime():
     print(f"{'Precision@5':<38} | {base_precisions[5]/num_eval:<22.4f} | {memo_precisions[5]/num_eval:<22.4f}")
     print(f"{'Mean Reciprocal Rank (MRR)':<38} | {base_mrr/num_eval:<22.4f} | {memo_mrr/num_eval:<22.4f}")
     print(f"{'Temporal Violations (Current)':<38} | {temporal_violations_base:<22} | {temporal_violations_memo:<22}")
+    print(f"{'Cross-Entity Violations':<38} | {cross_entity_violations_base:<22} | {cross_entity_violations_memo:<22}")
     print(f"{'Historical Precursor Coverage':<38} | {precursor_covered_base}/2{'':<20} | {precursor_covered_memo}/2{'':<20}")
     print(f"{'Provenance Survival':<38} | {provenance_verified_base}/{num_total:<18} | {provenance_verified_memo}/{num_total:<18}")
     print(f"{'Median Latency (ms)':<38} | {statistics.median(base_latencies):<22.2f} | {statistics.median(memo_latencies):<22.2f}")
@@ -787,3 +795,65 @@ def test_real_repo_benchmark_baseline_vs_memotime():
     print("\n--- QUERY-BY-QUERY BREAKDOWN ---")
     for r in query_outcomes:
         print(f"[{r['id']:<33}] ({r['category']:<35}): {r['outcome']}")
+
+
+def test_memotime_cross_entity_and_diff_evidence_real_repo():
+    """
+    Validates MemoTime Milestone 3 capabilities on the real-repository corpus:
+    1. Grounded Git diff evidence extraction against real commit artifacts.
+    2. Commit changeset retrieval with exact SHA matching and line bounds.
+    3. Multi-hop cross-entity temporal constraint propagation over real repository relationships.
+    4. Verified absence of false positive temporal or cross-entity contradictions.
+    """
+    from apps.api.src.services.context_engine.memotime import (
+        MemoTimeService,
+        TemporalIntentType,
+    )
+
+    corpus = build_real_repo_corpus()
+    assert len(corpus) >= 50
+
+    # 1. Grounded Diff Evidence Extraction on Real Commit Chunks
+    cand_420 = next(c for c in corpus if "42096a5" in str(c.metadata.get("commit_sha", "")))
+    diff_ev = MemoTimeService.extract_diff_evidence(cand_420)
+    assert diff_ev["commit_sha"] == cand_420.metadata["commit_sha"]
+    assert diff_ev["path"] == cand_420.path
+    assert diff_ev["is_available"] is True
+    assert diff_ev["start_line"] is not None
+
+    # 2. DIFF Strategy Retrieval with Commit SHA
+    query = "What changes were introduced in commit 42096a5?"
+    analyzed = analyze_query(query)
+    q_emb = generate_text_embedding(query)
+    chunk_embeddings = {c.candidate_id: generate_text_embedding(c.content) for c in corpus}
+
+    q_candidates = []
+    for c in corpus:
+        c_copy = copy.deepcopy(c)
+        sim = compute_cosine_similarity(q_emb, chunk_embeddings[c.candidate_id])
+        c_copy.signals["vector_similarity"] = round(sim, 4)
+        q_candidates.append(c_copy)
+
+    memo_res = MemoTimeService.run_memotime_pipeline(
+        candidates=copy.deepcopy(q_candidates),
+        analyzed_query=analyzed,
+        query_text=query,
+    )
+    assert memo_res.strategy_used == TemporalIntentType.DIFF
+    assert memo_res.is_fallback is False
+    assert memo_res.applied_signals_count > 0
+    assert "42096a5" in memo_res.diagnostics.get("matched_commit_sha", "")
+
+    ranked = MultiSignalRanker.rank_candidates(memo_res.candidates, analyzed)
+    top_cand = ranked[0].candidate
+    assert top_cand.metadata.get("commit_sha") == "42096a5"
+    assert top_cand.signals.get("memotime_diff_match") == 1.0
+
+    # 3. Cross-Entity Temporal Constraint Propagation over Real Repo Candidates
+    propagated_cands, errors = MemoTimeService.propagate_cross_entity_temporal_constraints(
+        candidates=copy.deepcopy(corpus)
+    )
+    assert errors == []
+    for c in propagated_cands:
+        assert not c.signals.get("memotime_temporal_mismatch")
+        assert c.metadata.get("commit_sha") is not None

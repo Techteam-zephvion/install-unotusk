@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,17 +99,38 @@ class ProjectContextEngine:
             if enable_memotime is not None
             else getattr(settings, "MEMOTIME_ENABLED", False)
         )
+        memotime_diagnostics: dict[str, Any] = {}
+        memotime_success = False
         if use_memotime:
             try:
                 from apps.api.src.services.context_engine.memotime import MemoTimeService
 
-                expanded_candidates = MemoTimeService.apply_memotime_retrieval(
+                memo_res = MemoTimeService.run_memotime_pipeline(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
                     query_text=question,
                 )
-            except Exception:
-                pass
+                expanded_candidates = memo_res.candidates
+                memotime_success = not memo_res.is_fallback
+                memotime_diagnostics = {
+                    "strategy": (
+                        memo_res.strategy_used.value
+                        if hasattr(memo_res.strategy_used, "value")
+                        else str(memo_res.strategy_used)
+                    ),
+                    "is_fallback": memo_res.is_fallback,
+                    "fallback_reason": memo_res.fallback_reason,
+                    "applied_signals_count": memo_res.applied_signals_count,
+                    **memo_res.diagnostics,
+                }
+            except Exception as exc:
+                memotime_success = False
+                memotime_diagnostics = {
+                    "exception_occurred": True,
+                    "is_fallback": True,
+                    "fallback_reason": str(exc),
+                    "error": str(exc),
+                }
 
         # 4. Multi-Signal Ranking
         ranked = MultiSignalRanker.rank_candidates(
@@ -172,7 +194,8 @@ class ProjectContextEngine:
                 "candidates_expanded": len(expanded_candidates),
                 "customer_knowledge_count": len(knowledge_records),
                 "top_score": ranked[0].score if ranked else 0.0,
-                "memotime_used": use_memotime,
+                "memotime_used": memotime_success if use_memotime else False,
+                "memotime_diagnostics": memotime_diagnostics,
                 "star_rag_used": use_star_rag,
             }
         )
