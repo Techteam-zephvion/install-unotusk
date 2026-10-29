@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import combinations
@@ -33,7 +34,14 @@ from apps.api.src.services.code_atom.temporal import (
     parse_candidate_timestamp,
     resolve_temporal_supersession,
 )
-from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
+from apps.api.src.services.context_engine.query_analyzer import (
+    NEGATION_WORDS,
+    STOP_WORDS,
+    AnalyzedQuery,
+)
+
+_WORD_PATTERN = re.compile(r"[A-Za-z0-9_]+", re.ASCII)
+_CAMEL_PATTERN = re.compile(r"[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z][a-z0-9]|\b)", re.ASCII)
 from apps.api.src.services.context_engine.retriever import RetrievedCandidate
 
 logger = logging.getLogger(__name__)
@@ -734,6 +742,55 @@ class StarRagContextService:
         return events
 
     @classmethod
+    def _tokenize_code_text(cls, text: str) -> set[str]:
+        """
+        Extracts normalized tokens from identifiers, paths, and code text.
+        Handles snake_case, camelCase, PascalCase, and dot-separated names.
+        Returns a set of lowercase tokens, plus composite stems without delimiters.
+        """
+        if not text:
+            return set()
+        tokens: set[str] = set()
+        raw_words = _WORD_PATTERN.findall(text)
+        for raw_w in raw_words:
+            w_lower = raw_w.lower()
+            tokens.add(w_lower)
+            if "_" in raw_w:
+                clean_w = w_lower.replace("_", "")
+                if clean_w:
+                    tokens.add(clean_w)
+                for part in raw_w.split("_"):
+                    if part:
+                        tokens.add(part.lower())
+                        if not part.islower() and not part.isupper():
+                            for sp in _CAMEL_PATTERN.findall(part):
+                                tokens.add(sp.lower())
+            elif not raw_w.islower() and not raw_w.isupper():
+                for sw in _CAMEL_PATTERN.findall(raw_w):
+                    tokens.add(sw.lower())
+        return tokens
+
+    @classmethod
+    def _get_candidate_tokens(
+        cls, candidate: RetrievedCandidate
+    ) -> tuple[set[str], str, set[str], set[str]]:
+        cache_key = (candidate.name, candidate.path, candidate.content)
+        cached = getattr(candidate, "_token_cache", None)
+        if cached is not None and cached[0] == cache_key:
+            return cached[1]
+        name_stem = candidate.name.split(" (")[0].strip()
+        name_tokens = cls._tokenize_code_text(name_stem) | cls._tokenize_code_text(candidate.name)
+        path_norm = candidate.path.replace("\\", "/").lower()
+        path_tokens = cls._tokenize_code_text(path_norm)
+        content_tokens = cls._tokenize_code_text(candidate.content)
+        result = (name_tokens, path_norm, path_tokens, content_tokens)
+        try:
+            candidate._token_cache = (cache_key, result)
+        except Exception:
+            pass
+        return result
+
+    @classmethod
     def compute_anchor_relevance(
         cls,
         candidate: RetrievedCandidate,
@@ -760,34 +817,52 @@ class StarRagContextService:
 
         lexical_score = 0.0
         if analyzed_query:
-            name_lower = candidate.name.lower()
-            name_stem = name_lower.split(" (")[0].strip()
-            path_lower = candidate.path.lower()
-            content_lower = candidate.content.lower()
+            name_tokens, path_norm, path_tokens, content_tokens = cls._get_candidate_tokens(candidate)
 
+            # 1. Exact / token-aware symbol candidates match
             for sym in analyzed_query.symbol_candidates:
-                sym_l = sym.lower()
-                if sym_l in (name_lower, name_stem):
+                sym_l = sym.lower().strip()
+                if not sym_l or sym_l in STOP_WORDS or sym_l in NEGATION_WORDS or len(sym_l) <= 1:
+                    continue
+                sym_clean = sym_l.replace("_", "")
+                if sym_l in name_tokens or sym_clean in name_tokens:
                     lexical_score += 1.5
-                elif sym_l in path_lower:
+                elif sym_l in path_tokens or sym_clean in path_tokens:
                     lexical_score += 0.8
 
+            # 2. Path candidates match
             for p_cand in analyzed_query.path_candidates:
-                if p_cand.lower() in path_lower:
+                p_cand_norm = p_cand.replace("\\", "/").lower().strip()
+                if not p_cand_norm:
+                    continue
+                if (
+                    p_cand_norm == path_norm
+                    or path_norm.endswith("/" + p_cand_norm)
+                    or ("/" + p_cand_norm + "/" in "/" + path_norm + "/")
+                    or p_cand_norm in path_tokens
+                ):
                     lexical_score += 0.8
 
+            # 3. Meaningful keyword matches
             for kw in analyzed_query.keywords:
-                kw_l = kw.lower()
-                if kw_l in name_lower or kw_l in name_stem:
+                kw_l = kw.lower().strip()
+                if not kw_l or kw_l in STOP_WORDS or kw_l in NEGATION_WORDS or len(kw_l) <= 1:
+                    continue
+                kw_clean = kw_l.replace("_", "")
+                if kw_l in name_tokens or kw_clean in name_tokens:
                     lexical_score += 0.8
-                elif kw_l in content_lower:
+                elif kw_l in content_tokens or kw_clean in content_tokens:
                     lexical_score += 0.3
 
+            # 4. Architectural concept keyword matches
             for concept in analyzed_query.concept_keywords:
-                concept_l = concept.lower()
-                if concept_l in name_lower:
+                concept_l = concept.lower().strip()
+                if not concept_l or concept_l in STOP_WORDS or concept_l in NEGATION_WORDS or len(concept_l) <= 1:
+                    continue
+                concept_clean = concept_l.replace("_", "")
+                if concept_l in name_tokens or concept_clean in name_tokens:
                     lexical_score += 0.6
-                elif concept_l in content_lower:
+                elif concept_l in content_tokens or concept_clean in content_tokens:
                     lexical_score += 0.2
 
         return round(base_score + lexical_score, 4)

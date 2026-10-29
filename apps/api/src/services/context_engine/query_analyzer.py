@@ -12,12 +12,33 @@ class AnalyzedQuery:
     is_temporal: bool = False
     temporal_intent: str | None = None
     temporal_keywords: list[str] = field(default_factory=list)
+    has_negation: bool = False
+    negation_keywords: list[str] = field(default_factory=list)
 
+
+# Conjunctions that don't flip polarity or provide semantic code discrimination
+CONJUNCTIONS = {
+    "and",
+    "or",
+    "but",
+    "nor",
+    "so",
+    "yet",
+}
+
+# Semantic negation tokens that invert or restrict intent
+NEGATION_WORDS = {
+    "not",
+    "no",
+    "never",
+    "without",
+}
 
 # Stop words that don't help in code retrieval
 STOP_WORDS = {
     "a",
     "an",
+    *CONJUNCTIONS,
     "the",
     "in",
     "on",
@@ -112,6 +133,7 @@ def analyze_query(query: str) -> AnalyzedQuery:
     symbol_candidates: list[str] = []
     path_candidates: list[str] = []
     concept_keywords: list[str] = []
+    negation_keywords: list[str] = []
 
     for word in words:
         # Detect paths (containing '/' or file extensions)
@@ -125,12 +147,16 @@ def analyze_query(query: str) -> AnalyzedQuery:
             parts = word.split(".")
             symbol_candidates.extend(parts)
         elif re.match(r"^[A-Z][a-zA-Z0-9]*[a-z][a-zA-Z0-9]*$", word):
-            symbol_candidates.append(word)
+            if word.lower() not in STOP_WORDS and word.lower() not in NEGATION_WORDS:
+                symbol_candidates.append(word)
         elif "_" in word and re.match(r"^[a-zA-Z0-9_]+$", word):
             symbol_candidates.append(word)
 
-        # Clean word for keywords
+        # Clean word for keywords and negation tracking
         clean_w = word.lower().strip(".,?!:;()[]{}'\"")
+        if clean_w in NEGATION_WORDS:
+            negation_keywords.append(clean_w)
+
         if len(clean_w) > 1 and clean_w not in STOP_WORDS:
             keywords.append(clean_w)
             if "." in clean_w:
@@ -148,6 +174,7 @@ def analyze_query(query: str) -> AnalyzedQuery:
     dedup_symbols = list(dict.fromkeys(symbol_candidates))
     dedup_paths = list(dict.fromkeys(path_candidates))
     dedup_concepts = list(dict.fromkeys(concept_keywords))
+    dedup_negations = list(dict.fromkeys(negation_keywords))
 
     # Detect temporal intent and code evolution queries
     from apps.api.src.services.code_atom.temporal import classify_temporal_intent
@@ -163,6 +190,8 @@ def analyze_query(query: str) -> AnalyzedQuery:
         is_temporal=is_temporal,
         temporal_intent=temporal_intent,
         temporal_keywords=detected_temporal_keywords,
+        has_negation=len(dedup_negations) > 0,
+        negation_keywords=dedup_negations,
     )
 
 

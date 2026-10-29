@@ -181,7 +181,7 @@ def test_3_hamming_distance_edge_construction():
     """
     r1 = RuleNode("<T1, CALLS, T2>", "T1", "CALLS", "T2")
     r2 = RuleNode("<T1, IMPORTS, T2>", "T1", "IMPORTS", "T2")  # dH = 1 (relation differs)
-    r3 = RuleNode("<T1, CALLS, T3>", "T1", "CALLS", "T3")    # dH = 1 (object differs)
+    r3 = RuleNode("<T1, CALLS, T3>", "T1", "CALLS", "T3")  # dH = 1 (object differs)
     r4 = RuleNode("<T2, IMPORTS, T3>", "T2", "IMPORTS", "T3")  # dH = 3 (all differ)
 
     nodes = {r.node_id: r for r in [r1, r2, r3, r4]}
@@ -358,7 +358,9 @@ def test_7_mapping_selected_rules_to_code_evidence():
         "apps/order.py",
         "def process(): PaymentGateway.charge()",
         committed_at=t0,
-        temporal_relations=[{"subject": "OrderProcessor", "relation": "CALLS", "object": "PaymentGateway"}],
+        temporal_relations=[
+            {"subject": "OrderProcessor", "relation": "CALLS", "object": "PaymentGateway"}
+        ],
     )
     c2 = make_candidate(
         "cand-2",
@@ -366,7 +368,9 @@ def test_7_mapping_selected_rules_to_code_evidence():
         "apps/payment.py",
         "class PaymentGateway: ...",
         committed_at=t1,
-        temporal_relations=[{"subject": "PaymentGateway", "relation": "DEFINES", "object": "charge"}],
+        temporal_relations=[
+            {"subject": "PaymentGateway", "relation": "DEFINES", "object": "charge"}
+        ],
     )
 
     result = StarRagContextService.run_star_rag_pipeline(
@@ -409,7 +413,9 @@ def test_8_historical_versus_current_implementation_retrieval():
         "apps/auth.py",
         "def hash_password(pwd): return sha1_hasher.hash(pwd)",
         committed_at=t_old,
-        temporal_relations=[{"subject": "hash_password", "relation": "CALLS", "object": "sha1_hasher"}],
+        temporal_relations=[
+            {"subject": "hash_password", "relation": "CALLS", "object": "sha1_hasher"}
+        ],
         symbol_name="hash_password",
     )
     new_cand = make_candidate(
@@ -477,13 +483,21 @@ def test_10_repository_and_snapshot_isolation():
     snap_b = uuid.uuid4()
 
     cA = make_candidate(
-        "cA", "ModA", "a.py", "code_a",
-        repository_id=repo_a, snapshot_id=snap_a,
+        "cA",
+        "ModA",
+        "a.py",
+        "code_a",
+        repository_id=repo_a,
+        snapshot_id=snap_a,
         temporal_relations=[{"subject": "ModA", "relation": "CALLS", "object": "HelperA"}],
     )
     cB = make_candidate(
-        "cB", "ModB", "b.py", "code_b",
-        repository_id=repo_b, snapshot_id=snap_b,
+        "cB",
+        "ModB",
+        "b.py",
+        "code_b",
+        repository_id=repo_b,
+        snapshot_id=snap_b,
         temporal_relations=[{"subject": "ModB", "relation": "CALLS", "object": "HelperB"}],
     )
 
@@ -552,25 +566,37 @@ def test_12_baseline_versus_star_rag_evaluation():
 
     # 4 candidates forming related code events
     c1 = make_candidate(
-        "c1", "AuthHandler", "auth/handler.py", "def handle(): token_mgr.check()",
+        "c1",
+        "AuthHandler",
+        "auth/handler.py",
+        "def handle(): token_mgr.check()",
         committed_at=t1,
         temporal_relations=[{"subject": "AuthHandler", "relation": "CALLS", "object": "TokenMgr"}],
         signals={"vector_similarity": 0.85},
     )
     c2 = make_candidate(
-        "c2", "TokenMgr", "auth/token.py", "def check(): crypto.verify()",
+        "c2",
+        "TokenMgr",
+        "auth/token.py",
+        "def check(): crypto.verify()",
         committed_at=t2,
         temporal_relations=[{"subject": "TokenMgr", "relation": "CALLS", "object": "Crypto"}],
         signals={"vector_similarity": 0.75},
     )
     c3 = make_candidate(
-        "c3", "SessionMgr", "auth/session.py", "def save(): token_mgr.check()",
+        "c3",
+        "SessionMgr",
+        "auth/session.py",
+        "def save(): token_mgr.check()",
         committed_at=t2,
         temporal_relations=[{"subject": "SessionMgr", "relation": "CALLS", "object": "TokenMgr"}],
         signals={"vector_similarity": 0.70},
     )
     c4 = make_candidate(
-        "c4", "UnrelatedJob", "jobs/cleanup.py", "def cleanup(): pass",
+        "c4",
+        "UnrelatedJob",
+        "jobs/cleanup.py",
+        "def cleanup(): pass",
         committed_at=t3,
         temporal_relations=[{"subject": "UnrelatedJob", "relation": "RUNS", "object": "Db"}],
         signals={"vector_similarity": 0.30},
@@ -624,14 +650,19 @@ def test_12_baseline_versus_star_rag_evaluation():
     # Report measured metrics
     print("\n--- STAR-RAG Evaluation Metrics ---")
     print(f"Raw events: {total_events}")
-    print(f"Rule nodes: {total_rule_nodes} (Compression ratio: {round(total_rule_nodes / total_events, 2)})")
+    print(
+        f"Rule nodes: {total_rule_nodes} (Compression ratio: {round(total_rule_nodes / total_events, 2)})"
+    )
     print(f"Selected MDL edges: {len(star_rag_res.selected_edges)}")
     print(f"Initial MDL cost: {round(star_rag_res.initial_mdl_cost, 2)} bits")
     print(f"Final MDL cost: {round(star_rag_res.final_mdl_cost, 2)} bits")
-    print(f"Baseline top raw vector score: {raw_vec} (weighted contribution: {round(weighted_vec, 4)})")
-    print(f"STAR-RAG top candidate raw PPR: {round(raw_ppr, 4)} (weighted contribution: {round(weighted_ppr, 4)})")
+    print(
+        f"Baseline top raw vector score: {raw_vec} (weighted contribution: {round(weighted_vec, 4)})"
+    )
+    print(
+        f"STAR-RAG top candidate raw PPR: {round(raw_ppr, 4)} (weighted contribution: {round(weighted_ppr, 4)})"
+    )
     print(f"Combined base signal sum: {round(base_signal_contribution, 4)}")
-
 
 
 # ==============================================================================
@@ -662,90 +693,160 @@ def test_13_grounded_repo_temporal_query_evaluation():
     candidates = [
         # Snapshot 1 (Legacy Initial Implementation - superseded)
         make_candidate(
-            "c_leg_auth", "LegacyAuthHandler", "auth/legacy_handler.py",
+            "c_leg_auth",
+            "LegacyAuthHandler",
+            "auth/legacy_handler.py",
             "def handle(): legacy_token.verify()",
-            committed_at=t1, snapshot_id=snap1, repository_id=repo_id,
-            temporal_relations=[{"subject": "LegacyAuthHandler", "relation": "CALLS", "object": "LegacyTokenMgr"}],
+            committed_at=t1,
+            snapshot_id=snap1,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "LegacyAuthHandler", "relation": "CALLS", "object": "LegacyTokenMgr"}
+            ],
             signals={"vector_similarity": 0.72},
         ),
         make_candidate(
-            "c_leg_tok", "LegacyTokenMgr", "auth/legacy_token.py",
+            "c_leg_tok",
+            "LegacyTokenMgr",
+            "auth/legacy_token.py",
             "def verify(): md5.hash()",
-            committed_at=t1, snapshot_id=snap1, repository_id=repo_id,
-            temporal_relations=[{"subject": "LegacyTokenMgr", "relation": "USES", "object": "Md5Hasher"}],
+            committed_at=t1,
+            snapshot_id=snap1,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "LegacyTokenMgr", "relation": "USES", "object": "Md5Hasher"}
+            ],
             signals={"vector_similarity": 0.70},
         ),
         make_candidate(
-            "c_md5", "Md5Hasher", "auth/hasher.py",
+            "c_md5",
+            "Md5Hasher",
+            "auth/hasher.py",
             "def hash(): md5()",
-            committed_at=t1, snapshot_id=snap1, repository_id=repo_id,
+            committed_at=t1,
+            snapshot_id=snap1,
+            repository_id=repo_id,
             temporal_relations=[{"subject": "Md5Hasher", "relation": "HASHES", "object": "Token"}],
             signals={"vector_similarity": 0.65},
         ),
         # Snapshot 2 (Modern Token Introduction)
         make_candidate(
-            "c_jwt", "JwtTokenMgr", "auth/jwt_token.py",
+            "c_jwt",
+            "JwtTokenMgr",
+            "auth/jwt_token.py",
             "def verify(): signer.verify()",
-            committed_at=t2, snapshot_id=snap2, repository_id=repo_id,
-            temporal_relations=[{"subject": "JwtTokenMgr", "relation": "USES", "object": "Sha256Signer"}],
+            committed_at=t2,
+            snapshot_id=snap2,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "JwtTokenMgr", "relation": "USES", "object": "Sha256Signer"}
+            ],
             signals={"vector_similarity": 0.82},
         ),
         make_candidate(
-            "c_sha", "Sha256Signer", "auth/signer.py",
+            "c_sha",
+            "Sha256Signer",
+            "auth/signer.py",
             "def verify(): hmac()",
-            committed_at=t2, snapshot_id=snap2, repository_id=repo_id,
-            temporal_relations=[{"subject": "Sha256Signer", "relation": "SIGNS", "object": "JwtPayload"}],
+            committed_at=t2,
+            snapshot_id=snap2,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "Sha256Signer", "relation": "SIGNS", "object": "JwtPayload"}
+            ],
             signals={"vector_similarity": 0.75},
         ),
         make_candidate(
-            "c_sync", "NightlySync", "jobs/nightly_sync.py",
+            "c_sync",
+            "NightlySync",
+            "jobs/nightly_sync.py",
             "def run(): backup()",
-            committed_at=t2, snapshot_id=snap2, repository_id=repo_id,
-            temporal_relations=[{"subject": "NightlySync", "relation": "RUNS", "object": "DbBackup"}],
+            committed_at=t2,
+            snapshot_id=snap2,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "NightlySync", "relation": "RUNS", "object": "DbBackup"}
+            ],
             signals={"vector_similarity": 0.20},
         ),
         # Snapshot 3 (OAuth & Session Store)
         make_candidate(
-            "c_oauth", "OAuthHandler", "auth/oauth_handler.py",
+            "c_oauth",
+            "OAuthHandler",
+            "auth/oauth_handler.py",
             "def oauth(): jwt.verify()",
-            committed_at=t3, snapshot_id=snap3, repository_id=repo_id,
-            temporal_relations=[{"subject": "OAuthHandler", "relation": "CALLS", "object": "JwtTokenMgr"}],
+            committed_at=t3,
+            snapshot_id=snap3,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "OAuthHandler", "relation": "CALLS", "object": "JwtTokenMgr"}
+            ],
             signals={"vector_similarity": 0.78},
         ),
         make_candidate(
-            "c_sess", "SessionStore", "auth/session_store.py",
+            "c_sess",
+            "SessionStore",
+            "auth/session_store.py",
             "def store(): redis.set()",
-            committed_at=t3, snapshot_id=snap3, repository_id=repo_id,
-            temporal_relations=[{"subject": "SessionStore", "relation": "STORES_IN", "object": "RedisCache"}],
+            committed_at=t3,
+            snapshot_id=snap3,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "SessionStore", "relation": "STORES_IN", "object": "RedisCache"}
+            ],
             signals={"vector_similarity": 0.68},
         ),
         make_candidate(
-            "c_redis", "RedisCache", "db/redis_pool.py",
+            "c_redis",
+            "RedisCache",
+            "db/redis_pool.py",
             "def set(): redis()",
-            committed_at=t3, snapshot_id=snap3, repository_id=repo_id,
-            temporal_relations=[{"subject": "RedisCache", "relation": "CONNECTS", "object": "RedisServer"}],
+            committed_at=t3,
+            snapshot_id=snap3,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "RedisCache", "relation": "CONNECTS", "object": "RedisServer"}
+            ],
             signals={"vector_similarity": 0.25},
         ),
         # Snapshot 4 (Current Active Refactor)
         make_candidate(
-            "c_auth_svc", "AuthService", "auth/auth_service.py",
+            "c_auth_svc",
+            "AuthService",
+            "auth/auth_service.py",
             "def authenticate(): jwt.verify(); rotator.check()",
-            committed_at=t4, snapshot_id=snap4, repository_id=repo_id,
-            temporal_relations=[{"subject": "AuthService", "relation": "CALLS", "object": "JwtTokenMgr"}],
+            committed_at=t4,
+            snapshot_id=snap4,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "AuthService", "relation": "CALLS", "object": "JwtTokenMgr"}
+            ],
             signals={"vector_similarity": 0.88},
         ),
         make_candidate(
-            "c_rotator", "KeyRotator", "auth/key_rotator.py",
+            "c_rotator",
+            "KeyRotator",
+            "auth/key_rotator.py",
             "def check(): signer.refresh()",
-            committed_at=t4, snapshot_id=snap4, repository_id=repo_id,
-            temporal_relations=[{"subject": "KeyRotator", "relation": "USES", "object": "Sha256Signer"}],
+            committed_at=t4,
+            snapshot_id=snap4,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "KeyRotator", "relation": "USES", "object": "Sha256Signer"}
+            ],
             signals={"vector_similarity": 0.80},
         ),
         make_candidate(
-            "c_inv", "InvoiceJob", "billing/invoice_job.py",
+            "c_inv",
+            "InvoiceJob",
+            "billing/invoice_job.py",
             "def bill(): stripe()",
-            committed_at=t4, snapshot_id=snap4, repository_id=repo_id,
-            temporal_relations=[{"subject": "InvoiceJob", "relation": "PROCESSES", "object": "StripePayment"}],
+            committed_at=t4,
+            snapshot_id=snap4,
+            repository_id=repo_id,
+            temporal_relations=[
+                {"subject": "InvoiceJob", "relation": "PROCESSES", "object": "StripePayment"}
+            ],
             signals={"vector_similarity": 0.15},
         ),
     ]
@@ -779,7 +880,10 @@ def test_13_grounded_repo_temporal_query_evaluation():
 
     # 2. Candidate reduction / noise filtering:
     ranked_cand_ids = {r.candidate.candidate_id for r in ranked_curr}
-    assert "c_inv" not in ranked_cand_ids or next(r.score for r in ranked_curr if r.candidate.candidate_id == "c_inv") < 0.2
+    assert (
+        "c_inv" not in ranked_cand_ids
+        or next(r.score for r in ranked_curr if r.candidate.candidate_id == "c_inv") < 0.2
+    )
 
     # 3. Provenance preservation:
     top_cand = ranked_curr[0].candidate
@@ -819,7 +923,9 @@ def test_13_grounded_repo_temporal_query_evaluation():
 
     # 2. Historical precursors are not demoted when query is temporal:
     leg_cand = next(r for r in ranked_hist if r.candidate.name == "LegacyTokenMgr")
-    assert any("Historical" in reason or "precursor" in reason for reason in leg_cand.matched_reasons)
+    assert any(
+        "Historical" in reason or "precursor" in reason for reason in leg_cand.matched_reasons
+    )
 
     # 3. Latency performance:
     assert latency_hist_ms < 50.0
@@ -898,14 +1004,20 @@ def test_14_anchor_scoring_signal_disagreement_and_determinism():
     score_d = StarRagContextService.compute_anchor_relevance(cand_d, query)
 
     # 1. Semantic match dominates incidental keyword
-    assert score_a > score_b, f"Semantic candidate ({score_a}) should beat incidental keyword ({score_b})"
+    assert score_a > score_b, (
+        f"Semantic candidate ({score_a}) should beat incidental keyword ({score_b})"
+    )
 
     # 2. Exact symbol match with moderate similarity ranks top
-    assert score_d > score_a, f"Exact symbol candidate ({score_d}) should outrank pure semantic ({score_a})"
+    assert score_d > score_a, (
+        f"Exact symbol candidate ({score_d}) should outrank pure semantic ({score_a})"
+    )
 
     # 3. Pre-computed score is preserved exactly without double-counting lexical signals
     assert score_c == 2.20, f"Pre-computed score was double-counted! Expected 2.20, got {score_c}"
-    assert score_c > score_b, f"Pre-computed score ({score_c}) should outrank weak candidate ({score_b})"
+    assert score_c > score_b, (
+        f"Pre-computed score ({score_c}) should outrank weak candidate ({score_b})"
+    )
 
     # 3b. Unscored candidate with same content gets raw signals + lexical signals
     cand_e_unscored = make_candidate(
@@ -916,7 +1028,9 @@ def test_14_anchor_scoring_signal_disagreement_and_determinism():
         signals={"vector_similarity": 0.10},
     )
     score_e = StarRagContextService.compute_anchor_relevance(cand_e_unscored, query)
-    assert score_e == round(0.10 * 1.4 + 0.0, 4), f"Expected raw unscored calculation, got {score_e}"
+    assert score_e == round(0.10 * 1.4 + 0.0, 4), (
+        f"Expected raw unscored calculation, got {score_e}"
+    )
 
     # 4. Deterministic tie-breaking on identical scores
     cand_tie1 = make_candidate(
@@ -934,7 +1048,9 @@ def test_14_anchor_scoring_signal_disagreement_and_determinism():
         signals={"vector_similarity": 0.50},
     )
 
-    assert StarRagContextService.compute_anchor_relevance(cand_tie1, query) == StarRagContextService.compute_anchor_relevance(cand_tie2, query)
+    assert StarRagContextService.compute_anchor_relevance(
+        cand_tie1, query
+    ) == StarRagContextService.compute_anchor_relevance(cand_tie2, query)
 
     # Regardless of input ordering or permutations, tie-break produces identical sorted order
     for _ in range(20):
@@ -942,10 +1058,12 @@ def test_14_anchor_scoring_signal_disagreement_and_determinism():
         random.shuffle(cands)
         sorted_cands = sorted(
             cands,
-            key=lambda c: (-StarRagContextService.compute_anchor_relevance(c, query), c.candidate_id),
+            key=lambda c: (
+                -StarRagContextService.compute_anchor_relevance(c, query),
+                c.candidate_id,
+            ),
         )
         assert [c.candidate_id for c in sorted_cands] == ["cand_tie_alpha", "cand_tie_beta"]
-
 
 
 # ==============================================================================
@@ -980,7 +1098,9 @@ def test_15_absent_evidence_gating_and_hub_attenuation():
             content="PostgreSQL connection pool management.",
             committed_at=t0,
             signals={"vector_similarity": 0.05},
-            temporal_relations=[{"subject": "DatabasePool", "relation": "DEFINES", "object": "db/pool.py"}],
+            temporal_relations=[
+                {"subject": "DatabasePool", "relation": "DEFINES", "object": "db/pool.py"}
+            ],
         ),
         make_candidate(
             candidate_id="c_db_2",
@@ -989,7 +1109,9 @@ def test_15_absent_evidence_gating_and_hub_attenuation():
             content="Pool acquire and release routines.",
             committed_at=t0,
             signals={"vector_similarity": 0.04},
-            temporal_relations=[{"subject": "DatabasePool", "relation": "CONNECTS", "object": "PostgreSQL"}],
+            temporal_relations=[
+                {"subject": "DatabasePool", "relation": "CONNECTS", "object": "PostgreSQL"}
+            ],
         ),
     ]
 
@@ -1036,7 +1158,9 @@ def test_15_absent_evidence_gating_and_hub_attenuation():
             content="Pool.",
             committed_at=t0,
             signals={"score": 0.22, "vector_similarity": 0.05},
-            temporal_relations=[{"subject": "DatabasePool", "relation": "DEFINES", "object": "db/pool.py"}],
+            temporal_relations=[
+                {"subject": "DatabasePool", "relation": "DEFINES", "object": "db/pool.py"}
+            ],
         ),
         make_candidate(
             candidate_id="c_pre_2",
@@ -1045,7 +1169,9 @@ def test_15_absent_evidence_gating_and_hub_attenuation():
             content="Pool.",
             committed_at=t0,
             signals={"score": 0.20, "vector_similarity": 0.05},
-            temporal_relations=[{"subject": "DatabasePool", "relation": "CONNECTS", "object": "PostgreSQL"}],
+            temporal_relations=[
+                {"subject": "DatabasePool", "relation": "CONNECTS", "object": "PostgreSQL"}
+            ],
         ),
     ]
 
@@ -1066,7 +1192,9 @@ def test_15_absent_evidence_gating_and_hub_attenuation():
         content="Generic hub class.",
         committed_at=t0,
         signals={"vector_similarity": 0.70},
-        temporal_relations=[{"subject": "HubClass", "relation": "CALLS", "object": f"target_{i}"} for i in range(25)],
+        temporal_relations=[
+            {"subject": "HubClass", "relation": "CALLS", "object": f"target_{i}"} for i in range(25)
+        ],
     )
     c_spec = make_candidate(
         candidate_id="c_spec",
@@ -1095,8 +1223,16 @@ def test_15_absent_evidence_gating_and_hub_attenuation():
     )
 
     # Hub node candidates should have their ppr score dampened under attenuation
-    hub_ppr_att = next(c.signals.get("star_rag_ppr", 0.0) for c in res_attenuated.candidates if c.candidate_id == "c_hub")
-    hub_ppr_unatt = next(c.signals.get("star_rag_ppr", 0.0) for c in res_unattenuated.candidates if c.candidate_id == "c_hub")
+    hub_ppr_att = next(
+        c.signals.get("star_rag_ppr", 0.0)
+        for c in res_attenuated.candidates
+        if c.candidate_id == "c_hub"
+    )
+    hub_ppr_unatt = next(
+        c.signals.get("star_rag_ppr", 0.0)
+        for c in res_unattenuated.candidates
+        if c.candidate_id == "c_hub"
+    )
     assert hub_ppr_att <= hub_ppr_unatt
 
 
@@ -1122,3 +1258,207 @@ def test_16_star_rag_configuration_and_defaults():
 
     # 2. Engine honors explicit opt-in
     assert getattr(settings, "STAR_RAG_ENABLED", False) is False
+
+
+# ==============================================================================
+# 17. Lexical Matching and False-Positive Prevention
+# ==============================================================================
+
+
+def test_17_lexical_matching_and_false_positive_prevention():
+    """
+    Verifies token-aware lexical matching in STAR-RAG anchor relevance:
+    1. 'and' must not match 'RelationshipExpander'.
+    2. 'cat' must not match unrelated identifiers such as 'scatter'.
+    3. Genuine symbol and keyword matches still work.
+    4. Meaningful matches across snake_case, camelCase, and PascalCase remain supported.
+    5. Path and content matches behave correctly without accidental substring hits.
+    6. Precomputed ranker scores are not double-counted.
+    7. Absent-evidence queries still fall back without injecting star_rag_ppr.
+    8. Existing current-state and historical temporal retrieval behavior remains intact.
+    """
+    # 1. 'and' must not match RelationshipExpander
+    cand_rel = make_candidate(
+        candidate_id="c_rel",
+        name="RelationshipExpander",
+        path="apps/api/src/services/context_engine/graph_expander.py",
+        content="class RelationshipExpander:\n    pass",
+        signals={"vector_similarity": 0.0},
+    )
+    q_and = AnalyzedQuery(raw_query="test and query", keywords=["and"], symbol_candidates=["and"])
+    assert StarRagContextService.compute_anchor_relevance(cand_rel, q_and) == 0.0
+
+    # 2. 'cat' must not match an unrelated identifier such as scatter
+    cand_scatter = make_candidate(
+        candidate_id="c_scatter",
+        name="scatter",
+        path="math/scatter.py",
+        content="def scatter(x, y):\n    return x + y",
+        signals={"vector_similarity": 0.0},
+    )
+    q_cat = AnalyzedQuery(raw_query="cat", keywords=["cat"], symbol_candidates=["cat"])
+    assert StarRagContextService.compute_anchor_relevance(cand_scatter, q_cat) == 0.0
+
+    # 3. Genuine symbol and keyword matches still work
+    q_rel_sym = AnalyzedQuery(
+        raw_query="RelationshipExpander", symbol_candidates=["RelationshipExpander"]
+    )
+    score_rel_sym = StarRagContextService.compute_anchor_relevance(cand_rel, q_rel_sym)
+    assert score_rel_sym >= 1.5, f"Expected exact symbol match bonus >= 1.5, got {score_rel_sym}"
+
+    q_rel_kw = AnalyzedQuery(raw_query="expander", keywords=["expander"])
+    score_rel_kw = StarRagContextService.compute_anchor_relevance(cand_rel, q_rel_kw)
+    assert score_rel_kw >= 0.8, f"Expected keyword match bonus >= 0.8, got {score_rel_kw}"
+
+    # 4. Meaningful matches across snake_case, camelCase, and PascalCase
+    cand_snake = make_candidate(
+        candidate_id="c_snake",
+        name="user_session_manager",
+        path="auth/user_session_manager.py",
+        content="pass",
+        signals={"vector_similarity": 0.0},
+    )
+    cand_camel = make_candidate(
+        candidate_id="c_camel",
+        name="userSessionManager",
+        path="auth/userSessionManager.py",
+        content="pass",
+        signals={"vector_similarity": 0.0},
+    )
+    cand_pascal = make_candidate(
+        candidate_id="c_pascal",
+        name="UserSessionManager",
+        path="auth/UserSessionManager.py",
+        content="pass",
+        signals={"vector_similarity": 0.0},
+    )
+
+    q_pascal = AnalyzedQuery(
+        raw_query="UserSessionManager", symbol_candidates=["UserSessionManager"]
+    )
+    score_s = StarRagContextService.compute_anchor_relevance(cand_snake, q_pascal)
+    score_c = StarRagContextService.compute_anchor_relevance(cand_camel, q_pascal)
+    score_p = StarRagContextService.compute_anchor_relevance(cand_pascal, q_pascal)
+    assert score_s >= 1.5 and score_c >= 1.5 and score_p >= 1.5
+
+    # 5. Path and content matches behave correctly
+    cand_util = make_candidate(
+        candidate_id="c_util",
+        name="util",
+        path="auth/token_util.py",
+        content="def calculate_discount(amount):\n    return amount * 0.15",
+        signals={"vector_similarity": 0.0},
+    )
+    q_pth_valid = AnalyzedQuery(raw_query="token_util.py", path_candidates=["token_util.py"])
+    q_pth_unrelated = AnalyzedQuery(raw_query="scatter.py", path_candidates=["scatter.py"])
+    assert StarRagContextService.compute_anchor_relevance(cand_util, q_pth_valid) >= 0.8
+    assert StarRagContextService.compute_anchor_relevance(cand_util, q_pth_unrelated) == 0.0
+
+    q_content_valid = AnalyzedQuery(raw_query="discount", keywords=["discount"])
+    q_content_sub = AnalyzedQuery(raw_query="count", keywords=["count"])
+    assert StarRagContextService.compute_anchor_relevance(cand_util, q_content_valid) >= 0.3
+    assert StarRagContextService.compute_anchor_relevance(cand_util, q_content_sub) == 0.0
+
+    # 6. Precomputed ranker scores are not double-counted
+    cand_prescored = make_candidate(
+        candidate_id="c_prescored",
+        name="RelationshipExpander",
+        path="expander.py",
+        content="class RelationshipExpander: pass",
+        signals={"score": 0.75, "vector_similarity": 0.5},
+    )
+    assert StarRagContextService.compute_anchor_relevance(cand_prescored, q_rel_sym) == 0.75
+
+    # 7. Absent-evidence queries still fall back without injecting star_rag_ppr
+    q_absent = AnalyzedQuery(
+        raw_query="How is WebSocket audio streaming handled?",
+        keywords=["websocket", "audio", "streaming"],
+        symbol_candidates=["WebSocketAudio"],
+    )
+    res_absent = StarRagContextService.run_star_rag_pipeline(
+        [cand_rel, cand_scatter],
+        analyzed_query=q_absent,
+        query_text=q_absent.raw_query,
+    )
+    assert res_absent.is_fallback is True
+    assert res_absent.top_rules == []
+    assert all("star_rag_ppr" not in c.signals for c in res_absent.candidates)
+
+    # 8. Existing current-state and historical temporal retrieval behavior remains intact
+    cand_old = make_candidate(
+        candidate_id="c_old",
+        name="Worker.run",
+        path="worker.py",
+        content="old worker implementation",
+        committed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        signals={"vector_similarity": 0.6},
+        temporal_relations=[
+            {"subject": "Worker.run", "relation": "SUPERSEDED_BY", "object": "Worker.execute"}
+        ],
+    )
+    cand_new = make_candidate(
+        candidate_id="c_new",
+        name="Worker.execute",
+        path="worker.py",
+        content="new worker implementation",
+        committed_at=datetime(2026, 2, 1, tzinfo=UTC),
+        signals={"vector_similarity": 0.6},
+        temporal_relations=[
+            {"subject": "Worker.execute", "relation": "SUPERSEDES", "object": "Worker.run"}
+        ],
+    )
+    res_temporal = StarRagContextService.run_star_rag_pipeline(
+        [cand_old, cand_new],
+        query_text="How did worker evolve?",
+        min_anchor_score=0.0,
+    )
+    assert res_temporal.is_fallback is False
+    assert any(
+        c.metadata.get("commit_sha") or c.metadata.get("committed_at")
+        for c in res_temporal.candidates
+    )
+
+    # 9. Semantic negation words ('not', 'no', 'never', 'without') do not inflate anchor relevance
+    cand_with_not = make_candidate(
+        candidate_id="c_not",
+        name="authenticate",
+        path="auth/authenticate.py",
+        content="def authenticate():\n    if not user:\n        return False",
+        signals={"vector_similarity": 0.0},
+    )
+    q_neg_not = AnalyzedQuery(
+        raw_query="Which functions do not call authenticate?",
+        keywords=["functions", "not", "call", "authenticate"],
+        has_negation=True,
+        negation_keywords=["not"],
+    )
+    # The score should come from 'authenticate' in name (+0.8), NOT from 'not' matching the code content (+0.3)
+    score_with_not = StarRagContextService.compute_anchor_relevance(cand_with_not, q_neg_not)
+    assert score_with_not == 0.8, (
+        f"Expected 0.8 (from 'authenticate' name match), got {score_with_not}"
+    )
+
+    q_pure_neg = AnalyzedQuery(
+        raw_query="without never no",
+        keywords=["without", "never", "no"],
+        has_negation=True,
+        negation_keywords=["without", "never", "no"],
+    )
+    assert StarRagContextService.compute_anchor_relevance(cand_with_not, q_pure_neg) == 0.0
+
+    # 10. Token caching cannot produce stale matches when candidate content changes
+    cand_mutable = make_candidate(
+        candidate_id="c_mut",
+        name="initial_func",
+        path="mut.py",
+        content="def initial_func(): pass",
+        signals={"vector_similarity": 0.0},
+    )
+    tokens_v1 = StarRagContextService._get_candidate_tokens(cand_mutable)
+    assert "initial_func" in tokens_v1[0]
+    assert "updated_func" not in tokens_v1[3]
+
+    cand_mutable.content = "def updated_func(): return True"
+    tokens_v2 = StarRagContextService._get_candidate_tokens(cand_mutable)
+    assert "updated_func" in tokens_v2[3]
+    assert "initial_func" not in tokens_v2[3]
