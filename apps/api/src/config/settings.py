@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     MEMOTIME_ENABLED: bool = Field(default=False)
     MEMOTIME_MAX_PROPAGATION_HOPS: int = Field(default=5)
 
+    # EvoKG Temporal Knowledge Graph Settings (arXiv:2509.15464: "EvoReasoner: Temporal Reasoning with LLMs Augmented by Evolving Knowledge Graphs")
+    EVOKG_ENABLED: bool = Field(
+        default=False,
+        description="Enable incremental EvoKG temporal triplet extraction, contradiction resolution, and persistence.",
+    )
+
     # Code-Lane Embedding Settings ('voyage' or 'development')
     EMBEDDING_PROVIDER: str = Field(default="development")
     VOYAGE_API_KEY: str | None = Field(default=None)

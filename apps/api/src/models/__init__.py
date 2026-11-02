@@ -20,6 +20,7 @@ from apps.api.src.models.enums import (
     SnapshotStatus,
     SymbolType,
 )
+from apps.api.src.models.evokg import EvoKGTriplet
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
@@ -43,6 +44,7 @@ __all__ = [
     "DependencyType",
     "DiscoveryJobStatus",
     "DiscoveryRun",
+    "EvoKGTriplet",
     "Finding",
     "FindingCategory",
     "FindingConfidence",

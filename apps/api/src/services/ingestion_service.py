@@ -407,6 +407,24 @@ class IngestionService:
                     for atom_chunk in atom_chunks:
                         session.add(atom_chunk)
 
+                    # 4.6. EvoKG Temporal Knowledge Graph Persistence
+                    from apps.api.src.config.settings import settings
+                    if getattr(settings, 'EVOKG_ENABLED', False) and getattr(decomp_result, 'relations', None):
+                        from apps.api.src.services.evokg import EvoKGPersistenceService
+                        evokg_service = EvoKGPersistenceService()
+                        files_id_map = {p: rf.id for p, rf in created_files_map.items()}
+                        syms_id_map = {s.name: s.id for _, s in created_symbols_list}
+                        await evokg_service.persist_relations(
+                            session=session,
+                            repository_id=repository.id,
+                            relations=decomp_result.relations,
+                            branch=snapshot.branch,
+                            snapshot_id=snapshot.id,
+                            commit_sha=snapshot.commit_sha,
+                            files_map=files_id_map,
+                            symbols_map=syms_id_map,
+                        )
+
                     await session.flush()
 
                 # 5. INDEXING: Link internal dependencies & external packages
@@ -592,6 +610,38 @@ class IngestionService:
         for chunk in atom_chunks:
             if chunk.fingerprint not in existing_chunks_by_fingerprint:
                 session.add(chunk)
+
+        # 4.5. EvoKG Temporal Knowledge Graph Persistence
+        from apps.api.src.config.settings import settings
+        if getattr(settings, 'EVOKG_ENABLED', False) and getattr(decomp_result, 'relations', None):
+            from apps.api.src.services.evokg import EvoKGPersistenceService
+
+            snap_branch = 'main'
+            snap_query = select(RepositorySnapshot.branch, RepositorySnapshot.repository_id).where(
+                RepositorySnapshot.id == snapshot_id
+            )
+            snap_res = await session.execute(snap_query)
+            snap_row = snap_res.first()
+            if snap_row:
+                snap_branch = snap_row[0] or 'main'
+                if not repository_id:
+                    repository_id = snap_row[1]
+
+            if repository_id:
+                evokg_service = EvoKGPersistenceService()
+                files_id_map = {f.path: f.id for f in files}
+                syms_id_map = {sym.name: sym.id for sym, _ in symbols_with_path}
+                await evokg_service.persist_relations(
+                    session=session,
+                    repository_id=repository_id,
+                    relations=decomp_result.relations,
+                    branch=snap_branch,
+                    snapshot_id=snapshot_id,
+                    commit_sha=commit_artifact.commit_sha,
+                    files_map=files_id_map,
+                    symbols_map=syms_id_map,
+                    rename_history=rename_history,
+                )
 
         await session.flush()
         return atom_chunks

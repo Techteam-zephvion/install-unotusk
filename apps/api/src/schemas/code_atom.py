@@ -135,6 +135,7 @@ class TemporalCodeRelation(BaseModel):
     scope_key: str = "default"
     confidence_score: float = 0.50
     superseded_by_id: str | None = None
+    supersedes_id: str | None = None
 
     @model_validator(mode="before")
     @classmethod
