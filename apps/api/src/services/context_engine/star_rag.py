@@ -1,6 +1,6 @@
 """
 STAR-RAG (Spatio-Temporal Abstraction & Reasoning for RAG) Code Lane Integration.
-Based on Zhu et al. (arXiv:2510.16715, "Right Answer at the Right Time - Temporal
+Based on Zhu et al. (arXiv:2510.16715, "Right Answer at the Right Time — Temporal
 Retrieval-Augmented Generation via Graph Summarization").
 
 Implements:

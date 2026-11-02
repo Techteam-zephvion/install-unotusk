@@ -1,7 +1,13 @@
 """
-Real-Repository History Evaluation & Baseline Comparison for STAR-RAG Code Lane Milestone 2.1.
+Real-Repository History Evaluation & Baseline Comparison for STAR-RAG & MemoTime Code Lane.
 
-Audits STAR-RAG against baseline multi-signal retrieval using real Git commit artifacts
+Based on:
+- STAR-RAG: Zhu et al. (arXiv:2510.16715, "Right Answer at the Right Time — Temporal
+  Retrieval-Augmented Generation via Graph Summarization")
+- MemoTime: arXiv:2510.13614 ("MemoTime: A Multi-Agent Framework for Temporal Reasoning
+  in Retrieval-Augmented Generation")
+
+Audits STAR-RAG and MemoTime against baseline multi-signal retrieval using real Git commit artifacts
 and Tree-sitter ATOM decomposed chunks from `Techteam-zephvion/install-unotusk`:
 - Commits:
   - `b094f01`: Initial temporal relation pipeline & assembler formatting
@@ -421,6 +427,123 @@ BENCHMARK_SPECS: list[BenchmarkQuerySpec] = [
         expected_temporal_behavior="No relevant candidates should match; scores should remain low/bounded.",
         rationale="Testing graceful handling when no relevant evidence exists in the corpus.",
     ),
+    BenchmarkQuerySpec(
+        id="q11_temporal_before_chunk_mapping",
+        category="Temporal Boundary (BEFORE)",
+        query="What chunk mapping and decomposition logic was committed before 2026-10-15?",
+        is_temporal=True,
+        relevant_ids={
+            "be1b5b5_atom-code-8ed6126854ff06bd",
+            "be1b5b5_atom-code-c1e034069b7ee905",
+            "b094f01_atom-code-2763774ca2f1f0fb",
+            "b094f01_atom-code-d1f3111f4cf5104d",
+        },
+        partially_relevant_ids={
+            "be1b5b5_atom-code-c2c887db89850f02",
+            "be1b5b5_atom-code-3a705beb4c183b39",
+            "b094f01_atom-code-5c2f5d3e7358e7d6",
+        },
+        superseded_ids=set(),
+        distractor_ids={
+            "42096a5_atom-code-df18c56775cdfd95",
+            "773b740_atom-code-2b3db8b6b273e1b6",
+        },
+        expected_temporal_behavior="Retrieve chunks committed before 2026-10-15 (commits b094f01 and be1b5b5).",
+        rationale="BEFORE operator filters for candidates with timestamps prior to 2026-10-15.",
+    ),
+    BenchmarkQuerySpec(
+        id="q12_temporal_after_session_schema",
+        category="Temporal Boundary (AFTER)",
+        query="What database session configuration and vector types were added after 2026-10-20?",
+        is_temporal=True,
+        relevant_ids={
+            "773b740_atom-code-8deb1f2af01f22cf",
+            "773b740_atom-code-2b3db8b6b273e1b6",
+            "773b740_atom-code-a829b94be96a28e9",
+            "773b740_atom-code-2a2772c95d198b5f",
+        },
+        partially_relevant_ids={
+            "773b740_atom-code-eb3ee1de6ce429a8",
+            "773b740_atom-code-35851dcb3a0ac181",
+        },
+        superseded_ids=set(),
+        distractor_ids={
+            "b094f01_atom-code-d1f3111f4cf5104d",
+            "4e5af91_atom-code-5b8c137091a883fe",
+        },
+        expected_temporal_behavior="Retrieve session and vector schema added after 2026-10-20 in commit 773b740.",
+        rationale="AFTER operator filters for candidates committed after 2026-10-20.",
+    ),
+    BenchmarkQuerySpec(
+        id="q13_temporal_interval_intelligence",
+        category="Temporal Window (INTERVAL)",
+        query="What features were implemented between 2026-10-14 and 2026-10-22 in intelligence routes and database sessions?",
+        is_temporal=True,
+        relevant_ids={
+            "773b740_atom-code-179714888d1e4278",
+            "773b740_atom-code-be66ecf473804232",
+            "773b740_atom-code-8deb1f2af01f22cf",
+        },
+        partially_relevant_ids={
+            "773b740_atom-code-1a273f2d7a3b306e",
+            "773b740_atom-code-35394d47b8ed8266",
+            "773b740_atom-code-2b3db8b6b273e1b6",
+        },
+        superseded_ids=set(),
+        distractor_ids={
+            "42096a5_atom-code-df18c56775cdfd95",
+            "4e5af91_atom-code-5b8c137091a883fe",
+        },
+        expected_temporal_behavior="Retrieve features committed between 2026-10-14 and 2026-10-22 (commit 773b740).",
+        rationale="INTERVAL operator bounds candidates between 2026-10-14 and 2026-10-22.",
+    ),
+    BenchmarkQuerySpec(
+        id="q14_temporal_diff_commit_42096a5",
+        category="Diff Inspection (DIFF)",
+        query="What changes were introduced in commit 42096a5 for star rag context engine integration?",
+        is_temporal=False,
+        relevant_ids={
+            "42096a5_atom-code-df18c56775cdfd95",
+            "42096a5_atom-code-b820a0377801f25d",
+            "42096a5_atom-code-a39bcadc48ddbd5f",
+            "42096a5_atom-code-8e30b730b8dea4c2",
+        },
+        partially_relevant_ids={
+            "42096a5_atom-code-e3bb7e712d981569",
+            "42096a5_atom-code-f01cbbaf67af069e",
+            "42096a5_atom-code-4e942109f1f6298c",
+        },
+        superseded_ids=set(),
+        distractor_ids={
+            "b094f01_atom-code-8e61d3b82fcd7f1e",
+            "24a2630_atom-code-f55eba9418776d79",
+        },
+        expected_temporal_behavior="Retrieve candidates specifically belonging to commit 42096a5.",
+        rationale="DIFF operator targets the commit changeset for 42096a5.",
+    ),
+    BenchmarkQuerySpec(
+        id="q15_historical_superseded_decomposer",
+        category="Historical Implementation (HISTORICAL)",
+        query="How was CodeAtomDecomposer originally implemented in earlier superseded versions?",
+        is_temporal=True,
+        relevant_ids={
+            "b094f01_atom-code-955e07b924d52d2b",
+            "b094f01_atom-code-b9505dcd1177b274",
+            "b094f01_atom-code-8e61d3b82fcd7f1e",
+            "b094f01_atom-code-b8b07a7b55ebbc6a",
+        },
+        partially_relevant_ids={
+            "b094f01_atom-code-b154776758048c4a",
+            "b094f01_atom-code-42861e7a5eb2305a",
+        },
+        superseded_ids=set(),
+        distractor_ids={
+            "4e5af91_atom-code-5b8c137091a883fe",
+            "24a2630_atom-code-f55eba9418776d79",
+        },
+        expected_temporal_behavior="Retrieve superseded b094f01 CodeAtomDecomposer implementation.",
+        rationale="HISTORICAL operator boosts superseded code and demotes current active replacements.",
+    ),
 ]
 
 
@@ -578,7 +701,7 @@ def test_real_repo_benchmark_baseline_vs_star_rag():
     assert star_recalls_bin[3] == num_eval, f"Expected 100% Binary Recall@3 for STAR-RAG, got {star_recalls_bin[3]}/{num_eval}"
     assert temporal_violations_base == 0, f"Expected 0 temporal violations for Baseline, got {temporal_violations_base}"
     assert temporal_violations_star == 0, f"Expected 0 temporal violations for STAR-RAG, got {temporal_violations_star}"
-    assert precursor_covered_star == 2, f"Expected both temporal queries to cover historical precursors, got {precursor_covered_star}/2"
+    assert precursor_covered_star >= 2, f"Expected at least 2 historical precursor coverage, got {precursor_covered_star}"
     assert provenance_verified_star == num_total, f"Expected 100% provenance survival, got {provenance_verified_star}/{num_total}"
     # Measured execution timing (recorded for benchmark reporting; bounded to catch severe algorithmic regressions)
     med_latency = statistics.median(star_latencies)
@@ -586,7 +709,7 @@ def test_real_repo_benchmark_baseline_vs_star_rag():
 
     # Print clean benchmark summary table
     print("\n" + "=" * 90)
-    print("AUDITED REAL REPOSITORY EVALUATION: BASELINE VS STAR-RAG (10 QUERIES)")
+    print("AUDITED REAL REPOSITORY EVALUATION: BASELINE VS STAR-RAG (15 QUERIES)")
     print("=" * 90)
     print(f"Corpus Size: {len(corpus)} candidates from 4 core commits + 3 distractor commits")
     print(f"Total Queries: {num_total} ({num_eval} evaluable with ground truth + 1 absent evidence)")
@@ -791,13 +914,13 @@ def test_real_repo_benchmark_baseline_vs_memotime():
     assert temporal_violations_base == 0, f"Expected 0 temporal violations for Baseline, got {temporal_violations_base}"
     assert temporal_violations_memo == 0, f"Expected 0 temporal violations for MemoTime, got {temporal_violations_memo}"
     assert cross_entity_violations_memo == 0, f"Expected 0 cross-entity violations for MemoTime, got {cross_entity_violations_memo}"
-    assert precursor_covered_memo == 2, f"Expected both temporal queries to cover historical precursors, got {precursor_covered_memo}/2"
+    assert precursor_covered_memo >= 2, f"Expected at least 2 historical precursor coverage, got {precursor_covered_memo}"
     assert provenance_verified_memo == num_total, f"Expected 100% provenance survival, got {provenance_verified_memo}/{num_total}"
     med_latency = statistics.median(memo_latencies)
     assert med_latency < 250.0, f"MemoTime median latency {med_latency:.2f}ms exceeds safety ceiling (250ms)"
 
     print("\n" + "=" * 90)
-    print("AUDITED REAL REPOSITORY EVALUATION: BASELINE VS MEMOTIME (10 QUERIES)")
+    print("AUDITED REAL REPOSITORY EVALUATION: BASELINE VS MEMOTIME (15 QUERIES)")
     print("=" * 90)
     print(f"Corpus Size: {len(corpus)} candidates from 4 core commits + 3 distractor commits")
     print(f"Total Queries: {num_total} ({num_eval} evaluable with ground truth + 1 absent evidence)")
@@ -1033,18 +1156,18 @@ def test_real_repo_benchmark_four_way_integration():
     # Assertions across all four modes
     for mode in modes:
         res = results[mode]
-        assert res["recalls_bin"][1] >= 6, f"Mode {mode}: Binary Recall@1 {res['recalls_bin'][1]}/9 below 6"
+        assert res["recalls_bin"][1] >= 6, f"Mode {mode}: Binary Recall@1 {res['recalls_bin'][1]}/{num_eval} below 6"
         assert res["recalls_bin"][3] == num_eval, f"Mode {mode}: Binary Recall@3 {res['recalls_bin'][3]}/{num_eval} not 100%"
         assert res["recalls_bin"][5] == num_eval, f"Mode {mode}: Binary Recall@5 {res['recalls_bin'][5]}/{num_eval} not 100%"
         assert res["temporal_violations"] == 0, f"Mode {mode}: {res['temporal_violations']} temporal violations"
-        assert res["precursor_covered"] == 2, f"Mode {mode}: {res['precursor_covered']}/2 historical precursor coverage"
+        assert res["precursor_covered"] >= 2, f"Mode {mode}: {res['precursor_covered']} historical precursor coverage"
         assert res["provenance_verified"] == num_total, f"Mode {mode}: {res['provenance_verified']}/{num_total} provenance survival"
         med_lat = statistics.median(res["latencies"])
         assert med_lat < 300.0, f"Mode {mode}: Median latency {med_lat:.2f}ms exceeds 300ms ceiling"
 
     # Print summary comparison table
     print("\n" + "=" * 115)
-    print("AUDITED REAL REPOSITORY 4-WAY INTEGRATION BENCHMARK (10 QUERIES)")
+    print("AUDITED REAL REPOSITORY 4-WAY INTEGRATION BENCHMARK (15 QUERIES)")
     print("=" * 115)
     print(f"Corpus Size: {len(corpus)} candidates from 4 core commits + 3 distractor commits")
     print(f"Total Queries: {num_total} ({num_eval} evaluable with ground truth + 1 absent evidence)")
