@@ -112,7 +112,7 @@ class ProjectContextEngine:
                     "error": str(exc),
                 }
 
-        # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614)
+        # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
         use_memotime = (
             enable_memotime
             if enable_memotime is not None
@@ -217,6 +217,7 @@ class ProjectContextEngine:
                 "memotime_diagnostics": memotime_diagnostics,
                 "star_rag_used": star_rag_applied if use_star_rag else False,
                 "star_rag_diagnostics": star_rag_diagnostics,
+                "synthesis_gated": answer.debug_signals.get("is_abstention", False),
             }
         )
 

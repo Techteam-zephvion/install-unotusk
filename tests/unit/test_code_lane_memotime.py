@@ -1,5 +1,5 @@
 """
-Unit test suite for MemoTime Code Lane foundation (arXiv:2510.13614).
+Unit test suite for MemoTime Code Lane foundation (arXiv:2510.13614, "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning").
 
 Verifies:
 1. Current vs. historical intent classification and candidate binding.

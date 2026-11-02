@@ -1002,9 +1002,14 @@ class StarRagContextService:
                 else 0.0
             )
 
-            # Absent-evidence / weak-anchor gate:
-            # If candidates have pre-computed ranker scores ([0, 1]), effective threshold is scaled to min(min_anchor_th, 0.40).
-            # Otherwise on unnormalized raw multi-signal combinations, threshold defaults to min_anchor_th (1.0).
+            # Absent-evidence / weak-anchor gate (reconciled scoring scale):
+            # - Raw unnormalized multi-signal anchor relevance uses threshold 1.0 (STAR_RAG_MIN_ANCHOR_SCORE),
+            #   which requires at least one strong keyword or symbol match.
+            # - When candidates carry pre-computed normalized ranker scores in [0, 1], effective threshold scales
+            #   to min(min_anchor_th, 0.40).
+            # - Note on architectural reconciliation: The ~0.15 score reported in previous audits is the MultiSignalRanker
+            #   background floor score of an unaugmented chunk (and the separate Architecture V1 Low-Confidence Synthesis Gate),
+            #   not the STAR-RAG raw anchor relevance threshold (1.0).
             has_precomputed = (
                 bool(ranked_anchor_candidates)
                 and "score" in ranked_anchor_candidates[0].signals

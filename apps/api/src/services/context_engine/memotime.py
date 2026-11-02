@@ -1,7 +1,7 @@
 """
 MemoTime: Tree-of-Time Foundation and Structured Temporal Intent for Code Lane.
 
-Adapted from MemoTime (arXiv:2510.13614) for deterministic code intelligence:
+Adapted from MemoTime (arXiv:2510.13614, "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning") for deterministic code intelligence:
 - Structured temporal query intent classification across 8 core types.
 - Hierarchical Tree of Time (ToT) representing query decomposition and subquestions.
 - Monotonic progression and 13 Allen interval algebra relations.

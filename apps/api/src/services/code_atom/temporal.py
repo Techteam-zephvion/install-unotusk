@@ -53,7 +53,8 @@ TEMPORAL_REGEX_PATTERNS = [
 def classify_temporal_intent(query_text: str) -> tuple[bool, str | None, list[str]]:
     """
     Analyzes query text to detect temporal intent, intent type, and detected temporal tokens.
-    Leverages MemoTime structured temporal intent parser while preserving the tuple interface.
+    Leverages MemoTime (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
+    structured temporal intent parser while preserving the tuple interface.
     """
     if not query_text or not query_text.strip():
         return False, None, []

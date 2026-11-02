@@ -2,7 +2,13 @@ import logging
 from typing import Any
 
 from apps.api.src.config.settings import settings
-from apps.api.src.services.llm.base import GroundedAnswer, LLMProvider
+from apps.api.src.services.llm.base import (
+    GroundedAnswer,
+    LLMProvider,
+    extract_customer_notes,
+    format_insufficient_evidence_response,
+    should_abstain_due_to_insufficient_evidence,
+)
 from apps.api.src.services.llm.system_prompt import PROJECT_INTELLIGENCE_SYSTEM_PROMPT
 from apps.api.src.services.llm.thinking_policy import (
     ThinkingPolicy,
@@ -35,17 +41,56 @@ class GroqProvider(LLMProvider):
         conversation_history: list[dict[str, str]] | None = None,
         thinking_tier: str | None = None,
     ) -> GroundedAnswer:
-        # Determine thinking policy for reasoning depth
-        policy = get_thinking_policy(thinking_tier)
 
-        # Determine confidence based on retrieved evidence density & relevance
-        confidence = "LOW"
-        if evidence_items:
-            max_rel = max((e.get("relevance", 0.0) for e in evidence_items), default=0.0)
-            if max_rel >= 0.8:
-                confidence = "HIGH"
-            elif max_rel >= 0.5:
-                confidence = "MEDIUM"
+
+
+        policy = get_thinking_policy(thinking_tier)
+        customer_notes = extract_customer_notes(project_context)
+
+        # Architecture V1 Section 9 Low-Confidence Synthesis Gate
+        should_abstain, max_rel = should_abstain_due_to_insufficient_evidence(
+            evidence_items=evidence_items,
+            customer_notes=customer_notes,
+        )
+
+        if should_abstain:
+            abstention_content = format_insufficient_evidence_response(
+                question=question,
+                max_relevance=max_rel,
+            )
+            return GroundedAnswer(
+                content=abstention_content,
+                evidence=[],
+                related_entities=[],
+                confidence="LOW",
+                debug_signals={
+                    "is_abstention": True,
+                    "abstention_reason": "INSUFFICIENT_EVIDENCE",
+                    "model": "low-confidence-synthesis-gate",
+                    "provider": "offline",
+                    "thinking_tier": policy.tier.value,
+                    "evidence_count": len(evidence_items),
+                    "max_relevance": max_rel,
+                },
+            )
+
+
+        if max_rel >= 0.8:
+            confidence = "HIGH"
+        elif max_rel >= 0.5:
+            confidence = "MEDIUM"
+
+
+
+
+        else:
+            confidence = "LOW"
+
+
+
+
+
+
 
         # If live API key is available, call Groq API
         if self._client:
@@ -147,9 +192,9 @@ class GroqProvider(LLMProvider):
         confidence: str,
         policy: ThinkingPolicy | None = None,
     ) -> str:
-        # Extract any active customer knowledge from context
-        customer_notes: list[str] = []
-        if "<customer_project_knowledge>" in project_context:
+        customer_notes = extract_customer_notes(project_context)
+
+        if False:  # parsed via extract_customer_notes
             try:
                 start_tag = "<customer_project_knowledge>"
                 end_tag = "</customer_project_knowledge>"

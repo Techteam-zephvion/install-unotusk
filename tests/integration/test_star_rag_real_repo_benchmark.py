@@ -4,8 +4,7 @@ Real-Repository History Evaluation & Baseline Comparison for STAR-RAG & MemoTime
 Based on:
 - STAR-RAG: Zhu et al. (arXiv:2510.16715, "Right Answer at the Right Time — Temporal
   Retrieval-Augmented Generation via Graph Summarization")
-- MemoTime: arXiv:2510.13614 ("MemoTime: A Multi-Agent Framework for Temporal Reasoning
-  in Retrieval-Augmented Generation")
+- MemoTime: arXiv:2510.13614 ("MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
 
 Audits STAR-RAG and MemoTime against baseline multi-signal retrieval using real Git commit artifacts
 and Tree-sitter ATOM decomposed chunks from `Techteam-zephvion/install-unotusk`:
