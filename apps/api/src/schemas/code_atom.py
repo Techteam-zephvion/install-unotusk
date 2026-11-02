@@ -3,7 +3,31 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class PropertyExclusivity(str, Enum):
+    EXCLUSIVE = "EXCLUSIVE"
+    NON_EXCLUSIVE = "NON_EXCLUSIVE"
+
+
+class ScopeKeyStrategy(str, Enum):
+    GLOBAL = "GLOBAL"
+    OVERLOAD_INDEX = "OVERLOAD_INDEX"
+    LEXICAL_SCOPE = "LEXICAL_SCOPE"
+    INHERITANCE_SLOT = "INHERITANCE_SLOT"
+    SYMBOL_NAME = "SYMBOL_NAME"
+    CANONICAL_PATH = "CANONICAL_PATH"
+    CONCURRENT = "CONCURRENT"
+    UNCERTAIN = "UNCERTAIN"
+
+
+class TemporalSupersessionPolicy(str, Enum):
+    CONCURRENT = "CONCURRENT"
+    SLOT_EXCLUSIVE = "SLOT_EXCLUSIVE"
+    CONTAINER_EXCLUSIVE = "CONTAINER_EXCLUSIVE"
+    PATH_EXCLUSIVE = "PATH_EXCLUSIVE"
+    PRESERVE_UNCERTAIN = "PRESERVE_UNCERTAIN"
 
 
 class CodeChangeType(str, Enum):
@@ -40,6 +64,11 @@ class RelationType(str, Enum):
     VALIDATES = "VALIDATES"
     RAISES = "RAISES"
     REFERENCES = "REFERENCES"
+    # EvoKG Code Lane extensions (arXiv:2509.15464 §3.1-3.2)
+    DEFINES_RETURN_TYPE = "DEFINES_RETURN_TYPE"
+    HAS_SIGNATURE = "HAS_SIGNATURE"
+    ASSIGNED_TYPE = "ASSIGNED_TYPE"
+    MODULE_LOCATION = "MODULE_LOCATION"
 
 
 class SemanticCodeFact(BaseModel):
@@ -74,6 +103,8 @@ class TemporalCodeRelation(BaseModel):
     Module 2: Temporal 5-Tuple Extraction (Code-Lane).
     Represents a structured code relationship with temporal validity:
     (subject, relation, object, t_start, t_end) along with observation timestamp t_obs.
+    Extended for EvoKG (arXiv:2509.15464) with exclusivity metadata, deterministic
+    scope keys, and confidence separation.
     """
 
     id: str
@@ -98,6 +129,85 @@ class TemporalCodeRelation(BaseModel):
     history_fact_ids: list[str] = Field(default_factory=list)
     provenance: dict[str, Any] = Field(default_factory=dict)
     fingerprint: str
+
+    # EvoKG Code Lane extensions (arXiv:2509.15464)
+    is_exclusive: bool = False
+    scope_key: str = "default"
+    confidence_score: float = 0.50
+    superseded_by_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_evokg_metadata(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            rel = data.get("relation")
+
+            # 1. Taxonomy classification lookup
+            taxonomy_entry = None
+            if rel:
+                try:
+                    from apps.api.src.services.code_atom.taxonomy import CodeRelationTaxonomy
+
+                    taxonomy_entry = CodeRelationTaxonomy.classify(rel)
+                except ImportError:
+                    pass
+
+            # 2. Exclusivity: if not explicitly passed, derive from taxonomy
+            if "is_exclusive" not in data:
+                if taxonomy_entry is not None:
+                    data["is_exclusive"] = taxonomy_entry.exclusivity == PropertyExclusivity.EXCLUSIVE
+                else:
+                    data["is_exclusive"] = False
+
+            # 3. Scope key: if not explicitly passed, derive from taxonomy
+            scope_key_uncertain = False
+            if "scope_key" not in data:
+                if taxonomy_entry is not None:
+                    from apps.api.src.services.code_atom.taxonomy import CodeRelationTaxonomy
+
+                    key, uncertain = CodeRelationTaxonomy.generate_scope_key(
+                        rel,
+                        symbol_name=data.get("symbol_name"),
+                    )
+                    data["scope_key"] = key
+                    if uncertain:
+                        scope_key_uncertain = True
+                else:
+                    data["scope_key"] = "default"
+
+            # 4. Unknown / unclassified relation uncertainty
+            if taxonomy_entry is not None and taxonomy_entry.scope_strategy == ScopeKeyStrategy.UNCERTAIN:
+                scope_key_uncertain = True
+
+            # 5. Confidence consistency (Phase 5)
+            # If scope_key couldn't be resolved or relation is unknown, force uncertainty
+            if scope_key_uncertain:
+                data["is_uncertain"] = True
+
+            is_unc = data.get("is_uncertain", False)
+            conf = data.get("confidence")
+
+            if is_unc:
+                # Uncertain relations must never present as HIGH confidence
+                if conf is None or conf == FactConfidence.HIGH or conf == "HIGH":
+                    data["confidence"] = FactConfidence.UNCERTAIN
+            elif conf == FactConfidence.UNCERTAIN or conf == "UNCERTAIN":
+                # UNCERTAIN confidence category must agree with uncertainty flag
+                data["is_uncertain"] = True
+
+            # 6. Numeric confidence score calibration
+            if "confidence_score" not in data:
+                c = data.get("confidence", FactConfidence.HIGH)
+                if data.get("is_uncertain"):
+                    data["confidence_score"] = 0.30
+                elif c == FactConfidence.HIGH or c == "HIGH":
+                    data["confidence_score"] = 0.95
+                elif c == FactConfidence.MEDIUM or c == "MEDIUM":
+                    data["confidence_score"] = 0.70
+                else:
+                    data["confidence_score"] = 0.30
+
+        return data
 
     model_config = ConfigDict(extra="ignore")
 
