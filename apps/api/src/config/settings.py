@@ -87,6 +87,15 @@ class Settings(BaseSettings):
         description="Enable incremental EvoKG temporal triplet extraction, contradiction resolution, and persistence.",
     )
 
+    # EvoReasoner Multi-Route Query Planner Settings (arXiv:2509.15464 §3.3)
+    EVOREASONER_ENABLED: bool = Field(
+        default=False,
+        description="Enable EvoReasoner deterministic multi-route query planning and route cost estimation.",
+    )
+    EVOREASONER_MAX_CANDIDATES: int = Field(default=20)
+    EVOREASONER_MAX_SELECTED_ROUTES: int = Field(default=3)
+    EVOREASONER_MAX_ROUTE_HOPS: int = Field(default=4)
+
     # Code-Lane Embedding Settings ('voyage' or 'development')
     EMBEDDING_PROVIDER: str = Field(default="development")
     VOYAGE_API_KEY: str | None = Field(default=None)

@@ -33,6 +33,7 @@ class ProjectContextEngine:
         repository_id: uuid.UUID | None = None,
         enable_star_rag: bool | None = None,
         enable_memotime: bool | None = None,
+        enable_evoreasoner: bool | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -157,8 +158,85 @@ class ProjectContextEngine:
             analyzed_query=analyzed,
         )
 
+        # 4b. EvoReasoner Multi-Route Planning, Beam Search & Proof-Chain Aggregation (arXiv:2509.15464)
+        use_evoreasoner = (
+            enable_evoreasoner
+            if enable_evoreasoner is not None
+            else getattr(settings, "EVOREASONER_ENABLED", False)
+        )
+        proof_chains = []
+        evoreasoner_applied = False
+        evoreasoner_diagnostics: dict[str, Any] = {}
+
+        if use_evoreasoner and repository_id is not None:
+            try:
+                from apps.api.src.services.evoreasoner.aggregator import ProofChainAggregator
+                from apps.api.src.services.evoreasoner.beam_search import EvoBeamSearchEngine
+                from apps.api.src.services.evoreasoner.planner import EvoRoutePlanner
+
+                # Identify seed entities from query analysis and top retrieved candidates
+                seed_entities = list(analyzed.symbol_candidates)
+                if not seed_entities and ranked:
+                    for r in ranked[:3]:
+                        if r.candidate.name and r.candidate.name not in ("dependency", "import"):
+                            seed_entities.append(r.candidate.name)
+
+                # Generate bounded multi-route plan
+                plan = EvoRoutePlanner.generate_multi_route_plan(
+                    query_text=question,
+                    seed_entities=seed_entities,
+                )
+
+                if plan.selected_routes:
+                    search_res = await EvoBeamSearchEngine.search_paths(
+                        session=session,
+                        plan=plan,
+                        repository_id=repository_id,
+                        branch="main",
+                    )
+
+                    if search_res.paths:
+                        agg_res = ProofChainAggregator.aggregate_paths(
+                            paths=search_res.paths,
+                            query_text=question,
+                            temporal_intent=plan.temporal_intent,
+                            repository_id=repository_id,
+                            branch="main",
+                        )
+                        proof_chains = agg_res.chains
+                        evoreasoner_applied = len(proof_chains) > 0
+                        evoreasoner_diagnostics = {
+                            "routes_planned": len(plan.selected_routes),
+                            "paths_explored": search_res.total_paths_explored,
+                            "paths_found": len(search_res.paths),
+                            "proof_chains_aggregated": len(proof_chains),
+                            "rejected_paths": agg_res.rejected_paths_count,
+                            "deduplicated_chains": agg_res.deduplicated_chains_count,
+                            **agg_res.aggregation_diagnostics,
+                        }
+                    else:
+                        evoreasoner_diagnostics = {
+                            "routes_planned": len(plan.selected_routes),
+                            "paths_found": 0,
+                            "search_diagnostics": search_res.search_diagnostics,
+                        }
+                else:
+                    evoreasoner_diagnostics = {
+                        "routes_planned": 0,
+                        "fallback_reason": "no_routes_generated",
+                    }
+            except Exception as exc:
+                evoreasoner_applied = False
+                evoreasoner_diagnostics = {
+                    "exception_occurred": True,
+                    "error": str(exc),
+                }
+
         # 5. Context Assembly & Budgeting
-        assembled = ContextAssembler.assemble_context(ranked_candidates=ranked)
+        assembled = ContextAssembler.assemble_context(
+            ranked_candidates=ranked,
+            proof_chains=proof_chains,
+        )
 
         # 5b. Retrieve Customer Project Knowledge
         if project_id is None:
@@ -217,6 +295,9 @@ class ProjectContextEngine:
                 "memotime_diagnostics": memotime_diagnostics,
                 "star_rag_used": star_rag_applied if use_star_rag else False,
                 "star_rag_diagnostics": star_rag_diagnostics,
+                "evoreasoner_used": evoreasoner_applied if use_evoreasoner else False,
+                "evoreasoner_diagnostics": evoreasoner_diagnostics,
+                "proof_chains_count": len(proof_chains),
                 "synthesis_gated": answer.debug_signals.get("is_abstention", False),
             }
         )
