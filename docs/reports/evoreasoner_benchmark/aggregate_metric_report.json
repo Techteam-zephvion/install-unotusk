@@ -1,0 +1,524 @@
+{
+  "M0_BASELINE": {
+    "total_queries": 56,
+    "evaluable_queries": 48,
+    "recall_at_3": 0.2818,
+    "recall_at_5": 0.3546,
+    "recall_at_10": 0.4436,
+    "precision_at_3": 0.4167,
+    "precision_at_5": 0.3583,
+    "mrr": 0.6818,
+    "ndcg_at_5": 0.4989,
+    "latency_p50_ms": 48.11,
+    "latency_p95_ms": 52.51,
+    "latency_mean_ms": 48.47,
+    "abstention_recall": 1.0,
+    "superseded_violations": 0,
+    "correct_path_rate": 0.0,
+    "path_precision": 0.0,
+    "recall_at_5_95ci": [
+      0.2343,
+      0.4956
+    ],
+    "category_breakdown": {
+      "Branch and Provenance": {
+        "count": 8,
+        "mean_latency_ms": 46.94,
+        "recall_at_5": 0.299,
+        "precision_at_5": 0.2,
+        "mrr": 0.6667,
+        "ndcg_at_5": 0.3845,
+        "paths_found": 0
+      },
+      "Contradiction and Supersession": {
+        "count": 8,
+        "mean_latency_ms": 48.48,
+        "recall_at_5": 0.3542,
+        "precision_at_5": 0.175,
+        "mrr": 0.5572,
+        "ndcg_at_5": 0.3589,
+        "paths_found": 0
+      },
+      "Current Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 48.15,
+        "recall_at_5": 0.3027,
+        "precision_at_5": 0.2,
+        "mrr": 0.6554,
+        "ndcg_at_5": 0.3996,
+        "paths_found": 0
+      },
+      "Historical Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 49.04,
+        "recall_at_5": 0.5997,
+        "precision_at_5": 0.7,
+        "mrr": 0.875,
+        "ndcg_at_5": 0.8266,
+        "paths_found": 0
+      },
+      "Insufficient Evidence (Abstention)": {
+        "count": 8,
+        "mean_latency_ms": 48.17,
+        "recall_at_5": 1.0,
+        "precision_at_5": 1.0,
+        "mrr": 0.0,
+        "ndcg_at_5": 1.0,
+        "paths_found": 0
+      },
+      "Multi-Hop Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 48.3,
+        "recall_at_5": 0.3317,
+        "precision_at_5": 0.45,
+        "mrr": 0.7533,
+        "ndcg_at_5": 0.5762,
+        "paths_found": 0
+      },
+      "Temporal Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 50.16,
+        "recall_at_5": 0.2401,
+        "precision_at_5": 0.425,
+        "mrr": 0.5832,
+        "ndcg_at_5": 0.4477,
+        "paths_found": 0
+      }
+    }
+  },
+  "M1_STAR_RAG": {
+    "total_queries": 56,
+    "evaluable_queries": 48,
+    "recall_at_3": 0.2892,
+    "recall_at_5": 0.353,
+    "recall_at_10": 0.4436,
+    "precision_at_3": 0.4167,
+    "precision_at_5": 0.3542,
+    "mrr": 0.6855,
+    "ndcg_at_5": 0.4968,
+    "latency_p50_ms": 111.02,
+    "latency_p95_ms": 121.95,
+    "latency_mean_ms": 110.4,
+    "abstention_recall": 1.0,
+    "superseded_violations": 0,
+    "correct_path_rate": 0.0,
+    "path_precision": 0.0,
+    "recall_at_5_95ci": [
+      0.2168,
+      0.4746
+    ],
+    "category_breakdown": {
+      "Branch and Provenance": {
+        "count": 8,
+        "mean_latency_ms": 115.54,
+        "recall_at_5": 0.299,
+        "precision_at_5": 0.2,
+        "mrr": 0.6667,
+        "ndcg_at_5": 0.3845,
+        "paths_found": 0
+      },
+      "Contradiction and Supersession": {
+        "count": 8,
+        "mean_latency_ms": 111.38,
+        "recall_at_5": 0.3542,
+        "precision_at_5": 0.175,
+        "mrr": 0.5739,
+        "ndcg_at_5": 0.3676,
+        "paths_found": 0
+      },
+      "Current Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 103.5,
+        "recall_at_5": 0.3027,
+        "precision_at_5": 0.2,
+        "mrr": 0.6554,
+        "ndcg_at_5": 0.3966,
+        "paths_found": 0
+      },
+      "Historical Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 110.08,
+        "recall_at_5": 0.5997,
+        "precision_at_5": 0.7,
+        "mrr": 0.875,
+        "ndcg_at_5": 0.8266,
+        "paths_found": 0
+      },
+      "Insufficient Evidence (Abstention)": {
+        "count": 8,
+        "mean_latency_ms": 113.0,
+        "recall_at_5": 1.0,
+        "precision_at_5": 1.0,
+        "mrr": 0.0,
+        "ndcg_at_5": 1.0,
+        "paths_found": 0
+      },
+      "Multi-Hop Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 109.26,
+        "recall_at_5": 0.3317,
+        "precision_at_5": 0.45,
+        "mrr": 0.7533,
+        "ndcg_at_5": 0.5762,
+        "paths_found": 0
+      },
+      "Temporal Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 110.03,
+        "recall_at_5": 0.2305,
+        "precision_at_5": 0.4,
+        "mrr": 0.5885,
+        "ndcg_at_5": 0.4295,
+        "paths_found": 0
+      }
+    }
+  },
+  "M2_MEMOTIME": {
+    "total_queries": 56,
+    "evaluable_queries": 48,
+    "recall_at_3": 0.2748,
+    "recall_at_5": 0.345,
+    "recall_at_10": 0.4436,
+    "precision_at_3": 0.4028,
+    "precision_at_5": 0.3458,
+    "mrr": 0.6818,
+    "ndcg_at_5": 0.4882,
+    "latency_p50_ms": 48.2,
+    "latency_p95_ms": 55.66,
+    "latency_mean_ms": 48.97,
+    "abstention_recall": 1.0,
+    "superseded_violations": 0,
+    "correct_path_rate": 0.0,
+    "path_precision": 0.0,
+    "recall_at_5_95ci": [
+      0.2168,
+      0.4746
+    ],
+    "category_breakdown": {
+      "Branch and Provenance": {
+        "count": 8,
+        "mean_latency_ms": 48.36,
+        "recall_at_5": 0.299,
+        "precision_at_5": 0.2,
+        "mrr": 0.6667,
+        "ndcg_at_5": 0.3845,
+        "paths_found": 0
+      },
+      "Contradiction and Supersession": {
+        "count": 8,
+        "mean_latency_ms": 48.22,
+        "recall_at_5": 0.3542,
+        "precision_at_5": 0.175,
+        "mrr": 0.5572,
+        "ndcg_at_5": 0.3589,
+        "paths_found": 0
+      },
+      "Current Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 49.59,
+        "recall_at_5": 0.3027,
+        "precision_at_5": 0.2,
+        "mrr": 0.6554,
+        "ndcg_at_5": 0.3996,
+        "paths_found": 0
+      },
+      "Historical Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 48.74,
+        "recall_at_5": 0.5424,
+        "precision_at_5": 0.625,
+        "mrr": 0.875,
+        "ndcg_at_5": 0.7623,
+        "paths_found": 0
+      },
+      "Insufficient Evidence (Abstention)": {
+        "count": 8,
+        "mean_latency_ms": 48.75,
+        "recall_at_5": 1.0,
+        "precision_at_5": 1.0,
+        "mrr": 0.0,
+        "ndcg_at_5": 1.0,
+        "paths_found": 0
+      },
+      "Multi-Hop Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 49.25,
+        "recall_at_5": 0.3317,
+        "precision_at_5": 0.45,
+        "mrr": 0.7533,
+        "ndcg_at_5": 0.5762,
+        "paths_found": 0
+      },
+      "Temporal Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 49.91,
+        "recall_at_5": 0.2401,
+        "precision_at_5": 0.425,
+        "mrr": 0.5832,
+        "ndcg_at_5": 0.4477,
+        "paths_found": 0
+      }
+    }
+  },
+  "M3_COMBINED": {
+    "total_queries": 56,
+    "evaluable_queries": 48,
+    "recall_at_3": 0.2823,
+    "recall_at_5": 0.3434,
+    "recall_at_10": 0.4395,
+    "precision_at_3": 0.4028,
+    "precision_at_5": 0.3417,
+    "mrr": 0.6855,
+    "ndcg_at_5": 0.4861,
+    "latency_p50_ms": 107.64,
+    "latency_p95_ms": 119.96,
+    "latency_mean_ms": 108.63,
+    "abstention_recall": 1.0,
+    "superseded_violations": 0,
+    "correct_path_rate": 0.0,
+    "path_precision": 0.0,
+    "recall_at_5_95ci": [
+      0.2168,
+      0.4746
+    ],
+    "category_breakdown": {
+      "Branch and Provenance": {
+        "count": 8,
+        "mean_latency_ms": 108.78,
+        "recall_at_5": 0.299,
+        "precision_at_5": 0.2,
+        "mrr": 0.6667,
+        "ndcg_at_5": 0.3845,
+        "paths_found": 0
+      },
+      "Contradiction and Supersession": {
+        "count": 8,
+        "mean_latency_ms": 109.59,
+        "recall_at_5": 0.3542,
+        "precision_at_5": 0.175,
+        "mrr": 0.5739,
+        "ndcg_at_5": 0.3676,
+        "paths_found": 0
+      },
+      "Current Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 106.9,
+        "recall_at_5": 0.3027,
+        "precision_at_5": 0.2,
+        "mrr": 0.6554,
+        "ndcg_at_5": 0.3966,
+        "paths_found": 0
+      },
+      "Historical Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 105.61,
+        "recall_at_5": 0.5424,
+        "precision_at_5": 0.625,
+        "mrr": 0.875,
+        "ndcg_at_5": 0.7623,
+        "paths_found": 0
+      },
+      "Insufficient Evidence (Abstention)": {
+        "count": 8,
+        "mean_latency_ms": 111.53,
+        "recall_at_5": 1.0,
+        "precision_at_5": 1.0,
+        "mrr": 0.0,
+        "ndcg_at_5": 1.0,
+        "paths_found": 0
+      },
+      "Multi-Hop Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 108.95,
+        "recall_at_5": 0.3317,
+        "precision_at_5": 0.45,
+        "mrr": 0.7533,
+        "ndcg_at_5": 0.5762,
+        "paths_found": 0
+      },
+      "Temporal Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 109.0,
+        "recall_at_5": 0.2305,
+        "precision_at_5": 0.4,
+        "mrr": 0.5885,
+        "ndcg_at_5": 0.4295,
+        "paths_found": 0
+      }
+    }
+  },
+  "M4_EVOREASONER": {
+    "total_queries": 56,
+    "evaluable_queries": 48,
+    "recall_at_3": 0.2839,
+    "recall_at_5": 0.356,
+    "recall_at_10": 0.4623,
+    "precision_at_3": 0.4097,
+    "precision_at_5": 0.3625,
+    "mrr": 0.6855,
+    "ndcg_at_5": 0.5017,
+    "latency_p50_ms": 156.93,
+    "latency_p95_ms": 175.94,
+    "latency_mean_ms": 156.52,
+    "abstention_recall": 1.0,
+    "superseded_violations": 0,
+    "correct_path_rate": 0.125,
+    "path_precision": 0.125,
+    "recall_at_5_95ci": [
+      0.2343,
+      0.4956
+    ],
+    "category_breakdown": {
+      "Branch and Provenance": {
+        "count": 8,
+        "mean_latency_ms": 156.34,
+        "recall_at_5": 0.299,
+        "precision_at_5": 0.2,
+        "mrr": 0.6667,
+        "ndcg_at_5": 0.3845,
+        "paths_found": 0
+      },
+      "Contradiction and Supersession": {
+        "count": 8,
+        "mean_latency_ms": 151.78,
+        "recall_at_5": 0.3542,
+        "precision_at_5": 0.175,
+        "mrr": 0.5739,
+        "ndcg_at_5": 0.3676,
+        "paths_found": 0
+      },
+      "Current Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 159.83,
+        "recall_at_5": 0.3339,
+        "precision_at_5": 0.225,
+        "mrr": 0.6554,
+        "ndcg_at_5": 0.4177,
+        "paths_found": 2
+      },
+      "Historical Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 158.24,
+        "recall_at_5": 0.558,
+        "precision_at_5": 0.65,
+        "mrr": 0.875,
+        "ndcg_at_5": 0.7787,
+        "paths_found": 1
+      },
+      "Insufficient Evidence (Abstention)": {
+        "count": 8,
+        "mean_latency_ms": 155.62,
+        "recall_at_5": 1.0,
+        "precision_at_5": 1.0,
+        "mrr": 0.0,
+        "ndcg_at_5": 1.0,
+        "paths_found": 0
+      },
+      "Multi-Hop Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 154.15,
+        "recall_at_5": 0.3413,
+        "precision_at_5": 0.475,
+        "mrr": 0.7533,
+        "ndcg_at_5": 0.5926,
+        "paths_found": 2
+      },
+      "Temporal Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 159.69,
+        "recall_at_5": 0.2497,
+        "precision_at_5": 0.45,
+        "mrr": 0.5885,
+        "ndcg_at_5": 0.4689,
+        "paths_found": 4
+      }
+    }
+  },
+  "M4a_DIAGNOSTIC": {
+    "total_queries": 56,
+    "evaluable_queries": 48,
+    "recall_at_3": 0.2839,
+    "recall_at_5": 0.356,
+    "recall_at_10": 0.4623,
+    "precision_at_3": 0.4097,
+    "precision_at_5": 0.3625,
+    "mrr": 0.6855,
+    "ndcg_at_5": 0.5017,
+    "latency_p50_ms": 154.75,
+    "latency_p95_ms": 168.8,
+    "latency_mean_ms": 154.98,
+    "abstention_recall": 1.0,
+    "superseded_violations": 0,
+    "correct_path_rate": 0.125,
+    "path_precision": 0.125,
+    "recall_at_5_95ci": [
+      0.2343,
+      0.4956
+    ],
+    "category_breakdown": {
+      "Branch and Provenance": {
+        "count": 8,
+        "mean_latency_ms": 155.73,
+        "recall_at_5": 0.299,
+        "precision_at_5": 0.2,
+        "mrr": 0.6667,
+        "ndcg_at_5": 0.3845,
+        "paths_found": 0
+      },
+      "Contradiction and Supersession": {
+        "count": 8,
+        "mean_latency_ms": 150.88,
+        "recall_at_5": 0.3542,
+        "precision_at_5": 0.175,
+        "mrr": 0.5739,
+        "ndcg_at_5": 0.3676,
+        "paths_found": 0
+      },
+      "Current Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 152.56,
+        "recall_at_5": 0.3339,
+        "precision_at_5": 0.225,
+        "mrr": 0.6554,
+        "ndcg_at_5": 0.4177,
+        "paths_found": 2
+      },
+      "Historical Code Understanding": {
+        "count": 8,
+        "mean_latency_ms": 157.33,
+        "recall_at_5": 0.558,
+        "precision_at_5": 0.65,
+        "mrr": 0.875,
+        "ndcg_at_5": 0.7787,
+        "paths_found": 1
+      },
+      "Insufficient Evidence (Abstention)": {
+        "count": 8,
+        "mean_latency_ms": 154.1,
+        "recall_at_5": 1.0,
+        "precision_at_5": 1.0,
+        "mrr": 0.0,
+        "ndcg_at_5": 1.0,
+        "paths_found": 0
+      },
+      "Multi-Hop Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 155.51,
+        "recall_at_5": 0.3413,
+        "precision_at_5": 0.475,
+        "mrr": 0.7533,
+        "ndcg_at_5": 0.5926,
+        "paths_found": 2
+      },
+      "Temporal Reasoning": {
+        "count": 8,
+        "mean_latency_ms": 158.75,
+        "recall_at_5": 0.2497,
+        "precision_at_5": 0.45,
+        "mrr": 0.5885,
+        "ndcg_at_5": 0.4689,
+        "paths_found": 4
+      }
+    }
+  }
+}
