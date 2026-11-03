@@ -1,4 +1,6 @@
 import asyncio
+import os
+import socket
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -21,7 +23,43 @@ from apps.api.src.schemas.code_atom import (
 )
 from apps.api.src.services.evokg.service import EvoKGPersistenceService
 
-POSTGRES_TEST_URL = "postgresql+asyncpg://postgres:postgres@localhost:5433/unotusk_test"
+
+def _resolve_postgres_test_url() -> str:
+    # 1. Explicit override via TEST_DATABASE_URL
+    if os.getenv("TEST_DATABASE_URL"):
+        return os.environ["TEST_DATABASE_URL"]
+
+    # 2. In CI environments, respect DATABASE_URL directly (points to localhost:5432 in GitHub Actions)
+    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+        return os.getenv(
+            "DATABASE_URL",
+            "postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test",
+        )
+
+    # 3. Explicit custom DATABASE_URL in local environment (e.g. non-default port)
+    env_db_url = os.getenv("DATABASE_URL")
+    if env_db_url and ("5433" in env_db_url or "5432" not in env_db_url):
+        return env_db_url
+
+    # 4. Local development heuristic: if port 5433 is listening locally (e.g. dedicated Docker container),
+    # use port 5433; otherwise default to standard port 5432.
+    local_5433 = "postgresql+asyncpg://postgres:postgres@localhost:5433/unotusk_test"
+    default_5432 = "postgresql+asyncpg://postgres:postgres@localhost:5432/unotusk_test"
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.2)
+        res = sock.connect_ex(("127.0.0.1", 5433))
+        sock.close()
+        if res == 0:
+            return local_5433
+    except Exception:
+        pass
+
+    return env_db_url or default_5432
+
+
+POSTGRES_TEST_URL = _resolve_postgres_test_url()
 
 
 @pytest.fixture
@@ -34,6 +72,17 @@ def pg_engine():
 def clean_database():
     """Override root conftest autouse clean_database to prevent concurrent background truncation."""
     yield
+
+
+@pytest.fixture(autouse=True)
+async def check_db_available(pg_session: AsyncSession):
+    """Skips acceptance test gracefully if PostgreSQL service is not reachable."""
+    if pg_session is None:
+        pytest.skip("Database session is not configured")
+    try:
+        await asyncio.wait_for(pg_session.execute(text("SELECT 1")), timeout=1.0)
+    except Exception as exc:
+        pytest.skip(f"PostgreSQL database acceptance environment not available: {exc}")
 
 
 @pytest.fixture
