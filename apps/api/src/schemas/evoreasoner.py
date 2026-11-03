@@ -243,7 +243,7 @@ class ProofChainHop(BaseModel):
     observation_time: datetime | None = None
     commit_sha: str | None = None
     branch: str = "main"
-    confidence: float = 1.0
+    confidence: float = 0.50
     is_uncertain: bool = False
     has_conflict: bool = False
     conflict_detail: str | None = None
