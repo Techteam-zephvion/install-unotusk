@@ -280,8 +280,6 @@ class _AuthScreenState extends State<AuthScreen> {
       return const SizedBox.shrink();
     }
 
-    final subnet = result.scannedSubnet ?? 'local network';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(12),
@@ -312,64 +310,17 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4725A).withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '0/${result.totalScanned > 0 ? result.totalScanned : 254} alive',
-                  style: UnoTypography.mono(
-                    color: const Color(0xFFE89885),
-                    fontSize: 10.5,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Scanned $subnet on port 28000. No running Unotusk Control Plane responded.',
+            'No running Unotusk Control Plane was found on the local network. Make sure your server is running or configure the server address manually.',
             style: UnoTypography.body(
               color: widget.palette.textSec,
-              fontSize: 11.5,
+              fontSize: 12,
             ),
           ),
-          const SizedBox(height: 8),
-
-          // Clean terminal error log box
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF141412),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: widget.palette.div),
-            ),
-            constraints: const BoxConstraints(maxHeight: 110),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: result.logs.map((line) {
-                  final isErr = line.contains('[ERROR]');
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      line,
-                      style: UnoTypography.mono(
-                        color: isErr
-                            ? const Color(0xFFE89885)
-                            : widget.palette.textSec.withValues(alpha: 0.85),
-                        fontSize: 10,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -1244,73 +1195,95 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ActionChip(
-                          avatar: isScanningDialog
-                              ? SizedBox(
-                                  width: 12,
-                                  height: 12,
+                    Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: isScanningDialog
+                            ? null
+                            : () async {
+                                setDialogState(() {
+                                  isScanningDialog = true;
+                                });
+                                final result = await ApiService.autoDetectWithResult(forceRescan: true);
+                                if (context.mounted) {
+                                  setDialogState(() {
+                                    isScanningDialog = false;
+                                    dialogResult = result;
+                                    if (result.isSuccess && result.serverUrl != null) {
+                                      controller.text = result.serverUrl!;
+                                    }
+                                  });
+                                }
+                                _checkServer();
+                                if (mounted) {
+                                  setState(() {
+                                    _discoveryResult = result;
+                                    _isServerConnected = ApiService.isConnected;
+                                  });
+                                }
+                              },
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color(0xFF2E2D29),
+                                Color(0xFF1D1C1A),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF42403A),
+                              width: 1.0,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x66000000),
+                                offset: Offset(0, 2),
+                                blurRadius: 4,
+                              ),
+                              BoxShadow(
+                                color: Color(0x18FFFFFF),
+                                offset: Offset(0, 1),
+                                blurRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isScanningDialog)
+                                SizedBox(
+                                  width: 13,
+                                  height: 13,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(widget.palette.accent),
                                   ),
                                 )
-                              : const Icon(Icons.autorenew, size: 14),
-                          label: Text(
-                            isScanningDialog ? 'Scanning Subnet...' : 'Auto-Detect',
-                            style: UnoTypography.mono(color: widget.palette.text, fontSize: 11),
+                              else
+                                Icon(
+                                  LucideIcons.refreshCw,
+                                  size: 13,
+                                  color: widget.palette.accent,
+                                ),
+                              const SizedBox(width: 8),
+                              Text(
+                                isScanningDialog ? 'Scanning Subnet...' : 'Auto-Detect',
+                                style: UnoTypography.body(
+                                  color: const Color(0xFFF2F1ED),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          backgroundColor: widget.palette.bgBase,
-                          onPressed: isScanningDialog
-                              ? null
-                              : () async {
-                                  setDialogState(() {
-                                    isScanningDialog = true;
-                                  });
-                                  final result = await ApiService.autoDetectWithResult(forceRescan: true);
-                                  if (context.mounted) {
-                                    setDialogState(() {
-                                      isScanningDialog = false;
-                                      dialogResult = result;
-                                      if (result.isSuccess && result.serverUrl != null) {
-                                        controller.text = result.serverUrl!;
-                                      }
-                                    });
-                                  }
-                                  _checkServer();
-                                  if (mounted) {
-                                    setState(() {
-                                      _discoveryResult = result;
-                                      _isServerConnected = ApiService.isConnected;
-                                    });
-                                  }
-                                },
                         ),
-                        ActionChip(
-                          label: Text('Localhost (28000)', style: UnoTypography.mono(color: widget.palette.text, fontSize: 11)),
-                          backgroundColor: widget.palette.bgBase,
-                          onPressed: () {
-                            controller.text = 'http://127.0.0.1:28000';
-                          },
-                        ),
-                        ActionChip(
-                          label: Text('This PC LAN (10.0.0.35)', style: UnoTypography.mono(color: widget.palette.text, fontSize: 11)),
-                          backgroundColor: widget.palette.bgBase,
-                          onPressed: () {
-                            controller.text = 'http://10.0.0.35:28000';
-                          },
-                        ),
-                        ActionChip(
-                          label: Text('Linux (10.0.0.59)', style: UnoTypography.mono(color: widget.palette.text, fontSize: 11)),
-                          backgroundColor: widget.palette.bgBase,
-                          onPressed: () {
-                            controller.text = 'http://10.0.0.59:28000';
-                          },
-                        ),
-                      ],
+                      ),
                     ),
 
                     if (isScanningDialog) ...[
@@ -1367,61 +1340,22 @@ class _AuthScreenState extends State<AuthScreen> {
                         )
                       else
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFD4725A).withValues(alpha: 0.09),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: const Color(0xFFD4725A).withValues(alpha: 0.35)),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(LucideIcons.alertTriangle, size: 13, color: Color(0xFFD4725A)),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      'No servers available on local network',
-                                      style: UnoTypography.body(
-                                        color: const Color(0xFFE89885),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '0/254 alive',
-                                    style: UnoTypography.mono(color: const Color(0xFFE89885), fontSize: 10),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Scanned ${dialogResult!.scannedSubnet ?? "subnet"} on port 28000: 0 responsive servers.',
-                                style: UnoTypography.body(color: widget.palette.textSec, fontSize: 11),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF141412),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: widget.palette.div),
-                                ),
-                                constraints: const BoxConstraints(maxHeight: 75),
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: dialogResult!.logs.map((l) => Text(
-                                      l,
-                                      style: UnoTypography.mono(
-                                        color: l.contains('[ERROR]')
-                                            ? const Color(0xFFE89885)
-                                            : widget.palette.textSec.withValues(alpha: 0.85),
-                                        fontSize: 9.5,
-                                      ),
-                                    )).toList(),
+                              const Icon(LucideIcons.alertTriangle, size: 14, color: Color(0xFFD4725A)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'No servers found on the local network. Make sure your server is running or enter the address manually.',
+                                  style: UnoTypography.body(
+                                    color: const Color(0xFFE89885),
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),

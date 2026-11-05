@@ -142,7 +142,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
       _appStage = 'projects';
       _user = const UserModel(
         name: 'Jane Dev',
