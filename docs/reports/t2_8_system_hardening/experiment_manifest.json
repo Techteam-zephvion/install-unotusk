@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-11-03T11:22:55.355840+00:00",
+  "git_commit": "09df97df13bdc1b73f86fb3fb577363367d51a18",
+  "git_branch": "main",
+  "dataset_size": 84,
+  "configurations": [
+    "M0_BASELINE",
+    "M1_STAR_RAG",
+    "M2_MEMOTIME",
+    "M3_COMBINED",
+    "M4_EVOREASONER",
+    "M4a_DIAGNOSTIC"
+  ],
+  "database_url": "postgresql+asyncpg://postgres:postgres@localhost:5433/unotusk_test"
+}
