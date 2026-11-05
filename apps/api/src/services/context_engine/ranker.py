@@ -183,6 +183,9 @@ class MultiSignalRanker:
                 elif sig == "memotime_historical":
                     score += val * 1.0
                     reasons.append("MemoTime historical candidate match")
+                elif sig == "memotime_experience_relevance":
+                    score += val * 1.5
+                    reasons.append(f"MemoTime experience memory reuse ({round(val, 2)})")
                 elif sig.startswith("graph_expansion_hop"):
                     try:
                         hop_num = int(sig.replace("graph_expansion_hop", ""))
@@ -250,6 +253,11 @@ class MultiSignalRanker:
             if cand.signals.get("memotime_temporal_mismatch"):
                 score *= 0.3
                 reasons.append("Candidate outside requested temporal bound")
+
+            # MemoTime experience contradiction penalty
+            if cand.signals.get("memotime_experience_contradiction"):
+                score *= 0.2
+                reasons.append("Contradicts verified MemoTime historical experience")
 
 
             # 6. Temporal adjustments based on query intent and code change lifecycle

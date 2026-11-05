@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -41,6 +42,8 @@ ALL_TEMPORAL_KEYWORDS = {
     "between",
     "interval",
     "window",
+    "legacy",
+    "historical",
 }
 
 # ISO 8601 Date regex: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS
@@ -255,6 +258,32 @@ class TreeOfTime:
 
 
 @dataclass
+class ExperienceRecord:
+    """
+    In-memory representation of a verified reasoning experience (arXiv:2510.13614 §3.2-3.4).
+    Scoped to repository and branch, captures verified provenance, temporal intervals,
+    and factual outcomes for cross-query-type reuse.
+    """
+
+    id: str
+    repository_id: str
+    branch: str = "main"
+    query_text: str = ""
+    intent_type: str = "CURRENT"
+    target_entities: list[str] = field(default_factory=list)
+    commit_sha: str | None = None
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    verified_outcome: dict[str, Any] = field(default_factory=dict)
+    confidence_score: float = 0.85
+    is_verified: bool = True
+    is_contradictory: bool = False
+    contradiction_detail: str | None = None
+    attribution: str = ""
+    created_at: datetime | None = None
+
+
+@dataclass
 class MemoTimeRetrievalResult:
     """Result of executing the MemoTime operator-aware retrieval pipeline."""
 
@@ -265,6 +294,188 @@ class MemoTimeRetrievalResult:
     fallback_reason: str | None = None
     applied_signals_count: int = 0
     diagnostics: dict[str, Any] = field(default_factory=dict)
+    experiences_used: list[ExperienceRecord] = field(default_factory=list)
+    new_experience_candidate: ExperienceRecord | None = None
+
+
+class MemoTimeExperienceStore:
+    """
+    Persistent PostgreSQL-backed storage and retrieval of verified reasoning experiences
+    for MemoTime (arXiv:2510.13614 §3.2-3.4).
+    Enforces quality threshold (confidence >= 0.80), branch isolation, contradiction rejection,
+    and cross-question-type experience reuse.
+    """
+
+    MIN_CONFIDENCE_THRESHOLD: float = 0.80
+
+    @classmethod
+    async def record_verified_experience_async(
+        cls,
+        session: Any,
+        repository_id: Any,
+        branch: str = "main",
+        query_text: str = "",
+        intent_type: str = "CURRENT",
+        target_entities: list[str] | None = None,
+        commit_sha: str | None = None,
+        valid_from: datetime | None = None,
+        valid_to: datetime | None = None,
+        verified_outcome: dict[str, Any] | None = None,
+        confidence_score: float = 0.85,
+        is_verified: bool = True,
+        attribution: str = "",
+    ) -> tuple[ExperienceRecord | None, str | None]:
+        """
+        Stores a verified reasoning experience in PostgreSQL if it passes verification gates:
+        1. Confidence >= MIN_CONFIDENCE_THRESHOLD (0.80)
+        2. Must be marked verified
+        3. Must have non-empty query_text and verified_outcome
+        Returns (record, error_message).
+        """
+        if confidence_score < cls.MIN_CONFIDENCE_THRESHOLD:
+            return None, f"Experience confidence {confidence_score:.2f} below threshold {cls.MIN_CONFIDENCE_THRESHOLD:.2f}"
+        if not is_verified:
+            return None, "Experience is unverified and cannot be committed to experience memory"
+        if not verified_outcome:
+            return None, "Experience lacks verified outcome or reasoning trace"
+
+        repo_id_uuid = uuid.UUID(str(repository_id)) if repository_id else uuid.uuid4()
+        exp_id = uuid.uuid4()
+        entities = target_entities or []
+        outcome = verified_outcome or {}
+        now = datetime.now(UTC)
+
+        attr = attribution or f"Verified {intent_type} experience for {entities[:3]} at commit {commit_sha or 'HEAD'}"
+
+        record = ExperienceRecord(
+            id=str(exp_id),
+            repository_id=str(repo_id_uuid),
+            branch=branch,
+            query_text=query_text,
+            intent_type=intent_type,
+            target_entities=entities,
+            commit_sha=commit_sha,
+            valid_from=valid_from,
+            valid_to=valid_to,
+            verified_outcome=outcome,
+            confidence_score=confidence_score,
+            is_verified=True,
+            is_contradictory=False,
+            attribution=attr,
+            created_at=now,
+        )
+
+        if session is not None:
+            try:
+                from apps.api.src.models.memotime import MemoTimeExperience
+
+                db_item = MemoTimeExperience(
+                    id=exp_id,
+                    repository_id=repo_id_uuid,
+                    branch=branch,
+                    query_text=query_text,
+                    intent_type=intent_type,
+                    target_entities=entities,
+                    commit_sha=commit_sha,
+                    valid_from=valid_from,
+                    valid_to=valid_to,
+                    verified_outcome=outcome,
+                    confidence_score=confidence_score,
+                    is_verified=True,
+                    is_contradictory=False,
+                    attribution=attr,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(db_item)
+                await session.flush()
+            except Exception as exc:
+                logger.warning("Failed to persist MemoTime experience to database: %s", exc)
+
+        return record, None
+
+    @classmethod
+    async def retrieve_relevant_experiences_async(
+        cls,
+        session: Any,
+        repository_id: Any,
+        branch: str = "main",
+        target_entities: list[str] | None = None,
+        commit_sha: str | None = None,
+        intent_type: str | None = None,
+        limit: int = 10,
+    ) -> list[ExperienceRecord]:
+        """
+        Retrieves relevant experiences for a given repository and branch from PostgreSQL.
+        Enforces strict repository and branch isolation, filters out contradictory records,
+        and matches by entity overlap, commit SHA, or compatible intent types.
+        """
+        if not repository_id or session is None:
+            return []
+
+        try:
+            from sqlalchemy import select
+
+            from apps.api.src.models.memotime import MemoTimeExperience
+
+            repo_id_uuid = uuid.UUID(str(repository_id))
+            stmt = select(MemoTimeExperience).where(
+                MemoTimeExperience.repository_id == repo_id_uuid,
+                MemoTimeExperience.branch == branch,
+                MemoTimeExperience.is_verified == True,  # noqa: E712
+                MemoTimeExperience.is_contradictory == False,  # noqa: E712
+            ).order_by(MemoTimeExperience.created_at.desc()).limit(limit * 3)
+
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+        except Exception as exc:
+            logger.warning("Error querying MemoTime experiences: %s", exc)
+            return []
+
+        targets_lower = {t.lower().strip() for t in (target_entities or []) if t.strip()}
+        c_sha_clean = commit_sha.strip().lower() if commit_sha else None
+
+        matched_records: list[ExperienceRecord] = []
+        for r in rows:
+            rec = ExperienceRecord(
+                id=str(r.id),
+                repository_id=str(r.repository_id),
+                branch=r.branch,
+                query_text=r.query_text,
+                intent_type=r.intent_type,
+                target_entities=list(r.target_entities or []),
+                commit_sha=r.commit_sha,
+                valid_from=r.valid_from,
+                valid_to=r.valid_to,
+                verified_outcome=dict(r.verified_outcome or {}),
+                confidence_score=r.confidence_score,
+                is_verified=r.is_verified,
+                is_contradictory=r.is_contradictory,
+                contradiction_detail=r.contradiction_detail,
+                attribution=r.attribution,
+                created_at=r.created_at,
+            )
+
+            is_relevant = False
+            # 1. Commit match
+            if c_sha_clean and rec.commit_sha and rec.commit_sha.lower().startswith(c_sha_clean):
+                is_relevant = True
+            # 2. Entity match
+            rec_entities_lower = {e.lower().strip() for e in rec.target_entities}
+            if targets_lower and targets_lower.intersection(rec_entities_lower):
+                is_relevant = True
+            # 3. Compatible cross-question-type match
+            if intent_type and rec.intent_type == intent_type:
+                is_relevant = True
+            elif not targets_lower and not c_sha_clean:
+                is_relevant = True
+
+            if is_relevant:
+                matched_records.append(rec)
+                if len(matched_records) >= limit:
+                    break
+
+        return matched_records
 
 
 class MemoTimeService:
@@ -286,16 +497,81 @@ class MemoTimeService:
         return bool(settings.MEMOTIME_ENABLED)
 
     @classmethod
+    def apply_experience_memory(
+        cls,
+        candidates: list[RetrievedCandidate],
+        experiences: list[ExperienceRecord],
+    ) -> tuple[list[RetrievedCandidate], int]:
+        """
+        Augments candidates with verified prior reasoning experiences (arXiv:2510.13614).
+        Incorporate experience signals:
+        - memotime_experience_relevance: boosted if candidate matches verified experience outcome
+        - memotime_experience_contradiction: penalized if candidate directly contradicts verified experience
+        Returns (augmented_candidates, applied_count).
+        """
+        if not experiences or not candidates:
+            return candidates, 0
+
+        applied_count = 0
+        for cand in candidates:
+            cand_path = cand.path.lower().replace("\\", "/")
+            cand_sym = str(cand.metadata.get("symbol_name") or cand.name.split(" (")[0] or "").lower()
+            cand_sha = str(
+                cand.metadata.get("commit_sha")
+                or (cand.metadata.get("provenance") or {}).get("commit_sha")
+                or ""
+            ).lower()
+
+            for exp in experiences:
+                if exp.is_contradictory:
+                    continue
+
+                exp_entities = {e.lower().strip() for e in exp.target_entities}
+                entity_match = any(e in cand_path or e == cand_sym for e in exp_entities) if exp_entities else False
+                commit_match = bool(exp.commit_sha and cand_sha and cand_sha.startswith(exp.commit_sha.lower()))
+
+                if commit_match or entity_match:
+                    is_contradictory = False
+                    if exp.valid_from and cand.metadata.get("is_deleted") and cand.metadata.get("ended_at"):
+                        cand_ts = parse_candidate_timestamp(cand)
+                        if cand_ts and cand_ts < exp.valid_from:
+                            is_contradictory = True
+
+                    if is_contradictory:
+                        cand.signals["memotime_experience_contradiction"] = 1.0
+                        cand.metadata["memotime_experience_conflict"] = (
+                            f"Contradicts verified experience {exp.id[:8]} ({exp.attribution})"
+                        )
+                    else:
+                        rel_score = exp.confidence_score * (1.0 if commit_match and entity_match else 0.85)
+                        cand.signals["memotime_experience_relevance"] = max(
+                            cand.signals.get("memotime_experience_relevance", 0.0),
+                            round(rel_score, 3),
+                        )
+                        cand.metadata["memotime_experience_id"] = exp.id
+                        cand.metadata["memotime_experience_attribution"] = exp.attribution
+                        applied_count += 1
+
+        def _sort_key(c: RetrievedCandidate) -> float:
+            if c.signals.get("memotime_experience_contradiction"):
+                return -10.0
+            return float(c.signals.get("memotime_experience_relevance", 0.0))
+
+        candidates.sort(key=_sort_key, reverse=True)
+        return candidates, applied_count
+
+    @classmethod
     def apply_memotime_retrieval(
         cls,
         candidates: list[RetrievedCandidate],
         analyzed_query: Any | None = None,
         query_text: str = "",
         tree_of_time: TreeOfTime | None = None,
+        experiences: list[ExperienceRecord] | None = None,
     ) -> list[RetrievedCandidate]:
         """
         Applies operator-aware temporal retrieval strategy to code candidates
-        based on StructuredTemporalIntent and Tree of Time.
+        based on StructuredTemporalIntent, Tree of Time, and Experience Memory.
         Gracefully falls back to baseline candidates if intent is ambiguous,
         contradictory, or if candidates lack temporal provenance.
         """
@@ -304,6 +580,7 @@ class MemoTimeService:
             analyzed_query=analyzed_query,
             query_text=query_text,
             tree_of_time=tree_of_time,
+            experiences=experiences,
         )
         return result.candidates
 
@@ -314,6 +591,7 @@ class MemoTimeService:
         analyzed_query: Any | None = None,
         query_text: str = "",
         tree_of_time: TreeOfTime | None = None,
+        experiences: list[ExperienceRecord] | None = None,
     ) -> MemoTimeRetrievalResult:
         """
         Executes the operator-aware temporal retrieval pipeline and returns
@@ -780,12 +1058,52 @@ class MemoTimeService:
             mismatch_c = [c for c in final_cands if c.signals.get("memotime_temporal_mismatch")]
             final_cands = valid_c + mismatch_c
 
+        # Apply MemoTime Experience Memory (arXiv:2510.13614)
+        exp_applied_count = 0
+        if experiences:
+            final_cands, exp_applied_count = cls.apply_experience_memory(final_cands, experiences)
+            applied_count += exp_applied_count
+            diagnostics["experiences_applied_count"] = exp_applied_count
+            diagnostics["reused_experience_ids"] = [e.id for e in experiences]
+
+        # Synthesize a verified ExperienceRecord candidate if high confidence
+        new_exp_candidate: ExperienceRecord | None = None
+        if strategy in (TemporalIntentType.DIFF, TemporalIntentType.EVOLUTION, TemporalIntentType.HISTORICAL):
+            proven_cands = [
+                c for c in final_cands
+                if c.signals.get("memotime_temporal_match") or c.signals.get("memotime_diff_match")
+            ]
+            if proven_cands and not tree.validation_errors:
+                first_sha = next(
+                    (str(c.metadata.get("commit_sha") or "") for c in proven_cands if c.metadata.get("commit_sha")),
+                    None,
+                )
+                new_exp_candidate = ExperienceRecord(
+                    id=str(uuid.uuid4()),
+                    repository_id=str(getattr(analyzed_query, "repository_id", "") or ""),
+                    branch="main",
+                    query_text=q_text,
+                    intent_type=strategy.value if hasattr(strategy, "value") else str(strategy),
+                    target_entities=list(target_symbols) if target_symbols else [c.path for c in proven_cands[:3]],
+                    commit_sha=first_sha,
+                    verified_outcome={
+                        "strategy": strategy.value if hasattr(strategy, "value") else str(strategy),
+                        "proven_candidates_count": len(proven_cands),
+                        "primary_paths": [c.path for c in proven_cands[:5]],
+                    },
+                    confidence_score=0.90 if strategy == TemporalIntentType.DIFF else 0.85,
+                    is_verified=True,
+                    attribution=f"Verified {strategy.value if hasattr(strategy, 'value') else strategy} trace for query: {q_text[:60]}",
+                )
+
         return MemoTimeRetrievalResult(
             candidates=final_cands,
             strategy_used=strategy,
             tree_of_time=tree,
             applied_signals_count=applied_count,
             diagnostics=diagnostics,
+            experiences_used=experiences or [],
+            new_experience_candidate=new_exp_candidate,
         )
 
     @classmethod
@@ -1079,7 +1397,7 @@ class MemoTimeService:
         has_current = bool(re.search(r"\b(current|currently|latest|now|present|active|today)\b", q_lower))
         has_historical = bool(
             re.search(
-                r"\b(previous|previously|past|earlier|former|prior|superseded|deprecated|older|original|originally|initial|initially|introduced|origin)\b",
+                r"\b(previous|previously|past|earlier|former|prior|superseded|deprecated|older|original|originally|initial|initially|introduced|origin|legacy|historical)\b",
                 q_lower,
             )
         )

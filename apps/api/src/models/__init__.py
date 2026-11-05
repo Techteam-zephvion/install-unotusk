@@ -26,6 +26,7 @@ from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
 from apps.api.src.models.knowledge import ProjectKnowledge
 from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
+from apps.api.src.models.memotime import MemoTimeExperience
 from apps.api.src.models.message import Message
 from apps.api.src.models.organization import Organization
 from apps.api.src.models.project import Project
@@ -57,6 +58,7 @@ __all__ = [
     "KnowledgeClass",
     "KnowledgeStatus",
     "MembershipRole",
+    "MemoTimeExperience",
     "Message",
     "Organization",
     "OrganizationMembership",

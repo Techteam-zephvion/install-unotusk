@@ -123,12 +123,30 @@ class ProjectContextEngine:
         memotime_success = False
         if use_memotime:
             try:
-                from apps.api.src.services.context_engine.memotime import MemoTimeService
+                from apps.api.src.services.context_engine.memotime import (
+                    MemoTimeExperienceStore,
+                    MemoTimeService,
+                )
+
+                experiences = []
+                if repository_id is not None and session is not None:
+                    experiences = await MemoTimeExperienceStore.retrieve_relevant_experiences_async(
+                        session=session,
+                        repository_id=repository_id,
+                        branch="main",
+                        target_entities=analyzed.symbol_candidates if analyzed else None,
+                        intent_type=(
+                            analyzed.structured_temporal_intent.intent_type.value
+                            if analyzed and analyzed.structured_temporal_intent
+                            else None
+                        ),
+                    )
 
                 memo_res = MemoTimeService.run_memotime_pipeline(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
                     query_text=question,
+                    experiences=experiences,
                 )
                 expanded_candidates = memo_res.candidates
                 memotime_success = not memo_res.is_fallback
@@ -141,8 +159,31 @@ class ProjectContextEngine:
                     "is_fallback": memo_res.is_fallback,
                     "fallback_reason": memo_res.fallback_reason,
                     "applied_signals_count": memo_res.applied_signals_count,
+                    "reused_experiences_count": len(memo_res.experiences_used),
                     **memo_res.diagnostics,
                 }
+
+                # Persist high-confidence verified reasoning trace to experience memory
+                if (
+                    memo_res.new_experience_candidate
+                    and repository_id is not None
+                    and session is not None
+                ):
+                    await MemoTimeExperienceStore.record_verified_experience_async(
+                        session=session,
+                        repository_id=repository_id,
+                        branch="main",
+                        query_text=memo_res.new_experience_candidate.query_text,
+                        intent_type=memo_res.new_experience_candidate.intent_type,
+                        target_entities=memo_res.new_experience_candidate.target_entities,
+                        commit_sha=memo_res.new_experience_candidate.commit_sha,
+                        valid_from=memo_res.new_experience_candidate.valid_from,
+                        valid_to=memo_res.new_experience_candidate.valid_to,
+                        verified_outcome=memo_res.new_experience_candidate.verified_outcome,
+                        confidence_score=memo_res.new_experience_candidate.confidence_score,
+                        is_verified=memo_res.new_experience_candidate.is_verified,
+                        attribution=memo_res.new_experience_candidate.attribution,
+                    )
             except Exception as exc:
                 memotime_success = False
                 memotime_diagnostics = {
