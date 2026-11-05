@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.unotusk" "\0"
-            VALUE "FileDescription", "setup_app" "\0"
+            VALUE "FileDescription", "Unotusk Server Manager" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "setup_app" "\0"
+            VALUE "InternalName", "unotusk_server_manager" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.unotusk. All rights reserved." "\0"
-            VALUE "OriginalFilename", "setup_app.exe" "\0"
-            VALUE "ProductName", "setup_app" "\0"
+            VALUE "OriginalFilename", "unotusk_server_manager.exe" "\0"
+            VALUE "ProductName", "Unotusk Server Manager" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

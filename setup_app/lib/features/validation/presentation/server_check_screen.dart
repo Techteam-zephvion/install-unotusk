@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/uno_palette.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
@@ -14,27 +14,37 @@ class ServerCheckScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = UnoPalette.of(context);
     final checkState = ref.watch(serverCheckControllerProvider);
     final checkNotifier = ref.read(serverCheckControllerProvider.notifier);
     final wizardNotifier = ref.read(wizardControllerProvider.notifier);
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: const BoxConstraints(maxWidth: 580),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Check Server', style: AppTextStyles.h1),
+              Text(
+                'Check Server',
+                style: UnoTypography.brandSerif(
+                  palette: palette,
+                  fontSize: 21,
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Checking machine readiness and prerequisites before installation.',
-                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
+                'Checking machine readiness, ports, and prerequisites before installation.',
+                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                  color: palette.textSec,
+                  fontSize: 13.5,
+                ),
               ),
               const SizedBox(height: 24),
               AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Column(
                   children: checkState.items.map((item) {
                     return _buildCheckRow(context, item);
@@ -56,20 +66,21 @@ class ServerCheckScreen extends ConsumerWidget {
                     AppButton(
                       label: 'Retry',
                       variant: AppButtonVariant.secondary,
-                      icon: Icons.refresh,
+                      icon: Icons.refresh_rounded,
                       onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
                     ),
                   if (checkState.hasOnlyPortConflict && checkState.isExistingUnotuskActive)
                     AppButton(
                       label: 'Use Existing Server',
                       variant: AppButtonVariant.secondary,
-                      icon: Icons.check_circle_outline,
+                      icon: Icons.check_circle_outline_rounded,
                       onPressed: checkState.isRunning
                           ? null
                           : () => wizardNotifier.setStep(WizardStep.verify),
                     ),
                   AppButton(
                     label: checkState.hasOnlyPortConflict ? 'Configure Alternate Port' : 'Continue',
+                    icon: Icons.arrow_forward_rounded,
                     isLoading: checkState.isRunning,
                     onPressed: (checkState.isAllPassed || checkState.hasOnlyPortConflict)
                         ? () => wizardNotifier.nextStep()
@@ -85,34 +96,36 @@ class ServerCheckScreen extends ConsumerWidget {
   }
 
   Widget _buildCheckRow(BuildContext context, CheckItem item) {
+    final palette = UnoPalette.of(context);
     Widget statusIcon;
 
     switch (item.status) {
       case CheckStatus.pending:
         statusIcon = Container(
-          width: 16,
-          height: 16,
-          decoration: const BoxDecoration(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.slate200,
+            color: palette.bgElevated,
+            border: Border.all(color: palette.div),
           ),
         );
         break;
       case CheckStatus.checking:
-        statusIcon = const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+        statusIcon = SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
         );
         break;
       case CheckStatus.passed:
-        statusIcon = const Icon(Icons.check_circle, size: 18, color: AppColors.success);
+        statusIcon = Icon(Icons.check_circle_rounded, size: 20, color: palette.live);
         break;
       case CheckStatus.warning:
-        statusIcon = const Icon(Icons.info, size: 18, color: AppColors.warning);
+        statusIcon = Icon(Icons.info_outline_rounded, size: 20, color: palette.warn);
         break;
       case CheckStatus.failed:
-        statusIcon = const Icon(Icons.cancel, size: 18, color: AppColors.error);
+        statusIcon = Icon(Icons.cancel_rounded, size: 20, color: palette.error);
         break;
     }
 
@@ -129,16 +142,20 @@ class ServerCheckScreen extends ConsumerWidget {
               children: [
                 Text(
                   item.title,
-                  style: AppTextStyles.bodyMedium.copyWith(
+                  style: AppTextStyles.bodyMediumOf(context).copyWith(
                     fontWeight: FontWeight.w500,
-                    color: item.status.isFailed ? AppColors.error : AppColors.slate900,
+                    fontSize: 13.5,
+                    color: item.status.isFailed ? palette.error : palette.text,
                   ),
                 ),
                 if (item.status.isFailed && item.failureMessage != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     item.failureMessage!,
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                    style: AppTextStyles.bodySmallOf(context).copyWith(
+                      color: palette.error,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ],
@@ -150,23 +167,25 @@ class ServerCheckScreen extends ConsumerWidget {
   }
 
   Widget _buildFailureBanner(BuildContext context, CheckItem failedItem) {
+    final palette = UnoPalette.of(context);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.errorBg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.errorBorder),
+        color: palette.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.error.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+              Icon(Icons.error_outline_rounded, size: 18, color: palette.error),
               const SizedBox(width: 8),
               Text(
                 '${failedItem.title} Failed',
-                style: AppTextStyles.h3.copyWith(color: AppColors.error),
+                style: AppTextStyles.h3Of(context).copyWith(color: palette.error),
               ),
             ],
           ),
@@ -174,7 +193,10 @@ class ServerCheckScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               failedItem.remediationHint!,
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate800),
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
+                color: palette.text,
+                fontSize: 13,
+              ),
             ),
           ],
         ],

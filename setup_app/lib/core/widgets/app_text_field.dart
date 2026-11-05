@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/uno_palette.dart';
 import '../theme/app_text_styles.dart';
 
 class AppTextField extends StatelessWidget {
@@ -36,13 +36,22 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = UnoPalette.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (label != null) ...[
-          Text(label!, style: AppTextStyles.label),
-          const SizedBox(height: 6),
+          Text(
+            label!,
+            style: AppTextStyles.labelOf(context).copyWith(
+              color: palette.textSec,
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 7),
         ],
         TextFormField(
           controller: controller,
@@ -52,14 +61,40 @@ class AppTextField extends StatelessWidget {
           validator: validator,
           enabled: enabled,
           maxLines: maxLines,
-          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate900),
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: palette.text,
+            fontSize: 13.5,
+          ),
           decoration: InputDecoration(
             hintText: hintText,
+            hintStyle: AppTextStyles.bodyMediumOf(context).copyWith(
+              color: palette.textSec.withValues(alpha: 0.55),
+              fontSize: 13.5,
+            ),
             errorText: errorText,
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
             helperText: helperText,
-            helperStyle: AppTextStyles.bodySmall,
+            helperStyle: AppTextStyles.bodySmallOf(context),
+            filled: true,
+            fillColor: palette.bgElevated,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: palette.div),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: palette.div),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: palette.accent, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: palette.error),
+            ),
           ),
         ),
       ],

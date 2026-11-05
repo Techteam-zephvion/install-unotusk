@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../config/presentation/config_screen.dart';
 import '../../deploy/presentation/deploy_screen.dart';
@@ -24,21 +22,21 @@ class WizardShell extends ConsumerWidget {
     final wizardNotifier = ref.read(wizardControllerProvider.notifier);
 
     return DesktopScaffold(
-      headerAction: wizardState.currentStep.canGoBack
-          ? TextButton.icon(
-              onPressed: wizardState.isBusy ? null : wizardNotifier.previousStep,
-              icon: const Icon(Icons.arrow_back, size: 16),
-              label: const Text('Back'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.slate700,
-                textStyle: AppTextStyles.label,
-              ),
-            )
-          : null,
       body: Column(
         children: [
           if (wizardState.currentStep != WizardStep.welcome)
-            WizardStepHeader(currentStep: wizardState.currentStep),
+            WizardStepHeader(
+              currentStep: wizardState.currentStep,
+              onBack: wizardState.isBusy || !wizardState.currentStep.canGoBack
+                  ? null
+                  : wizardNotifier.previousStep,
+              onStepTapped: (step) {
+                if (!wizardState.isBusy &&
+                    step.index < wizardState.currentStep.index) {
+                  wizardNotifier.setStep(step);
+                }
+              },
+            ),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),

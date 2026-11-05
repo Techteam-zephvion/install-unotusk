@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../security/secret_sanitizer.dart';
-import '../theme/app_colors.dart';
+import '../theme/uno_palette.dart';
 import '../theme/app_text_styles.dart';
 import 'app_button.dart';
 
@@ -15,10 +15,16 @@ class TechnicalDetailsDialog extends StatefulWidget {
     required this.details,
   });
 
-  static Future<void> show(BuildContext context, {required String title, required String details}) {
+  static Future<void> show(
+    BuildContext context, {
+    required String title,
+    String? details,
+    String? logs,
+  }) {
+    final text = details ?? logs ?? '';
     return showDialog(
       context: context,
-      builder: (context) => TechnicalDetailsDialog(title: title, details: details),
+      builder: (context) => TechnicalDetailsDialog(title: title, details: text),
     );
   }
 
@@ -31,13 +37,17 @@ class _TechnicalDetailsDialogState extends State<TechnicalDetailsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = UnoPalette.of(context);
     final sanitized = SecretSanitizer.sanitize(widget.details);
 
     return Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      backgroundColor: palette.bgSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: palette.div),
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 520),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -46,29 +56,37 @@ class _TechnicalDetailsDialogState extends State<TechnicalDetailsDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(widget.title, style: AppTextStyles.h2),
+                  Row(
+                    children: [
+                      Icon(Icons.terminal_rounded, size: 20, color: palette.accent),
+                      const SizedBox(width: 10),
+                      Text(widget.title, style: AppTextStyles.h2Of(context)),
+                    ],
+                  ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 18),
+                    icon: Icon(Icons.close, size: 18, color: palette.textSec),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: AppColors.slate900,
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFF141412),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: palette.div),
                   ),
                   child: SingleChildScrollView(
                     child: SelectableText(
                       sanitized,
-                      style: AppTextStyles.code.copyWith(
-                        color: AppColors.slate100,
-                        fontSize: 11,
-                        height: 1.4,
+                      style: UnoTypography.mono(
+                        color: const Color(0xFFEDEDEB),
+                        fontSize: 12,
+                        letterSpacing: 0.3,
+                        height: 1.5,
                       ),
                     ),
                   ),
@@ -76,25 +94,23 @@ class _TechnicalDetailsDialogState extends State<TechnicalDetailsDialog> {
               ),
               const SizedBox(height: 16),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   AppButton(
                     label: _copied ? 'Copied' : 'Copy Logs',
                     variant: AppButtonVariant.secondary,
                     icon: _copied ? Icons.check : Icons.copy,
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: sanitized));
-                      if (mounted) {
-                        setState(() => _copied = true);
-                        Future.delayed(const Duration(seconds: 2), () {
-                          if (mounted) setState(() => _copied = false);
-                        });
-                      }
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: sanitized));
+                      setState(() => _copied = true);
+                      Future.delayed(const Duration(seconds: 2), () {
+                        if (mounted) setState(() => _copied = false);
+                      });
                     },
                   ),
-                  const SizedBox(width: 8),
                   AppButton(
                     label: 'Close',
+                    variant: AppButtonVariant.primary,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
