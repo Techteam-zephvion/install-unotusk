@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/uno_palette.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
@@ -34,6 +34,7 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = UnoPalette.of(context);
     final deployState = ref.watch(deployControllerProvider);
     final deployNotifier = ref.read(deployControllerProvider.notifier);
     final wizardNotifier = ref.read(wizardControllerProvider.notifier);
@@ -53,24 +54,33 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: const BoxConstraints(maxWidth: 580),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Installing Unotusk', style: AppTextStyles.h1),
+              Text(
+                'Installing Unotusk',
+                style: UnoTypography.brandSerif(
+                  palette: palette,
+                  fontSize: 21,
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Deploying containers and configuring internal infrastructure.',
-                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
+                'Deploying containers, bootstrapping PostgreSQL + pgvector, and configuring infrastructure.',
+                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                  color: palette.textSec,
+                  fontSize: 13.5,
+                ),
               ),
               const SizedBox(height: 24),
               AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Column(
                   children: stages.map((stage) {
-                    return _buildStageRow(stage, deployState.currentStage);
+                    return _buildStageRow(context, stage, deployState.currentStage);
                   }).toList(),
                 ),
               ),
@@ -90,6 +100,7 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
                   if (deployState.isSuccess) ...[
                     AppButton(
                       label: 'Continue',
+                      icon: Icons.arrow_forward_rounded,
                       onPressed: () => wizardNotifier.nextStep(),
                     ),
                   ],
@@ -102,27 +113,29 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
     );
   }
 
-  Widget _buildStageRow(DeployStage stage, DeployStage currentStage) {
+  Widget _buildStageRow(BuildContext context, DeployStage stage, DeployStage currentStage) {
+    final palette = UnoPalette.of(context);
     final isCompleted = currentStage.index > stage.index || currentStage == DeployStage.completed;
     final isCurrent = currentStage == stage;
     final isPending = currentStage.index < stage.index;
 
     Widget indicator;
     if (isCompleted) {
-      indicator = const Icon(Icons.check_circle, size: 18, color: AppColors.success);
+      indicator = Icon(Icons.check_circle_rounded, size: 20, color: palette.live);
     } else if (isCurrent) {
-      indicator = const SizedBox(
-        width: 16,
-        height: 16,
-        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+      indicator = SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
       );
     } else {
       indicator = Container(
-        width: 16,
-        height: 16,
-        decoration: const BoxDecoration(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.slate200,
+          color: palette.bgElevated,
+          border: Border.all(color: palette.div),
         ),
       );
     }
@@ -136,9 +149,10 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
           Expanded(
             child: Text(
               stage.label,
-              style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
                 fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
-                color: isPending ? AppColors.slate400 : AppColors.slate900,
+                fontSize: 13.5,
+                color: isPending ? palette.textSec : palette.text,
               ),
             ),
           ),

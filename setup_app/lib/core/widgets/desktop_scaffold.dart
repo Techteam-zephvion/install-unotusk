@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart';
+import '../theme/theme_provider.dart';
+import '../theme/uno_palette.dart';
 import '../theme/app_text_styles.dart';
+import 'desktop_window_controls.dart';
+import 'unotusk_logo.dart';
 
-class DesktopScaffold extends StatelessWidget {
+class DesktopScaffold extends ConsumerWidget {
   final Widget body;
   final String? title;
   final Widget? headerAction;
@@ -15,54 +20,83 @@ class DesktopScaffold extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = UnoPalette.of(context);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.slate50,
+      backgroundColor: palette.bgBase,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar
+            // Top Bar matching Employee App Window Title Bar exactly (Image 5)
             Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: AppColors.slate200),
-                ),
-              ),
+              height: 36,
+              color: palette.bgBase,
               child: Row(
                 children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(4),
+                  const SizedBox(width: 14),
+                  // Official Unotusk Logo from Employee App
+                  UnotuskLogo(size: 16, onDark: palette.isDark),
+                  const SizedBox(width: 8),
+                  Text(
+                    title ?? 'Unotusk Server Manager',
+                    style: UnoTypography.brandSerif(
+                      palette: palette,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
                     ),
-                    child: const Center(
-                      child: Text(
-                        'U',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                  ),
+                  // Draggable Window Area in the middle
+                  const Expanded(
+                    child: DragToMoveArea(
+                      child: SizedBox(
+                        height: double.infinity,
+                        width: double.infinity,
+                      ),
+                    ),
+                  ),
+                  // Theme Toggle Button (Dark / Light)
+                  Tooltip(
+                    message: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                    child: InkWell(
+                      onTap: () {
+                        ref.read(themeModeProvider.notifier).toggleTheme();
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: palette.bgElevated,
+                          border: Border.all(color: palette.div),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                          size: 14,
+                          color: palette.textSec,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    title ?? 'Unotusk Server Setup',
-                    style: AppTextStyles.h3,
-                  ),
-                  const Spacer(),
-                  ?headerAction,
+                  if (headerAction != null) ...[
+                    const SizedBox(width: 8),
+                    headerAction!,
+                  ],
+                  const SizedBox(width: 6),
+                  // Native-style Frameless Window Controls
+                  DesktopWindowControls(palette: palette, height: 36),
                 ],
               ),
             ),
             // Main Content Area
-            Expanded(child: body),
+            Expanded(
+              child: Container(
+                color: palette.bgBase,
+                child: body,
+              ),
+            ),
           ],
         ),
       ),

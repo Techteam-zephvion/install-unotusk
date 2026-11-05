@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/uno_palette.dart';
 import '../theme/app_text_styles.dart';
 
 enum AppButtonVariant { primary, secondary, text, destructive }
@@ -24,6 +24,8 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = UnoPalette.of(context);
+
     Widget buttonChild;
     if (isLoading) {
       buttonChild = SizedBox(
@@ -31,7 +33,7 @@ class AppButton extends StatelessWidget {
         width: 16,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: variant == AppButtonVariant.primary ? Colors.white : AppColors.primary,
+          color: variant == AppButtonVariant.primary ? Colors.white : palette.accent,
         ),
       );
     } else if (icon != null) {
@@ -54,12 +56,20 @@ class AppButton extends StatelessWidget {
         button = ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: palette.accent,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.slate300,
-            disabledForegroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            disabledBackgroundColor: palette.accent.withValues(alpha: 0.4),
+            disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            textStyle: AppTextStyles.label.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+            ),
           ),
           child: buttonChild,
         );
@@ -69,10 +79,21 @@ class AppButton extends StatelessWidget {
         button = OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.slate800,
-            side: const BorderSide(color: AppColors.slate300),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            backgroundColor: palette.bgElevated,
+            foregroundColor: palette.text,
+            disabledBackgroundColor: palette.bgElevated.withValues(alpha: 0.5),
+            disabledForegroundColor: palette.textSec,
+            side: BorderSide(color: palette.div),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            textStyle: AppTextStyles.label.copyWith(
+              color: palette.text,
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
           ),
           child: buttonChild,
         );
@@ -82,10 +103,18 @@ class AppButton extends StatelessWidget {
         button = ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.error,
+            backgroundColor: palette.error,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            textStyle: AppTextStyles.label.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
           ),
           child: buttonChild,
         );
@@ -95,10 +124,15 @@ class AppButton extends StatelessWidget {
         button = TextButton(
           onPressed: isLoading ? null : onPressed,
           style: TextButton.styleFrom(
-            foregroundColor: AppColors.slate700,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-            textStyle: AppTextStyles.label,
+            foregroundColor: palette.textSec,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: AppTextStyles.label.copyWith(
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
           ),
           child: buttonChild,
         );

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/uno_palette.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
@@ -13,6 +13,7 @@ class VerifyScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = UnoPalette.of(context);
     final verifyState = ref.watch(verifyControllerProvider);
     final verifyNotifier = ref.read(verifyControllerProvider.notifier);
     final wizardNotifier = ref.read(wizardControllerProvider.notifier);
@@ -22,72 +23,96 @@ class VerifyScreen extends ConsumerWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: const BoxConstraints(maxWidth: 580),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Verifying Server Health', style: AppTextStyles.h1),
+              Text(
+                'Verifying Server Health',
+                style: UnoTypography.brandSerif(
+                  palette: palette,
+                  fontSize: 21,
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Checking server responsiveness and network connectivity.',
-                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600),
+                'Checking server responsiveness, database transactions, and network handshake.',
+                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                  color: palette.textSec,
+                  fontSize: 13.5,
+                ),
               ),
               const SizedBox(height: 24),
               AppCard(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         if (verifyState.isVerifying) ...[
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
                           ),
                           const SizedBox(width: 12),
-                          Text('Waiting for services to start...', style: AppTextStyles.bodyMedium),
+                          Text(
+                            'Waiting for services to start...',
+                            style: AppTextStyles.bodyMediumOf(context).copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: palette.text,
+                            ),
+                          ),
                         ] else if (verifyState.isSuccess) ...[
-                          const Icon(Icons.check_circle, size: 20, color: AppColors.success),
+                          Icon(Icons.check_circle_rounded, size: 22, color: palette.live),
                           const SizedBox(width: 10),
                           Text(
                             'Services Running & Healthy',
-                            style: AppTextStyles.h2.copyWith(color: AppColors.success),
+                            style: AppTextStyles.h2Of(context).copyWith(
+                              color: palette.live,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ] else ...[
-                          const Icon(Icons.cancel, size: 20, color: AppColors.error),
+                          Icon(Icons.cancel_rounded, size: 22, color: palette.error),
                           const SizedBox(width: 10),
                           Text(
                             'Verification Failed',
-                            style: AppTextStyles.h2.copyWith(color: AppColors.error),
+                            style: AppTextStyles.h2Of(context).copyWith(
+                              color: palette.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    const Divider(),
+                    const SizedBox(height: 18),
+                    Divider(color: palette.div),
                     const SizedBox(height: 16),
                     _buildMetricRow(
+                      context,
                       'Local Health Check',
                       localUrl,
                       isSuccess: verifyState.isLocalHealthy ? true : (verifyState.isVerifying ? null : false),
                       isChecking: verifyState.isVerifying && !verifyState.isLocalHealthy,
                     ),
                     if (lanUrl != null) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       _buildMetricRow(
+                        context,
                         'LAN Health Check',
                         lanUrl,
                         isSuccess: verifyState.isLanHealthy ? true : (verifyState.isVerifying ? null : false),
                         isChecking: verifyState.isVerifying && !verifyState.isLanHealthy,
                       ),
                     ],
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     _buildMetricRow(
-                      'Database',
+                      context,
+                      'PostgreSQL & pgvector',
                       verifyState.healthStatus?.databaseStatus ??
                           (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
                       isSuccess: verifyState.healthStatus?.databaseStatus == 'connected'
@@ -96,8 +121,9 @@ class VerifyScreen extends ConsumerWidget {
                       isChecking: verifyState.isVerifying &&
                           verifyState.healthStatus?.databaseStatus != 'connected',
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     _buildMetricRow(
+                      context,
                       'Redis Cache & Queue',
                       verifyState.healthStatus?.redisStatus ??
                           (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
@@ -115,24 +141,27 @@ class VerifyScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.errorBg,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.errorBorder),
+                    color: palette.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: palette.error.withValues(alpha: 0.35)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.error_outline, size: 18, color: AppColors.error),
+                          Icon(Icons.error_outline_rounded, size: 18, color: palette.error),
                           const SizedBox(width: 8),
-                          Text('Health check failed', style: AppTextStyles.h3.copyWith(color: AppColors.error)),
+                          Text(
+                            'Health check failed',
+                            style: AppTextStyles.h3Of(context).copyWith(color: palette.error),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        verifyState.errorMessage ?? 'Server failed to start in time or LAN is blocked.',
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate800),
+                        verifyState.errorMessage ?? 'Server failed to start in time or LAN connection was blocked.',
+                        style: AppTextStyles.bodyMediumOf(context).copyWith(color: palette.text),
                       ),
                     ],
                   ),
@@ -146,13 +175,14 @@ class VerifyScreen extends ConsumerWidget {
                     AppButton(
                       label: 'Retry Check',
                       variant: AppButtonVariant.secondary,
-                      icon: Icons.refresh,
+                      icon: Icons.refresh_rounded,
                       onPressed: () => verifyNotifier.verifyServer(),
                     ),
                     const SizedBox(width: 12),
                   ],
                   AppButton(
                     label: 'Continue',
+                    icon: Icons.arrow_forward_rounded,
                     isLoading: verifyState.isVerifying,
                     onPressed: verifyState.isSuccess
                         ? () => wizardNotifier.nextStep()
@@ -167,40 +197,55 @@ class VerifyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMetricRow(String label, String value, {bool? isSuccess, bool isChecking = false}) {
+  Widget _buildMetricRow(
+    BuildContext context,
+    String label,
+    String value, {
+    bool? isSuccess,
+    bool isChecking = false,
+  }) {
+    final palette = UnoPalette.of(context);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.slate600)),
+        Text(
+          label,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: palette.textSec,
+            fontSize: 13,
+          ),
+        ),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isChecking) ...[
-              const SizedBox(
+              SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                child: CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
               ),
               const SizedBox(width: 8),
             ] else if (isSuccess != null) ...[
               Icon(
-                isSuccess ? Icons.check_circle_outline : Icons.cancel_outlined,
-                size: 14,
-                color: isSuccess ? AppColors.success : AppColors.error,
+                isSuccess ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+                size: 15,
+                color: isSuccess ? palette.live : palette.error,
               ),
               const SizedBox(width: 6),
             ],
             Text(
               value,
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontWeight: FontWeight.w600,
+              style: UnoTypography.mono(
                 color: isChecking
-                    ? AppColors.slate600
+                    ? palette.textSec
                     : isSuccess == true
-                        ? AppColors.success
+                        ? palette.live
                         : isSuccess == false
-                            ? AppColors.error
-                            : AppColors.slate900,
+                            ? palette.error
+                            : palette.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

@@ -1,6 +1,6 @@
 class AppConstants {
-  static const String appName = 'Unotusk Server Setup';
-  static const String appVersion = '0.1.0';
+  static const String appName = 'Unotusk Server Manager';
+  static const String appVersion = '1.0.0';
   static const String defaultServerName = 'Engineering Unotusk';
   static const int defaultPort = 28000;
   static const int defaultPostgresPort = 5432;
