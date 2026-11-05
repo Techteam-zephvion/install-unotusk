@@ -36,10 +36,16 @@ TEMPORAL_KEYWORDS = {
     "deleted",
     "removed",
     "deprecated",
+    "introduced",
+    "introduction",
+    "initially",
+    "initial",
+    "originally",
+    "origin",
 }
 
 TEMPORAL_REGEX_PATTERNS = [
-    re.compile(r"\b(how|what)\s+(did|has|have|was|were)\s+.*?\b(change|evolve|modify|update|differ)\b", re.I),
+    re.compile(r"\b(how|what)\s+(did|has|have|was|were)\s+.*?\b(change|evolve|modify|update|differ|introduced?)\b", re.I),
     re.compile(r"\b(who|when)\s+.*?\b(changed|added|removed|deleted|created|modified|wrote|committed|introduced)\b", re.I),
     re.compile(r"\b(evolution|history|changes|commits|timeline)\s+of\b", re.I),
     re.compile(r"\bchanges\s+(in|to|for|across)\b", re.I),

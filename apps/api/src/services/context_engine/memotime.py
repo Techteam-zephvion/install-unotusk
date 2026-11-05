@@ -1078,7 +1078,10 @@ class MemoTimeService:
         # Detect temporal markers
         has_current = bool(re.search(r"\b(current|currently|latest|now|present|active|today)\b", q_lower))
         has_historical = bool(
-            re.search(r"\b(previous|previously|past|earlier|former|prior|superseded|deprecated|older|original)\b", q_lower)
+            re.search(
+                r"\b(previous|previously|past|earlier|former|prior|superseded|deprecated|older|original|originally|initial|initially|introduced|origin)\b",
+                q_lower,
+            )
         )
         has_evolution = bool(
             re.search(r"\b(evolve|evolved|evolution|history|timeline|chronology|across\s+commits)\b", q_lower)

@@ -139,7 +139,23 @@ class EvoRoutePlanner:
         # Harmonize with query temporal cues if parser defaulted to CURRENT
         if intent_type == TemporalIntentType.CURRENT:
             q_lower_check = query_text.lower()
-            if any(k in q_lower_check for k in ("historical", "historically", "superseded", "previous", "legacy", "deprecated")):
+            if any(
+                k in q_lower_check
+                for k in (
+                    "historical",
+                    "historically",
+                    "superseded",
+                    "previous",
+                    "legacy",
+                    "deprecated",
+                    "introduced",
+                    "introduction",
+                    "initial",
+                    "initially",
+                    "originally",
+                    "original",
+                )
+            ):
                 intent_type = TemporalIntentType.HISTORICAL
             elif any(k in q_lower_check for k in ("evolve", "evolved", "evolution", "across releases", "across commits", "timeline")):
                 intent_type = TemporalIntentType.EVOLUTION

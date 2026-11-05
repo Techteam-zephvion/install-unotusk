@@ -269,12 +269,30 @@ class MultiSignalRanker:
                     reasons.append("Latest active implementation")
             else:
                 # Temporal / evolution query: highlight history, commit evidence, and change lineage
+                c_name_l = (cand.name or "").lower()
+                c_sym_l = (cand.metadata.get("symbol_name") or "").lower()
+                c_path_l = (cand.path or "").lower()
+                target_syms = [s.lower() for s in analyzed_query.symbol_candidates if len(s) > 2]
+                target_paths = [p.lower() for p in getattr(analyzed_query, "path_candidates", []) if len(p) > 2]
+                matches_target = (
+                    any(s in c_name_l or s in c_sym_l or (len(c_name_l) > 3 and c_name_l in s) for s in target_syms)
+                    or any(p in c_path_l or c_path_l in p for p in target_paths)
+                ) if (target_syms or target_paths) else True
+
                 if cand.metadata.get("commit_sha") or cand.metadata.get("committed_at"):
-                    score += 0.6
-                    reasons.append("Historical commit evidence")
+                    if matches_target:
+                        score += 0.6
+                        reasons.append("Historical commit evidence")
+                    else:
+                        score += 0.2
+                        reasons.append("Historical background commit")
                 if cand.metadata.get("is_superseded"):
-                    score += 0.4
-                    reasons.append("Historical precursor in code evolution")
+                    if matches_target:
+                        score += 0.4
+                        reasons.append("Historical precursor in code evolution")
+                    else:
+                        score += 0.1
+                        reasons.append("Background superseded change")
                 if cand.metadata.get("is_deleted"):
                     score += 0.5
                     reasons.append("Deletion event in code evolution")
