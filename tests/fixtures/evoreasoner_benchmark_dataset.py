@@ -18,7 +18,7 @@ persisted EvoKG triplets, and architectural dependencies in `Techteam-zephvion/i
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from apps.api.src.services.context_engine.memotime import TemporalIntentType
@@ -1218,6 +1218,536 @@ def get_evoreasoner_benchmark_dataset() -> list[GroundTruthQuery]:
             expected_paths=[["EvoKGTriplet", "HAS_INDEX", "ix_evokg_repo_branch_subject"]],
             commit_sha="2905a44",
             rationale="Verifies branch column and database index layout.",
+        )
+    )
+
+    return queries
+
+
+def get_expanded_evoreasoner_benchmark_dataset() -> list[GroundTruthQuery]:
+    """
+    Returns the expanded 84-query benchmark dataset.
+    Preserves all 56 original reference queries (q01-q56) and appends 28 independently
+    authored ground-truth queries (q57-q84, 4 additional queries per category).
+    """
+    queries = list(get_evoreasoner_benchmark_dataset())
+
+    # =========================================================================
+    # CATEGORY A: CURRENT CODE UNDERSTANDING (Expanded: q57 - q60)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q57_current_beam_search_def",
+            category="Current Code Understanding",
+            query="What is the function signature and primary return type of EvoBeamSearchEngine.search_paths?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="EvoBeamSearchEngine.search_paths takes session, repository_id, route_plan, branch, config, and temporal filters, returning a PathSearchResult.",
+            relevant_files=["apps/api/src/services/evoreasoner/beam_search.py"],
+            relevant_symbols=["EvoBeamSearchEngine", "search_paths"],
+            expected_relations=[
+                {"subject": "EvoBeamSearchEngine", "relation": "DEFINES_METHOD", "object": "search_paths"}
+            ],
+            expected_paths=[["EvoBeamSearchEngine", "DEFINES_METHOD", "search_paths"]],
+            commit_sha="94fbd79",
+            rationale="Verifies current beam search execution entry point and return contract.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q58_current_route_planner_plan",
+            category="Current Code Understanding",
+            query="How does EvoRoutePlanner.generate_multi_route_plan select and score reasoning routes for a query?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="EvoRoutePlanner extracts seed entities, matches candidate graph patterns, estimates costs via HeuristicRuleEstimator, deduplicates routes, and returns a MultiRoutePlan.",
+            relevant_files=["apps/api/src/services/evoreasoner/planner.py"],
+            relevant_symbols=["EvoRoutePlanner", "generate_multi_route_plan"],
+            expected_relations=[
+                {"subject": "EvoRoutePlanner", "relation": "DEFINES_METHOD", "object": "generate_multi_route_plan"}
+            ],
+            expected_paths=[["EvoRoutePlanner", "DEFINES_METHOD", "generate_multi_route_plan"]],
+            commit_sha="94fbd79",
+            rationale="Verifies current route planning heuristics and MultiRoutePlan assembly.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q59_current_path_scorer_breakdown",
+            category="Current Code Understanding",
+            query="What metrics compose the evidence path score in PathScorer.evaluate_path?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="PathScorer evaluates confidence_score, temporal_consistency, hop_relevance, depth_penalty, and route_cost, returning an aggregated score and PathScoreBreakdown.",
+            relevant_files=["apps/api/src/services/evoreasoner/path_scorer.py"],
+            relevant_symbols=["PathScorer", "evaluate_path"],
+            expected_relations=[
+                {"subject": "PathScorer", "relation": "DEFINES_METHOD", "object": "evaluate_path"}
+            ],
+            expected_paths=[["PathScorer", "DEFINES_METHOD", "evaluate_path"]],
+            commit_sha="94fbd79",
+            rationale="Verifies multi-factor path scoring and breakdown components.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q60_current_aggregator_schema",
+            category="Current Code Understanding",
+            query="What is the schema and structure of GroundedProofChain produced by ProofChainAggregator?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="GroundedProofChain contains chain_id, route_id, route_perspective, hops, confidence_score, temporal_validity, and formatting helpers.",
+            relevant_files=["apps/api/src/schemas/evoreasoner.py", "apps/api/src/services/evoreasoner/aggregator.py"],
+            relevant_symbols=["GroundedProofChain", "ProofChainAggregator"],
+            expected_relations=[
+                {"subject": "ProofChainAggregator", "relation": "PRODUCES", "object": "GroundedProofChain"}
+            ],
+            expected_paths=[["ProofChainAggregator", "PRODUCES", "GroundedProofChain"]],
+            commit_sha="94fbd79",
+            rationale="Verifies proof-chain schema and hop representations.",
+        )
+    )
+
+    # =========================================================================
+    # CATEGORY B: HISTORICAL CODE UNDERSTANDING (Expanded: q61 - q64)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q61_historical_decomposer_heuristic",
+            category="Historical Code Understanding",
+            query="How was _find_enclosing_scope_heuristic implemented in CodeAtomDecomposer before innermost scope resolution?",
+            intent=TemporalIntentType.HISTORICAL,
+            is_temporal=True,
+            expected_answer="Before commit be1b5b5, CodeAtomDecomposer used _find_enclosing_scope_heuristic which performed shallow lexical regex indentation parsing.",
+            relevant_files=["apps/api/src/services/code_atom/decomposer.py"],
+            relevant_symbols=["CodeAtomDecomposer", "_find_enclosing_scope_heuristic"],
+            superseded_ids=["b094f01_atom-code-8e61d3b82fcd7f1e"],
+            expected_relations=[
+                {"subject": "CodeAtomDecomposer", "relation": "CALLS", "object": "_find_enclosing_scope_heuristic"}
+            ],
+            expected_paths=[["CodeAtomDecomposer", "CALLS", "_find_enclosing_scope_heuristic"]],
+            commit_sha="b094f01",
+            rationale="Verifies historical AST decomposer heuristic retrieval.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q62_historical_reconcile_unconstrained",
+            category="Historical Code Understanding",
+            query="What was the initial return type of reconcile_code_relationships before exclusive property enforcement?",
+            intent=TemporalIntentType.HISTORICAL,
+            is_temporal=True,
+            expected_answer="Initially, reconcile_code_relationships returned list[AtomicCodeRelation] without filtering or resolving contradictory exclusive relations.",
+            relevant_files=["apps/api/src/services/code_atom/reconciler.py"],
+            relevant_symbols=["reconcile_code_relationships"],
+            expected_relations=[
+                {"subject": "reconcile_code_relationships", "relation": "DEFINES_RETURN_TYPE", "object": "list[AtomicCodeRelation]"}
+            ],
+            expected_paths=[["reconcile_code_relationships", "DEFINES_RETURN_TYPE", "list[AtomicCodeRelation]"]],
+            commit_sha="6626c5c",
+            rationale="Verifies historical unconstrained code relationship reconciliation.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q63_historical_atomic_relation_origin",
+            category="Historical Code Understanding",
+            query="How were atomic code relations originally introduced in b094f01 before the EvoKG taxonomy?",
+            intent=TemporalIntentType.HISTORICAL,
+            is_temporal=True,
+            expected_answer="In commit b094f01, AtomicCodeRelation was defined as a simple dataclass with source_atom_id, target_atom_id, and relation_type.",
+            relevant_files=["apps/api/src/services/code_atom/models.py"],
+            relevant_symbols=["AtomicCodeRelation"],
+            expected_relations=[
+                {"subject": "CodeAtomDecomposer", "relation": "PRODUCES", "object": "AtomicCodeRelation"}
+            ],
+            expected_paths=[["CodeAtomDecomposer", "PRODUCES", "AtomicCodeRelation"]],
+            commit_sha="b094f01",
+            rationale="Verifies initial atom relation model prior to contradiction engine.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q64_historical_multisignal_ranker_weights",
+            category="Historical Code Understanding",
+            query="What was the original weight configuration of MultiSignalRanker when first introduced in commit 773b740?",
+            intent=TemporalIntentType.HISTORICAL,
+            is_temporal=True,
+            expected_answer="In commit 773b740, MultiSignalRanker weighted semantic similarity at 0.50, exact match at 0.30, and recency at 0.20.",
+            relevant_files=["apps/api/src/services/context_engine/ranker.py"],
+            relevant_symbols=["MultiSignalRanker"],
+            expected_relations=[
+                {"subject": "MultiSignalRanker", "relation": "CALLS", "object": "rank_candidates"}
+            ],
+            expected_paths=[["MultiSignalRanker", "CALLS", "rank_candidates"]],
+            commit_sha="773b740",
+            rationale="Verifies historical multi-signal ranking weights.",
+        )
+    )
+
+    # =========================================================================
+    # CATEGORY C: TEMPORAL REASONING (Expanded: q65 - q68)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q65_temporal_before_scope_change",
+            category="Temporal Reasoning",
+            query="What was the active implementation of CodeAtomDecomposer before commit be1b5b5?",
+            intent=TemporalIntentType.BEFORE,
+            is_temporal=True,
+            expected_answer="Before commit be1b5b5, CodeAtomDecomposer used lexical heuristic scoping rather than Tree-sitter AST hierarchy.",
+            relevant_files=["apps/api/src/services/code_atom/decomposer.py"],
+            relevant_symbols=["CodeAtomDecomposer"],
+            expected_relations=[
+                {"subject": "CodeAtomDecomposer", "relation": "CALLS", "object": "_find_enclosing_scope_heuristic"}
+            ],
+            expected_paths=[["CodeAtomDecomposer", "CALLS", "_find_enclosing_scope_heuristic"]],
+            commit_sha="b094f01",
+            rationale="Verifies BEFORE temporal anchor boundary handling.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q66_temporal_after_multisignal",
+            category="Temporal Reasoning",
+            query="What retrieval components were added after commit 773b740?",
+            intent=TemporalIntentType.AFTER,
+            is_temporal=True,
+            expected_answer="After commit 773b740, EvoKG persistence (2905a44) and EvoReasoner multi-route planning and beam search (94fbd79) were added.",
+            relevant_files=["apps/api/src/services/context_engine/ranker.py", "apps/api/src/services/evoreasoner/planner.py"],
+            relevant_symbols=["EvoRoutePlanner", "EvoBeamSearchEngine"],
+            expected_relations=[
+                {"subject": "ProjectContextEngine", "relation": "CALLS", "object": "EvoRoutePlanner"}
+            ],
+            expected_paths=[["ProjectContextEngine", "CALLS", "EvoRoutePlanner"]],
+            commit_sha="773b740",
+            rationale="Verifies AFTER temporal anchor boundary progression.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q67_temporal_interval_october",
+            category="Temporal Reasoning",
+            query="What changes were introduced between 2026-10-14 and 2026-10-22?",
+            intent=TemporalIntentType.INTERVAL,
+            is_temporal=True,
+            as_of=datetime(2026, 10, 14, 12, 0, 0, tzinfo=UTC),
+            until=datetime(2026, 10, 22, 12, 0, 0, tzinfo=UTC),
+            expected_answer="Between 2026-10-14 and 2026-10-22, Tree-sitter scope resolution (be1b5b5) and MultiSignalRanker with CompatibleVector (773b740) were introduced.",
+            relevant_files=["apps/api/src/services/code_atom/decomposer.py", "apps/api/src/services/context_engine/ranker.py"],
+            relevant_symbols=["CodeAtomDecomposer", "MultiSignalRanker"],
+            commit_sha="be1b5b5",
+            rationale="Verifies closed INTERVAL temporal boundary filtering.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q68_temporal_diff_graph_evolution",
+            category="Temporal Reasoning",
+            query="What is the difference between commit b094f01 and commit 94fbd79 regarding graph reasoning?",
+            intent=TemporalIntentType.DIFF,
+            is_temporal=True,
+            commit_sha="b094f01",
+            target_commit_sha="94fbd79",
+            expected_answer="Commit b094f01 had flat atomic code chunks; commit 94fbd79 added EvoRoutePlanner, beam search, and proof-chain aggregation over EvoKG triplets.",
+            relevant_files=["apps/api/src/services/code_atom/decomposer.py", "apps/api/src/services/evoreasoner/planner.py"],
+            relevant_symbols=["EvoRoutePlanner", "EvoBeamSearchEngine"],
+            expected_relations=[
+                {"subject": "EvoRoutePlanner", "relation": "PLANS_FOR", "object": "EvoBeamSearchEngine"}
+            ],
+            expected_paths=[["EvoRoutePlanner", "PLANS_FOR", "EvoBeamSearchEngine"]],
+            rationale="Verifies DIFF temporal comparison across repository milestones.",
+        )
+    )
+
+    # =========================================================================
+    # CATEGORY D: MULTI-HOP REASONING (Expanded: q69 - q72)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q69_multihop_pce_to_beam_search",
+            category="Multi-Hop Reasoning",
+            query="How does ProjectContextEngine connect to EvoBeamSearchEngine through EvoRoutePlanner?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="ProjectContextEngine calls EvoRoutePlanner, which plans routes for EvoBeamSearchEngine, which executes beam search.",
+            relevant_files=["apps/api/src/services/context_engine/engine.py", "apps/api/src/services/evoreasoner/planner.py", "apps/api/src/services/evoreasoner/beam_search.py"],
+            relevant_symbols=["ProjectContextEngine", "EvoRoutePlanner", "EvoBeamSearchEngine"],
+            expected_paths=[["ProjectContextEngine", "CALLS", "EvoRoutePlanner"], ["EvoRoutePlanner", "PLANS_FOR", "EvoBeamSearchEngine"]],
+            commit_sha="94fbd79",
+            rationale="Verifies 2-hop architectural delegation from context engine to beam search.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q70_multihop_persistence_to_triplet",
+            category="Multi-Hop Reasoning",
+            query="How does EvoKGPersistenceService persist code relations to the EvoKGTriplet table?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="EvoKGPersistenceService writes resolved AtomicCodeRelations as EvoKGTriplet records in PostgreSQL.",
+            relevant_files=["apps/api/src/services/evokg/persistence.py", "apps/api/src/models/evokg/triplet.py"],
+            relevant_symbols=["EvoKGPersistenceService", "EvoKGTriplet"],
+            expected_paths=[["EvoKGPersistenceService", "WRITES_TO", "EvoKGTriplet"]],
+            commit_sha="2905a44",
+            rationale="Verifies multi-hop persistence pipeline traversal.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q71_multihop_starrag_to_ranker",
+            category="Multi-Hop Reasoning",
+            query="How does StarRagContextService influence MultiSignalRanker via PersonalizedPageRank?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="StarRagContextService computes PersonalizedPageRank across the code graph to boost scores in MultiSignalRanker.",
+            relevant_files=["apps/api/src/services/context_engine/ranker.py"],
+            relevant_symbols=["StarRagContextService", "PersonalizedPageRank", "MultiSignalRanker"],
+            expected_paths=[["StarRagContextService", "COMPUTES", "PersonalizedPageRank"], ["PersonalizedPageRank", "BOOSTS", "MultiSignalRanker"]],
+            commit_sha="773b740",
+            rationale="Verifies 2-hop STAR-RAG PPR graph boosting traversal.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q72_multihop_memotime_to_assembler",
+            category="Multi-Hop Reasoning",
+            query="How does MemoTimeService annotate ContextAssembler through TreeOfTime?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="MemoTimeService constructs TreeOfTime intervals which annotate context chunks in ContextAssembler.",
+            relevant_files=["apps/api/src/services/context_engine/memotime.py", "apps/api/src/services/context_engine/assembler.py"],
+            relevant_symbols=["MemoTimeService", "TreeOfTime", "ContextAssembler"],
+            expected_paths=[["MemoTimeService", "CALLS", "TreeOfTime"], ["TreeOfTime", "ANNOTATES", "ContextAssembler"]],
+            commit_sha="94fbd79",
+            rationale="Verifies 2-hop MemoTime temporal tree traversal to ContextAssembler.",
+        )
+    )
+
+    # =========================================================================
+    # CATEGORY E: CONTRADICTION AND SUPERSESSION (Expanded: q73 - q76)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q73_contradiction_exclusive_branch_conflict",
+            category="Contradiction and Supersession",
+            query="How does the system resolve conflicting exclusive return types on a feature branch versus main?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="Branch isolation restricts queries to the requested branch, and exclusive property rules flag conflicting relations as temporal conflicts.",
+            relevant_files=["apps/api/src/services/evokg/contradiction.py"],
+            relevant_symbols=["EvoKGContradictionEngine", "reconcile_code_relationships"],
+            commit_sha="2905a44",
+            rationale="Verifies exclusive relation contradiction detection across branches.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q74_supersession_decomposer_scope",
+            category="Contradiction and Supersession",
+            query="Which EvoKG triplet superseded the old lexical heuristic in CodeAtomDecomposer?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="The DEFINES_METHOD 'decompose' triplet at be1b5b5 superseded the old _find_enclosing_scope_heuristic triplet from b094f01.",
+            relevant_files=["apps/api/src/services/code_atom/decomposer.py"],
+            relevant_symbols=["CodeAtomDecomposer"],
+            superseded_ids=["b094f01_atom-code-8e61d3b82fcd7f1e"],
+            expected_relations=[
+                {"subject": "CodeAtomDecomposer", "relation": "DEFINES_METHOD", "object": "decompose"}
+            ],
+            expected_paths=[["CodeAtomDecomposer", "DEFINES_METHOD", "decompose"]],
+            commit_sha="be1b5b5",
+            rationale="Verifies explicit supersedes_id link retrieval and demotion.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q75_demotion_superseded_heuristic",
+            category="Contradiction and Supersession",
+            query="Why is _find_enclosing_scope_heuristic demoted when answering queries about the current decomposer?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="Because its triplet has valid_to set and has been superseded, causing MemoTime and beam search to heavily penalize it under CURRENT intent.",
+            relevant_files=["apps/api/src/services/code_atom/decomposer.py"],
+            relevant_symbols=["CodeAtomDecomposer", "_find_enclosing_scope_heuristic"],
+            superseded_ids=["b094f01_atom-code-8e61d3b82fcd7f1e"],
+            expected_relations=[
+                {"subject": "CodeAtomDecomposer", "relation": "DEFINES_METHOD", "object": "decompose"}
+            ],
+            expected_paths=[["CodeAtomDecomposer", "DEFINES_METHOD", "decompose"]],
+            commit_sha="be1b5b5",
+            rationale="Verifies zero superseded violations in top-ranked candidates.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q76_unique_index_active_exclusive",
+            category="Contradiction and Supersession",
+            query="How does PostgreSQL enforce that only one active relation exists per exclusive scope?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="Using partial unique index uq_evokg_active_exclusive on (repository_id, branch, subject_id, relation, scope_key) WHERE is_exclusive = TRUE AND valid_to IS NULL.",
+            relevant_files=["alembic/versions/0011_evokg_triplets.py", "apps/api/src/models/evokg/triplet.py"],
+            relevant_symbols=["uq_evokg_active_exclusive", "EvoKGTriplet"],
+            expected_relations=[
+                {"subject": "0011_evokg_triplets.py", "relation": "CREATES_INDEX", "object": "uq_evokg_active_exclusive"}
+            ],
+            expected_paths=[["0011_evokg_triplets.py", "CREATES_INDEX", "uq_evokg_active_exclusive"]],
+            commit_sha="2905a44",
+            rationale="Verifies database integrity constraint for exclusive relations.",
+        )
+    )
+
+    # =========================================================================
+    # CATEGORY F: INSUFFICIENT EVIDENCE (ABSTENTION) (Expanded: q77 - q80)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q77_abstain_kubernetes_operator",
+            category="Insufficient Evidence (Abstention)",
+            query="What is the Kubernetes operator deployment configuration for Unotusk worker nodes?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="INSUFFICIENT EVIDENCE: Unotusk MVP uses local docker-compose and does not implement a Kubernetes operator.",
+            should_abstain=True,
+            abstention_rationale="Unotusk MVP explicitly uses local docker-compose; no Kubernetes operator exists.",
+            rationale="Tests model abstention on ungrounded infrastructure requests.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q78_abstain_qdrant_partitioning",
+            category="Insufficient Evidence (Abstention)",
+            query="How does the Qdrant vector database handle collection partitioning in Unotusk?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="INSUFFICIENT EVIDENCE: Qdrant was discarded from Unotusk MVP in favor of PostgreSQL 16 + pgvector.",
+            should_abstain=True,
+            abstention_rationale="Qdrant was explicitly removed from the MVP architecture.",
+            rationale="Tests model abstention on removed external vector database.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q79_abstain_okta_sso",
+            category="Insufficient Evidence (Abstention)",
+            query="What is the OAuth2 SSO provider configuration for Okta enterprise login in Unotusk?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="INSUFFICIENT EVIDENCE: Enterprise OIDC/SAML is out of scope for Unotusk MVP; authentication uses local email and JWT.",
+            should_abstain=True,
+            abstention_rationale="Enterprise SAML/OIDC is out of scope for the single-tenant MVP.",
+            rationale="Tests model abstention on enterprise auth integrations.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q80_abstain_neo4j_graph",
+            category="Insufficient Evidence (Abstention)",
+            query="How does Neo4j store graph relationships in the Decision Lane?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="INSUFFICIENT EVIDENCE: Neo4j is not used in Unotusk; knowledge graphs are stored in PostgreSQL 16 (EvoKG).",
+            should_abstain=True,
+            abstention_rationale="Neo4j is not part of Unotusk; EvoKG is relational in PostgreSQL.",
+            rationale="Tests model abstention on non-existent graph databases.",
+        )
+    )
+
+    # =========================================================================
+    # CATEGORY G: BRANCH AND PROVENANCE (Expanded: q81 - q84)
+    # =========================================================================
+    queries.append(
+        GroundTruthQuery(
+            query_id="q81_provenance_feature_branch_isolation",
+            category="Branch and Provenance",
+            query="How are triplets filtered when querying feature-alt-return versus main?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="Queries filter by branch column, ensuring feature-alt-return triplets are never returned when querying main.",
+            relevant_files=["apps/api/src/services/evoreasoner/beam_search.py"],
+            relevant_symbols=["EvoBeamSearchEngine"],
+            expected_relations=[
+                {"subject": "EvoKGTriplet", "relation": "HAS_INDEX", "object": "ix_evokg_repo_branch_subject"}
+            ],
+            expected_paths=[["EvoKGTriplet", "HAS_INDEX", "ix_evokg_repo_branch_subject"]],
+            commit_sha="94fbd79",
+            rationale="Verifies branch isolation during graph traversal.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q82_provenance_migration_commit",
+            category="Branch and Provenance",
+            query="Which Alembic migration added the EvoKG triplets table and indexes?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="Migration 0011_evokg_triplets.py created table evokg_triplets, index ix_evokg_repo_branch_subject, and partial unique index uq_evokg_active_exclusive.",
+            relevant_files=["alembic/versions/0011_evokg_triplets.py"],
+            relevant_symbols=["0011_evokg_triplets.py"],
+            expected_relations=[
+                {"subject": "0011_evokg_triplets.py", "relation": "CREATES_INDEX", "object": "uq_evokg_active_exclusive"}
+            ],
+            expected_paths=[["0011_evokg_triplets.py", "CREATES_INDEX", "uq_evokg_active_exclusive"]],
+            commit_sha="2905a44",
+            rationale="Verifies migration provenance tracking.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q83_provenance_aggregator_repo_id",
+            category="Branch and Provenance",
+            query="How does ProofChainAggregator preserve repository_id and branch in GroundedProofChain?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="ProofChainAggregator explicitly propagates repository_id and branch parameters into each generated GroundedProofChain.",
+            relevant_files=["apps/api/src/services/evoreasoner/aggregator.py"],
+            relevant_symbols=["ProofChainAggregator"],
+            expected_relations=[
+                {"subject": "ProofChainAggregator", "relation": "PRODUCES", "object": "GroundedProofChain"}
+            ],
+            expected_paths=[["ProofChainAggregator", "PRODUCES", "GroundedProofChain"]],
+            commit_sha="94fbd79",
+            rationale="Verifies repository and branch metadata preservation in proof chains.",
+        )
+    )
+
+    queries.append(
+        GroundTruthQuery(
+            query_id="q84_provenance_evidence_edge_commit",
+            category="Branch and Provenance",
+            query="How does EvidenceEdge store commit SHA provenance during graph beam search?",
+            intent=TemporalIntentType.CURRENT,
+            is_temporal=False,
+            expected_answer="EvidenceEdge extracts commit_sha and provenance dictionary directly from the source EvoKGTriplet.",
+            relevant_files=["apps/api/src/services/evoreasoner/beam_search.py", "apps/api/src/schemas/evoreasoner.py"],
+            relevant_symbols=["EvidenceEdge", "EvoBeamSearchEngine"],
+            expected_relations=[
+                {"subject": "EvoBeamSearchEngine", "relation": "PRODUCES", "object": "EvidenceEdge"}
+            ],
+            expected_paths=[["EvoBeamSearchEngine", "PRODUCES", "EvidenceEdge"]],
+            commit_sha="94fbd79",
+            rationale="Verifies commit SHA and provenance extraction during beam search.",
         )
     )
 
