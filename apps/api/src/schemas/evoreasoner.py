@@ -198,6 +198,7 @@ class BeamSearchConfig(BaseModel):
     max_expansions_per_node: int = 5
     max_total_expansions: int = 50
     max_returned_paths: int = 5
+    timeout_seconds: float = 5.0
 
     # Path scoring formula weights
     w_confidence: float = 0.35

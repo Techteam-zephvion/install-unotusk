@@ -14,9 +14,11 @@ Implements a bounded, deterministic beam search over persisted EvoKG triplets:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,7 +69,7 @@ class EvoBeamSearchEngine:
         cls,
         session: AsyncSession,
         repository_id: uuid.UUID,
-        route_plan: MultiRoutePlan,
+        route_plan: MultiRoutePlan | None = None,
         branch: str = "main",
         grounded_entities: list[str] | None = None,
         config: BeamSearchConfig | None = None,
@@ -75,14 +77,16 @@ class EvoBeamSearchEngine:
         until: datetime | None = None,
         reference_commit: str | None = None,
         target_commit: str | None = None,
+        plan: MultiRoutePlan | None = None,
     ) -> PathSearchResult:
         """
         Executes beam search across all selected routes in a MultiRoutePlan.
         """
         cfg = config or BeamSearchConfig()
+        resolved_plan = route_plan or plan
 
         # Handle empty plan or missing query
-        if not route_plan or not route_plan.selected_routes:
+        if not resolved_plan or not resolved_plan.selected_routes:
             return PathSearchResult(
                 query_text=route_plan.query_text if route_plan else "",
                 temporal_intent=route_plan.temporal_intent if route_plan else TemporalIntentType.CURRENT,
@@ -94,7 +98,7 @@ class EvoBeamSearchEngine:
                 search_diagnostics={"reason": "empty_route_plan"},
             )
 
-        intent = route_plan.temporal_intent
+        intent = resolved_plan.temporal_intent
 
         # Validate temporal intent requirements and anchors
         temporal_diagnostic = None
@@ -122,7 +126,7 @@ class EvoBeamSearchEngine:
 
         if is_unsupported:
             return PathSearchResult(
-                query_text=route_plan.query_text,
+                query_text=resolved_plan.query_text,
                 temporal_intent=intent,
                 repository_id=repository_id,
                 branch=branch,
@@ -139,9 +143,16 @@ class EvoBeamSearchEngine:
         all_candidate_paths: list[EvidencePath] = []
         total_expansions_counter = 0
         total_paths_explored = 0
+        triplet_cache: dict[tuple[Any, ...], list[EvoKGTriplet]] = {}
+        timed_out = False
+        t_start = time.perf_counter()
 
         # Execute beam search for each selected route
-        for route in route_plan.selected_routes:
+        for route in resolved_plan.selected_routes:
+            if (time.perf_counter() - t_start) > cfg.timeout_seconds:
+                timed_out = True
+                break
+
             # Determine start entity
             start_entity = None
             if grounded_entities and len(grounded_entities) > 0:
@@ -159,11 +170,12 @@ class EvoBeamSearchEngine:
                 branch=branch,
                 start_entity=start_entity,
                 config=cfg,
-                intent_type=route_plan.temporal_intent,
+                intent_type=resolved_plan.temporal_intent,
                 as_of=as_of,
                 until=until,
                 reference_commit=reference_commit,
                 target_commit=target_commit,
+                triplet_cache=triplet_cache,
             )
 
             total_expansions_counter += expansions
@@ -196,18 +208,19 @@ class EvoBeamSearchEngine:
         final_paths = ranked[: cfg.max_returned_paths]
 
         return PathSearchResult(
-            query_text=route_plan.query_text,
-            temporal_intent=route_plan.temporal_intent,
+            query_text=resolved_plan.query_text,
+            temporal_intent=resolved_plan.temporal_intent,
             repository_id=repository_id,
             branch=branch,
             paths=final_paths,
             total_paths_explored=total_paths_explored,
             total_expansions=total_expansions_counter,
             search_diagnostics={
-                "routes_executed": len(route_plan.selected_routes),
+                "routes_executed": len(resolved_plan.selected_routes),
                 "paths_retained": len(final_paths),
                 "beam_width": cfg.beam_width,
                 "max_path_depth": cfg.max_path_depth,
+                "timed_out": timed_out,
             },
         )
 
@@ -225,6 +238,7 @@ class EvoBeamSearchEngine:
         until: datetime | None = None,
         reference_commit: str | None = None,
         target_commit: str | None = None,
+        triplet_cache: dict[tuple[Any, ...], list[EvoKGTriplet]] | None = None,
     ) -> tuple[list[EvidencePath], int]:
         """
         Executes bounded beam search for a single planned reasoning route.
@@ -267,6 +281,7 @@ class EvoBeamSearchEngine:
                     until=until,
                     reference_commit=reference_commit,
                     target_commit=target_commit,
+                    triplet_cache=triplet_cache,
                 )
                 expansions += 1
 
@@ -419,10 +434,31 @@ class EvoBeamSearchEngine:
         until: datetime | None = None,
         reference_commit: str | None = None,
         target_commit: str | None = None,
+        triplet_cache: dict[tuple[Any, ...], list[EvoKGTriplet]] | None = None,
     ) -> list[EvoKGTriplet]:
         """
-        Executes bounded, indexed query against evokg_triplets.
+        Executes bounded, indexed query against evokg_triplets with request-scoped caching.
         """
+        intent_val = (
+            intent_type.value
+            if isinstance(intent_type, TemporalIntentType)
+            else str(intent_type).upper()
+        )
+        cache_key = (
+            repository_id,
+            branch,
+            current_node.strip().lower(),
+            hop.canonical_relation.value if hasattr(hop.canonical_relation, 'value') else str(hop.canonical_relation),
+            hop.is_inverse,
+            intent_val,
+            limit,
+            as_of,
+            until,
+            reference_commit,
+            target_commit,
+        )
+        if triplet_cache is not None and cache_key in triplet_cache:
+            return triplet_cache[cache_key]
         canon_rel = hop.canonical_relation
         rel_str = canon_rel.value
 

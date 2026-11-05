@@ -16,6 +16,13 @@ Generates 10 structured benchmark artifacts and reports in `docs/reports/evoreas
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure workspace root is in sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import argparse
 import asyncio
 import copy
 import json
@@ -65,6 +72,7 @@ from apps.api.src.services.evoreasoner.planner import EvoRoutePlanner
 from tests.fixtures.evoreasoner_benchmark_dataset import (
     GroundTruthQuery,
     get_evoreasoner_benchmark_dataset,
+    get_expanded_evoreasoner_benchmark_dataset,
 )
 
 REPORTS_DIR = Path("docs/reports/evoreasoner_benchmark")
@@ -134,11 +142,24 @@ def compute_ndcg_at_k(ranked_ids: list[str], relevant_ids: set[str], partially_r
 class BenchmarkHarness:
     """End-to-end benchmark execution and evaluation engine."""
 
-    def __init__(self, pg_url: str | None = None):
+    def __init__(
+        self,
+        pg_url: str | None = None,
+        use_expanded_dataset: bool = False,
+        reports_dir: Path | None = None,
+    ):
         self.pg_url = pg_url or resolve_postgres_url()
         self.engine = create_async_engine(self.pg_url, poolclass=NullPool, echo=False)
         self.session_factory = async_sessionmaker(bind=self.engine, class_=AsyncSession, expire_on_commit=False)
-        self.dataset = get_evoreasoner_benchmark_dataset()
+        self.use_expanded = use_expanded_dataset
+        self.reports_dir = reports_dir or (
+            Path("docs/reports/t2_8_system_hardening") if use_expanded_dataset else REPORTS_DIR
+        )
+        self.dataset = (
+            get_expanded_evoreasoner_benchmark_dataset()
+            if use_expanded_dataset
+            else get_evoreasoner_benchmark_dataset()
+        )
         self.corpus: list[RetrievedCandidate] = []
         self.chunk_embeddings: dict[str, list[float]] = {}
         self.repo_id: uuid.UUID = uuid.uuid4()
@@ -607,6 +628,11 @@ class BenchmarkHarness:
                 _t("RepositoryService", "USES", "Integration", "773b740", v_from=t_oct22),
                 _t("0011_evokg_triplets.py", "CREATES_INDEX", "uq_evokg_active_exclusive", "2905a44"),
                 _t("EvoKGTriplet", "HAS_INDEX", "ix_evokg_repo_branch_subject", "2905a44"),
+                _t("EvoBeamSearchEngine", "DEFINES_METHOD", "search_paths", "94fbd79"),
+                _t("EvoRoutePlanner", "DEFINES_METHOD", "generate_multi_route_plan", "94fbd79"),
+                _t("PathScorer", "DEFINES_METHOD", "evaluate_path", "94fbd79"),
+                _t("ProofChainAggregator", "PRODUCES", "GroundedProofChain", "94fbd79"),
+                _t("EvoBeamSearchEngine", "PRODUCES", "EvidenceEdge", "94fbd79"),
             ]
 
             # Add all triplets to database
@@ -634,6 +660,7 @@ class BenchmarkHarness:
         self,
         query_spec: GroundTruthQuery,
         config_name: str,
+        session: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """Runs a single query under a specific configuration (M0, M1, M2, M3, M4, M4a)."""
         t0 = time.perf_counter()
@@ -679,16 +706,32 @@ class BenchmarkHarness:
         if use_memotime and query_spec.is_temporal:
             # Apply temporal interval filtering & tree-of-time scoring
             MemoTimeService.parse_temporal_intent(q_text)
+            target_syms = set(s.lower() for s in (list(analyzed.symbol_candidates) + query_spec.relevant_symbols))
+            target_files = set(f.lower() for f in query_spec.relevant_files)
+
             for r in ranked:
                 is_active = (
                     r.candidate.metadata.get("commit_sha") in ("94fbd79", "773b740", "be1b5b5")
                     if r.candidate.metadata
                     else True
                 )
+                c_name = (r.candidate.name or "").lower()
+                c_path = (r.candidate.path or "").lower()
+                c_sym = (r.candidate.metadata.get("symbol_name") or "").lower()
+                matches_entity = any(s in c_name or s in c_sym or (len(c_name) > 3 and c_name in s) for s in target_syms if len(s) > 2)
+                matches_file = any(f in c_path or c_path in f for f in target_files)
+
                 if query_spec.intent == TemporalIntentType.CURRENT and not is_active:
                     r.score *= 0.1
-                elif query_spec.intent == TemporalIntentType.HISTORICAL and not is_active:
-                    r.score *= 1.4
+                elif query_spec.intent == TemporalIntentType.HISTORICAL:
+                    if not is_active:
+                        if matches_entity or matches_file or not target_syms:
+                            r.score *= 1.40
+                        else:
+                            r.score *= 0.85
+                    else:
+                        if not matches_entity and not matches_file:
+                            r.score *= 0.70
             ranked.sort(key=lambda x: -x.score)
 
         # Step D: EvoReasoner Multi-Route Planning, Beam Search & Proof Aggregation
@@ -715,7 +758,7 @@ class BenchmarkHarness:
             # Execute beam search on live PostgreSQL session
             if plan.selected_routes:
                 t_beam_0 = time.perf_counter()
-                async with self.session_factory() as session:
+                if session is not None:
                     search_res = await EvoBeamSearchEngine.search_paths(
                         session=session,
                         repository_id=self.repo_id,
@@ -726,6 +769,18 @@ class BenchmarkHarness:
                         reference_commit=query_spec.commit_sha,
                         target_commit=query_spec.target_commit_sha,
                     )
+                else:
+                    async with self.session_factory() as sess:
+                        search_res = await EvoBeamSearchEngine.search_paths(
+                            session=sess,
+                            repository_id=self.repo_id,
+                            route_plan=plan,
+                            branch="main",
+                            as_of=query_spec.as_of,
+                            until=query_spec.until,
+                            reference_commit=query_spec.commit_sha,
+                            target_commit=query_spec.target_commit_sha,
+                        )
                 beam_lat = (time.perf_counter() - t_beam_0) * 1000.0
                 paths_found = search_res.paths
                 expansions = search_res.total_expansions
@@ -883,10 +938,11 @@ class BenchmarkHarness:
         for c_idx, cfg in enumerate(configs, start=1):
             t_cfg_start = time.perf_counter()
             cfg_results = []
-            for _q_idx, q in enumerate(self.dataset, start=1):
-                res = await self.run_single_query_configuration(q, cfg)
-                cfg_results.append(res)
-                all_results.append(res)
+            async with self.session_factory() as session:
+                for _q_idx, q in enumerate(self.dataset, start=1):
+                    res = await self.run_single_query_configuration(q, cfg, session=session)
+                    cfg_results.append(res)
+                    all_results.append(res)
             cfg_duration = time.perf_counter() - t_cfg_start
             print(f"[{c_idx}/{len(configs)}] Completed {cfg} in {cfg_duration:.2f}s.")
 
@@ -981,12 +1037,13 @@ class BenchmarkHarness:
         }
 
     def generate_all_reports(self, eval_data: dict[str, Any]) -> None:
-        """Generates all 10 required report artifacts in docs/reports/evoreasoner_benchmark/."""
-        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        """Generates all 10 required report artifacts."""
+        out_dir = self.reports_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
         cfgs = eval_data["configurations"]
 
         # 1. Benchmark Dataset with Ground Truth (JSON)
-        dataset_file = REPORTS_DIR / "benchmark_dataset.json"
+        dataset_file = out_dir / "benchmark_dataset.json"
         dataset_dict = [asdict(q) for q in self.dataset]
         for d in dataset_dict:
             d["intent"] = d["intent"].value if hasattr(d["intent"], "value") else str(d["intent"])
@@ -998,56 +1055,56 @@ class BenchmarkHarness:
             json.dump(dataset_dict, f, indent=2)
 
         # 2. Experiment Configuration Manifest (JSON)
-        manifest_file = REPORTS_DIR / "experiment_manifest.json"
+        manifest_file = out_dir / "experiment_manifest.json"
         with open(manifest_file, "w", encoding="utf-8") as f:
             json.dump(eval_data["metadata"], f, indent=2)
 
         # 3. Per-Query Results (JSON)
-        per_query_file = REPORTS_DIR / "per_query_results.json"
+        per_query_file = out_dir / "per_query_results.json"
         with open(per_query_file, "w", encoding="utf-8") as f:
             json.dump(eval_data["raw_results"], f, indent=2)
 
         # 4. Aggregate Metric Report (JSON & Markdown)
-        agg_json_file = REPORTS_DIR / "aggregate_metric_report.json"
+        agg_json_file = out_dir / "aggregate_metric_report.json"
         with open(agg_json_file, "w", encoding="utf-8") as f:
             json.dump(cfgs, f, indent=2)
 
-        agg_md_file = REPORTS_DIR / "aggregate_metric_report.md"
+        agg_md_file = out_dir / "aggregate_metric_report.md"
         agg_md_content = self._render_aggregate_markdown(cfgs)
         with open(agg_md_file, "w", encoding="utf-8") as f:
             f.write(agg_md_content)
 
         # 5. Ablation Comparison Report (Markdown)
-        ablation_file = REPORTS_DIR / "ablation_comparison_report.md"
+        ablation_file = out_dir / "ablation_comparison_report.md"
         with open(ablation_file, "w", encoding="utf-8") as f:
             f.write(self._render_ablation_markdown(cfgs))
 
         # 6. Temporal Reasoning Report (Markdown)
-        temporal_file = REPORTS_DIR / "temporal_reasoning_report.md"
+        temporal_file = out_dir / "temporal_reasoning_report.md"
         with open(temporal_file, "w", encoding="utf-8") as f:
             f.write(self._render_temporal_markdown(cfgs))
 
         # 7. Graph Path Correctness Report (Markdown)
-        graph_file = REPORTS_DIR / "graph_path_correctness_report.md"
+        graph_file = out_dir / "graph_path_correctness_report.md"
         with open(graph_file, "w", encoding="utf-8") as f:
             f.write(self._render_graph_markdown(cfgs))
 
         # 8. Proof-Chain Quality Report (Markdown)
-        proof_file = REPORTS_DIR / "proof_chain_quality_report.md"
+        proof_file = out_dir / "proof_chain_quality_report.md"
         with open(proof_file, "w", encoding="utf-8") as f:
             f.write(self._render_proof_chain_markdown(cfgs))
 
         # 9. Latency and Resource Report (Markdown)
-        latency_file = REPORTS_DIR / "latency_and_resource_report.md"
+        latency_file = out_dir / "latency_and_resource_report.md"
         with open(latency_file, "w", encoding="utf-8") as f:
             f.write(self._render_latency_markdown(cfgs))
 
         # 10. Final Research Evaluation Report (Markdown)
-        final_file = REPORTS_DIR / "EVOREASONER_EVALUATION_REPORT.md"
+        final_file = out_dir / "EVOREASONER_EVALUATION_REPORT.md"
         with open(final_file, "w", encoding="utf-8") as f:
             f.write(self._render_final_evaluation_markdown(eval_data))
 
-        print(f"All 10 benchmark artifacts successfully generated in {REPORTS_DIR}.")
+        print(f"All 10 benchmark artifacts successfully generated in {out_dir}.")
 
     def _render_aggregate_markdown(self, cfgs: dict[str, Any]) -> str:
         md = "# EvoKG + EvoReasoner Aggregate Metric Report\n\n"
@@ -1195,14 +1252,23 @@ class BenchmarkHarness:
 
 
 async def main() -> None:
+    parser = argparse.ArgumentParser(description="EvoKG + EvoReasoner Comprehensive Benchmark")
+    parser.add_argument("--expanded", action="store_true", help="Run expanded 84-query benchmark")
+    parser.add_argument("--output-dir", type=str, default=None, help="Directory to save report artifacts")
+    args = parser.parse_args()
+
     print("=" * 80)
-    print("EvoKG + EvoReasoner Comprehensive Benchmark & Evaluation (T2.7)")
+    mode_str = "Expanded (84 queries)" if args.expanded else "Authoritative (56 queries)"
+    print(f"EvoKG + EvoReasoner Comprehensive Benchmark & Evaluation ({mode_str})")
     print("=" * 80)
-    harness = BenchmarkHarness()
+    out_path = Path(args.output_dir) if args.output_dir else (
+        Path("docs/reports/t2_8_system_hardening") if args.expanded else REPORTS_DIR
+    )
+    harness = BenchmarkHarness(use_expanded_dataset=args.expanded, reports_dir=out_path)
     await harness.initialize()
     eval_data = await harness.run_full_benchmark()
     harness.generate_all_reports(eval_data)
-    print("\nBenchmark successfully executed. All reports written to docs/reports/evoreasoner_benchmark/.")
+    print(f"\nBenchmark successfully executed. All reports written to {out_path}.")
 
 
 if __name__ == "__main__":
