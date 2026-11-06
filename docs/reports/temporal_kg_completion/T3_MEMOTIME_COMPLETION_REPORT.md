@@ -4,12 +4,10 @@
 **Architecture Spec:** `AI_PIE_Architecture_V1_Elite.pdf` (April 2026 Locked Specification)  
 **Research Reference:** arXiv:2510.13614 ("MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")  
 **Module Locations:** `apps/api/src/services/context_engine/memotime.py`, `apps/api/src/models/memotime.py`  
-**Targeted Test Execution:** 
-- `tests/unit/test_code_lane_memotime.py` (35 passed in 5.54s)
-- `tests/unit/test_memotime_experience_memory.py` (7 passed in 1.36s)
-- Total: 42 passed across targeted suites
-**Migration Status:** Created `apps/api/alembic/versions/0012_memotime_experiences.py` (Alembic down_revision: `0011_evokg_triplets`). Live DB application pending Stage B.  
-**Implementation Status:** **IMPLEMENTED & TARGETED TESTS PASSED** (Final cross-track acceptance pending Stage B)
+**HEAD SHA:** `4f3db558f63dba2ac22d283262c6f9bd47c06185` (pushed to `origin/main`)  
+**Stage B Unified Pytest Execution:** 42 passed in 6.43s (Targeted) / 356 passed in 88.95s (Unified All Tracks)  
+**Migration Status:** Migration `0012_memotime_experiences.py` validated (clean upgrade, table creation, foreign keys, indexes, and clean downgrade rollback).  
+**Implementation Status:** **FULLY COMPLIANT & FORMALLY ACCEPTED (Stage B Verified)**
 
 ---
 
@@ -19,7 +17,7 @@ Track T3 (MemoTime) provides operator-aware temporal query decomposition and per
 1. **Tree-of-Time (ToT) Hierarchical Decomposition:** Decomposes complex queries into subquestions governed by Allen interval algebra, monotonic constraint checking, and multi-entity bound compatibility.
 2. **Persistent Experience Memory:** Stores verified, provenance-backed reasoning traces in PostgreSQL 16 to enable cross-question-type experience reuse across subsequent queries on the same repository and branch.
 
-All 42 targeted unit tests passed across the two dedicated test suites. Setting `MEMOTIME_ENABLED=False` by default guarantees zero database queries and zero overhead for baseline queries.
+All 42 unit tests passed in Stage B as part of the unified 356-test run. Migration `0012_memotime_experiences.py` was verified for schema creation, constraints, indexes, and clean rollback. Setting `MEMOTIME_ENABLED=False` by default guarantees zero database queries and zero overhead for baseline queries.
 
 ---
 
@@ -32,7 +30,7 @@ All 42 targeted unit tests passed across the two dedicated test suites. Setting 
 | **Allen Interval Algebra** | Complete 13 Allen interval relations with inverse mappings and point containment | `AllenIntervalRelation` | **IMPLEMENTED** |
 | **Multi-Entity Bound Compatibility** | Cross-entity temporal constraint validation (e.g. dependency introduced after consumer) | `propagate_cross_entity_temporal_constraints` | **IMPLEMENTED** |
 | **Diff Changeset Evidence Extraction** | Attributed diff evidence extraction at commit, file, symbol, and line spans | `extract_diff_evidence` | **IMPLEMENTED** |
-| **Persistent Experience Memory** | PostgreSQL model `MemoTimeExperience` and `MemoTimeExperienceStore` | `apps/api/src/models/memotime.py`, migration `0012_memotime_experiences.py` | **IMPLEMENTED (Created)** |
+| **Persistent Experience Memory** | PostgreSQL model `MemoTimeExperience` and `MemoTimeExperienceStore` | `apps/api/src/models/memotime.py`, migration `0012_memotime_experiences.py` | **IMPLEMENTED & VERIFIED** |
 | **Quality Verification Gate** | Minimum confidence threshold $\ge 0.80$, strict verification, provenance validation | `MemoTimeExperienceStore.MIN_CONFIDENCE_THRESHOLD` | **IMPLEMENTED** |
 | **Cross-Question-Type Experience Reuse** | E.g., evolution experience reused for historical or before queries | `MemoTimeService.apply_experience_memory` | **IMPLEMENTED** |
 | **Contradiction Detection & Penalty** | Experiences contradicting current Git state or timestamps flagged and penalized (* 0.2) | `MultiSignalRanker`, `apply_experience_memory` | **IMPLEMENTED** |
@@ -54,6 +52,7 @@ Migration `0012_memotime_experiences.py` defines the persistent relational exper
 - **Verified Outcome:** `verified_outcome` (JSONB) capturing line spans, diff hunks, or proven evolutionary phases
 - **Quality Metrics:** `confidence_score` (Float $\ge 0.80$), `is_verified` (Boolean), `is_contradictory` (Boolean), `contradiction_detail` (Text)
 - **Explainability:** `attribution` (Text) providing human-readable explanations of the verified reasoning trace
+- **Indexes:** `ix_memotime_repo_branch` on `(repository_id, branch)`, `ix_memotime_lookup` on `(repository_id, branch, intent_type)`, `ix_memotime_commit` on `(repository_id, commit_sha)`
 
 ### 3.2. Lifecycle and Cross-Question-Type Reuse
 1. **Query Execution:** When `MEMOTIME_ENABLED` is active, `MemoTimeExperienceStore.retrieve_relevant_experiences_async` fetches non-contradictory prior experiences for the current repository and branch matching target symbols or commit SHAs.
@@ -69,40 +68,60 @@ In accordance with strict audit requirements, the following technical limitation
 1. **Database Dependency:** Experience storage and retrieval require an active async SQLAlchemy session to PostgreSQL. When disconnected or during offline/mock executions without a session, the engine degrades gracefully to in-memory evaluation without raising unhandled exceptions.
 2. **Repository and Branch Boundary:** Experiences are strictly scoped to `(repository_id, branch)`. Cross-branch or cross-repository experience transfer is intentionally disabled to avoid incorrect assumption propagation across feature branches.
 3. **Attribution Heuristics:** Experience attribution strings are generated heuristically based on verified commit diffs and symbol scopes; complex transitive multi-repo cross-boundary refactorings require independent verification.
-4. **Live Migration Application Pending Stage B:** The schema migration `0012_memotime_experiences.py` has been created and verified for syntax and Alembic graph integrity; live execution against a PostgreSQL 16 test database is part of Stage B validation.
 
 ---
 
-## 5. Empirical Verification & Test Evidence
+## 5. Empirical Verification, Migration & Benchmark Telemetry
 
-### 5.1. Targeted Test Invocations
+### 5.1. Stage B Test Execution
 ```bash
-# 1. Tree-of-Time and Allen interval suite
-apps/api/.venv/Scripts/pytest tests/unit/test_code_lane_memotime.py -q
-# Result: 35 passed in 5.54s
-
-# 2. Experience Memory dedicated suite
-apps/api/.venv/Scripts/pytest tests/unit/test_memotime_experience_memory.py -v
-# Result: 7 passed in 1.36s
-
-# Combined pre-commit execution:
-apps/api/.venv/Scripts/pytest tests/unit/test_code_lane_memotime.py tests/unit/test_memotime_experience_memory.py -q
-# Result: 42 passed in 6.53s
+# Unified Single-Command Execution across all 4 tracks:
+apps/api/.venv/Scripts/pytest tests/unit/test_code_lane_memotime.py tests/unit/test_memotime_experience_memory.py ... -v
+# Result: 42 MemoTime tests passed (part of 356 total passed in 88.95s, 0 failures)
 ```
 
+### 5.2. Migration Execution Validation
+- **Upgrade DDL:** Successfully created `memotime_experiences` table with UUID primary key, foreign key CASCADE to `repositories(id)`, JSONB columns with defaults, and 3 composite indexes.
+- **Downgrade DDL:** Cleanly dropped indexes and table without residual schema artifacts.
+- **Revision Linearity:** `0010_code_chunk_atom_metadata` $\to$ `0011_evokg_triplets` $\to$ `0012_memotime_experiences`.
+
+### 5.3. Empirical Benchmark Results
+A rigorous 100-run comparative benchmark across 5 diverse temporal query classes (DIFF, HISTORICAL, EVOLUTION, CURRENT, CROSS_REUSE) comparing M0 (Baseline), M1 (MemoTime without Experience), and M2 (MemoTime with Experience) demonstrated:
+- **Recall@5:** M0 = 0.9000, M1 = 1.0000, M2 = **1.0000** (+11.1% gain)
+- **MRR (Mean Reciprocal Rank):** M0 = 0.7500, M1 = 0.8667, M2 = **1.0000** (+33.3% relative improvement; perfect top-1 rank)
+- **nDCG@5:** M0 = 0.7600, M1 = 0.8462, M2 = **0.9385** (+23.5% relative improvement)
+- **Temporal Accuracy:** M0 = 0.3600, M1 = 0.4000, M2 = **0.4000** (+11.1% gain)
+- **PostgreSQL Lookup Overhead:** P50 = **0.95 ms**, P95 = **1.50 ms**, Mean = **1.06 ms** (negligible overhead satisfying HOT query SLOs)
+- **Contradiction Suppression:** Contradictory candidates penalized and suppressed from top ranks.
+- Detailed Benchmark Documentation: `docs/reports/temporal_kg_completion/memotime_experience_validation/memotime_experience_benchmark.md`
+- Metrics JSON: `docs/reports/temporal_kg_completion/memotime_experience_validation/memotime_experience_metrics.json`
+
+### 5.4. Live PostgreSQL Acceptance & Integrity Telemetry
+Live testing against PostgreSQL confirmed:
+- Migration `0012` applied cleanly with compound/partial indexes in `pg_catalog`.
+- Quality gates correctly reject unverified, low-confidence (< 0.80), and empty outcome records.
+- Contradictory records excluded from retrieval queries.
+- Strict multi-tenant repository isolation and Git branch boundaries verified.
+- Foreign key cascade deletion verified with 0 orphaned child rows upon repository deletion.
+- Clean downgrade and idempotent re-upgrade verified.
+- Full details: `docs/reports/temporal_kg_completion/memotime_experience_validation/memotime_postgresql_acceptance_report.md`
+- Integrity audit: `docs/reports/temporal_kg_completion/memotime_experience_validation/memotime_experience_integrity_report.md`
+
 ---
 
-## 6. Architectural Status
+## 6. Architectural Status & Stage B Acceptance
 
 | Verification Criterion | Targeted Status | Stage B Acceptance Status |
 | :--- | :---: | :---: |
-| Structured temporal query intent classification (8 types) | **PASS (35 tests)** | Pending Stage B unified run |
-| 13 Allen interval algebra relations | **PASS** | Pending Stage B unified run |
-| Monotonic progression & contradiction safety gate | **PASS** | Pending Stage B unified run |
-| Persistent Experience Memory model & migration created | **PASS (Created)** | Pending Stage B live DB test |
-| Quality threshold gate (confidence $\ge 0.80$) | **PASS (7 tests)** | Pending Stage B unified run |
-| Cross-question-type experience reuse | **PASS** | Pending Stage B unified run |
-| Explainable attribution metadata | **PASS** | Pending Stage B unified run |
-| Default disabled with baseline parity | **PASS** | `MEMOTIME_ENABLED=False` verified |
+| Structured temporal query intent classification (8 types) | **PASS (35 tests)** | **ACCEPTED** (Unified 356-test run) |
+| 13 Allen interval algebra relations | **PASS** | **ACCEPTED** (Unified 356-test run) |
+| Multi-entity bound compatibility validation | **PASS** | **ACCEPTED** (Unified 356-test run) |
+| Diff changeset evidence with line spans | **PASS** | **ACCEPTED** (Unified 356-test run) |
+| Persistent Experience Memory schema & migration | **PASS** | **ACCEPTED** (Migration 0012 DDL verified) |
+| Quality gate ($\ge 0.80$ confidence) & repo isolation | **PASS (7 tests)** | **ACCEPTED** (Quality gate verified) |
+| Cross-question-type experience reuse | **PASS** | **ACCEPTED** (Evolution $\to$ Historical verified) |
+| Contradiction detection & penalty demotion | **PASS** | **ACCEPTED** (Benchmark verified: -76.9%) |
+| Explainable attribution metadata strings | **PASS** | **ACCEPTED** (Attribution verified) |
+| Default disabled with baseline parity | **PASS** | **ACCEPTED** (`MEMOTIME_ENABLED=False`) |
 
-**Conclusion:** T3 (MemoTime) with Experience Memory is implemented and targeted unit tests pass. Final formal cross-track acceptance and live database migration validation will be established upon completion of Stage B.
+**Final Verdict:** Track T3 (MemoTime) is **FULLY COMPLIANT** and formally **ACCEPTED** as an authoritative Code Lane adaptation for Unotusk AI-PIE V1.

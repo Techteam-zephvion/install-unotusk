@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-14T10:05:09.702640+00:00",
+  "timestamp": "2026-11-06T05:09:06.111957+00:00",
   "evaluation_scope": "Real-Repository Git Commits & End-to-End Code Retrieval (Phase 14)",
   "dataset_summary": {
     "total_cases": 10,
@@ -46,11 +46,11 @@
       "relation_jaccard": 1.0
     },
     "latency_ms": {
-      "decomposition_mean_ms": 1.37,
-      "resolution_mean_ms": 0.12,
-      "total_mean_ms": 1.49,
-      "min_ms": 0.29,
-      "max_ms": 6.41
+      "decomposition_mean_ms": 4.19,
+      "resolution_mean_ms": 0.33,
+      "total_mean_ms": 4.52,
+      "min_ms": 0.73,
+      "max_ms": 21.57
     }
   },
   "retrieval_evaluation": {
@@ -77,7 +77,7 @@
         "total_ranked_candidates": 11,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15610
+        "assembled_chars": 15433
       },
       {
         "case_id": "real_02_removal",
@@ -88,12 +88,12 @@
         ],
         "first_match_rank": 1,
         "reciprocal_rank": 1.0,
-        "top_1_candidate": "ProjectService (MODIFY)",
+        "top_1_candidate": "project_service.py (MODIFY)",
         "top_1_path": "apps/api/src/services/project_service.py",
-        "total_ranked_candidates": 40,
+        "total_ranked_candidates": 26,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15967
+        "assembled_chars": 12690
       },
       {
         "case_id": "real_03_method_replacement",
@@ -109,7 +109,7 @@
         "total_ranked_candidates": 18,
         "provenance_intact": true,
         "relationship_expanded": false,
-        "assembled_chars": 15842
+        "assembled_chars": 15433
       },
       {
         "case_id": "real_04_imports_refactor",
@@ -124,7 +124,7 @@
         "total_ranked_candidates": 23,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 14923
+        "assembled_chars": 15483
       },
       {
         "case_id": "real_05_configuration",
@@ -137,10 +137,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ApiService (MODIFY)",
         "top_1_path": "app/lib/services/api_service.dart",
-        "total_ranked_candidates": 25,
+        "total_ranked_candidates": 23,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15607
+        "assembled_chars": 15433
       },
       {
         "case_id": "real_06_admin_guard",
@@ -156,7 +156,7 @@
         "total_ranked_candidates": 29,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15829
+        "assembled_chars": 14821
       },
       {
         "case_id": "real_07_rbac_isolation",
@@ -169,10 +169,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ProjectService (MODIFY)",
         "top_1_path": "apps/api/src/services/project_service.py",
-        "total_ranked_candidates": 40,
+        "total_ranked_candidates": 26,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15868
+        "assembled_chars": 15317
       },
       {
         "case_id": "real_08_file_rename",
@@ -187,7 +187,7 @@
         "total_ranked_candidates": 12,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15970
+        "assembled_chars": 14836
       },
       {
         "case_id": "real_09_pipeline_integration",
@@ -200,10 +200,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ContextAssembler (MODIFY)",
         "top_1_path": "apps/api/src/services/context_engine/assembler.py",
-        "total_ranked_candidates": 24,
+        "total_ranked_candidates": 13,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15196
+        "assembled_chars": 15433
       },
       {
         "case_id": "real_10_scope_resolution",
@@ -219,7 +219,7 @@
         "total_ranked_candidates": 35,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 14898
+        "assembled_chars": 14764
       }
     ]
   },

@@ -467,7 +467,7 @@ class MemoTimeExperienceStore:
             # 3. Compatible cross-question-type match
             if intent_type and rec.intent_type == intent_type:
                 is_relevant = True
-            elif not targets_lower and not c_sha_clean:
+            elif not targets_lower and not c_sha_clean and not intent_type:
                 is_relevant = True
 
             if is_relevant:

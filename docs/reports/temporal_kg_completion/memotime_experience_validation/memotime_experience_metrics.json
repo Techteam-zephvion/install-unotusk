@@ -1,0 +1,40 @@
+{
+  "M0_Baseline": {
+    "recall_at_5": 0.9,
+    "mrr": 0.75,
+    "ndcg_at_5": 0.76,
+    "temporal_accuracy": 0.36,
+    "contradiction_rate": 0.12,
+    "stale_violation_rate": 0.04,
+    "latency_p50_ms": 0.14,
+    "latency_p95_ms": 0.19,
+    "latency_mean_ms": 0.15
+  },
+  "M1_MemoTime_NoExperience": {
+    "recall_at_5": 1.0,
+    "mrr": 0.8667,
+    "ndcg_at_5": 0.8462,
+    "temporal_accuracy": 0.4,
+    "contradiction_rate": 0.12,
+    "stale_violation_rate": 0.04,
+    "latency_p50_ms": 0.33,
+    "latency_p95_ms": 65.76,
+    "latency_mean_ms": 13.39
+  },
+  "M2_MemoTime_WithExperience": {
+    "recall_at_5": 1.0,
+    "mrr": 1.0,
+    "ndcg_at_5": 0.9385,
+    "temporal_accuracy": 0.4,
+    "contradiction_rate": 0.12,
+    "stale_violation_rate": 0.04,
+    "latency_p50_ms": 1.6,
+    "latency_p95_ms": 67.61,
+    "latency_mean_ms": 14.65
+  },
+  "lookup_overhead": {
+    "lookup_overhead_p50_ms": 0.95,
+    "lookup_overhead_p95_ms": 1.5,
+    "lookup_overhead_mean_ms": 1.06
+  }
+}
