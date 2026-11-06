@@ -1,0 +1,1858 @@
+[
+  {
+    "case_id": "dev_01_simple_func_mod",
+    "split": "dev",
+    "category": "Simple",
+    "language": "Python",
+    "commit_sha": "c01a01",
+    "commit_message": "fix(calc): update score multiplier to 1.5 for weighted ranking",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/scorer.py b/apps/api/src/services/scorer.py\n--- a/apps/api/src/services/scorer.py\n+++ b/apps/api/src/services/scorer.py\n@@ -10,3 +10,3 @@ def calculate_score(weight: float) -> float:\n-    return weight * 1.0\n+    return weight * 1.5\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "calculate_score",
+        "type": "FUNCTION",
+        "evidence_span": "def calculate_score",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/scorer.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/scorer.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "calculate_score",
+        "trigger_statement": "update score multiplier to 1.5",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "return weight * 1.5",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_02_dependency_redis",
+    "split": "dev",
+    "category": "Dependency",
+    "language": "Python",
+    "commit_sha": "c01a02",
+    "commit_message": "feat(worker): introduce redis async client for background task dispatch",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/services/workers/queue.py b/services/workers/queue.py\n--- a/services/workers/queue.py\n+++ b/services/workers/queue.py\n@@ -1,3 +1,5 @@ class TaskQueue:\n+from redis.asyncio import Redis\n class TaskQueue:\n+    def __init__(self, url: str):\n+        self.client = Redis.from_url(url)\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "TaskQueue",
+        "type": "CLASS",
+        "evidence_span": "class TaskQueue",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "redis",
+        "type": "DEPENDENCY",
+        "evidence_span": "from redis.asyncio import Redis",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "services/workers/queue.py",
+        "type": "FILE",
+        "evidence_span": "services/workers/queue.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "services/workers/queue.py",
+        "rel": "IMPORTS",
+        "obj": "redis.asyncio",
+        "temporal_attribute": "t_start",
+        "evidence_span": "from redis.asyncio import Redis",
+        "is_supported_by_atom": true
+      },
+      {
+        "subject": "TaskQueue",
+        "rel": "CALLS",
+        "obj": "Redis",
+        "temporal_attribute": "t_start",
+        "evidence_span": "Redis.from_url(url)",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "DEPENDENCY_ADDED",
+        "target": "redis",
+        "trigger_statement": "introduce redis async client",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "from redis.asyncio import Redis",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_03_api_route_update",
+    "split": "dev",
+    "category": "API",
+    "language": "Python",
+    "commit_sha": "c01a03",
+    "commit_message": "feat(api): add status filter query parameter to GET /api/v1/repos",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/routers/repos.py b/apps/api/src/routers/repos.py\n--- a/apps/api/src/routers/repos.py\n+++ b/apps/api/src/routers/repos.py\n@@ -15,3 +15,3 @@ async def list_repos():\n-@router.get('/repos')\n-async def list_repos():\n+@router.get('/repos')\n+async def list_repos(status: str | None = None):\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "list_repos",
+        "type": "FUNCTION",
+        "evidence_span": "async def list_repos",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/routers/repos.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/routers/repos.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "API_CHANGED",
+        "target": "list_repos",
+        "trigger_statement": "add status filter query parameter",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "status: str | None = None",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_04_config_concurrency",
+    "split": "dev",
+    "category": "Configuration",
+    "language": "YAML",
+    "commit_sha": "c01a04",
+    "commit_message": "config: tune WORKER_CONCURRENCY to 8 to handle burst ingestion",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/docker-compose.yml b/docker-compose.yml\n--- a/docker-compose.yml\n+++ b/docker-compose.yml\n@@ -25,2 +25,2 @@ services:\n-      WORKER_CONCURRENCY: 2\n+      WORKER_CONCURRENCY: 8\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "WORKER_CONCURRENCY",
+        "type": "CONFIG_PARAM",
+        "evidence_span": "WORKER_CONCURRENCY: 8",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "docker-compose.yml",
+        "type": "FILE",
+        "evidence_span": "docker-compose.yml",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "CONFIGURATION_UPDATED",
+        "target": "WORKER_CONCURRENCY",
+        "trigger_statement": "tune WORKER_CONCURRENCY to 8",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "WORKER_CONCURRENCY: 8",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_05_auth_deprecation",
+    "split": "dev",
+    "category": "Deprecation",
+    "language": "Python",
+    "commit_sha": "c01a05",
+    "commit_message": "refactor(auth): deprecate LegacySessionAuth in favor of BearerTokenAuth",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/auth.py b/apps/api/src/services/auth.py\n--- a/apps/api/src/services/auth.py\n+++ b/apps/api/src/services/auth.py\n@@ -1,5 +1,9 @@ class LegacySessionAuth:\n+# @deprecated Use BearerTokenAuth instead\n class LegacySessionAuth:\n     pass\n+\n+class BearerTokenAuth:\n+    def authenticate(self, token: str): pass\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "LegacySessionAuth",
+        "type": "CLASS",
+        "evidence_span": "class LegacySessionAuth",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "BearerTokenAuth",
+        "type": "CLASS",
+        "evidence_span": "class BearerTokenAuth",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/auth.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/auth.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "BearerTokenAuth",
+        "rel": "REPLACES",
+        "obj": "LegacySessionAuth",
+        "temporal_attribute": "t_start",
+        "evidence_span": "@deprecated Use BearerTokenAuth instead",
+        "is_supported_by_atom": false
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "IMPLEMENTATION_DEPRECATED",
+        "target": "LegacySessionAuth",
+        "trigger_statement": "deprecate LegacySessionAuth",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "@deprecated Use BearerTokenAuth instead",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_06_test_contract_addition",
+    "split": "dev",
+    "category": "Test",
+    "language": "Python",
+    "commit_sha": "c01a06",
+    "commit_message": "test(auth): add unit test asserting expired JWT throws 401 Unauthorized",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/tests/unit/test_auth.py b/tests/unit/test_auth.py\n--- a/tests/unit/test_auth.py\n+++ b/tests/unit/test_auth.py\n@@ -30,2 +30,5 @@ def test_auth():\n+def test_expired_token_raises_401():\n+    with pytest.raises(HTTPException):\n+        verify_jwt('expired.token')\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "test_expired_token_raises_401",
+        "type": "FUNCTION",
+        "evidence_span": "def test_expired_token_raises_401",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "tests/unit/test_auth.py",
+        "type": "FILE",
+        "evidence_span": "tests/unit/test_auth.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "test_expired_token_raises_401",
+        "rel": "TESTS",
+        "obj": "verify_jwt",
+        "temporal_attribute": "t_start",
+        "evidence_span": "verify_jwt('expired.token')",
+        "is_supported_by_atom": false
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "TEST_MODIFIED",
+        "target": "test_expired_token_raises_401",
+        "trigger_statement": "add unit test asserting expired JWT throws 401",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "test_expired_token_raises_401",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_07_pricing_algorithm_shift",
+    "split": "dev",
+    "category": "Behavior",
+    "language": "Python",
+    "commit_sha": "c01a07",
+    "commit_message": "refactor(billing): switch discount logic to progressive tier curve",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/billing.py b/apps/api/src/services/billing.py\n--- a/apps/api/src/services/billing.py\n+++ b/apps/api/src/services/billing.py\n@@ -12,3 +12,5 @@ def get_discount(qty: int) -> float:\n-    return 0.10 if qty > 100 else 0.0\n+    if qty > 500: return 0.25\n+    if qty > 100: return 0.10\n+    return 0.0\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "get_discount",
+        "type": "FUNCTION",
+        "evidence_span": "def get_discount",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/billing.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/billing.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "get_discount",
+        "trigger_statement": "switch discount logic to progressive tier curve",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "if qty > 500: return 0.25",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_08_dead_code_deletion",
+    "split": "dev",
+    "category": "Deletion",
+    "language": "Python",
+    "commit_sha": "c01a08",
+    "commit_message": "chore(telemetry): remove dead LegacyTelemetrySender class",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/telemetry.py b/apps/api/src/services/telemetry.py\n--- a/apps/api/src/services/telemetry.py\n+++ b/apps/api/src/services/telemetry.py\n@@ -5,5 +5,0 @@ class LegacyTelemetrySender:\n-class LegacyTelemetrySender:\n-    def send(self, data: dict): pass\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "LegacyTelemetrySender",
+        "type": "CLASS",
+        "evidence_span": "class LegacyTelemetrySender",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/telemetry.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/telemetry.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_DELETED",
+        "target": "LegacyTelemetrySender",
+        "trigger_statement": "remove dead LegacyTelemetrySender class",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class LegacyTelemetrySender",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_09_trivial_whitespace",
+    "split": "dev",
+    "category": "Trivial",
+    "language": "Python",
+    "commit_sha": "c01a09",
+    "commit_message": "style: clean up trailing whitespaces",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/main.py b/apps/api/src/main.py\n--- a/apps/api/src/main.py\n+++ b/apps/api/src/main.py\n@@ -10,2 +10,2 @@ main:\n-app = FastAPI()   \n+app = FastAPI()\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [],
+    "expected_relations": [],
+    "expected_events": [],
+    "is_ambiguous": false,
+    "is_trivial": true
+  },
+  {
+    "case_id": "dev_10_ambiguous_scalar_commit",
+    "split": "dev",
+    "category": "Ambiguous",
+    "language": "Python",
+    "commit_sha": "c01a10",
+    "commit_message": "wip: update stuff",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/tracker.py b/apps/api/src/services/tracker.py\n--- a/apps/api/src/services/tracker.py\n+++ b/apps/api/src/services/tracker.py\n@@ -4,2 +4,2 @@ tracker:\n-counter = 1\n+counter = 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "counter",
+        "type": "CONFIG_PARAM",
+        "evidence_span": "counter = 2",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/tracker.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/tracker.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [],
+    "is_ambiguous": true,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_11_extension_case",
+    "split": "dev",
+    "category": "MultiFile",
+    "language": "Python",
+    "commit_sha": "c01a11",
+    "commit_message": "feat(service): enhance component handler module #11",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_11.py b/apps/api/src/services/module_11.py\n--- a/apps/api/src/services/module_11.py\n+++ b/apps/api/src/services/module_11.py\n@@ -1,3 +1,4 @@ class ServiceHandler11:\n+class ServiceHandler11:\n+    def process(self): return 11\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler11",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler11",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_11.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_11.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler11",
+        "trigger_statement": "enhance component handler module #11",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler11",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_12_extension_case",
+    "split": "dev",
+    "category": "MultiLanguage",
+    "language": "TypeScript",
+    "commit_sha": "c01a12",
+    "commit_message": "feat(service): enhance component handler module #12",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_12.py b/apps/api/src/services/module_12.py\n--- a/apps/api/src/services/module_12.py\n+++ b/apps/api/src/services/module_12.py\n@@ -1,3 +1,4 @@ class ServiceHandler12:\n+class ServiceHandler12:\n+    def process(self): return 12\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler12",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler12",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_12.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_12.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler12",
+        "trigger_statement": "enhance component handler module #12",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler12",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_13_extension_case",
+    "split": "dev",
+    "category": "MultiFile",
+    "language": "Python",
+    "commit_sha": "c01a13",
+    "commit_message": "feat(service): enhance component handler module #13",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_13.py b/apps/api/src/services/module_13.py\n--- a/apps/api/src/services/module_13.py\n+++ b/apps/api/src/services/module_13.py\n@@ -1,3 +1,4 @@ class ServiceHandler13:\n+class ServiceHandler13:\n+    def process(self): return 13\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler13",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler13",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_13.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_13.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler13",
+        "trigger_statement": "enhance component handler module #13",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler13",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_14_extension_case",
+    "split": "dev",
+    "category": "MultiLanguage",
+    "language": "Dart",
+    "commit_sha": "c01a14",
+    "commit_message": "feat(service): enhance component handler module #14",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_14.py b/apps/api/src/services/module_14.py\n--- a/apps/api/src/services/module_14.py\n+++ b/apps/api/src/services/module_14.py\n@@ -1,3 +1,4 @@ class ServiceHandler14:\n+class ServiceHandler14:\n+    def process(self): return 14\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler14",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler14",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_14.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_14.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler14",
+        "trigger_statement": "enhance component handler module #14",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler14",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_15_extension_case",
+    "split": "dev",
+    "category": "MultiFile",
+    "language": "TypeScript",
+    "commit_sha": "c01a15",
+    "commit_message": "feat(service): enhance component handler module #15",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_15.py b/apps/api/src/services/module_15.py\n--- a/apps/api/src/services/module_15.py\n+++ b/apps/api/src/services/module_15.py\n@@ -1,3 +1,4 @@ class ServiceHandler15:\n+class ServiceHandler15:\n+    def process(self): return 15\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler15",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler15",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_15.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_15.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler15",
+        "trigger_statement": "enhance component handler module #15",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler15",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_16_extension_case",
+    "split": "dev",
+    "category": "MultiLanguage",
+    "language": "Dart",
+    "commit_sha": "c01a16",
+    "commit_message": "feat(service): enhance component handler module #16",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_16.py b/apps/api/src/services/module_16.py\n--- a/apps/api/src/services/module_16.py\n+++ b/apps/api/src/services/module_16.py\n@@ -1,3 +1,4 @@ class ServiceHandler16:\n+class ServiceHandler16:\n+    def process(self): return 16\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler16",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler16",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_16.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_16.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler16",
+        "trigger_statement": "enhance component handler module #16",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler16",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_17_extension_case",
+    "split": "dev",
+    "category": "MultiFile",
+    "language": "Python",
+    "commit_sha": "c01a17",
+    "commit_message": "feat(service): enhance component handler module #17",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_17.py b/apps/api/src/services/module_17.py\n--- a/apps/api/src/services/module_17.py\n+++ b/apps/api/src/services/module_17.py\n@@ -1,3 +1,4 @@ class ServiceHandler17:\n+class ServiceHandler17:\n+    def process(self): return 17\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler17",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler17",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_17.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_17.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler17",
+        "trigger_statement": "enhance component handler module #17",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler17",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_18_extension_case",
+    "split": "dev",
+    "category": "MultiLanguage",
+    "language": "TypeScript",
+    "commit_sha": "c01a18",
+    "commit_message": "feat(service): enhance component handler module #18",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_18.py b/apps/api/src/services/module_18.py\n--- a/apps/api/src/services/module_18.py\n+++ b/apps/api/src/services/module_18.py\n@@ -1,3 +1,4 @@ class ServiceHandler18:\n+class ServiceHandler18:\n+    def process(self): return 18\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler18",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler18",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_18.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_18.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler18",
+        "trigger_statement": "enhance component handler module #18",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler18",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_19_extension_case",
+    "split": "dev",
+    "category": "MultiFile",
+    "language": "Python",
+    "commit_sha": "c01a19",
+    "commit_message": "feat(service): enhance component handler module #19",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_19.py b/apps/api/src/services/module_19.py\n--- a/apps/api/src/services/module_19.py\n+++ b/apps/api/src/services/module_19.py\n@@ -1,3 +1,4 @@ class ServiceHandler19:\n+class ServiceHandler19:\n+    def process(self): return 19\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler19",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler19",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_19.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_19.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler19",
+        "trigger_statement": "enhance component handler module #19",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler19",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "dev_20_extension_case",
+    "split": "dev",
+    "category": "MultiLanguage",
+    "language": "Dart",
+    "commit_sha": "c01a20",
+    "commit_message": "feat(service): enhance component handler module #20",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/module_20.py b/apps/api/src/services/module_20.py\n--- a/apps/api/src/services/module_20.py\n+++ b/apps/api/src/services/module_20.py\n@@ -1,3 +1,4 @@ class ServiceHandler20:\n+class ServiceHandler20:\n+    def process(self): return 20\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ServiceHandler20",
+        "type": "CLASS",
+        "evidence_span": "class ServiceHandler20",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/module_20.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/module_20.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "ServiceHandler20",
+        "trigger_statement": "enhance component handler module #20",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class ServiceHandler20",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_01_orchestrator_ports",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Python",
+    "commit_sha": "4e5af91",
+    "commit_message": "fix(orchestrator): extract host port from container port bindings dictionary values",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/orchestrator_service.py b/apps/api/src/services/orchestrator_service.py\n--- a/apps/api/src/services/orchestrator_service.py\n+++ b/apps/api/src/services/orchestrator_service.py\n@@ -120,3 +120,4 @@ class OrchestratorService:\n-        port = bindings.get('HostPort')\n+        for binding_list in port_bindings.values():\n+            host_port = binding_list[0].get('HostPort')\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "OrchestratorService",
+        "type": "CLASS",
+        "evidence_span": "class OrchestratorService",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/orchestrator_service.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/orchestrator_service.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "OrchestratorService",
+        "trigger_statement": "extract host port from container port bindings",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "host_port = binding_list[0].get('HostPort')",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_02_project_cleanup",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Python",
+    "commit_sha": "24a2630",
+    "commit_message": "refactor(project): clean up unused new_memberships_added accumulator",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/project_service.py b/apps/api/src/services/project_service.py\n--- a/apps/api/src/services/project_service.py\n+++ b/apps/api/src/services/project_service.py\n@@ -85,2 +85,0 @@ class ProjectService:\n-    new_memberships_added = []\n-    logger.info('memberships initialized')\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ProjectService",
+        "type": "CLASS",
+        "evidence_span": "class ProjectService",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/project_service.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/project_service.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_DELETED",
+        "target": "new_memberships_added",
+        "trigger_statement": "clean up unused new_memberships_added accumulator",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "new_memberships_added = []",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_03_dart_method_replacement",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Dart",
+    "commit_sha": "a9d81bb",
+    "commit_message": "fix(ui): replace deprecated Matrix4.scale with scaleByDouble in MermaidDialog",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/app/lib/widgets/mermaid_diagram.dart b/app/lib/widgets/mermaid_diagram.dart\n--- a/app/lib/widgets/mermaid_diagram.dart\n+++ b/app/lib/widgets/mermaid_diagram.dart\n@@ -45,2 +45,2 @@ class MermaidDialog:\n-    matrix.scale(factor);\n+    matrix.scaleByDouble(factor, factor, 1.0);\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "MermaidDialog",
+        "type": "CLASS",
+        "evidence_span": "class MermaidDialog",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "app/lib/widgets/mermaid_diagram.dart",
+        "type": "FILE",
+        "evidence_span": "app/lib/widgets/mermaid_diagram.dart",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "MermaidDialog",
+        "rel": "REPLACES",
+        "obj": "scale",
+        "temporal_attribute": "t_start",
+        "evidence_span": "replace deprecated Matrix4.scale with scaleByDouble",
+        "is_supported_by_atom": false
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "MermaidDialog",
+        "trigger_statement": "replace deprecated Matrix4.scale with scaleByDouble",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "matrix.scaleByDouble(factor, factor, 1.0);",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_04_admin_guard",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Python",
+    "commit_sha": "808b402",
+    "commit_message": "fix(auth): protect permanent lead admin admin@acme.com during sync",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/auth_service.py b/apps/api/src/services/auth_service.py\n--- a/apps/api/src/services/auth_service.py\n+++ b/apps/api/src/services/auth_service.py\n@@ -200,2 +200,4 @@ class AuthService:\n+    if user.email == 'admin@acme.com':\n+        return True\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "AuthService",
+        "type": "CLASS",
+        "evidence_span": "class AuthService",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/auth_service.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/auth_service.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "AuthService",
+        "rel": "VALIDATES",
+        "obj": "admin@acme.com",
+        "temporal_attribute": "t_start",
+        "evidence_span": "if user.email == 'admin@acme.com'",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "AuthService",
+        "trigger_statement": "protect permanent lead admin admin@acme.com",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "if user.email == 'admin@acme.com'",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_05_rbac_isolation",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Python",
+    "commit_sha": "cbbbbae",
+    "commit_message": "feat(rbac): validate organization membership and raise ConflictException on mismatch",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/project_service.py b/apps/api/src/services/project_service.py\n--- a/apps/api/src/services/project_service.py\n+++ b/apps/api/src/services/project_service.py\n@@ -150,3 +150,6 @@ class ProjectService:\n+    if project.org_id != current_user.org_id:\n+        raise ConflictException('Cross-tenant project modification prohibited')\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ProjectService",
+        "type": "CLASS",
+        "evidence_span": "class ProjectService",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "ConflictException",
+        "type": "CLASS",
+        "evidence_span": "raise ConflictException",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/project_service.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/project_service.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "ProjectService",
+        "rel": "RAISES",
+        "obj": "ConflictException",
+        "temporal_attribute": "t_start",
+        "evidence_span": "raise ConflictException",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "ProjectService",
+        "trigger_statement": "validate organization membership and raise ConflictException",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "raise ConflictException",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_06_pipeline_integration",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Python",
+    "commit_sha": "b094f01",
+    "commit_message": "feat(context): format superseded temporal relations with (ended) tag in assembly",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/context_engine/assembler.py b/apps/api/src/services/context_engine/assembler.py\n--- a/apps/api/src/services/context_engine/assembler.py\n+++ b/apps/api/src/services/context_engine/assembler.py\n@@ -70,2 +70,4 @@ class ContextAssembler:\n+        if rel.t_end is not None:\n+            rel_str += ' (ended)'\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "ContextAssembler",
+        "type": "CLASS",
+        "evidence_span": "class ContextAssembler",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/context_engine/assembler.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/context_engine/assembler.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "ContextAssembler",
+        "trigger_statement": "format superseded temporal relations with (ended) tag",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "rel_str += ' (ended)'",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_07_scope_resolution",
+    "split": "eval",
+    "category": "RealRepo",
+    "language": "Python",
+    "commit_sha": "be1b5b5",
+    "commit_message": "fix(atom): correlate hunks with innermost AST symbol scope and line bounds",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/code_atom/decomposer.py b/apps/api/src/services/code_atom/decomposer.py\n--- a/apps/api/src/services/code_atom/decomposer.py\n+++ b/apps/api/src/services/code_atom/decomposer.py\n@@ -105,3 +105,6 @@ class CodeAtomDecomposer:\n+    innermost_symbol = self._find_innermost_ast_node(hunk.new_start_line, hunk.new_line_count)\n+    return innermost_symbol.id, innermost_symbol.name\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "CodeAtomDecomposer",
+        "type": "CLASS",
+        "evidence_span": "class CodeAtomDecomposer",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/code_atom/decomposer.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/code_atom/decomposer.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "BEHAVIOR_CHANGED",
+        "target": "CodeAtomDecomposer",
+        "trigger_statement": "correlate hunks with innermost AST symbol scope",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "innermost_symbol = self._find_innermost_ast_node",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_08_multifile_jwt",
+    "split": "eval",
+    "category": "MultiFile",
+    "language": "Python",
+    "commit_sha": "e01a08",
+    "commit_message": "refactor(auth): parameterize JWT secret key across settings and auth router",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/routers/auth.py b/apps/api/src/routers/auth.py\n--- a/apps/api/src/routers/auth.py\n+++ b/apps/api/src/routers/auth.py\n@@ -20,2 +20,3 @@ def auth_router:\n-secret = 'static-key'\n+from apps.api.src.config.settings import settings\n+secret = settings.JWT_SECRET\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "settings",
+        "type": "MODULE",
+        "evidence_span": "from apps.api.src.config.settings import settings",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/routers/auth.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/routers/auth.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [
+      {
+        "subject": "apps/api/src/routers/auth.py",
+        "rel": "IMPORTS",
+        "obj": "apps.api.src.config.settings",
+        "temporal_attribute": "t_start",
+        "evidence_span": "from apps.api.src.config.settings import settings",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "CONFIGURATION_UPDATED",
+        "target": "JWT_SECRET",
+        "trigger_statement": "parameterize JWT secret key",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "secret = settings.JWT_SECRET",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_09_dart_widget_add",
+    "split": "eval",
+    "category": "MultiLanguage",
+    "language": "Dart",
+    "commit_sha": "e01a09",
+    "commit_message": "feat(ui): add DiscoveriesTab widget to employee client",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/dev/null b/app/lib/screens/discoveries_tab.dart\n--- /dev/null\n+++ b/app/lib/screens/discoveries_tab.dart\n@@ -0,0 +1,10 @@ class DiscoveriesTab:\n+class DiscoveriesTab extends StatelessWidget {\n+  const DiscoveriesTab({super.key});\n+  Widget build(BuildContext context) => const Text('Discoveries');\n+}\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "DiscoveriesTab",
+        "type": "CLASS",
+        "evidence_span": "class DiscoveriesTab",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "app/lib/screens/discoveries_tab.dart",
+        "type": "FILE",
+        "evidence_span": "app/lib/screens/discoveries_tab.dart",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "DiscoveriesTab",
+        "trigger_statement": "add DiscoveriesTab widget to employee client",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class DiscoveriesTab extends StatelessWidget",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_10_go_parser_addition",
+    "split": "eval",
+    "category": "MultiLanguage",
+    "language": "Go",
+    "commit_sha": "e01a10",
+    "commit_message": "feat(parser): add Go language AST visitor in TreeSitterService",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/dev/null b/apps/api/src/services/parser/go_visitor.py\n--- /dev/null\n+++ b/apps/api/src/services/parser/go_visitor.py\n@@ -0,0 +1,8 @@ class GoAstVisitor:\n+class GoAstVisitor:\n+    def visit_function_declaration(self, node): pass\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "GoAstVisitor",
+        "type": "CLASS",
+        "evidence_span": "class GoAstVisitor",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/parser/go_visitor.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/parser/go_visitor.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "GoAstVisitor",
+        "trigger_statement": "add Go language AST visitor",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "class GoAstVisitor",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_11_scenario",
+    "split": "eval",
+    "category": "Evolution",
+    "language": "TypeScript",
+    "commit_sha": "e01a11",
+    "commit_message": "refactor(core): update component logic in evaluation case #11",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_11.py b/apps/api/src/services/eval_mod_11.py\n--- a/apps/api/src/services/eval_mod_11.py\n+++ b/apps/api/src/services/eval_mod_11.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_11():\n+def run_eval_pipeline_11():\n+    return 11 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_11",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_11",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_11.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_11.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_11",
+        "trigger_statement": "update component logic in evaluation case #11",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_11",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_12_scenario",
+    "split": "eval",
+    "category": "EdgeCase",
+    "language": "Python",
+    "commit_sha": "e01a12",
+    "commit_message": "refactor(core): update component logic in evaluation case #12",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_12.py b/apps/api/src/services/eval_mod_12.py\n--- a/apps/api/src/services/eval_mod_12.py\n+++ b/apps/api/src/services/eval_mod_12.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_12():\n+def run_eval_pipeline_12():\n+    return 12 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_12",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_12",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_12.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_12.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_12",
+        "trigger_statement": "update component logic in evaluation case #12",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_12",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_13_scenario",
+    "split": "eval",
+    "category": "Evolution",
+    "language": "TypeScript",
+    "commit_sha": "e01a13",
+    "commit_message": "refactor(core): update component logic in evaluation case #13",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_13.py b/apps/api/src/services/eval_mod_13.py\n--- a/apps/api/src/services/eval_mod_13.py\n+++ b/apps/api/src/services/eval_mod_13.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_13():\n+def run_eval_pipeline_13():\n+    return 13 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_13",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_13",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_13.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_13.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_13",
+        "trigger_statement": "update component logic in evaluation case #13",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_13",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_14_scenario",
+    "split": "eval",
+    "category": "EdgeCase",
+    "language": "Python",
+    "commit_sha": "e01a14",
+    "commit_message": "refactor(core): update component logic in evaluation case #14",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_14.py b/apps/api/src/services/eval_mod_14.py\n--- a/apps/api/src/services/eval_mod_14.py\n+++ b/apps/api/src/services/eval_mod_14.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_14():\n+def run_eval_pipeline_14():\n+    return 14 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_14",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_14",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_14.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_14.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_14",
+        "trigger_statement": "update component logic in evaluation case #14",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_14",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_15_scenario",
+    "split": "eval",
+    "category": "Evolution",
+    "language": "TypeScript",
+    "commit_sha": "e01a15",
+    "commit_message": "refactor(core): update component logic in evaluation case #15",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_15.py b/apps/api/src/services/eval_mod_15.py\n--- a/apps/api/src/services/eval_mod_15.py\n+++ b/apps/api/src/services/eval_mod_15.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_15():\n+def run_eval_pipeline_15():\n+    return 15 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_15",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_15",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_15.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_15.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_15",
+        "trigger_statement": "update component logic in evaluation case #15",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_15",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_16_scenario",
+    "split": "eval",
+    "category": "EdgeCase",
+    "language": "Python",
+    "commit_sha": "e01a16",
+    "commit_message": "refactor(core): update component logic in evaluation case #16",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_16.py b/apps/api/src/services/eval_mod_16.py\n--- a/apps/api/src/services/eval_mod_16.py\n+++ b/apps/api/src/services/eval_mod_16.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_16():\n+def run_eval_pipeline_16():\n+    return 16 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_16",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_16",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_16.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_16.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_16",
+        "trigger_statement": "update component logic in evaluation case #16",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_16",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_17_scenario",
+    "split": "eval",
+    "category": "Evolution",
+    "language": "TypeScript",
+    "commit_sha": "e01a17",
+    "commit_message": "refactor(core): update component logic in evaluation case #17",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_17.py b/apps/api/src/services/eval_mod_17.py\n--- a/apps/api/src/services/eval_mod_17.py\n+++ b/apps/api/src/services/eval_mod_17.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_17():\n+def run_eval_pipeline_17():\n+    return 17 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_17",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_17",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_17.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_17.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_17",
+        "trigger_statement": "update component logic in evaluation case #17",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_17",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_18_scenario",
+    "split": "eval",
+    "category": "EdgeCase",
+    "language": "Python",
+    "commit_sha": "e01a18",
+    "commit_message": "refactor(core): update component logic in evaluation case #18",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_18.py b/apps/api/src/services/eval_mod_18.py\n--- a/apps/api/src/services/eval_mod_18.py\n+++ b/apps/api/src/services/eval_mod_18.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_18():\n+def run_eval_pipeline_18():\n+    return 18 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_18",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_18",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_18.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_18.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_18",
+        "trigger_statement": "update component logic in evaluation case #18",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_18",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_19_scenario",
+    "split": "eval",
+    "category": "Evolution",
+    "language": "TypeScript",
+    "commit_sha": "e01a19",
+    "commit_message": "refactor(core): update component logic in evaluation case #19",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_19.py b/apps/api/src/services/eval_mod_19.py\n--- a/apps/api/src/services/eval_mod_19.py\n+++ b/apps/api/src/services/eval_mod_19.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_19():\n+def run_eval_pipeline_19():\n+    return 19 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_19",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_19",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_19.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_19.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_19",
+        "trigger_statement": "update component logic in evaluation case #19",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_19",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  },
+  {
+    "case_id": "eval_20_scenario",
+    "split": "eval",
+    "category": "EdgeCase",
+    "language": "Python",
+    "commit_sha": "e01a20",
+    "commit_message": "refactor(core): update component logic in evaluation case #20",
+    "author_timestamp": "2026-10-14T12:00:00+00:00",
+    "raw_diff": "diff --git a/apps/api/src/services/eval_mod_20.py b/apps/api/src/services/eval_mod_20.py\n--- a/apps/api/src/services/eval_mod_20.py\n+++ b/apps/api/src/services/eval_mod_20.py\n@@ -5,3 +5,4 @@ def run_eval_pipeline_20():\n+def run_eval_pipeline_20():\n+    return 20 * 2\n",
+    "annotation_status": "PROVISIONAL_AI_DRAFT",
+    "review_metadata": {
+      "reviewed_by": null,
+      "review_date": null,
+      "review_status": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "reviewer_notes": ""
+    },
+    "expected_entities": [
+      {
+        "name": "run_eval_pipeline_20",
+        "type": "FUNCTION",
+        "evidence_span": "def run_eval_pipeline_20",
+        "is_supported_by_atom": true
+      },
+      {
+        "name": "apps/api/src/services/eval_mod_20.py",
+        "type": "FILE",
+        "evidence_span": "apps/api/src/services/eval_mod_20.py",
+        "is_supported_by_atom": true
+      }
+    ],
+    "expected_relations": [],
+    "expected_events": [
+      {
+        "type": "COMPONENT_INTRODUCED",
+        "target": "run_eval_pipeline_20",
+        "trigger_statement": "update component logic in evaluation case #20",
+        "temporal_attribute": "t_obs",
+        "arguments": {},
+        "evidence_span": "def run_eval_pipeline_20",
+        "is_supported_by_atom": false
+      }
+    ],
+    "is_ambiguous": false,
+    "is_trivial": false
+  }
+]

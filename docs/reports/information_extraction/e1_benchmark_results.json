@@ -1,0 +1,470 @@
+{
+  "M0_ATOM_Baseline": {
+    "model_name": "Configuration M0",
+    "total_cases": 40,
+    "entity_metrics": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "true_positives": 0,
+      "false_positives": 40,
+      "false_negatives": 41
+    },
+    "relation_metrics": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "true_positives": 0,
+      "false_positives": 43,
+      "false_negatives": 7
+    },
+    "event_metrics": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 38
+    },
+    "schema_validity_rate": 1.0,
+    "evidence_grounding_accuracy": 1.0,
+    "unsupported_fact_rate": 0.0,
+    "duplicate_extraction_rate": 0.0,
+    "temporal_accuracy_rate": 1.0,
+    "abstention_accuracy": 0.975,
+    "p50_latency_ms": 0.6139499998880638,
+    "p95_latency_ms": 1.5279999997801497,
+    "latencies": [
+      0.6002999998599989,
+      2.24949999983437,
+      1.0201000000051863,
+      0.68409999994401,
+      0.6680999999844062,
+      1.1186000001544016,
+      0.9746000000632193,
+      0.49279999984719325,
+      0.19799999972747173,
+      0.1861000000644708,
+      0.8014000000002852,
+      0.8861000001161301,
+      1.1936000000787317,
+      0.7192999996732397,
+      0.5814000001009845,
+      0.5734000001211825,
+      0.5526999998437532,
+      0.5442000001494307,
+      0.5559000001085224,
+      0.5255000000943255,
+      0.8084000000962988,
+      0.6477000001723354,
+      0.73370000018258,
+      0.48289999995176913,
+      0.7942999995975697,
+      0.2658000003066263,
+      0.9544999998070125,
+      0.6121999999777472,
+      0.3311000000394415,
+      0.6156999997983803,
+      0.5759999999099819,
+      0.5463999996209168,
+      0.5866999999852851,
+      0.5332000000635162,
+      0.9596000004421512,
+      1.5279999997801497,
+      0.8056000001488428,
+      0.6315999999060296,
+      0.5953999998382642,
+      0.5989999999655993
+    ],
+    "category_breakdown": {
+      "Simple": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Dependency": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "API": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Configuration": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Deprecation": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Test": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Behavior": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Deletion": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Trivial": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Ambiguous": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "MultiFile": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "MultiLanguage": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.14285714285714285,
+        "event_f1": 0.0
+      },
+      "RealRepo": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.14285714285714285,
+        "event_f1": 0.0
+      },
+      "Evolution": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "EdgeCase": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      }
+    },
+    "live_model_status": "BLOCKED_OFFLINE_PATH"
+  },
+  "M1_Generative_IE": {
+    "model_name": "Configuration M1",
+    "total_cases": 40,
+    "entity_metrics": {
+      "precision": 0.3614,
+      "recall": 0.7317,
+      "f1": 0.4839,
+      "true_positives": 30,
+      "false_positives": 53,
+      "false_negatives": 11
+    },
+    "relation_metrics": {
+      "precision": 0.3333,
+      "recall": 0.1429,
+      "f1": 0.2,
+      "true_positives": 1,
+      "false_positives": 2,
+      "false_negatives": 6
+    },
+    "event_metrics": {
+      "precision": 0.1026,
+      "recall": 0.1053,
+      "f1": 0.1039,
+      "true_positives": 4,
+      "false_positives": 35,
+      "false_negatives": 34
+    },
+    "schema_validity_rate": 1.0,
+    "evidence_grounding_accuracy": 1.0,
+    "unsupported_fact_rate": 0.0,
+    "duplicate_extraction_rate": 0.0,
+    "temporal_accuracy_rate": 1.0,
+    "abstention_accuracy": 1.0,
+    "p50_latency_ms": 0.13164999995751714,
+    "p95_latency_ms": 0.35780000007434865,
+    "latencies": [
+      1.214200000049459,
+      0.35780000007434865,
+      0.22470000021712622,
+      0.15910000001895241,
+      0.2023000001827313,
+      0.1297999997404986,
+      0.20429999995030812,
+      0.25069999992410885,
+      0.16140000025188783,
+      0.11050000011891825,
+      0.14549999968949123,
+      0.1405999996677565,
+      0.1364999998259009,
+      0.18140000020139269,
+      0.13239999998404528,
+      0.1318999998147774,
+      0.13140000010025688,
+      0.15530000018770806,
+      0.13390000003710156,
+      0.1339999998890562,
+      0.11619999986578478,
+      0.10689999999158317,
+      0.10530000008657225,
+      0.10250000013911631,
+      0.10539999993852689,
+      0.10559999964243616,
+      0.110200000108307,
+      0.1584999999977299,
+      0.12870000000475557,
+      0.1395999997839681,
+      0.13479999961418798,
+      0.11880000010933145,
+      0.11089999998148414,
+      0.11230000018258579,
+      0.11110000014014076,
+      0.11069999982282752,
+      0.10930000007647322,
+      0.10969999993903912,
+      0.1111999999920954,
+      0.10999999994965037
+    ],
+    "category_breakdown": {
+      "Simple": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Dependency": {
+        "entity_f1": 0.4,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "API": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Configuration": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Deprecation": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Test": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 0.0,
+        "event_f1": 1.0
+      },
+      "Behavior": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Deletion": {
+        "entity_f1": 0.5,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Trivial": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Ambiguous": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "MultiFile": {
+        "entity_f1": 0.4166666666666667,
+        "relation_f1": 0.8333333333333334,
+        "event_f1": 0.0
+      },
+      "MultiLanguage": {
+        "entity_f1": 0.5238095238095238,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "RealRepo": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.5714285714285714,
+        "event_f1": 0.0
+      },
+      "Evolution": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "EdgeCase": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      }
+    },
+    "live_model_status": "BLOCKED_OFFLINE_PATH"
+  },
+  "M2_Constrained_Decoding": {
+    "model_name": "Configuration M2",
+    "total_cases": 40,
+    "entity_metrics": {
+      "precision": 0.3614,
+      "recall": 0.7317,
+      "f1": 0.4839,
+      "true_positives": 30,
+      "false_positives": 53,
+      "false_negatives": 11
+    },
+    "relation_metrics": {
+      "precision": 0.3333,
+      "recall": 0.1429,
+      "f1": 0.2,
+      "true_positives": 1,
+      "false_positives": 2,
+      "false_negatives": 6
+    },
+    "event_metrics": {
+      "precision": 0.1026,
+      "recall": 0.1053,
+      "f1": 0.1039,
+      "true_positives": 4,
+      "false_positives": 35,
+      "false_negatives": 34
+    },
+    "schema_validity_rate": 1.0,
+    "evidence_grounding_accuracy": 1.0,
+    "unsupported_fact_rate": 0.0,
+    "duplicate_extraction_rate": 0.0,
+    "temporal_accuracy_rate": 1.0,
+    "abstention_accuracy": 1.0,
+    "p50_latency_ms": 0.13794999995297985,
+    "p95_latency_ms": 0.4121000001759967,
+    "latencies": [
+      0.17579999985173345,
+      0.1818999999159132,
+      0.13009999975110986,
+      0.09610000006432529,
+      0.2058000000033644,
+      0.1495999999860942,
+      0.14069999997445848,
+      0.1374999997096893,
+      0.099800000043615,
+      0.09989999989556964,
+      0.1795000002857705,
+      0.4401999999572581,
+      0.3082000002905261,
+      0.20290000020395382,
+      0.19109999993816018,
+      0.23879999980636057,
+      0.4121000001759967,
+      0.18430000000080327,
+      0.15110000003915047,
+      0.15940000002956367,
+      0.14280000004873727,
+      0.13799999987895717,
+      0.1142999999501626,
+      0.13790000002700253,
+      0.11279999989710632,
+      0.12040000001434237,
+      0.10789999987537158,
+      0.13889999991079094,
+      0.1484999997956038,
+      0.14009999995323597,
+      0.11549999999260763,
+      0.11240000003454043,
+      0.11159999985466129,
+      0.12939999987793271,
+      0.11829999994006357,
+      0.10990000009769574,
+      0.10969999993903912,
+      0.10930000007647322,
+      0.10859999974854873,
+      0.1173999999082298
+    ],
+    "category_breakdown": {
+      "Simple": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Dependency": {
+        "entity_f1": 0.4,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "API": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Configuration": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Deprecation": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Test": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 0.0,
+        "event_f1": 1.0
+      },
+      "Behavior": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Deletion": {
+        "entity_f1": 0.5,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Trivial": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Ambiguous": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "MultiFile": {
+        "entity_f1": 0.4166666666666667,
+        "relation_f1": 0.8333333333333334,
+        "event_f1": 0.0
+      },
+      "MultiLanguage": {
+        "entity_f1": 0.5238095238095238,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "RealRepo": {
+        "entity_f1": 0.0,
+        "relation_f1": 0.5714285714285714,
+        "event_f1": 0.0
+      },
+      "Evolution": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "EdgeCase": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      }
+    },
+    "live_model_status": "BLOCKED_OFFLINE_PATH"
+  }
+}
