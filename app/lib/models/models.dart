@@ -62,6 +62,7 @@ class ProjectItem {
   final int? port;
   final String? role;
   final String? repositoryName;
+  final String? defaultBranch;
 
   const ProjectItem({
     required this.id,
@@ -77,6 +78,7 @@ class ProjectItem {
     this.port,
     this.role,
     this.repositoryName,
+    this.defaultBranch,
   });
 
   ProjectItem copyWith({
@@ -93,6 +95,7 @@ class ProjectItem {
     int? port,
     String? role,
     String? repositoryName,
+    String? defaultBranch,
   }) {
     return ProjectItem(
       id: id ?? this.id,
@@ -108,6 +111,7 @@ class ProjectItem {
       port: port ?? this.port,
       role: role ?? this.role,
       repositoryName: repositoryName ?? this.repositoryName,
+      defaultBranch: defaultBranch ?? this.defaultBranch,
     );
   }
 }

@@ -141,6 +141,28 @@ class SemanticFactExtractor:
         base_prov["atom_id"] = change.id
         base_prov["change_fingerprint"] = change.fingerprint
 
+        # Data assets, large tabular files, and lockfiles
+        if ext in (".csv", ".tsv", ".parquet", ".jsonl", ".ndjson", ".sql", ".log", ".map", ".lock"):
+            stmt = f"Data or tabular asset `{file_path}` added with {len(change.added_lines)} lines."
+            fp = generate_fact_fingerprint(commit_sha, file_path, symbol_name, stmt, FactType.STRUCTURAL)
+            return [
+                SemanticCodeFact(
+                    id=generate_fact_id(fp),
+                    statement=stmt,
+                    fact_type=FactType.STRUCTURAL,
+                    confidence=FactConfidence.HIGH,
+                    is_uncertain=False,
+                    file_path=file_path,
+                    symbol_name=symbol_name,
+                    commit_sha=commit_sha,
+                    commit_message=commit_message,
+                    change_type=change_type,
+                    evidenced_lines=[],
+                    provenance=base_prov,
+                    fingerprint=fp,
+                )
+            ]
+
         # 1. Pure File Deletions
         if change_type == CodeChangeType.DELETE:
             stmt = f"Removed file `{file_path}`."
@@ -613,25 +635,28 @@ class SemanticFactExtractor:
                 continue
 
             # L. General unclassified line -> mark UNCERTAIN without fabricating
-            stmt = f"{subject} updates implementation line in `{file_path}`: `{line[:60]}`."
-            fp = generate_fact_fingerprint(commit_sha, file_path, symbol_name, stmt, FactType.BEHAVIOR)
-            facts.append(
-                SemanticCodeFact(
-                    id=generate_fact_id(fp),
-                    statement=stmt,
-                    fact_type=FactType.BEHAVIOR,
-                    confidence=FactConfidence.UNCERTAIN,
-                    is_uncertain=True,
-                    file_path=file_path,
-                    symbol_name=symbol_name,
-                    commit_sha=commit_sha,
-                    commit_message=commit_message,
-                    change_type=change_type,
-                    evidenced_lines=[line],
-                    provenance=base_prov,
-                    fingerprint=fp,
+            # Bound the number of unclassified line facts to at most 30 per change to prevent JSONB explosions
+            unclassified_count = sum(1 for f in facts if f.confidence == FactConfidence.UNCERTAIN)
+            if unclassified_count < 30:
+                stmt = f"{subject} updates implementation line in `{file_path}`: `{line[:60]}`."
+                fp = generate_fact_fingerprint(commit_sha, file_path, symbol_name, stmt, FactType.BEHAVIOR)
+                facts.append(
+                    SemanticCodeFact(
+                        id=generate_fact_id(fp),
+                        statement=stmt,
+                        fact_type=FactType.BEHAVIOR,
+                        confidence=FactConfidence.UNCERTAIN,
+                        is_uncertain=True,
+                        file_path=file_path,
+                        symbol_name=symbol_name,
+                        commit_sha=commit_sha,
+                        commit_message=commit_message,
+                        change_type=change_type,
+                        evidenced_lines=[line],
+                        provenance=base_prov,
+                        fingerprint=fp,
+                    )
                 )
-            )
             idx += 1
 
         return deduplicate_facts(facts)

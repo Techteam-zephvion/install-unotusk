@@ -540,6 +540,9 @@ class ApiService {
                 ? (m['repository']['full_name']?.toString() ??
                     m['repository']['name']?.toString())
                 : null,
+            defaultBranch: m['repository'] is Map
+                ? m['repository']['default_branch']?.toString()
+                : null,
           );
         }).toList();
 
@@ -653,6 +656,9 @@ class ApiService {
                     repositoryName: pm['repository'] is Map
                         ? (pm['repository']['full_name']?.toString() ?? pm['repository']['name']?.toString())
                         : ls.repoUrl,
+                    defaultBranch: pm['repository'] is Map
+                        ? pm['repository']['default_branch']?.toString()
+                        : null,
                   );
 
                   mappedFromApi = true;

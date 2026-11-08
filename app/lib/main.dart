@@ -123,6 +123,42 @@ class _AppShellState extends State<AppShell> {
   ProjectItem? _openedProject;
   String _openedProjectName = '';
 
+  String get _currentRepoFullName {
+    final repo = _openedProject?.repositoryName?.trim();
+    if (repo != null && repo.isNotEmpty) {
+      if (repo.startsWith('http://') || repo.startsWith('https://') || repo.startsWith('git@')) {
+        var clean = repo.endsWith('.git') ? repo.substring(0, repo.length - 4) : repo;
+        if (clean.startsWith('git@')) {
+          final parts = clean.split(':');
+          if (parts.length > 1) {
+            clean = parts[1];
+          }
+        } else {
+          try {
+            final uri = Uri.parse(clean);
+            final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+            if (segments.length >= 2) {
+              return '${segments[segments.length - 2]}/${segments.last}';
+            } else if (segments.isNotEmpty) {
+              return segments.last;
+            }
+          } catch (_) {}
+        }
+        return clean;
+      }
+      return repo;
+    }
+    return _openedProjectName.isNotEmpty ? _openedProjectName : 'Workspace';
+  }
+
+  String get _currentBranchName {
+    final branch = _openedProject?.defaultBranch?.trim();
+    if (branch != null && branch.isNotEmpty) {
+      return branch;
+    }
+    return 'main';
+  }
+
   bool _sidebarOpen = true;
   String _activeView = 'chat'; // chat, spec-history, graph, feed, admin
   String _defaultSettingsTab = 'general';
@@ -249,7 +285,13 @@ class _AppShellState extends State<AppShell> {
         try {
           final serverProjects = await ApiService.fetchProjects();
           if (serverProjects.isNotEmpty) {
-            project = serverProjects.first;
+            final targetServerProj = serverProjects.first;
+            project = targetServerProj.copyWith(
+              repositoryName: (targetServerProj.repositoryName != null && targetServerProj.repositoryName!.isNotEmpty)
+                  ? targetServerProj.repositoryName
+                  : project.repositoryName,
+              defaultBranch: targetServerProj.defaultBranch ?? project.defaultBranch,
+            );
             setState(() {
               _openedProject = project;
             });
@@ -554,9 +596,8 @@ class _AppShellState extends State<AppShell> {
                               onToggleSidebar: () =>
                                   setState(() => _sidebarOpen = !_sidebarOpen),
                               projectName: _openedProjectName,
-                              repoFullName:
-                                  'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
-                              branchName: 'main',
+                              repoFullName: _currentRepoFullName,
+                              branchName: _currentBranchName,
                               onBackToProjects: _handleBackToProjects,
                             ),
 
@@ -582,9 +623,8 @@ class _AppShellState extends State<AppShell> {
                             onToggleSidebar: () =>
                                 setState(() => _sidebarOpen = !_sidebarOpen),
                             projectName: _openedProjectName,
-                            repoFullName:
-                                'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
-                            branchName: 'main',
+                            repoFullName: _currentRepoFullName,
+                            branchName: _currentBranchName,
                             onBackToProjects: _handleBackToProjects,
                           ),
 

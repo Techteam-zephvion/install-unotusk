@@ -230,7 +230,15 @@ class GroqProvider(LLMProvider):
             )
 
         top_evidence = evidence_items[:5]
-        files = sorted(list({e["file"] for e in top_evidence if e.get("file")}))
+        files = sorted(
+            list(
+                {
+                    e.get("file") or e.get("file_path")
+                    for e in top_evidence
+                    if e.get("file") or e.get("file_path")
+                }
+            )
+        )
         symbols = [e["symbol"] for e in top_evidence if e.get("symbol")]
 
         # Fast/Lightest synthesis for HOT tier
@@ -246,8 +254,9 @@ class GroqProvider(LLMProvider):
             if top_evidence:
                 first_ev = top_evidence[0]
                 sym = f" (`{first_ev['symbol']}`)" if first_ev.get("symbol") else ""
+                first_file = first_ev.get("file") or first_ev.get("file_path") or "Unknown"
                 hot_lines.append(
-                    f"- **Primary Reference**: `{first_ev.get('file', '')}`{sym} (Lines {first_ev.get('lines', 'N/A')})"
+                    f"- **Primary Reference**: `{first_file}`{sym} (Lines {first_ev.get('lines', 'N/A')})"
                 )
             return "\n".join(hot_lines)
 
@@ -281,8 +290,9 @@ class GroqProvider(LLMProvider):
             lines.append("**Observed Implementation Details:**")
             for i, ev in enumerate(top_evidence, start=1):
                 sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
+                ev_file = ev.get("file") or ev.get("file_path") or "Unknown"
                 lines.append(
-                    f"{i}. **{ev['file']}**{sym_name} (Lines {ev.get('lines', 'N/A')}):\n"
+                    f"{i}. **{ev_file}**{sym_name} (Lines {ev.get('lines', 'N/A')}):\n"
                     f"   Contains relevant definitions and logic associated with this query."
                 )
 

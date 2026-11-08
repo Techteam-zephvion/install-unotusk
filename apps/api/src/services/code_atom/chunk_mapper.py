@@ -74,13 +74,13 @@ def map_atomic_code_change_to_code_chunk(
     if getattr(change, "atomic_facts", None):
         prov_data["atomic_code_facts"] = [
             f.model_dump(mode="json") if hasattr(f, "model_dump") else f
-            for f in change.atomic_facts
+            for f in change.atomic_facts[:50]
         ]
     if getattr(change, "temporal_relations", None):
         reconciled = reconcile_code_relationships(change.temporal_relations)
         prov_data["temporal_relations"] = [
             r.model_dump(mode="json") if hasattr(r, "model_dump") else r
-            for r in reconciled
+            for r in reconciled[:50]
         ]
 
     # Generate embedding if requested

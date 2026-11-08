@@ -102,7 +102,7 @@ class TopNavBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
               ],
-              // Project Switcher Pill matching Kushall-07/SyncGuard · main ↕
+              // Project Switcher Pill showing repository/project name · branch
               InkWell(
                 onTap: onBackToProjects,
                 borderRadius: BorderRadius.circular(8),
