@@ -92,15 +92,15 @@ class E1ContextBuilder:
     def build_user_prompt(context: dict[str, Any]) -> str:
         """Constructs the per-commit extraction query."""
         files_str = "\n".join(
-            f"- {f['file_path']} ({f['change_type']}, +{f['added_lines_count']}/-{f['deleted_lines_count']} lines)"
-            for f in context["files"]
+            f"- {f.get('file_path', 'unknown')} ({f.get('change_type', 'MODIFIED')}, +{f.get('added_lines_count', 0)}/-{f.get('deleted_lines_count', 0)} lines)"
+            for f in context.get("files", [])
         )
 
         return (
-            f"Commit SHA: {context['commit_sha']}\n"
-            f"Commit Message: {context['commit_message']}\n"
-            f"Author Date: {context['committed_at'] or 'Unknown'}\n"
+            f"Commit SHA: {context.get('commit_sha', 'unknown')}\n"
+            f"Commit Message: {context.get('commit_message', '')}\n"
+            f"Author Date: {context.get('committed_at') or 'Unknown'}\n"
             f"Files Affected:\n{files_str}\n\n"
-            f"Raw Unified Diff:\n```diff\n{context['raw_diff']}\n```\n\n"
+            f"Raw Unified Diff:\n```diff\n{context.get('raw_diff', '')}\n```\n\n"
             "Extract all grounded entities, relationships, and software evolution events from this commit."
         )

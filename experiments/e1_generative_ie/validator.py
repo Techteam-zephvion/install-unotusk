@@ -4,6 +4,7 @@ Ensures every generative fact is strictly grounded in source diff tokens and AST
 """
 
 import re
+from typing import Any
 
 from experiments.e1_generative_ie.schema import (
     E1Entity,
@@ -56,38 +57,69 @@ class E1GroundingValidator:
             result.events = []
             return result
 
+        # 1. Validate, sanitize line references, and deduplicate entities
+        seen_entity_keys: set[str] = set()
         validated_entities: list[E1Entity] = []
         for entity in result.entities:
+            self._sanitize_evidence_lines(entity.evidence, result.warnings)
             status, reason = self.verify_entity_grounding(entity, source_corpus)
             entity.validation_status = status
+            dedup_key = f"{entity.entity_name.lower()}::{entity.file_path.lower()}"
+            if dedup_key in seen_entity_keys:
+                result.warnings.append(f"Deduplicated duplicate entity: {entity.entity_name}")
+                continue
+
             if status == ValidationStatus.VALIDATED:
+                seen_entity_keys.add(dedup_key)
                 validated_entities.append(entity)
             elif status == ValidationStatus.UNCERTAIN:
                 entity.confidence = min(entity.confidence, 0.40)
+                seen_entity_keys.add(dedup_key)
                 validated_entities.append(entity)
             else:
                 result.warnings.append(f"Rejected entity '{entity.entity_name}': {reason}")
 
+        # 2. Validate, normalize temporal bounds, and deduplicate relations
+        seen_relation_keys: set[str] = set()
         validated_relations: list[E1Relation] = []
         for relation in result.relations:
+            self._sanitize_evidence_lines(relation.evidence, result.warnings)
+            self._normalize_temporal_bounds(relation, result.warnings)
             status, reason = self.verify_relation_grounding(relation, source_corpus)
             relation.validation_status = status
+            dedup_key = f"{relation.subject.lower()}::{relation.relation_type.lower()}::{relation.object.lower()}"
+            if dedup_key in seen_relation_keys:
+                result.warnings.append(f"Deduplicated duplicate relation: {dedup_key}")
+                continue
+
             if status == ValidationStatus.VALIDATED:
+                seen_relation_keys.add(dedup_key)
                 validated_relations.append(relation)
             elif status == ValidationStatus.UNCERTAIN:
                 relation.confidence = min(relation.confidence, 0.40)
+                seen_relation_keys.add(dedup_key)
                 validated_relations.append(relation)
             else:
                 result.warnings.append(f"Rejected relation '{relation.subject} {relation.relation_type} {relation.object}': {reason}")
 
+        # 3. Validate and deduplicate events
+        seen_event_keys: set[str] = set()
         validated_events: list[E1Event] = []
         for event in result.events:
+            self._sanitize_evidence_lines(event.evidence, result.warnings)
             status, reason = self.verify_event_grounding(event, source_corpus, raw_diff)
             event.validation_status = status
+            dedup_key = f"{event.event_type.lower()}::{event.target_component.lower()}"
+            if dedup_key in seen_event_keys:
+                result.warnings.append(f"Deduplicated duplicate event: {dedup_key}")
+                continue
+
             if status == ValidationStatus.VALIDATED:
+                seen_event_keys.add(dedup_key)
                 validated_events.append(event)
             elif status == ValidationStatus.UNCERTAIN:
                 event.confidence = min(event.confidence, 0.40)
+                seen_event_keys.add(dedup_key)
                 validated_events.append(event)
             else:
                 result.warnings.append(f"Rejected event '{event.event_type} on {event.target_component}': {reason}")
@@ -97,6 +129,30 @@ class E1GroundingValidator:
         result.events = validated_events
 
         return result
+
+    @staticmethod
+    def _sanitize_evidence_lines(evidence: Any, warnings: list[str]) -> None:
+        """Sanitizes line numbers ensuring start_line > 0 and end_line >= start_line."""
+        if not evidence:
+            return
+        if getattr(evidence, "start_line", None) is not None:
+            if evidence.start_line <= 0:
+                warnings.append(f"Sanitized invalid start_line={evidence.start_line} to None")
+                evidence.start_line = None
+        if getattr(evidence, "end_line", None) is not None:
+            if evidence.end_line <= 0:
+                warnings.append(f"Sanitized invalid end_line={evidence.end_line} to None")
+                evidence.end_line = None
+            elif evidence.start_line and evidence.end_line < evidence.start_line:
+                warnings.append(f"Sanitized inverted lines [{evidence.start_line}, {evidence.end_line}]")
+                evidence.end_line = evidence.start_line
+
+    @staticmethod
+    def _normalize_temporal_bounds(relation: E1Relation, warnings: list[str]) -> None:
+        """Normalizes temporal bounds so that t_start <= t_end."""
+        if relation.t_start and relation.t_end and relation.t_end < relation.t_start:
+            warnings.append(f"Corrected inverted temporal bounds on relation '{relation.relation_id}': t_start={relation.t_start}, t_end={relation.t_end}")
+            relation.t_start, relation.t_end = relation.t_end, relation.t_start
 
     def verify_entity_grounding(
         self,

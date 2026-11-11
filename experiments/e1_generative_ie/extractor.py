@@ -4,7 +4,9 @@ Supports M0 (Fair Deterministic ATOM Baseline), M1 (Generative IE), and M2 (Cons
 Includes offline deterministic mock synthesis when API credentials are absent.
 """
 
+import asyncio
 import hashlib
+import json
 import logging
 import os
 import re
@@ -16,6 +18,7 @@ from apps.api.src.schemas.code_atom import (
     GitCommitArtifact,
 )
 from apps.api.src.services.code_atom.decomposer import CodeAtomDecomposer
+from experiments.e1_generative_ie.constrained_decoding import SchemaGrammarFSM
 from experiments.e1_generative_ie.context_builder import E1ContextBuilder
 from experiments.e1_generative_ie.schema import (
     E1Entity,
@@ -178,18 +181,34 @@ class E1Extractor:
         """
         M1: Generative Information Extraction.
         Extracts entities, relations, and events jointly via LLM with Pydantic validation.
+        Safely sanitizes input and falls back to ATOM on unexpected errors.
         """
         start_time = time.perf_counter()
-        context = E1ContextBuilder.prepare_diff_context(commit)
+        try:
+            clean_diff = self._sanitize_untrusted_input(commit.raw_diff)
+            clean_msg = self._sanitize_untrusted_input(commit.commit_message)
+            sanitized_commit = GitCommitArtifact(
+                commit_sha=commit.commit_sha,
+                commit_message=clean_msg,
+                raw_diff=clean_diff,
+                committed_at=commit.committed_at,
+                repository_id=commit.repository_id,
+            )
+            context = E1ContextBuilder.prepare_diff_context(sanitized_commit)
 
-        if not self.live_llm_available:
-            result = self._synthesize_offline_generative_result(commit, context, constrained=False)
-            result.model_name = "offline_deterministic_synthesizer (LIVE LLM BLOCKED)"
-            result.warnings.append("LIVE LLM EVALUATION BLOCKED: API credentials unavailable. Using offline verification path.")
-        else:
-            result = await self._call_live_llm(commit, context, constrained=False)
+            if not self.live_llm_available:
+                result = self._synthesize_offline_generative_result(sanitized_commit, context, constrained=False)
+                result.model_name = "offline_deterministic_synthesizer (LIVE LLM BLOCKED)"
+                result.warnings.append("LIVE LLM EVALUATION BLOCKED: API credentials unavailable. Using offline verification path.")
+            else:
+                result = await self._call_live_llm(sanitized_commit, context, constrained=False)
 
-        validated_result = self.validator.validate_result(result, commit.raw_diff, commit.commit_message)
+            validated_result = self.validator.validate_result(result, commit.raw_diff, commit.commit_message)
+        except Exception as exc:
+            logger.error("M1 extraction error: %s. Safely falling back to ATOM baseline.", exc)
+            validated_result = self.extract_m0_atom_baseline(commit)
+            validated_result.warnings.append(f"M1 extraction error: {exc}. Safe fallback to ATOM baseline.")
+
         validated_result.latency_ms = (time.perf_counter() - start_time) * 1000.0
         return validated_result
 
@@ -198,20 +217,36 @@ class E1Extractor:
         commit: GitCommitArtifact,
     ) -> E1ExtractionResult:
         """
-        M2: Generative IE with strongest supported structured-output / constrained-decoding mechanism.
-        Enforces 100% strict JSON schema compliance.
+        M2: Generative IE with Schema-Constrained Post-Generation FSM Gating.
+        Enforces 100% strict JSON schema compliance via SchemaGrammarFSM post-generation sanitization.
+        (Note: Generation-time token logit masking like Outlines requires local weights and is not used).
         """
         start_time = time.perf_counter()
-        context = E1ContextBuilder.prepare_diff_context(commit)
+        try:
+            clean_diff = self._sanitize_untrusted_input(commit.raw_diff)
+            clean_msg = self._sanitize_untrusted_input(commit.commit_message)
+            sanitized_commit = GitCommitArtifact(
+                commit_sha=commit.commit_sha,
+                commit_message=clean_msg,
+                raw_diff=clean_diff,
+                committed_at=commit.committed_at,
+                repository_id=commit.repository_id,
+            )
+            context = E1ContextBuilder.prepare_diff_context(sanitized_commit)
 
-        if not self.live_llm_available:
-            result = self._synthesize_offline_generative_result(commit, context, constrained=True)
-            result.model_name = "offline_constrained_synthesizer (LIVE LLM BLOCKED)"
-            result.warnings.append("LIVE LLM EVALUATION BLOCKED: API credentials unavailable. Using offline verification path.")
-        else:
-            result = await self._call_live_llm(commit, context, constrained=True)
+            if not self.live_llm_available:
+                result = self._synthesize_offline_generative_result(sanitized_commit, context, constrained=True)
+                result.model_name = "offline_constrained_synthesizer (LIVE LLM BLOCKED)"
+                result.warnings.append("LIVE LLM EVALUATION BLOCKED: API credentials unavailable. Using offline verification path.")
+            else:
+                result = await self._call_live_llm(sanitized_commit, context, constrained=True)
 
-        validated_result = self.validator.validate_result(result, commit.raw_diff, commit.commit_message)
+            validated_result = self.validator.validate_result(result, commit.raw_diff, commit.commit_message)
+        except Exception as exc:
+            logger.error("M2 extraction error: %s. Safely falling back to ATOM baseline.", exc)
+            validated_result = self.extract_m0_atom_baseline(commit)
+            validated_result.warnings.append(f"M2 extraction error: {exc}. Safe fallback to ATOM baseline.")
+
         validated_result.latency_ms = (time.perf_counter() - start_time) * 1000.0
         return validated_result
 
@@ -465,21 +500,86 @@ class E1Extractor:
             events=events,
         )
 
+    @staticmethod
+    def _sanitize_untrusted_input(text: str) -> str:
+        """Sanitizes source code and commit messages against prompt injection delimiters."""
+        if not text:
+            return ""
+        # Neutralize delimiter injection attempts
+        sanitized = text.replace("```json", "'''json").replace("```", "'''")
+        sanitized = re.sub(r"(?i)\b(system|assistant|human)\s*:\s*", r"[\1]: ", sanitized)
+        return sanitized
+
+    @staticmethod
+    def _repair_malformed_json(raw_text: str | dict[str, Any]) -> dict[str, Any]:
+        """Repairs malformed or noisy LLM JSON output (markdown blocks, trailing commas, etc.)."""
+        if isinstance(raw_text, dict):
+            return raw_text
+        if not isinstance(raw_text, str):
+            return {}
+
+        cleaned = raw_text.strip()
+        # Strip markdown block wrappers
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+
+        # Extract innermost JSON object if enclosed in conversational text
+        json_match = re.search(r"(\{[\s\S]*\})", cleaned)
+        if json_match:
+            cleaned = json_match.group(1)
+
+        # Remove trailing commas before closing braces/brackets
+        cleaned = re.sub(r",\s*(\}|\])", r"\1", cleaned)
+
+        try:
+            return json.loads(cleaned)
+        except Exception as e:
+            logger.warning("Failed to parse repaired JSON (%s): %s", e, cleaned[:100])
+            return {}
+
     async def _call_live_llm(
         self,
         commit: GitCommitArtifact,
         context: dict[str, Any],
         constrained: bool = False,
     ) -> E1ExtractionResult:
-        """Invokes the configured live LLM provider."""
+        """
+        Invokes the configured live LLM provider with bounded retries, rate-limit/timeout handling,
+        and automatic safe fallback to ATOM baseline upon retry exhaustion.
+        """
         from apps.api.src.services.llm.factory import get_llm_provider
 
         provider = get_llm_provider()
         sys_prompt = E1ContextBuilder.build_system_prompt()
         usr_prompt = E1ContextBuilder.build_user_prompt(context)
 
-        raw_resp = await provider.generate_json(sys_prompt, usr_prompt)
-        return self._parse_llm_json_to_result(raw_resp, commit)
+        max_retries = 3
+        delay = 0.5
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                raw_resp = await provider.generate_json(sys_prompt, usr_prompt)
+                payload = self._repair_malformed_json(raw_resp)
+                if constrained:
+                    fsm = SchemaGrammarFSM()
+                    payload, _ = fsm.constrain_and_repair(payload)
+                return self._parse_llm_json_to_result(payload, commit)
+            except (TimeoutError, Exception) as exc:
+                logger.warning("Live LLM invocation attempt %d/%d failed: %s", attempt, max_retries, exc)
+                if attempt < max_retries:
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                else:
+                    logger.error("Live LLM retries exhausted; safely falling back to ATOM baseline.")
+                    fallback = self.extract_m0_atom_baseline(commit)
+                    fallback.warnings.append(
+                        f"Live LLM provider failed after {max_retries} attempts ({exc}). Safe fallback to ATOM baseline."
+                    )
+                    return fallback
+
+        # Fallback if loop finishes unexpectedly
+        return self.extract_m0_atom_baseline(commit)
 
     def _parse_llm_json_to_result(
         self,

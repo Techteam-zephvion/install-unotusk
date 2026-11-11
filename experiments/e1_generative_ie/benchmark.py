@@ -82,8 +82,13 @@ class E1BenchmarkRunner:
         mode: str,
         cases: list[E1TestCase],
     ) -> ModelBenchmarkResult:
+        model_label = (
+            "Configuration M2 (Post-Gen Schema FSM Gating)"
+            if mode == "M2"
+            else f"Configuration {mode}"
+        )
         res = ModelBenchmarkResult(
-            model_name=f"Configuration {mode}",
+            model_name=model_label,
             total_cases=len(cases),
             live_model_status="LIVE" if self.extractor.live_llm_available else "BLOCKED_OFFLINE_PATH",
             annotation_classification="PROVISIONAL_AI_DRAFT (Human Review Pending)",
@@ -285,8 +290,12 @@ class E1BenchmarkRunner:
 
 
 async def main():
+    from experiments.e1_generative_ie.constrained_decoding import (
+        evaluate_structured_generation_comparison,
+    )
+
     runner = E1BenchmarkRunner()
-    print("Running E1 Stage 2 Benchmark across 40 scenarios...")
+    print("Running E1 Benchmark across 40 scenarios...")
     bench_results = await runner.run_benchmark()
     serializable = {}
     for name, br in bench_results.items():
@@ -301,10 +310,23 @@ async def main():
         print(f"Schema Validity: {br.schema_validity_rate * 100:.1f}%, Grounding Acc: {br.evidence_grounding_accuracy * 100:.1f}%")
         print(f"P50 Latency: {br.p50_latency_ms:.2f}ms, P95 Latency: {br.p95_latency_ms:.2f}ms")
 
-    out_path = "docs/reports/information_extraction/e1_stage2_benchmark_results.json"
-    with open(out_path, "w") as f:
-        json.dump(serializable, f, indent=2)
-    print(f"\nExported Stage 2 benchmark results to {out_path}")
+    # Evaluate structured generation mechanism overhead
+    sample_payloads = [
+        '{"entities": [{"entity_name": "Calculator", "entity_type": "CLASS", "file_path": "calc.py"}]}',
+        '```json\n{"entities": [{"entity_name": "APIClient", "entity_type": "SERVICE", "file_path": "client.py"}]}\n```',
+        '{"entities": [{"entity_name": "BadEnt"}]}',  # missing file_path
+    ]
+    struct_metrics = evaluate_structured_generation_comparison(sample_payloads)
+    serializable["_structured_generation_comparison"] = {k: asdict(v) for k, v in struct_metrics.items()}
+
+    out_paths = [
+        "docs/reports/information_extraction/e1_stage2_benchmark_results.json",
+        "docs/reports/information_extraction/e1_benchmark_results.json",
+    ]
+    for out_path in out_paths:
+        with open(out_path, "w") as f:
+            json.dump(serializable, f, indent=2)
+        print(f"Exported benchmark results to {out_path}")
 
 
 if __name__ == "__main__":

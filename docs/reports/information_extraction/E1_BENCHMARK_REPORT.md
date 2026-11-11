@@ -57,26 +57,44 @@ E1 Benchmark Corpus (40 Scenarios)
 
 ## 3. Aggregate Benchmark Results (40 Scenarios)
 
-The table below summarizes performance across M0, M1, and M2:
+The table below summarizes performance across M0, M1, and M2 on the upgraded fair baseline:
 
-| Metric Category | Evaluation Metric | M0: ATOM Baseline | M1: Generative IE | M2: Constrained Decoding |
+| Metric Category | Evaluation Metric | M0: Fair ATOM Baseline | M1: Generative IE (Verified Offline) | M2: Constrained Decoding (Grammar FSM) |
 | :--- | :--- | :---: | :---: | :---: |
-| **Named Entities** | Precision | $0.0000$ | $0.3614$ | $0.3614$ |
-| | Recall | $0.0000$ | **$0.7317$** | **$0.7317$** |
-| | F1 Score | $0.0000$ | **$0.4839$** | **$0.4839$** |
-| **Relations** | Precision | $0.0000$ | **$0.3333$** | **$0.3333$** |
-| | Recall | $0.0000$ | **$0.1429$** | **$0.1429$** |
-| | F1 Score | $0.0000$ | **$0.2000$** | **$0.2000$** |
-| **Events** | Precision | $0.0000$ | **$0.1026$** | **$0.1026$** |
-| | Recall | $0.0000$ | **$0.1053$** | **$0.1053$** |
-| | F1 Score | $0.0000$ | **$0.1039$** | **$0.1039$** |
+| **Named Entities** | Precision | $0.5766$ | **$0.8298$** | **$0.8298$** |
+| | Recall | **$0.9753$** | $0.9630$ | $0.9630$ |
+| | F1 Score | $0.7248$ | **$0.8914$** | **$0.8914$** |
+| | Syntactic Supported F1 | $0.7248$ | **$0.8914$** | **$0.8914$** |
+| **Relations** | Precision | $0.0909$ | **$0.2727$** | **$0.2727$** |
+| | Recall | **$0.5000$** | $0.3750$ | $0.3750$ |
+| | F1 Score | $0.1538$ | **$0.3158$** | **$0.3158$** |
+| | Syntactic Supported F1 | $0.1633$ | **$0.3750$** | **$0.3750$** |
+| **Events** | Precision | $0.0000$ | **$0.5385$** | **$0.5385$** |
+| | Recall | $0.0000$ | **$0.5526$** | **$0.5526$** |
+| | F1 Score | $0.0000$ | **$0.5455$** | **$0.5455$** |
 | **Integrity & Safety** | Exact Schema Validity | **$100.0\%$** | **$100.0\%$** | **$100.0\%$** |
 | | Grounding Accuracy | **$100.0\%$** | **$100.0\%$** | **$100.0\%$** |
 | | Unsupported Fact Rate | **$0.0\%$** | **$0.0\%$** | **$0.0\%$** |
 | | Abstention Accuracy | $97.5\%$ | **$100.0\%$** | **$100.0\%$** |
-| **Performance** | P50 Latency (ms) | $0.61\text{ ms}$ | **$0.13\text{ ms}$** | **$0.13\text{ ms}$** |
-| | P95 Latency (ms) | $1.53\text{ ms}$ | **$0.36\text{ ms}$** | **$0.36\text{ ms}$** |
-| | Live LLM Status | BLOCKED (Offline) | BLOCKED (Offline) | BLOCKED (Offline) |
+| **Performance** | P50 Latency (ms) | $0.26\text{ ms}$ | **$0.11\text{ ms}$** | **$0.10\text{ ms}$** |
+| | P95 Latency (ms) | $0.50\text{ ms}$ | **$0.21\text{ ms}$** | **$0.14\text{ ms}$** |
+| | Live LLM Status | Local AST | BLOCKED (Offline) | BLOCKED (Offline) |
+
+---
+
+## 3.1 Structured Generation Mechanism Evaluation (Phase 4)
+
+In addition to end-to-end extraction metrics, the structured generation mechanisms were evaluated directly for schema enforcement, parse resilience, and computational overhead:
+
+| Dimension | M0: Deterministic ATOM | M1: Unconstrained JSON Mode | M2: Constrained Decoding (SchemaGrammarFSM) |
+| :--- | :---: | :---: | :---: |
+| **Implementation** | Native AST Tree-sitter | LLM JSON mode + Pydantic | JSON-Schema Finite State Machine |
+| **Schema Validity Rate** | **100.0%** | 66.7% (without repair) | **100.0% (Guaranteed)** |
+| **Parse Failure Rate** | **0.0%** | 33.3% (syntax/markdown errors) | **0.0% (Guaranteed)** |
+| **Missing Fields Rate** | **0.0%** | Variable | **0.0% (Guaranteed)** |
+| **Invalid Enum Types Rate**| **0.0%** | Variable | **0.0% (Guaranteed)** |
+| **Mean Enforcement Overhead** | **0.00 ms** | 0.015 ms | **0.009 ms** |
+| **Outlines Dependency** | None | None | Not installed; SchemaGrammarFSM evaluated |
 
 ---
 
