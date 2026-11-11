@@ -43,14 +43,16 @@ class E1ReviewSession:
             raw_cases: list[E1TestCase] = load_e1_dataset()
             self.cases = []
             for c in raw_cases:
+                cid = getattr(c, "case_id", None) or getattr(c, "id", "case_unknown")
+                committed_at = getattr(c.commit, "committed_at", getattr(c.commit, "author_date", None))
                 case_dict = {
-                    "case_id": c.case_id,
+                    "case_id": cid,
                     "split": c.split,
                     "category": c.category,
                     "language": c.language,
                     "commit_sha": c.commit.commit_sha,
                     "commit_message": c.commit.commit_message,
-                    "author_timestamp": c.commit.author_date.isoformat() if c.commit.author_date else None,
+                    "author_timestamp": committed_at.isoformat() if committed_at else None,
                     "raw_diff": c.commit.raw_diff,
                     "annotation_status": "PROVISIONAL_AI_DRAFT",
                     "review_metadata": {
