@@ -102,7 +102,7 @@ class TopNavBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
               ],
-              // Project Switcher Pill showing repository/project name · branch
+              // Project Switcher Pill (e.g. owner/repo or projectName · branch)
               InkWell(
                 onTap: onBackToProjects,
                 borderRadius: BorderRadius.circular(8),
