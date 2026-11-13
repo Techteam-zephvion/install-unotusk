@@ -3198,7 +3198,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _buildSettingsRow('Primary Server URL', 'http://10.0.0.59:28000', palette),
+                    _buildSettingsRow('Primary Server URL', ApiService.baseUrl, palette),
                     _buildSettingsRow('LAN Interface', 'wlo1 (Private Subnet 10.0.0.0/24)', palette),
                     _buildSettingsRow('Health Endpoints', '/health (200 OK) · /health/ready (200 OK)', palette),
                     _buildSettingsRow('Average Response Time', '28ms across 6 employee nodes', palette),

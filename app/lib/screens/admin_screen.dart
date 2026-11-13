@@ -379,7 +379,7 @@ class _AdminScreenState extends State<AdminScreen> {
         const SizedBox(height: 14),
         _buildInfoField('ORGANIZATION / TEAM', widget.user.org.isNotEmpty ? widget.user.org : 'Pilot Workspace (34b9ce85)'),
         const SizedBox(height: 14),
-        _buildInfoField('ACTIVE BACKEND', 'http://10.0.0.59:28000'),
+        _buildInfoField('ACTIVE BACKEND', ApiService.baseUrl),
       ],
     );
   }

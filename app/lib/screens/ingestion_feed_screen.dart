@@ -53,9 +53,9 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
           _processingProjectId = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reindex initiated on backend http://10.0.0.59:28000'),
-            backgroundColor: Color(0xFF1B5E20),
+          SnackBar(
+            content: Text('Reindex initiated on backend ${ApiService.baseUrl}'),
+            backgroundColor: const Color(0xFF1B5E20),
           ),
         );
       }
