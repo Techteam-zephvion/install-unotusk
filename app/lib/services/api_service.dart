@@ -662,10 +662,13 @@ class ApiService {
                   );
 
                   mappedFromApi = true;
-                  if (!projects.any((p) => p.name == localProj.name || p.id == localProj.id)) {
+                  final idx = projects.indexWhere((p) =>
+                      p.name.toLowerCase() == localProj.name.toLowerCase() ||
+                      p.id.toLowerCase() == localProj.id.toLowerCase() ||
+                      (p.port != null && p.port == localProj.port));
+                  if (idx == -1) {
                     projects.add(localProj);
                   } else {
-                    final idx = projects.indexWhere((p) => p.name == localProj.name || p.id == localProj.id);
                     projects[idx] = localProj;
                   }
                 }
@@ -673,7 +676,7 @@ class ApiService {
               }
             } catch (_) {}
             
-            if (!mappedFromApi && isRunning) {
+            if (!mappedFromApi) {
               bool isPortHealthy = false;
               try {
                 final currentHost = Uri.parse(ApiService.baseUrl).host;
@@ -682,30 +685,25 @@ class ApiService {
                 isPortHealthy = healthRes.statusCode == 200;
               } catch (_) {}
 
-              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              final isLive = isPortHealthy || isRunning;
+              final idx = projects.indexWhere((p) =>
+                  p.name.toLowerCase() == fallbackProj.name.toLowerCase() ||
+                  p.id.toLowerCase() == fallbackProj.id.toLowerCase() ||
+                  (p.port != null && p.port == fallbackProj.port));
+
               if (idx != -1) {
                 final existing = projects[idx];
                 projects[idx] = existing.copyWith(
                   port: existing.port ?? fallbackProj.port,
                   repositoryName: existing.repositoryName ?? fallbackProj.repositoryName,
-                  upsStatus: (isPortHealthy || isRunning) ? 'READY' : existing.upsStatus,
-                  ingestionStatus: (isPortHealthy || isRunning) ? 'live' : existing.ingestionStatus,
+                  upsStatus: isLive ? 'READY' : 'STOPPED',
+                  ingestionStatus: isLive ? 'live' : 'stopped',
                 );
-              } else if (isPortHealthy) {
-                // Live running server that wasn't yet returned in primary list
+              } else {
                 projects.add(fallbackProj.copyWith(
-                  upsStatus: 'READY',
-                  ingestionStatus: 'live',
+                  upsStatus: isLive ? 'READY' : 'STOPPED',
+                  ingestionStatus: isLive ? 'live' : 'stopped',
                 ));
-              }
-            } else if (!mappedFromApi) {
-              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
-              if (idx != -1) {
-                final existing = projects[idx];
-                projects[idx] = existing.copyWith(
-                  port: existing.port ?? fallbackProj.port,
-                  repositoryName: existing.repositoryName ?? fallbackProj.repositoryName,
-                );
               }
             }
           }
