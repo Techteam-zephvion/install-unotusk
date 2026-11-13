@@ -264,6 +264,9 @@ class _AppShellState extends State<AppShell> {
   void _handleBackToProjects() async {
     _clearTimers();
     
+    // Ensure persisted connected projects are retained in memory
+    ApiService.loadPersistedConnectedProjects();
+
     // Revert to Control Plane Server
     final currentHost = Uri.parse(ApiService.baseUrl).host;
     final controlPlaneUrl = 'http://$currentHost:28000';
@@ -272,7 +275,7 @@ class _AppShellState extends State<AppShell> {
       try {
         await ApiService.createOrganisation(
           fullName: _user.name,
-          orgName: 'Acme Corporation',
+          orgName: _user.org.isNotEmpty ? _user.org : 'Acme Corporation',
           password: 'password123',
           role: _user.role,
           email: _user.email,
@@ -711,7 +714,10 @@ class _AppShellState extends State<AppShell> {
           onNavigateView: (v) => setState(() => _activeView = v),
         );
       case 'files':
-        return FilesScreen(palette: palette);
+        return FilesScreen(
+          palette: palette,
+          projectId: _openedProject?.id,
+        );
       case 'architecture':
         return ArchitectureScreen(
           palette: palette,

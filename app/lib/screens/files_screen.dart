@@ -8,7 +8,8 @@ import '../theme/app_theme.dart';
 /// Ported feature from install-unotusk repo, using local UnoPalette UI.
 class FilesScreen extends StatefulWidget {
   final UnoPalette palette;
-  const FilesScreen({super.key, required this.palette});
+  final String? projectId;
+  const FilesScreen({super.key, required this.palette, this.projectId});
 
   @override
   State<FilesScreen> createState() => _FilesScreenState();
@@ -33,20 +34,20 @@ class _FilesScreenState extends State<FilesScreen> {
   Future<void> _loadFiles() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final files = await ApiService.fetchProjectFiles();
+      final files = await ApiService.fetchProjectFiles(widget.projectId);
       setState(() {
         _fileTree = FileNode.buildTree(files);
         _loading = false;
       });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
     }
   }
 
   Future<void> _onFileSelected(ProjectFile file) async {
     setState(() { _selectedFileId = file.id; _loadingDetail = true; });
     try {
-      final detail = await ApiService.fetchFileDetail(file.id);
+      final detail = await ApiService.fetchFileDetail(file.id, widget.projectId);
       setState(() { _fileDetail = detail; _loadingDetail = false; });
     } catch (e) {
       setState(() { _loadingDetail = false; });

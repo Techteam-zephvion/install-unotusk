@@ -199,33 +199,51 @@ class ApiService {
   static final Set<String> connectedProjectIds = {};
   static final List<ProjectItem> connectedWorkspaceProjects = [];
 
+  static const String _prefConnectedProjectsKey = 'unotusk_connected_workspace_projects';
+
   static File? get _connectedProjectsFile {
     if (kIsWeb) return null;
-    final email = activeUser?.email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_') ?? 'default';
-    return File('${Directory.systemTemp.path}/unotusk_connected_projects_$email.json');
+    return File('${Directory.systemTemp.path}/unotusk_connected_projects.json');
   }
 
   static void loadPersistedConnectedProjects() {
     try {
-      if (kIsWeb) return;
+      // 1. Synchronously read from local disk fallback
       final file = _connectedProjectsFile;
       if (file != null && file.existsSync()) {
         final content = file.readAsStringSync();
         final List<dynamic> list = jsonDecode(content);
-        connectedProjectIds.clear();
         for (final id in list) {
-          connectedProjectIds.add(id.toString());
+          if (id != null && id.toString().isNotEmpty) {
+            connectedProjectIds.add(id.toString());
+          }
         }
       }
+    } catch (_) {}
+
+    // 2. Asynchronously sync with SharedPreferences
+    try {
+      SharedPreferences.getInstance().then((prefs) {
+        final saved = prefs.getStringList(_prefConnectedProjectsKey);
+        if (saved != null && saved.isNotEmpty) {
+          connectedProjectIds.addAll(saved);
+        }
+      });
     } catch (_) {}
   }
 
   static void savePersistedConnectedProjects() {
     try {
-      if (kIsWeb) return;
+      final list = connectedProjectIds.toList();
+      // 1. Save to SharedPreferences
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setStringList(_prefConnectedProjectsKey, list);
+      });
+
+      // 2. Save to file
       final file = _connectedProjectsFile;
       if (file != null) {
-        file.writeAsStringSync(jsonEncode(connectedProjectIds.toList()));
+        file.writeAsStringSync(jsonEncode(list));
       }
     } catch (_) {}
   }
@@ -545,9 +563,18 @@ class ApiService {
 
         // Deep verification against actual project container / data plane
         final currentHost = Uri.parse(baseUrl).host;
+        final currentUri = Uri.parse(baseUrl);
         final verifiedProjects = await Future.wait(projects.map((proj) async {
           if (accessToken == null) return proj;
           try {
+            // 0. If current baseUrl is already connected directly to this project's port, it is live
+            if (currentUri.hasPort && proj.port != null && currentUri.port == proj.port) {
+              return proj.copyWith(
+                upsStatus: 'READY',
+                ingestionStatus: 'live',
+              );
+            }
+
             // 1. If project has a designated data-plane port, probe it directly
             if (proj.port != null && proj.port! > 0) {
               try {
@@ -577,24 +604,23 @@ class ApiService {
               } catch (_) {}
             }
 
-            if (!dp.isRunning) {
+            if (dp.status.toLowerCase() == 'stopped' || dp.status.toLowerCase() == 'deleted') {
               return proj.copyWith(
                 upsStatus: 'STOPPED',
                 ingestionStatus: 'stopped',
                 port: dp.port ?? proj.port,
               );
-            } else {
+            } else if (dp.isRunning) {
               return proj.copyWith(
                 upsStatus: 'READY',
                 ingestionStatus: 'live',
                 port: dp.port ?? proj.port,
               );
+            } else {
+              return proj;
             }
           } catch (_) {
-            return proj.copyWith(
-              upsStatus: 'STOPPED',
-              ingestionStatus: 'stopped',
-            );
+            return proj;
           }
         }));
         projects
@@ -686,21 +712,38 @@ class ApiService {
           loadPersistedConnectedProjects();
         }
 
-        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects
-        final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
-        final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
-        connectedProjectIds.removeWhere(
-          (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
-        );
-        savePersistedConnectedProjects();
-
-        connectedWorkspaceProjects.clear();
+        // Only prune projects that the server explicitly reports as STOPPED, DELETED, or OFFLINE
         for (final p in projects) {
-          if (connectedProjectIds.contains(p.id) ||
-              connectedProjectIds.contains(p.name)) {
-            connectedWorkspaceProjects.add(p);
+          final isTerminated = p.upsStatus.toUpperCase() == 'STOPPED' ||
+              p.upsStatus.toUpperCase() == 'DELETED' ||
+              p.upsStatus.toUpperCase() == 'OFFLINE';
+          if (isTerminated) {
+            connectedProjectIds.remove(p.id);
+            connectedProjectIds.remove(p.name);
           }
         }
+        savePersistedConnectedProjects();
+
+        // Sync connectedWorkspaceProjects: preserve connected running projects
+        for (final p in projects) {
+          final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
+              p.upsStatus.toUpperCase() != 'DELETED' &&
+              p.upsStatus.toUpperCase() != 'OFFLINE';
+          final isConnected = connectedProjectIds.contains(p.id) ||
+              connectedProjectIds.contains(p.name);
+          if (isConnected && isRunning) {
+            final idx = connectedWorkspaceProjects.indexWhere((cp) => cp.id == p.id || cp.name == p.name);
+            if (idx != -1) {
+              connectedWorkspaceProjects[idx] = p;
+            } else {
+              connectedWorkspaceProjects.add(p);
+            }
+          }
+        }
+        connectedWorkspaceProjects.removeWhere((p) =>
+            p.upsStatus.toUpperCase() == 'STOPPED' ||
+            p.upsStatus.toUpperCase() == 'DELETED' ||
+            p.upsStatus.toUpperCase() == 'OFFLINE');
         if (activeProject == null && projects.isNotEmpty) {
           // Default to the first project or one with READY status
           activeProject = projects.firstWhere(
@@ -1599,24 +1642,88 @@ class ApiService {
   /// Fetches project files
   static Future<List<ProjectFile>> fetchProjectFiles([String? projectId, int limit = 500]) async {
     final pid = _resolveProjectId(projectId);
-    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/files?limit=$limit');
-    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-      if (data is List) {
-        return data.map((item) => ProjectFile.fromJson(Map<String, dynamic>.from(item))).toList();
-      }
+    final headers = _headers;
+
+    // 1. Primary endpoint: /api/v1/projects/{pid}/files
+    http.Response? res;
+    try {
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/files?limit=$limit');
+      res = await _client.get(uri, headers: headers).timeout(_timeout);
+    } catch (e) {
+      debugPrint('[ApiService] fetchProjectFiles primary request error: $e');
     }
+
+    // 2. Fallback without /api/v1 prefix if 404
+    if (res == null || res.statusCode == 404) {
+      try {
+        final fallbackUri = Uri.parse('$baseUrl/projects/$pid/files?limit=$limit');
+        res = await _client.get(fallbackUri, headers: headers).timeout(_timeout);
+      } catch (_) {}
+    }
+
+    // 3. Fallback: if 422 (UUID validation error or local srv ID passed), resolve real project UUID on active server
+    if (res != null && res.statusCode == 422) {
+      try {
+        final projUri = Uri.parse('$baseUrl/api/v1/projects');
+        final projRes = await _client.get(projUri, headers: headers).timeout(const Duration(seconds: 4));
+        if (projRes.statusCode == 200) {
+          final decoded = jsonDecode(projRes.body);
+          List<dynamic> pList = decoded is List
+              ? decoded
+              : (decoded is Map && decoded['projects'] is List ? decoded['projects'] : []);
+          if (pList.isNotEmpty) {
+            final realId = pList.first['id']?.toString();
+            if (realId != null && realId.isNotEmpty && realId != pid) {
+              final realUri = Uri.parse('$baseUrl/api/v1/projects/$realId/files?limit=$limit');
+              res = await _client.get(realUri, headers: headers).timeout(_timeout);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (res != null && res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      List<dynamic> list = [];
+      if (data is List) {
+        list = data;
+      } else if (data is Map) {
+        if (data['files'] is List) {
+          list = data['files'];
+        } else if (data['items'] is List) {
+          list = data['items'];
+        } else if (data['data'] is List) {
+          list = data['data'];
+        }
+      }
+      return list
+          .map((item) => ProjectFile.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+    }
+
+    if (res != null && res.statusCode != 200) {
+      debugPrint('[ApiService] fetchProjectFiles failed: HTTP ${res.statusCode} ${res.body}');
+      throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
+    }
+
     return [];
   }
 
   /// Fetches detailed file info including symbols, dependencies, code chunks
   static Future<FileDetail> fetchFileDetail(String fileId, [String? projectId]) async {
     final pid = _resolveProjectId(projectId);
+    final headers = _headers;
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/files/$fileId');
-    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    var res = await _client.get(uri, headers: headers).timeout(_timeout);
     if (res.statusCode == 200) {
       return FileDetail.fromJson(jsonDecode(res.body));
+    }
+    if (res.statusCode == 404) {
+      final fallbackUri = Uri.parse('$baseUrl/projects/$pid/files/$fileId');
+      res = await _client.get(fallbackUri, headers: headers).timeout(_timeout);
+      if (res.statusCode == 200) {
+        return FileDetail.fromJson(jsonDecode(res.body));
+      }
     }
     throw Exception('Failed to fetch file detail: HTTP ${res.statusCode}');
   }

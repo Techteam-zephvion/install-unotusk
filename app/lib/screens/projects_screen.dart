@@ -110,28 +110,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void initState() {
     super.initState();
     // Restore any previously connected projects so they remain in workspace
-    if (ApiService.connectedProjectIds.isEmpty) {
-      ApiService.loadPersistedConnectedProjects();
-    }
-    if (ApiService.cachedProjects.isNotEmpty) {
-      final validIds = ApiService.cachedProjects.map((p) => p.id.toLowerCase()).toSet();
-      final validNames = ApiService.cachedProjects.map((p) => p.name.toLowerCase()).toSet();
-      ApiService.connectedProjectIds.removeWhere((id) =>
-          !validIds.contains(id.toLowerCase()) &&
-          !validNames.contains(id.toLowerCase()));
-    }
+    ApiService.loadPersistedConnectedProjects();
     if (ApiService.connectedWorkspaceProjects.isNotEmpty) {
-      _projects.addAll(ApiService.connectedWorkspaceProjects);
-    } else {
-      for (final p in ApiService.cachedProjects) {
-        if (ApiService.connectedProjectIds.contains(p.id) ||
-            ApiService.connectedProjectIds.contains(p.name)) {
+      for (final cp in ApiService.connectedWorkspaceProjects) {
+        if (!_projects.any((p) => p.id == cp.id || p.name == cp.name)) {
+          _projects.add(cp);
+        }
+      }
+    }
+    for (final p in ApiService.cachedProjects) {
+      if (ApiService.connectedProjectIds.contains(p.id) ||
+          ApiService.connectedProjectIds.contains(p.name)) {
+        if (!_projects.any((cp) => cp.id == p.id || cp.name == p.name)) {
           _projects.add(p);
         }
       }
-      ApiService.connectedWorkspaceProjects
-        ..clear()
-        ..addAll(_projects);
     }
     _projects.removeWhere((p) =>
         p.upsStatus.toUpperCase() == 'STOPPED' ||
@@ -172,26 +165,31 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _isLoadingProjects = false;
         _isRefreshingProjects = false;
         _availableBackendProjects = List<ProjectItem>.from(serverProjects);
-        
-        final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
-        final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
-        ApiService.connectedProjectIds.removeWhere((id) =>
-            !validIds.contains(id.toLowerCase()) &&
-            !validNames.contains(id.toLowerCase()));
 
-        _projects.clear();
+        // Update connected projects from serverProjects without dropping active ones
         for (final p in serverProjects) {
-          final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
-              p.upsStatus.toUpperCase() != 'DELETED' &&
-              p.upsStatus.toUpperCase() != 'OFFLINE';
-          if (isRunning &&
-              (ApiService.connectedProjectIds.contains(p.id) ||
-                  ApiService.connectedProjectIds.contains(p.name))) {
-            _projects.add(p);
+          final isTerminated = p.upsStatus.toUpperCase() == 'STOPPED' ||
+              p.upsStatus.toUpperCase() == 'DELETED' ||
+              p.upsStatus.toUpperCase() == 'OFFLINE';
+          if (isTerminated) {
+            ApiService.connectedProjectIds.remove(p.id);
+            ApiService.connectedProjectIds.remove(p.name);
+            _projects.removeWhere((proj) => proj.id == p.id || proj.name == p.name);
+          } else {
+            final isConnected = ApiService.connectedProjectIds.contains(p.id) ||
+                ApiService.connectedProjectIds.contains(p.name);
+            if (isConnected) {
+              final idx = _projects.indexWhere((proj) => proj.id == p.id || proj.name == p.name);
+              if (idx != -1) {
+                _projects[idx] = p;
+              } else {
+                _projects.add(p);
+              }
+            }
           }
         }
         ApiService.savePersistedConnectedProjects();
-        
+
         ApiService.connectedWorkspaceProjects
           ..clear()
           ..addAll(_projects);
@@ -289,10 +287,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
         final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
 
-        // Evict any deleted or stopped projects from _projects
+        // Only evict explicitly stopped, deleted or offline projects from _projects
         _projects.removeWhere((p) =>
-            (!validIds.contains(p.id.toLowerCase()) &&
-            !validNames.contains(p.name.toLowerCase())) ||
             p.upsStatus.toUpperCase() == 'STOPPED' ||
             p.upsStatus.toUpperCase() == 'DELETED' ||
             p.upsStatus.toUpperCase() == 'OFFLINE');
@@ -310,13 +306,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               _projects[idx] = sp;
             } else {
               _projects.removeAt(idx);
+              ApiService.connectedProjectIds.remove(sp.id);
+              ApiService.connectedProjectIds.remove(sp.name);
             }
+          } else if (isRunning &&
+              (ApiService.connectedProjectIds.contains(sp.id) ||
+                  ApiService.connectedProjectIds.contains(sp.name))) {
+            _projects.add(sp);
           }
         }
 
-        ApiService.connectedProjectIds.removeWhere((id) =>
-            !validIds.contains(id.toLowerCase()) &&
-            !validNames.contains(id.toLowerCase()));
         for (final p in _projects) {
           ApiService.connectedProjectIds.add(p.id);
           ApiService.connectedProjectIds.add(p.name);
