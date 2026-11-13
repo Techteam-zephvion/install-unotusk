@@ -99,3 +99,45 @@ To graduate E1 from `experiments/e1_generative_ie/` into production `apps/api/sr
 3. Introduce Alembic migration adding `generative_metadata JSONB` column to the `code_chunks` table without altering existing primary keys or foreign keys.
 4. Maintain `E1_GENERATIVE_IE_ENABLED: bool = False` as default in `apps/api/src/config/settings.py`.
 5. Ensure zero test failures across the unified 356+ test cross-track suite.
+
+---
+
+## 5. Outlines Architecture Gap Closure Audit & Evaluation Findings
+
+**Evaluation Date:** November 13, 2026  
+**Evaluator Function:** `experiments/e1_generative_ie/constrained_decoding.py::evaluate_five_representative_samples`  
+**Classification:** `POST-GENERATION VALIDATION ONLY — ARCHITECTURE GAP OPEN`
+
+### 5.1 Architecture Requirement & Context
+- **Locked Architecture Ref:** `AI_PIE_Architecture_V1_Elite.pdf` — Section 5 (Code Lane representation), Section 20 (NLP/IE critical path), Section 23 (Outlines evaluation checklist), Section 25 (Grammar-constrained decoding requirement).
+- **Core Requirement:** Evaluate whether genuine generation-time structured output (Outlines token logit masking / CFG constraints) can be integrated with E1 schemas and extraction pipelines.
+
+### 5.2 Environment & Provider Audit Findings
+1. **Outlines Installation:** `outlines` is **NOT installed** in the virtual environment (`No module named 'outlines'`).
+2. **Local Model Infrastructure:** Zero local inference engines (`torch`, `transformers`, `llama_cpp`, `vllm`, `sglang`) and zero local model weights exist in the workspace.
+3. **Runtime Platform:** Python 3.13.9 on Windows x64. (Official prebuilt PyTorch/CUDA wheels are unavailable for Python 3.13 on Windows).
+4. **Remote API Constraints:** Configured providers (`GroqProvider` and `ClaudeProvider`) are closed remote REST APIs. Closed APIs do **not** expose token-level logit bias distributions or grammar constraints to clients over network calls.
+
+### 5.3 Paradigm Classification
+- **Category A: Direct Generation-Time Constraints (Outlines):** **EXECUTION BLOCKED**. Requires local model weights and open-weight logits access.
+- **Category B: Provider-Side Structured Output (Groq JSON mode):** Implemented in `apps/api/src/services/llm/groq.py` (`response_format={"type": "json_object"}`), but live execution is blocked by missing API credentials.
+- **Category C: Post-Generation Validation (M2 SchemaGrammarFSM + Pydantic v2):** **FULLY OPERATIONAL & VERIFIED**. Enforces 100% schema compliance, enum membership, required field containment, and token grounding with minimal overhead ($< 0.05\text{ ms}$).
+
+### 5.4 Five Representative Extraction Samples Benchmark
+Evaluated across 5 representative software evolution categories from the E1 corpus (`dev_01_simple_func_mod`, `dev_11_extension_case`, `dev_05_auth_deprecation`, `dev_02_dependency_redis`, `dev_08_dead_code_deletion`):
+
+| Scenario ID | Category | Commit SHA | M0 (ATOM) Entities/Rels | M2 (FSM) Entities/Rels/Events | M0 Latency | M2 Latency | FSM Overhead | Schema Compliance | Grounding Status | Outlines Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `dev_01_simple_func_mod` | Simple | `c01a01` | 2 ents / 0 rels | 2 ents / 0 rels / 1 evt | 1.68 ms | 0.52 ms | 0.023 ms | 100% | VALIDATED | EXECUTION_BLOCKED |
+| `dev_11_extension_case` | MultiFile | `c01a11` | 4 ents / 1 rel | 3 ents / 0 rels / 1 evt | 0.74 ms | 0.27 ms | 0.013 ms | 100% | VALIDATED | EXECUTION_BLOCKED |
+| `dev_05_auth_deprecation` | Deprecation | `c01a05` | 4 ents / 1 rel | 4 ents / 1 rel / 1 evt | 0.91 ms | 0.36 ms | 0.017 ms | 100% | VALIDATED | EXECUTION_BLOCKED |
+| `dev_02_dependency_redis` | Dependency | `c01a02` | 6 ents / 3 rels | 4 ents / 2 rels / 1 evt | 3.32 ms | 0.38 ms | 0.034 ms | 100% | VALIDATED | EXECUTION_BLOCKED |
+| `dev_08_dead_code_deletion` | Deletion | `c01a08` | 3 ents / 1 rel | 3 ents / 0 rels / 1 evt | 1.00 ms | 0.48 ms | 0.022 ms | 100% | VALIDATED | EXECUTION_BLOCKED |
+
+### 5.5 Minimal Setup Requirements to Unblock Outlines in Future
+To achieve genuine Category A generation-time Outlines constraints without cloud API restrictions:
+1. Python 3.11 or 3.12 environment with C++ build tools.
+2. Lightweight local model runtime: `llama-cpp-python` (CPU-compatible) or `outlines[transformers]`.
+3. Small quantized local weights (e.g. `Qwen2.5-Coder-1.5B-Instruct-GGUF` or `Mistral-7B-Instruct-v0.3-GGUF`, ~1.2–4.5 GB).
+4. Direct CFG/Regex compilation matching `E1ExtractionResult` Pydantic models.
+

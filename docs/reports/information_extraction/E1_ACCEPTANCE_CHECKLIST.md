@@ -39,7 +39,7 @@
 | **Grounding Validator** | `experiments/e1_generative_ie/validator.py` | Verified | Enforces token grounding, referential integrity, and whitespace diff abstention. |
 | **M0 ATOM Baseline Adapter** | `experiments/e1_generative_ie/extractor.py` | Verified | Adapts `CodeAtomDecomposer` with AST scope and relation participant harvesting. |
 | **M1 Generative IE Pipeline** | `experiments/e1_generative_ie/extractor.py` | Verified | Joint extraction with Pydantic validation and verified offline simulation fallback. |
-| **M2 Constrained Decoding** | `experiments/e1_generative_ie/extractor.py` | Verified | Structured output configuration targeting native JSON schema constraints. |
+| **M2 Constrained Decoding** | `experiments/e1_generative_ie/constrained_decoding.py` | Verified (Post-Gen FSM) | FSM schema conformance repair verified; Outlines generation-time logit masking evaluated as blocked due to missing local weights/engine. |
 | **Benchmark Harness** | `experiments/e1_generative_ie/benchmark.py` | Verified | Stratified evaluation reporting syntactic vs semantic P/R/F1, latency, and schema validity. |
 | **40-Scenario Dataset** | `experiments/e1_generative_ie/data/dataset.py` | Verified | 20 dev / 20 eval scenarios across 15 architectural categories with standard diff headers. |
 | **Unit & Security Suite** | `tests/unit/test_e1_*.py` | 14/14 Passed | 100% pass rate across 14 security invariants and reliability scenarios. |

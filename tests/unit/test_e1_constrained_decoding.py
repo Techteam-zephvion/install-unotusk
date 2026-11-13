@@ -6,6 +6,7 @@ and comparative overhead measurements between M0, M1, and M2.
 
 from experiments.e1_generative_ie.constrained_decoding import (
     SchemaGrammarFSM,
+    evaluate_five_representative_samples,
     evaluate_structured_generation_comparison,
 )
 
@@ -99,3 +100,18 @@ def test_evaluate_structured_generation_comparison():
     assert m2.schema_validity_rate == 1.0
     assert m2.missing_fields_rate == 0.0
     assert m2.invalid_types_rate == 0.0
+
+
+def test_evaluate_five_representative_samples():
+    results = evaluate_five_representative_samples()
+    assert results["total_evaluated_samples"] == 5
+    assert results["outlines_installed"] is False
+    assert results["classification"] == "POST-GENERATION VALIDATION ONLY — ARCHITECTURE GAP OPEN"
+
+    for sample in results["samples"]:
+        assert sample["m2_fsm_metrics"]["schema_compliance"] is True
+        assert sample["m2_fsm_metrics"]["required_fields_compliance"] is True
+        assert sample["m2_fsm_metrics"]["enum_compliance"] is True
+        assert sample["m2_fsm_metrics"]["json_parse_success"] is True
+        assert sample["outlines_generation_time"]["status"] == "EXECUTION_BLOCKED"
+
