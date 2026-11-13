@@ -4,6 +4,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../domain/discovery_summary.dart';
 import '../domain/file_detail.dart';
 import '../domain/grounded_answer.dart';
+import '../domain/feature_specification.dart';
 import '../domain/project_dependency.dart';
 import '../domain/project_file.dart';
 import '../domain/project_finding.dart';
@@ -238,6 +239,21 @@ class WorkspaceRepository {
       },
     );
     return ConversationThread.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<FeatureSpecification> generateFeatureSpecification(
+    String projectId,
+    String featureRequest, {
+    String thinkingTier = 'warm',
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.projectSpec(projectId),
+      data: {
+        'feature_request': featureRequest,
+        'thinking_tier': thinkingTier,
+      },
+    );
+    return FeatureSpecification.fromJson(Map<String, dynamic>.from(response.data));
   }
 
   Future<ProjectGraph> getProjectGraph(String projectId) async {

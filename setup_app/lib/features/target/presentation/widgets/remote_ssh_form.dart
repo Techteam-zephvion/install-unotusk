@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/uno_palette.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../domain/target_config.dart';
@@ -61,18 +61,32 @@ class _RemoteSshFormState extends State<RemoteSshForm> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = UnoPalette.of(context);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.slate50,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.slate200),
+        color: palette.bgElevated,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.div),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('SSH Connection Details', style: AppTextStyles.h3),
-          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.terminal_rounded, size: 16, color: palette.accent),
+              const SizedBox(width: 8),
+              Text(
+                'SSH Connection Details',
+                style: AppTextStyles.h3Of(context).copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -97,43 +111,45 @@ class _RemoteSshFormState extends State<RemoteSshForm> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           AppTextField(
             label: 'SSH Username',
             hintText: 'e.g. root or ubuntu',
             controller: _userController,
             onChanged: (_) => _notify(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 8,
             runSpacing: 8,
             children: [
-              Text('Authentication Method:', style: AppTextStyles.label),
-              ChoiceChip(
-                label: const Text('SSH Key'),
-                selected: !_usePassword,
-                onSelected: (selected) {
-                  if (selected) {
-                    setState(() => _usePassword = false);
-                    _notify();
-                  }
+              Text(
+                'Authentication Method:',
+                style: AppTextStyles.labelOf(context).copyWith(
+                  color: palette.textSec,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              _buildAuthChoice(
+                label: 'SSH Key',
+                isSelected: !_usePassword,
+                onTap: () {
+                  setState(() => _usePassword = false);
+                  _notify();
                 },
               ),
-              ChoiceChip(
-                label: const Text('Password'),
-                selected: _usePassword,
-                onSelected: (selected) {
-                  if (selected) {
-                    setState(() => _usePassword = true);
-                    _notify();
-                  }
+              _buildAuthChoice(
+                label: 'Password',
+                isSelected: _usePassword,
+                onTap: () {
+                  setState(() => _usePassword = true);
+                  _notify();
                 },
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           if (!_usePassword)
             AppTextField(
               label: 'Private Key Path',
@@ -150,6 +166,37 @@ class _RemoteSshFormState extends State<RemoteSshForm> {
               onChanged: (_) => _notify(),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAuthChoice({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final palette = UnoPalette.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? palette.accent.withValues(alpha: 0.15) : palette.bgSurface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? palette.accent : palette.div,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.labelOf(context).copyWith(
+            color: isSelected ? palette.accent : palette.textSec,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }

@@ -57,6 +57,10 @@ class CompatibleVector(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
+        if hasattr(value, "to_list"):
+            value = value.to_list()
+        elif hasattr(value, "tolist"):
+            value = value.tolist()
         if isinstance(value, list | tuple):
             if not value:
                 return None
@@ -66,6 +70,8 @@ class CompatibleVector(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is None:
             return None
+        if hasattr(value, "to_list"):
+            return value.to_list()
         if hasattr(value, "tolist"):
             return value.tolist()
         if isinstance(value, str):

@@ -11,6 +11,8 @@ from apps.api.src.schemas.intelligence import (
     ContextSearchResponse,
     ConversationCreate,
     ConversationRead,
+    FeatureSpecificationResponse,
+    FeatureSpecRequest,
     GroundedAnswerResponse,
     GroundedAskRequest,
     MessageRead,
@@ -40,6 +42,28 @@ async def ask_project(
         project_id=resolved_id,
         question=payload.question,
         conversation_id=payload.conversation_id,
+        thinking_tier=payload.thinking_tier,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/spec",
+    response_model=FeatureSpecificationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate evidence-grounded feature specification with BDD scenarios & confirmed facts",
+)
+async def generate_project_spec(
+    project_id: str,
+    payload: FeatureSpecRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> FeatureSpecificationResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await IntelligenceService.generate_feature_specification(
+        session=db,
+        user_id=current_user.id,
+        project_id=resolved_id,
+        feature_request=payload.feature_request,
         thinking_tier=payload.thinking_tier,
     )
 

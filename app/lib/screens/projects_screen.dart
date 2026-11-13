@@ -163,8 +163,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final serverProjects = await ApiService.fetchProjects();
       final elapsed = stopwatch.elapsedMilliseconds;
-      final isFlutterTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-      if (elapsed < 450 && !isFlutterTest) {
+      final isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+      if (elapsed < 450 && !isTest) {
         await Future.delayed(Duration(milliseconds: 450 - elapsed));
       }
       if (!mounted) return;
@@ -1162,8 +1162,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final results = await Future.wait([membersFuture, employeesFuture]);
 
       final elapsed = stopwatch.elapsedMilliseconds;
-      final isFlutterTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-      if (elapsed < 400 && !isFlutterTest) {
+      final isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+      if (elapsed < 400 && !isTest) {
         await Future.delayed(Duration(milliseconds: 400 - elapsed));
       }
       if (!mounted) return;

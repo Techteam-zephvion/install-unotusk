@@ -23,6 +23,8 @@ class AssembledContext:
     related_entities: list[str] = field(default_factory=list)
     total_characters: int = 0
     candidate_count: int = 0
+    proof_chains: list[dict[str, Any]] = field(default_factory=list)
+    proof_chain_count: int = 0
 
 
 class ContextAssembler:
@@ -30,6 +32,7 @@ class ContextAssembler:
     def assemble_context(
         ranked_candidates: list[RankedCandidate],
         max_tokens: int | None = None,
+        proof_chains: list[Any] | None = None,
     ) -> AssembledContext:
         budget_tokens = max_tokens or settings.CONTEXT_BUDGET_TOKENS
         # Approximate 4 characters per token
@@ -41,6 +44,136 @@ class ContextAssembler:
 
         current_chars = 0
         used_count = 0
+
+        # -------------------------------------------------------------
+        # 1. Format Grounded Proof Chains (Bounded to <= 25% of budget)
+        # -------------------------------------------------------------
+        formatted_proof_chains: list[dict[str, Any]] = []
+        proof_chain_sections: list[str] = []
+        proof_budget_chars = min(int(char_budget * 0.25), 2500) if proof_chains else 0
+        current_proof_chars = 0
+
+        if proof_chains:
+            for chain in proof_chains:
+                # Require valid GroundedProofChain with hops
+                if not hasattr(chain, "hops") or not chain.hops:
+                    continue
+
+                valid_from_str = chain.valid_from.isoformat() if chain.valid_from else "Origin"
+                valid_to_str = chain.valid_to.isoformat() if chain.valid_to else "Active"
+                temporal_status = "HISTORICAL" if chain.is_historical else "CURRENT"
+
+                conflict_line = ""
+                if chain.has_conflict and chain.conflict_reasons:
+                    conflict_line = f"- Conflict Warning: {'; '.join(chain.conflict_reasons)}\n"
+
+                uncertain_line = ""
+                if chain.has_uncertain_evidence and chain.uncertainty_reasons:
+                    uncertain_line = f"- Uncertainty Note: {'; '.join(chain.uncertainty_reasons)}\n"
+
+                hop_lines = []
+                for h in chain.hops:
+                    c_tag = " (conflict)" if getattr(h, "has_conflict", False) else ""
+                    u_tag = " (uncertain)" if getattr(h, "is_uncertain", False) else ""
+                    s_tag = " (superseded)" if getattr(h, "is_superseded", False) else ""
+                    c_sha = getattr(h, "commit_sha", None)
+                    commit_tag = f" [Commit: {c_sha[:8]}]" if c_sha else " [Commit: HEAD]"
+                    inv_tag = " [INVERSE]" if getattr(h, "is_inverse", False) else ""
+                    hop_lines.append(
+                        f"  {h.hop_index + 1}. ({h.source_entity}, {h.relation}, {h.target_entity})"
+                        f"{inv_tag}{commit_tag}{c_tag}{u_tag}{s_tag}"
+                    )
+
+                hops_formatted = "\n".join(hop_lines)
+                intent_val = (
+                    chain.temporal_intent.value
+                    if hasattr(chain.temporal_intent, "value")
+                    else str(chain.temporal_intent)
+                )
+                chain_text = (
+                    f"### [PROOF CHAIN] {chain.source_entity} -> {chain.target_entity}\n"
+                    f"- Scope: Repo: {chain.repository_id} | Branch: {chain.branch}\n"
+                    f"- Temporal Status: {temporal_status} | Intent: {intent_val}\n"
+                    f"- Validity Interval: [{valid_from_str} -> {valid_to_str}]\n"
+                    f"- Direction: {chain.direction} | Proof Score: {chain.proof_score:.2f} | Confidence: {chain.confidence:.2f}\n"
+                    f"{conflict_line}"
+                    f"{uncertain_line}"
+                    f"- Traversed Hops:\n{hops_formatted}\n"
+                    f"- Grounded Explanation: {chain.explanation}\n"
+                )
+
+                if current_proof_chars + len(chain_text) > proof_budget_chars and formatted_proof_chains:
+                    break
+
+                proof_chain_sections.append(chain_text)
+                current_proof_chars += len(chain_text)
+
+                chain_item = {
+                    "type": "proof_chain",
+                    "file": chain.hops[0].source_entity if chain.hops else "",
+                    "symbol": f"{chain.source_entity} -> {chain.target_entity}",
+                    "lines": None,
+                    "relevance": round(chain.proof_score, 4),
+                    "snippet": chain.explanation,
+                    "chain_id": str(chain.chain_id),
+                    "source_entity": chain.source_entity,
+                    "target_entity": chain.target_entity,
+                    "canonical_relation": chain.canonical_relation,
+                    "direction": chain.direction,
+                    "repository_id": str(chain.repository_id),
+                    "branch": chain.branch,
+                    "temporal_intent": intent_val,
+                    "is_historical": chain.is_historical,
+                    "valid_from": chain.valid_from.isoformat() if chain.valid_from else None,
+                    "valid_to": chain.valid_to.isoformat() if chain.valid_to else None,
+                    "confidence": round(chain.confidence, 4),
+                    "proof_score": round(chain.proof_score, 4),
+                    "has_conflict": chain.has_conflict,
+                    "conflict_reasons": chain.conflict_reasons,
+                    "has_uncertain_evidence": chain.has_uncertain_evidence,
+                    "uncertainty_reasons": chain.uncertainty_reasons,
+                    "commit_shas": chain.commit_shas,
+                    "supporting_triplet_ids": [str(tid) for tid in chain.supporting_triplet_ids],
+                    "constituent_path_ids": chain.constituent_path_ids,
+                    "hops": [
+                        {
+                            "hop_index": h.hop_index,
+                            "source": h.source_entity,
+                            "relation": h.relation,
+                            "canonical_relation": (
+                                h.canonical_relation.value
+                                if hasattr(h.canonical_relation, "value")
+                                else str(h.canonical_relation)
+                            ),
+                            "target": h.target_entity,
+                            "is_inverse": h.is_inverse,
+                            "commit_sha": h.commit_sha,
+                            "confidence": h.confidence,
+                            "is_uncertain": h.is_uncertain,
+                            "has_conflict": h.has_conflict,
+                            "is_superseded": h.is_superseded,
+                        }
+                        for h in chain.hops
+                    ],
+                    "explanation": chain.explanation,
+                }
+                formatted_proof_chains.append(chain_item)
+                evidence_items.append(chain_item)
+
+                if chain.source_entity:
+                    related_entities.add(chain.source_entity)
+                if chain.target_entity:
+                    related_entities.add(chain.target_entity)
+                for h in chain.hops:
+                    if h.source_entity:
+                        related_entities.add(h.source_entity)
+                    if h.target_entity:
+                        related_entities.add(h.target_entity)
+
+        # -------------------------------------------------------------
+        # 2. Format Candidate Code Chunks
+        # -------------------------------------------------------------
+        current_chars += current_proof_chars
 
         for r in ranked_candidates:
             cand = r.candidate
@@ -221,9 +354,22 @@ class ContextAssembler:
             if cand.name and cand.name not in ("dependency", "import"):
                 related_entities.add(cand.name)
 
+        # -------------------------------------------------------------
+        # 3. Assemble Unified Prompt Context
+        # -------------------------------------------------------------
+        context_parts = []
+        if proof_chain_sections:
+            context_parts.append("## EVOREASONER GROUNDED PROOF CHAINS\n" + "\n".join(proof_chain_sections))
+
+        if sections:
+            if proof_chain_sections:
+                context_parts.append("## REPOSITORY CODE EVIDENCE\n" + "\n".join(sections))
+            else:
+                context_parts.append("\n".join(sections))
+
         final_prompt_context = (
-            "\n".join(sections)
-            if sections
+            "\n\n".join(context_parts)
+            if context_parts
             else "No specific code evidence retrieved for this query."
         )
 
@@ -233,4 +379,6 @@ class ContextAssembler:
             related_entities=sorted(related_entities),
             total_characters=len(final_prompt_context),
             candidate_count=used_count,
+            proof_chains=formatted_proof_chains,
+            proof_chain_count=len(formatted_proof_chains),
         )

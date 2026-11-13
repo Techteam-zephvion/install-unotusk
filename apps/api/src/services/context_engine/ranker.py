@@ -136,7 +136,7 @@ class MultiSignalRanker:
         # 2. Resolve temporal supersession across candidates
         resolve_temporal_supersession(unique_candidates)
 
-        ranked: list[RankedCandidate] = []
+        intermediate: list[tuple[float, float, RetrievedCandidate, list[str]]] = []
 
         for cand in unique_candidates:
             score = 0.0
@@ -168,6 +168,24 @@ class MultiSignalRanker:
                 elif sig == "graph_expansion_hop2":
                     score += val * 0.5
                     reasons.append("Graph transitive 2-hop neighbor")
+                elif sig == "star_rag_ppr":
+                    score += val * 1.6
+                    reasons.append(f"STAR-RAG temporal rule propagation ({round(val, 3)})")
+                elif sig == "memotime_temporal_match":
+                    score += val * 1.5
+                    reasons.append(f"MemoTime temporal match ({round(val, 2)})")
+                elif sig == "memotime_evolution_phase":
+                    score += val * 1.2
+                    reasons.append("MemoTime evolution phase match")
+                elif sig == "memotime_diff_match":
+                    score += val * 1.4
+                    reasons.append("MemoTime commit changeset match")
+                elif sig == "memotime_historical":
+                    score += val * 1.0
+                    reasons.append("MemoTime historical candidate match")
+                elif sig == "memotime_experience_relevance":
+                    score += val * 1.5
+                    reasons.append(f"MemoTime experience memory reuse ({round(val, 2)})")
                 elif sig.startswith("graph_expansion_hop"):
                     try:
                         hop_num = int(sig.replace("graph_expansion_hop", ""))
@@ -195,6 +213,10 @@ class MultiSignalRanker:
                     reasons.append(f"Exact symbol match for '{sym}'")
                 elif sym.lower() in path_lower:
                     score += 0.8
+            for path_cand in analyzed_query.path_candidates:
+                if path_cand.lower() in path_lower:
+                    score += 0.8
+                    reasons.append(f"Path candidate match for '{path_cand}'")
 
             # 4. Keyword density in name vs content vs commit message
             content_lower = cand.content.lower()
@@ -216,6 +238,28 @@ class MultiSignalRanker:
                 elif concept in content_lower:
                     score += 0.2
 
+            # 5b. Test/mock/fixture demotion when query is not asking for tests
+            is_test_query = any(k in ("test", "tests", "mock", "mocks", "fixture", "fixtures") for k in analyzed_query.keywords)
+            path_normalized = path_lower.replace("\\", "/")
+            is_test_file = any(
+                part in path_normalized
+                for part in ("/tests/", "/test/", "/mocks/", "/fixtures/", "tests/", "mocks/", "fixtures/")
+            ) or path_normalized.split("/")[-1].startswith("test_") or "_test." in path_normalized
+            if is_test_file and not is_test_query:
+                score *= 0.7
+                reasons.append("Test/mock file demoted for non-test query")
+
+            # MemoTime temporal boundary penalty
+            if cand.signals.get("memotime_temporal_mismatch"):
+                score *= 0.3
+                reasons.append("Candidate outside requested temporal bound")
+
+            # MemoTime experience contradiction penalty
+            if cand.signals.get("memotime_experience_contradiction"):
+                score *= 0.2
+                reasons.append("Contradicts verified MemoTime historical experience")
+
+
             # 6. Temporal adjustments based on query intent and code change lifecycle
             if not analyzed_query.is_temporal:
                 # Current-state query: prioritize current active implementation, demote superseded and deleted
@@ -233,12 +277,30 @@ class MultiSignalRanker:
                     reasons.append("Latest active implementation")
             else:
                 # Temporal / evolution query: highlight history, commit evidence, and change lineage
+                c_name_l = (cand.name or "").lower()
+                c_sym_l = (cand.metadata.get("symbol_name") or "").lower()
+                c_path_l = (cand.path or "").lower()
+                target_syms = [s.lower() for s in analyzed_query.symbol_candidates if len(s) > 2]
+                target_paths = [p.lower() for p in getattr(analyzed_query, "path_candidates", []) if len(p) > 2]
+                matches_target = (
+                    any(s in c_name_l or s in c_sym_l or (len(c_name_l) > 3 and c_name_l in s) for s in target_syms)
+                    or any(p in c_path_l or c_path_l in p for p in target_paths)
+                ) if (target_syms or target_paths) else True
+
                 if cand.metadata.get("commit_sha") or cand.metadata.get("committed_at"):
-                    score += 0.6
-                    reasons.append("Historical commit evidence")
+                    if matches_target:
+                        score += 0.6
+                        reasons.append("Historical commit evidence")
+                    else:
+                        score += 0.2
+                        reasons.append("Historical background commit")
                 if cand.metadata.get("is_superseded"):
-                    score += 0.4
-                    reasons.append("Historical precursor in code evolution")
+                    if matches_target:
+                        score += 0.4
+                        reasons.append("Historical precursor in code evolution")
+                    else:
+                        score += 0.1
+                        reasons.append("Background superseded change")
                 if cand.metadata.get("is_deleted"):
                     score += 0.5
                     reasons.append("Deletion event in code evolution")
@@ -251,17 +313,20 @@ class MultiSignalRanker:
 
             # Normalize score (capped at 1.0)
             normalized_score = min(1.0, round(score / 3.0, 2))
+            intermediate.append((score, normalized_score, cand, reasons))
 
-            ranked.append(
-                RankedCandidate(
-                    candidate=cand,
-                    score=normalized_score,
-                    matched_reasons=reasons,
-                )
+        # Sort descending by raw score to preserve discrimination between strong candidates
+        intermediate.sort(key=lambda item: item[0], reverse=True)
+
+        ranked = [
+            RankedCandidate(
+                candidate=cand,
+                score=norm_s,
+                matched_reasons=reasons,
             )
+            for _, norm_s, cand, reasons in intermediate
+        ]
 
-        # Sort descending by score
-        ranked.sort(key=lambda r: r.score, reverse=True)
 
         # 6. Filter out negligible relevance candidates (noise threshold)
         # Ensure we keep at least 3 candidates (floor guarantee) if candidates exist

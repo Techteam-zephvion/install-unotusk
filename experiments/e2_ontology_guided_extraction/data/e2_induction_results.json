@@ -1,0 +1,77 @@
+{
+  "evaluation_title": "E2 Code Lane Ontology Induction Evaluation (OntoRAG)",
+  "benchmark_dataset_size": 40,
+  "total_raw_entities_ingested": 218,
+  "total_raw_relations_ingested": 52,
+  "ground_truth_entity_count": 79,
+  "primary_threshold": 0.7,
+  "baseline_metrics": {
+    "concept_extraction_coverage": 1.0,
+    "induced_concept_count": 60,
+    "candidate_relation_count": 23,
+    "relationship_proposal_precision": 1.0,
+    "evidence_grounding_coverage": 1.0,
+    "redundancy_reduction_ratio": 0.7248,
+    "tree_max_depth": 3.0,
+    "tree_mean_depth": 2.16,
+    "tree_mean_branching_factor": 4.5,
+    "total_taxonomy_nodes": 122
+  },
+  "sensitivity_analysis": [
+    {
+      "threshold": 0.3,
+      "concept_count": 3,
+      "relation_count": 0,
+      "redundancy_reduction": 0.9862,
+      "concept_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "max_depth": 3.0,
+      "mean_branching_factor": 11.78
+    },
+    {
+      "threshold": 0.5,
+      "concept_count": 5,
+      "relation_count": 1,
+      "redundancy_reduction": 0.9771,
+      "concept_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "max_depth": 3.0,
+      "mean_branching_factor": 9.73
+    },
+    {
+      "threshold": 0.7,
+      "concept_count": 60,
+      "relation_count": 23,
+      "redundancy_reduction": 0.7248,
+      "concept_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "max_depth": 3.0,
+      "mean_branching_factor": 4.5
+    },
+    {
+      "threshold": 0.85,
+      "concept_count": 100,
+      "relation_count": 42,
+      "redundancy_reduction": 0.5413,
+      "concept_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "max_depth": 3.0,
+      "mean_branching_factor": 5.32
+    },
+    {
+      "threshold": 0.95,
+      "concept_count": 102,
+      "relation_count": 43,
+      "redundancy_reduction": 0.5321,
+      "concept_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "max_depth": 3.0,
+      "mean_branching_factor": 5.85
+    }
+  ],
+  "governance_verification": {
+    "all_concepts_proposed_pending_review": true,
+    "all_relations_proposed_pending_review": true,
+    "v1_ontology_mutated": false
+  }
+}

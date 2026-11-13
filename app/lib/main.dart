@@ -155,7 +155,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _loadInitialTelemetry() async {
-    await ApiService.checkHealth();
+    await ApiService.autoDetectAndConnect();
   }
 
   @override
@@ -249,7 +249,13 @@ class _AppShellState extends State<AppShell> {
         try {
           final serverProjects = await ApiService.fetchProjects();
           if (serverProjects.isNotEmpty) {
-            project = serverProjects.first;
+            final targetServerProj = serverProjects.first;
+            project = targetServerProj.copyWith(
+              repositoryName: (targetServerProj.repositoryName != null && targetServerProj.repositoryName!.isNotEmpty)
+                  ? targetServerProj.repositoryName
+                  : project.repositoryName,
+              defaultBranch: targetServerProj.defaultBranch ?? project.defaultBranch,
+            );
             setState(() {
               _openedProject = project;
             });
@@ -554,8 +560,9 @@ class _AppShellState extends State<AppShell> {
                               onToggleSidebar: () =>
                                   setState(() => _sidebarOpen = !_sidebarOpen),
                               projectName: _openedProjectName,
-                              repoFullName:
-                                  'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
+                              repoFullName: (_openedProject?.repositoryName?.isNotEmpty == true)
+                                  ? _openedProject!.repositoryName
+                                  : _openedProjectName,
                               branchName: 'main',
                               onBackToProjects: _handleBackToProjects,
                             ),
@@ -582,8 +589,9 @@ class _AppShellState extends State<AppShell> {
                             onToggleSidebar: () =>
                                 setState(() => _sidebarOpen = !_sidebarOpen),
                             projectName: _openedProjectName,
-                            repoFullName:
-                                'Kushall-07/${_openedProjectName.isNotEmpty ? _openedProjectName : "SyncGuard"}',
+                            repoFullName: (_openedProject?.repositoryName?.isNotEmpty == true)
+                                ? _openedProject!.repositoryName
+                                : _openedProjectName,
                             branchName: 'main',
                             onBackToProjects: _handleBackToProjects,
                           ),

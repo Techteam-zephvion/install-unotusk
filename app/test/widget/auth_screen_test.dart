@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/models/models.dart';
 import 'package:app/screens/auth_screen.dart';
@@ -27,10 +27,10 @@ void main() {
 
     // Verify UI branding
     expect(find.text('Sign in to Unotusk'), findsOneWidget);
-    expect(find.text('Acme Corporation Auth'), findsOneWidget);
-    expect(find.text('Acme Workspace'), findsOneWidget);
+    expect(find.text('Acme Corporation Auth'), findsNothing);
+    expect(find.text('Acme Workspace'), findsNothing);
     expect(find.text('Sign In'), findsWidgets);
-    expect(find.text('Create Workspace'), findsOneWidget);
+    expect(find.text('Sign Up'), findsWidgets);
 
     // Enter a non-acme.com email
     final emailField = find.byType(TextField).first;
@@ -49,12 +49,12 @@ void main() {
     );
     expect(authenticatedUser, isNull);
 
-    // Switch to Create Workspace mode
-    final createWorkspaceTab = find.text('Create Workspace');
-    await tester.tap(createWorkspaceTab);
+    // Switch to Sign Up mode
+    final signUpTab = find.text('Sign Up').first;
+    await tester.tap(signUpTab);
     await tester.pumpAndSettle();
 
-    expect(find.text('Create Acme Workspace'), findsOneWidget);
+    expect(find.text('Sign up to Unotusk'), findsOneWidget);
     expect(find.text('Organisation Name'), findsOneWidget);
   });
 }

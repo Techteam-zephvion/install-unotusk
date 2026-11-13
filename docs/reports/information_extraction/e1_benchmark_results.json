@@ -1,0 +1,541 @@
+{
+  "M0_ATOM_Baseline": {
+    "model_name": "Configuration M0",
+    "total_cases": 40,
+    "annotation_classification": "PROVISIONAL_AI_DRAFT (Human Review Pending)",
+    "live_model_status": "BLOCKED_OFFLINE_PATH",
+    "entity_metrics": {
+      "precision": 0.5766,
+      "recall": 0.9753,
+      "f1": 0.7248,
+      "true_positives": 79,
+      "false_positives": 58,
+      "false_negatives": 2
+    },
+    "relation_metrics": {
+      "precision": 0.0909,
+      "recall": 0.5,
+      "f1": 0.1538,
+      "true_positives": 4,
+      "false_positives": 40,
+      "false_negatives": 4
+    },
+    "event_metrics": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 38
+    },
+    "entity_fairness": {
+      "overall_f1": 0.7248,
+      "syntactic_supported_f1": 0.7248,
+      "semantic_unsupported_f1": 0.0
+    },
+    "relation_fairness": {
+      "overall_f1": 0.1538,
+      "syntactic_supported_f1": 0.1633,
+      "semantic_unsupported_f1": 0.0
+    },
+    "schema_validity_rate": 1.0,
+    "evidence_grounding_accuracy": 1.0,
+    "unsupported_fact_rate": 0.0,
+    "duplicate_extraction_rate": 0.0,
+    "temporal_accuracy_rate": 1.0,
+    "abstention_accuracy": 0.975,
+    "p50_latency_ms": 0.27259999933448853,
+    "p95_latency_ms": 0.552100000277278,
+    "latencies": [
+      0.3698999989865115,
+      0.986400000329013,
+      0.43989999903715216,
+      0.3063000003749039,
+      0.2989999993587844,
+      0.5118999997648643,
+      0.43850000110978726,
+      0.27439999939815607,
+      0.10010000005422626,
+      0.08299999899463728,
+      0.2777999998215819,
+      0.2657000004546717,
+      0.2758999999059597,
+      0.32869999995455146,
+      0.26170000091951806,
+      0.2581999997346429,
+      0.25260000074922573,
+      0.2571000004536472,
+      0.25690000074973796,
+      0.2643999996507773,
+      0.3521999988151947,
+      0.3660000002128072,
+      0.24710000070626847,
+      0.22499999977299012,
+      0.31230000058712903,
+      0.12129999959142879,
+      0.4124999995838152,
+      0.26310000066587236,
+      0.14399999963643495,
+      0.2746999998635147,
+      0.2578999992692843,
+      0.24730000041017774,
+      0.3036999987671152,
+      0.26109999998880085,
+      0.552100000277278,
+      0.32780000037746504,
+      0.270799999270821,
+      0.2519000008760486,
+      0.24750000011408702,
+      0.3673999999591615
+    ],
+    "category_breakdown": {
+      "Simple": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "Dependency": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 0.8,
+        "event_f1": 0.0
+      },
+      "API": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Configuration": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Deprecation": {
+        "entity_f1": 0.5714285714285715,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Test": {
+        "entity_f1": 0.5,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Behavior": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Deletion": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Trivial": {
+        "entity_f1": 0.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Ambiguous": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "MultiFile": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 0.16666666666666666,
+        "event_f1": 0.0
+      },
+      "MultiLanguage": {
+        "entity_f1": 0.7142857142857143,
+        "relation_f1": 0.14285714285714285,
+        "event_f1": 0.0
+      },
+      "RealRepo": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.2857142857142857,
+        "event_f1": 0.0
+      },
+      "Evolution": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "EdgeCase": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      }
+    }
+  },
+  "M1_Generative_IE": {
+    "model_name": "Configuration M1",
+    "total_cases": 40,
+    "annotation_classification": "PROVISIONAL_AI_DRAFT (Human Review Pending)",
+    "live_model_status": "BLOCKED_OFFLINE_PATH",
+    "entity_metrics": {
+      "precision": 0.8298,
+      "recall": 0.963,
+      "f1": 0.8914,
+      "true_positives": 78,
+      "false_positives": 16,
+      "false_negatives": 3
+    },
+    "relation_metrics": {
+      "precision": 0.2727,
+      "recall": 0.375,
+      "f1": 0.3158,
+      "true_positives": 3,
+      "false_positives": 8,
+      "false_negatives": 5
+    },
+    "event_metrics": {
+      "precision": 0.5385,
+      "recall": 0.5526,
+      "f1": 0.5455,
+      "true_positives": 21,
+      "false_positives": 18,
+      "false_negatives": 17
+    },
+    "entity_fairness": {
+      "overall_f1": 0.8914,
+      "syntactic_supported_f1": 0.8914,
+      "semantic_unsupported_f1": 0.0
+    },
+    "relation_fairness": {
+      "overall_f1": 0.3158,
+      "syntactic_supported_f1": 0.375,
+      "semantic_unsupported_f1": 0.0
+    },
+    "schema_validity_rate": 1.0,
+    "evidence_grounding_accuracy": 1.0,
+    "unsupported_fact_rate": 0.0,
+    "duplicate_extraction_rate": 0.0,
+    "temporal_accuracy_rate": 1.0,
+    "abstention_accuracy": 1.0,
+    "p50_latency_ms": 0.11139999969600467,
+    "p95_latency_ms": 0.21240000023681205,
+    "latencies": [
+      0.7918000010249671,
+      0.1990000000660075,
+      0.1464000015403144,
+      0.1847000003181165,
+      0.149200001033023,
+      0.21240000023681205,
+      0.13670000043930486,
+      0.1263999984075781,
+      0.08829999933368526,
+      0.1159999992523808,
+      0.11629999971773941,
+      0.11059999997087289,
+      0.10699999984353781,
+      0.11679999988700729,
+      0.13159999980416615,
+      0.10489999840501696,
+      0.10479999946255703,
+      0.11219999942113645,
+      0.1052999996318249,
+      0.11970000014116522,
+      0.14569999984814785,
+      0.1323000014963327,
+      0.12720000086119398,
+      0.10329999895475339,
+      0.11580000136746094,
+      0.10920000022451859,
+      0.11330000052112155,
+      0.11959999937971588,
+      0.10680000013962854,
+      0.1067000011971686,
+      0.1004999994620448,
+      0.09810000119614415,
+      0.10269999984302558,
+      0.0976999999693362,
+      0.09680000039224979,
+      0.0959999997576233,
+      0.09569999929226469,
+      0.09929999941959977,
+      0.09529999988444615,
+      0.09580000005371403
+    ],
+    "category_breakdown": {
+      "Simple": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Dependency": {
+        "entity_f1": 0.8571428571428571,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "API": {
+        "entity_f1": 1.0,
+        "relation_f1": 0.0,
+        "event_f1": 1.0
+      },
+      "Configuration": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Deprecation": {
+        "entity_f1": 0.8571428571428571,
+        "relation_f1": 0.0,
+        "event_f1": 1.0
+      },
+      "Test": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Behavior": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Deletion": {
+        "entity_f1": 0.8,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Trivial": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Ambiguous": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "MultiFile": {
+        "entity_f1": 0.75,
+        "relation_f1": 1.0,
+        "event_f1": 0.8333333333333334
+      },
+      "MultiLanguage": {
+        "entity_f1": 0.8285714285714286,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "RealRepo": {
+        "entity_f1": 0.9714285714285714,
+        "relation_f1": 0.2857142857142857,
+        "event_f1": 0.2857142857142857
+      },
+      "Evolution": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "EdgeCase": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      }
+    }
+  },
+  "M2_Constrained_Decoding": {
+    "model_name": "Configuration M2 (Post-Gen Schema FSM Gating)",
+    "total_cases": 40,
+    "annotation_classification": "PROVISIONAL_AI_DRAFT (Human Review Pending)",
+    "live_model_status": "BLOCKED_OFFLINE_PATH",
+    "entity_metrics": {
+      "precision": 0.8298,
+      "recall": 0.963,
+      "f1": 0.8914,
+      "true_positives": 78,
+      "false_positives": 16,
+      "false_negatives": 3
+    },
+    "relation_metrics": {
+      "precision": 0.2727,
+      "recall": 0.375,
+      "f1": 0.3158,
+      "true_positives": 3,
+      "false_positives": 8,
+      "false_negatives": 5
+    },
+    "event_metrics": {
+      "precision": 0.5385,
+      "recall": 0.5526,
+      "f1": 0.5455,
+      "true_positives": 21,
+      "false_positives": 18,
+      "false_negatives": 17
+    },
+    "entity_fairness": {
+      "overall_f1": 0.8914,
+      "syntactic_supported_f1": 0.8914,
+      "semantic_unsupported_f1": 0.0
+    },
+    "relation_fairness": {
+      "overall_f1": 0.3158,
+      "syntactic_supported_f1": 0.375,
+      "semantic_unsupported_f1": 0.0
+    },
+    "schema_validity_rate": 1.0,
+    "evidence_grounding_accuracy": 1.0,
+    "unsupported_fact_rate": 0.0,
+    "duplicate_extraction_rate": 0.0,
+    "temporal_accuracy_rate": 1.0,
+    "abstention_accuracy": 1.0,
+    "p50_latency_ms": 0.10460000066814246,
+    "p95_latency_ms": 0.1477999994676793,
+    "latencies": [
+      0.12310000056459103,
+      0.15359999997599516,
+      0.1334000007773284,
+      0.09839999984251335,
+      0.14310000005934853,
+      0.1401999998051906,
+      0.11110000014014076,
+      0.1140000003942987,
+      0.07670000013604295,
+      0.08630000047560316,
+      0.1066999993781792,
+      0.11890000132552814,
+      0.10999999904015567,
+      0.10779999865917489,
+      0.10370000018156134,
+      0.10269999984302558,
+      0.10370000018156134,
+      0.10289999954693485,
+      0.10380000094301067,
+      0.10309999925084412,
+      0.1477999994676793,
+      0.11619999895629007,
+      0.12069999866071157,
+      0.10149999980058055,
+      0.10739999925135635,
+      0.10540000039327424,
+      0.11079999967478216,
+      0.11640000047918875,
+      0.11009999980160501,
+      0.10629999997036066,
+      0.0988000010693213,
+      0.09619999946153257,
+      0.09520000094198622,
+      0.09540000064589549,
+      0.09489999865763821,
+      0.09369999861519318,
+      0.09479999971517827,
+      0.10100000145030208,
+      0.09589999899617396,
+      0.09469999895372894
+    ],
+    "category_breakdown": {
+      "Simple": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Dependency": {
+        "entity_f1": 0.8571428571428571,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "API": {
+        "entity_f1": 1.0,
+        "relation_f1": 0.0,
+        "event_f1": 1.0
+      },
+      "Configuration": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Deprecation": {
+        "entity_f1": 0.8571428571428571,
+        "relation_f1": 0.0,
+        "event_f1": 1.0
+      },
+      "Test": {
+        "entity_f1": 0.8,
+        "relation_f1": 0.0,
+        "event_f1": 0.0
+      },
+      "Behavior": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Deletion": {
+        "entity_f1": 0.8,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Trivial": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "Ambiguous": {
+        "entity_f1": 0.6666666666666666,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "MultiFile": {
+        "entity_f1": 0.75,
+        "relation_f1": 1.0,
+        "event_f1": 0.8333333333333334
+      },
+      "MultiLanguage": {
+        "entity_f1": 0.8285714285714286,
+        "relation_f1": 1.0,
+        "event_f1": 1.0
+      },
+      "RealRepo": {
+        "entity_f1": 0.9714285714285714,
+        "relation_f1": 0.2857142857142857,
+        "event_f1": 0.2857142857142857
+      },
+      "Evolution": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      },
+      "EdgeCase": {
+        "entity_f1": 1.0,
+        "relation_f1": 1.0,
+        "event_f1": 0.0
+      }
+    }
+  },
+  "_structured_generation_comparison": {
+    "M0_Deterministic_ATOM": {
+      "method_name": "M0: Deterministic ATOM",
+      "implementation_type": "Tree-sitter AST & Regex",
+      "schema_validity_rate": 1.0,
+      "missing_fields_rate": 0.0,
+      "invalid_types_rate": 0.0,
+      "parse_failure_rate": 0.0,
+      "mean_enforcement_overhead_ms": 0.0,
+      "peak_memory_overhead_kb": 0.0,
+      "sample_size": 3,
+      "notes": "Zero LLM overhead; deterministic AST parser with native Python types."
+    },
+    "M1_Provider_JSON_Mode": {
+      "method_name": "M1: Generative IE (JSON Mode + Pydantic)",
+      "implementation_type": "Prompt-based JSON mode + Pydantic post-validation",
+      "schema_validity_rate": 0.6667,
+      "missing_fields_rate": 0.0,
+      "invalid_types_rate": 0.0,
+      "parse_failure_rate": 0.3333,
+      "mean_enforcement_overhead_ms": 0.0152,
+      "peak_memory_overhead_kb": 12.0,
+      "sample_size": 3,
+      "notes": "Standard unconstrained LLM sampling; susceptible to markdown wrappers and malformed syntax."
+    },
+    "M2_Constrained_Decoding": {
+      "method_name": "M2: Schema-Constrained Gating (FSM Grammar)",
+      "implementation_type": "Post-generation SchemaGrammarFSM validation & conformance repair",
+      "schema_validity_rate": 1.0,
+      "missing_fields_rate": 0.0,
+      "invalid_types_rate": 0.0,
+      "parse_failure_rate": 0.0,
+      "mean_enforcement_overhead_ms": 0.0089,
+      "peak_memory_overhead_kb": 28.0,
+      "sample_size": 3,
+      "notes": "Post-generation FSM grammar conformance and sanitization. Generation-time logit masking (e.g. Outlines) is not performed as closed remote APIs do not expose token logits."
+    }
+  }
+}

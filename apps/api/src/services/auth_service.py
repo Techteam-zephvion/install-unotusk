@@ -334,14 +334,33 @@ class AuthService:
 
             # Simple check to see if user has any projects
             result = await session.execute(select(Project).where(Project.organization_id == organization_id))
-            if result.scalars().first() is not None:
+            existing_project = result.scalars().first()
+            if existing_project is not None:
+                # If project exists, verify if it was left un-ingested (0 snapshots)
+                from apps.api.src.models.repository import Repository
+                from apps.api.src.models.snapshot import RepositorySnapshot
+                from apps.api.src.services.repository_service import RepositoryService
+
+                repo_query = select(Repository).where(Repository.project_id == existing_project.id)
+                repo_res = await session.execute(repo_query)
+                repo = repo_res.scalars().first()
+                if repo:
+                    snap_query = select(RepositorySnapshot).where(RepositorySnapshot.repository_id == repo.id)
+                    snap_res = await session.execute(snap_query)
+                    if snap_res.scalars().first() is None:
+                        import logging
+                        logger = logging.getLogger("unotusk-api")
+                        logger.info(f"Retrying ingestion for previously un-ingested project {existing_project.id}")
+                        try:
+                            await RepositoryService.trigger_ingestion(session, user_id, existing_project.id, repo.id)
+                        except Exception as retry_err:
+                            logger.error(f"Failed to retry ingestion for {existing_project.id}: {retry_err}")
                 return  # Already provisioned
 
             import urllib.parse
 
             from apps.api.src.schemas.project import ProjectCreate
             from apps.api.src.schemas.repository import RepositorySelectRequest
-            from apps.api.src.services.ingestion_service import IngestionService
             from apps.api.src.services.project_service import ProjectService
             from apps.api.src.services.repository_service import RepositoryService
 
@@ -371,7 +390,7 @@ class AuthService:
                     url=repo_url,
                 )
                 repo = await RepositoryService.select_repository(session, user_id, project.id, repo_req)
-                await IngestionService.trigger_ingestion(session, user_id, project.id, repo.id)
+                await RepositoryService.trigger_ingestion(session, user_id, project.id, repo.id)
             except Exception as e:
                 import logging
                 logger = logging.getLogger("unotusk-api")

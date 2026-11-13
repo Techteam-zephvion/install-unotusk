@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-14T08:31:27.822994+00:00",
+  "timestamp": "2026-11-06T05:09:04.004728+00:00",
   "dataset": {
     "total_cases": 10,
     "categories": [
@@ -62,10 +62,10 @@
     "relation_count_variance": 0.0
   },
   "performance_ms": {
-    "decomposition_mean_ms": 0.3,
-    "resolution_mean_ms": 0.12,
-    "total_mean_ms": 0.48,
-    "total_min_ms": 0.13,
-    "total_max_ms": 1.39
+    "decomposition_mean_ms": 0.81,
+    "resolution_mean_ms": 0.19,
+    "total_mean_ms": 1.11,
+    "total_min_ms": 0.21,
+    "total_max_ms": 2.89
   }
 }

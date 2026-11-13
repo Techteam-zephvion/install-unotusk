@@ -1,8 +1,10 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.src.config.settings import settings
 from apps.api.src.models.repository import Repository
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.services.context_engine.assembler import ContextAssembler
@@ -29,6 +31,9 @@ class ProjectContextEngine:
         query_embedding: list[float] | None = None,
         thinking_tier: str | None = None,
         repository_id: uuid.UUID | None = None,
+        enable_star_rag: bool | None = None,
+        enable_memotime: bool | None = None,
+        enable_evoreasoner: bool | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -71,14 +76,208 @@ class ProjectContextEngine:
             max_depth=2,
         )
 
+        # 3b. STAR-RAG Temporal Rule Graph Retrieval
+        use_star_rag = (
+            enable_star_rag
+            if enable_star_rag is not None
+            else getattr(settings, "STAR_RAG_ENABLED", False)
+        )
+        star_rag_diagnostics: dict[str, Any] = {}
+        star_rag_applied = False
+        if use_star_rag:
+            try:
+                from apps.api.src.services.context_engine.star_rag import StarRagContextService
+
+                star_res = StarRagContextService.run_star_rag_pipeline(
+                    candidates=expanded_candidates,
+                    analyzed_query=analyzed,
+                    query_text=question,
+                )
+                expanded_candidates = star_res.candidates
+                star_rag_applied = not star_res.is_fallback
+                star_rag_diagnostics = {
+                    "is_fallback": star_res.is_fallback,
+                    "fallback_reason": star_res.fallback_reason,
+                    "top_rules_count": len(star_res.top_rules),
+                    "rule_nodes_count": len(star_res.rule_nodes),
+                    "selected_edges_count": len(star_res.selected_edges),
+                    "initial_mdl_cost": round(star_res.initial_mdl_cost, 2),
+                    "final_mdl_cost": round(star_res.final_mdl_cost, 2),
+                }
+            except Exception as exc:
+                star_rag_applied = False
+                star_rag_diagnostics = {
+                    "exception_occurred": True,
+                    "is_fallback": True,
+                    "fallback_reason": str(exc),
+                    "error": str(exc),
+                }
+
+        # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
+        use_memotime = (
+            enable_memotime
+            if enable_memotime is not None
+            else getattr(settings, "MEMOTIME_ENABLED", False)
+        )
+        memotime_diagnostics: dict[str, Any] = {}
+        memotime_success = False
+        if use_memotime:
+            try:
+                from apps.api.src.services.context_engine.memotime import (
+                    MemoTimeExperienceStore,
+                    MemoTimeService,
+                )
+
+                experiences = []
+                if repository_id is not None and session is not None:
+                    experiences = await MemoTimeExperienceStore.retrieve_relevant_experiences_async(
+                        session=session,
+                        repository_id=repository_id,
+                        branch="main",
+                        target_entities=analyzed.symbol_candidates if analyzed else None,
+                        intent_type=(
+                            analyzed.structured_temporal_intent.intent_type.value
+                            if analyzed and analyzed.structured_temporal_intent
+                            else None
+                        ),
+                    )
+
+                memo_res = MemoTimeService.run_memotime_pipeline(
+                    candidates=expanded_candidates,
+                    analyzed_query=analyzed,
+                    query_text=question,
+                    experiences=experiences,
+                )
+                expanded_candidates = memo_res.candidates
+                memotime_success = not memo_res.is_fallback
+                memotime_diagnostics = {
+                    "strategy": (
+                        memo_res.strategy_used.value
+                        if hasattr(memo_res.strategy_used, "value")
+                        else str(memo_res.strategy_used)
+                    ),
+                    "is_fallback": memo_res.is_fallback,
+                    "fallback_reason": memo_res.fallback_reason,
+                    "applied_signals_count": memo_res.applied_signals_count,
+                    "reused_experiences_count": len(memo_res.experiences_used),
+                    **memo_res.diagnostics,
+                }
+
+                # Persist high-confidence verified reasoning trace to experience memory
+                if (
+                    memo_res.new_experience_candidate
+                    and repository_id is not None
+                    and session is not None
+                ):
+                    await MemoTimeExperienceStore.record_verified_experience_async(
+                        session=session,
+                        repository_id=repository_id,
+                        branch="main",
+                        query_text=memo_res.new_experience_candidate.query_text,
+                        intent_type=memo_res.new_experience_candidate.intent_type,
+                        target_entities=memo_res.new_experience_candidate.target_entities,
+                        commit_sha=memo_res.new_experience_candidate.commit_sha,
+                        valid_from=memo_res.new_experience_candidate.valid_from,
+                        valid_to=memo_res.new_experience_candidate.valid_to,
+                        verified_outcome=memo_res.new_experience_candidate.verified_outcome,
+                        confidence_score=memo_res.new_experience_candidate.confidence_score,
+                        is_verified=memo_res.new_experience_candidate.is_verified,
+                        attribution=memo_res.new_experience_candidate.attribution,
+                    )
+            except Exception as exc:
+                memotime_success = False
+                memotime_diagnostics = {
+                    "exception_occurred": True,
+                    "is_fallback": True,
+                    "fallback_reason": str(exc),
+                    "error": str(exc),
+                }
+
         # 4. Multi-Signal Ranking
         ranked = MultiSignalRanker.rank_candidates(
             candidates=expanded_candidates,
             analyzed_query=analyzed,
         )
 
+        # 4b. EvoReasoner Multi-Route Planning, Beam Search & Proof-Chain Aggregation (arXiv:2509.15464)
+        use_evoreasoner = (
+            enable_evoreasoner
+            if enable_evoreasoner is not None
+            else getattr(settings, "EVOREASONER_ENABLED", False)
+        )
+        proof_chains = []
+        evoreasoner_applied = False
+        evoreasoner_diagnostics: dict[str, Any] = {}
+
+        if use_evoreasoner and repository_id is not None:
+            try:
+                from apps.api.src.services.evoreasoner.aggregator import ProofChainAggregator
+                from apps.api.src.services.evoreasoner.beam_search import EvoBeamSearchEngine
+                from apps.api.src.services.evoreasoner.planner import EvoRoutePlanner
+
+                # Identify seed entities from query analysis and top retrieved candidates
+                seed_entities = list(analyzed.symbol_candidates)
+                if not seed_entities and ranked:
+                    for r in ranked[:3]:
+                        if r.candidate.name and r.candidate.name not in ("dependency", "import"):
+                            seed_entities.append(r.candidate.name)
+
+                # Generate bounded multi-route plan
+                plan = EvoRoutePlanner.generate_multi_route_plan(
+                    query_text=question,
+                    seed_entities=seed_entities,
+                )
+
+                if plan.selected_routes:
+                    search_res = await EvoBeamSearchEngine.search_paths(
+                        session=session,
+                        plan=plan,
+                        repository_id=repository_id,
+                        branch="main",
+                    )
+
+                    if search_res.paths:
+                        agg_res = ProofChainAggregator.aggregate_paths(
+                            paths=search_res.paths,
+                            query_text=question,
+                            temporal_intent=plan.temporal_intent,
+                            repository_id=repository_id,
+                            branch="main",
+                        )
+                        proof_chains = agg_res.chains
+                        evoreasoner_applied = len(proof_chains) > 0
+                        evoreasoner_diagnostics = {
+                            "routes_planned": len(plan.selected_routes),
+                            "paths_explored": search_res.total_paths_explored,
+                            "paths_found": len(search_res.paths),
+                            "proof_chains_aggregated": len(proof_chains),
+                            "rejected_paths": agg_res.rejected_paths_count,
+                            "deduplicated_chains": agg_res.deduplicated_chains_count,
+                            **agg_res.aggregation_diagnostics,
+                        }
+                    else:
+                        evoreasoner_diagnostics = {
+                            "routes_planned": len(plan.selected_routes),
+                            "paths_found": 0,
+                            "search_diagnostics": search_res.search_diagnostics,
+                        }
+                else:
+                    evoreasoner_diagnostics = {
+                        "routes_planned": 0,
+                        "fallback_reason": "no_routes_generated",
+                    }
+            except Exception as exc:
+                evoreasoner_applied = False
+                evoreasoner_diagnostics = {
+                    "exception_occurred": True,
+                    "error": str(exc),
+                }
+
         # 5. Context Assembly & Budgeting
-        assembled = ContextAssembler.assemble_context(ranked_candidates=ranked)
+        assembled = ContextAssembler.assemble_context(
+            ranked_candidates=ranked,
+            proof_chains=proof_chains,
+        )
 
         # 5b. Retrieve Customer Project Knowledge
         if project_id is None:
@@ -133,6 +332,14 @@ class ProjectContextEngine:
                 "candidates_expanded": len(expanded_candidates),
                 "customer_knowledge_count": len(knowledge_records),
                 "top_score": ranked[0].score if ranked else 0.0,
+                "memotime_used": memotime_success if use_memotime else False,
+                "memotime_diagnostics": memotime_diagnostics,
+                "star_rag_used": star_rag_applied if use_star_rag else False,
+                "star_rag_diagnostics": star_rag_diagnostics,
+                "evoreasoner_used": evoreasoner_applied if use_evoreasoner else False,
+                "evoreasoner_diagnostics": evoreasoner_diagnostics,
+                "proof_chains_count": len(proof_chains),
+                "synthesis_gated": answer.debug_signals.get("is_abstention", False),
             }
         )
 

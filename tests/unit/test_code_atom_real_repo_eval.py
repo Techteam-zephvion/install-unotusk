@@ -110,6 +110,10 @@ def test_embedding_provider_reality_check(real_repo_eval):
     assert emb["voyage_target_model"] == "voyage-code-2"
     assert emb["voyage_target_dimension"] == 1536
     assert "PostgreSQL 16 + pgvector" in emb["database_storage_layer"]
-    assert emb["fallback_mode_active"] is True
-    assert emb["live_credentials_available"] is False
+    if emb["is_voyage_configured"]:
+        assert emb["fallback_mode_active"] is False
+        assert emb["live_credentials_available"] is True
+    else:
+        assert emb["fallback_mode_active"] is True
+        assert emb["live_credentials_available"] is False
     assert "Qdrant discarded" in emb["external_vector_db_discarded"]

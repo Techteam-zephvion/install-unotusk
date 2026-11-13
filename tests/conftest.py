@@ -59,6 +59,7 @@ from apps.api.src.models.user import User
 
 try:
     test_engine = create_async_engine(TEST_DB_URL, poolclass=NullPool, echo=False)
+
     TestSessionLocal = async_sessionmaker(
         bind=test_engine,
         class_=AsyncSession,

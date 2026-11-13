@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import subprocess
 from datetime import datetime
 
@@ -218,3 +219,86 @@ def extract_incremental_commit_artifacts(
             artifacts.append(art)
 
     return artifacts
+
+
+def extract_diff_between_commits(
+    repo_dir: str,
+    base_commit_sha: str,
+    target_commit_sha: str,
+    file_path: str | None = None,
+) -> str:
+    """
+    Extracts unified git diff comparing base_commit_sha to target_commit_sha.
+    Optionally scoped to a specific file_path.
+    Returns empty string if commands fail or repository is unavailable.
+    """
+    if not repo_dir or not os.path.exists(repo_dir):
+        return ""
+
+    cmd = ["git", "diff", f"{base_commit_sha}..{target_commit_sha}"]
+    if file_path:
+        cmd.extend(["--", file_path])
+
+    try:
+        res = subprocess.run(
+            cmd,
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if res.returncode == 0:
+            return res.stdout
+    except Exception as e:
+        logger.warning(
+            f"Failed to extract diff between {base_commit_sha} and {target_commit_sha}: {e}"
+        )
+    return ""
+
+
+def extract_git_patch_lines(
+    repo_dir: str,
+    commit_sha: str,
+    file_path: str,
+) -> tuple[list[str], list[str], tuple[int, int] | None]:
+    """
+    Safely retrieves added lines, deleted lines, and line span for a file in commit_sha.
+    Returns (added_lines, deleted_lines, (start_line, end_line)).
+    """
+    if not repo_dir or not os.path.exists(repo_dir) or not commit_sha or not file_path:
+        return [], [], None
+
+    try:
+        res = subprocess.run(
+            ["git", "show", "--format=", "--unified=0", commit_sha, "--", file_path],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if res.returncode != 0 or not res.stdout.strip():
+            return [], [], None
+
+        added: list[str] = []
+        deleted: list[str] = []
+        start_line: int | None = None
+        end_line: int | None = None
+
+        for line in res.stdout.splitlines():
+            if line.startswith("@@"):
+                m = re.search(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+                if m:
+                    hunk_start = int(m.group(2))
+                    hunk_len = int(m.group(3)) if m.group(3) else 1
+                    if start_line is None:
+                        start_line = hunk_start
+                    end_line = hunk_start + max(0, hunk_len - 1)
+            elif line.startswith("+") and not line.startswith("+++"):
+                added.append(line[1:])
+            elif line.startswith("-") and not line.startswith("---"):
+                deleted.append(line[1:])
+
+        line_range = (start_line, end_line) if start_line is not None and end_line is not None else None
+        return added, deleted, line_range
+    except Exception:
+        return [], [], None

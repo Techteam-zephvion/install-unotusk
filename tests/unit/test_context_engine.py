@@ -18,6 +18,7 @@ from apps.api.src.services.context_engine.retriever import (
     compute_cosine_similarity,
 )
 from apps.api.src.services.llm.claude import ClaudeProvider
+from apps.api.src.services.llm.groq import GroqProvider
 
 
 def test_multi_signal_ranker_prioritizes_exact_symbol_match():
@@ -920,5 +921,172 @@ async def test_claude_and_groq_providers_with_mock_client():
         assert groq_answer.confidence == "HIGH"
         assert "TokenProvider" in groq_answer.content
         assert groq_answer.debug_signals["provider"] == "groq"
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_gate_abstains_on_empty_evidence():
+    """Verify that empty evidence triggers safe abstention without calling LLM or hallucinating."""
+    provider = ClaudeProvider(api_key=None)
+
+    answer = await provider.generate_grounded_answer(
+        question="How is Kubernetes ingress controller deployed?",
+        project_context="No specific code evidence retrieved for this query.",
+        evidence_items=[],
+        related_entities=[],
+    )
+
+    assert answer.confidence == "LOW"
+    assert answer.debug_signals.get("is_abstention") is True
+    assert answer.debug_signals.get("abstention_reason") == "INSUFFICIENT_EVIDENCE"
+    assert answer.evidence == []
+    assert "Insufficient Evidence" in answer.content
+    assert "no matching files, symbols, or dependencies were found" in answer.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_gate_abstains_on_weak_evidence():
+    """
+    Verify that weakly grounded candidate sets (e.g. relevance < 0.20 background noise)
+    trigger safe abstention and never claim the file contains relevant definitions.
+    """
+    provider = ClaudeProvider(api_key=None)
+
+    weak_evidence = [
+        {
+            "type": "chunk",
+            "file": "apps/api/src/services/code_atom/temporal.py",
+            "symbol": "classify_temporal_intent",
+            "lines": "50-75",
+            "relevance": 0.15,
+            "snippet": "def classify_temporal_intent(): pass",
+        }
+    ]
+
+    answer = await provider.generate_grounded_answer(
+        question="Explain Kubernetes Helm chart replica count configuration",
+        project_context="### [CHUNK] apps/api/src/services/code_atom/temporal.py\nRelevance Score: 0.15",
+        evidence_items=weak_evidence,
+        related_entities=["classify_temporal_intent"],
+    )
+
+    assert answer.confidence == "LOW"
+    assert answer.debug_signals.get("is_abstention") is True
+    assert answer.debug_signals.get("abstention_reason") == "INSUFFICIENT_EVIDENCE"
+    assert answer.evidence == []
+    assert "Insufficient Evidence" in answer.content
+    assert "minimum grounding threshold" in answer.content
+    # Crucial zero-hallucination check: must NOT claim temporal.py is relevant or contains logic
+    assert "Contains relevant definitions and logic associated with this query" not in answer.content
+    assert "Observed Implementation Details" not in answer.content
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_gate_preserves_grounded_evidence():
+    """Verify that strongly grounded evidence passes the gate and produces normal factual analysis."""
+    provider = ClaudeProvider(api_key=None)
+
+    grounded_evidence = [
+        {
+            "type": "symbol",
+            "file": "src/auth/service.py",
+            "symbol": "AuthService",
+            "lines": "10-45",
+            "relevance": 0.88,
+            "snippet": "class AuthService: def verify_token(self): pass",
+        }
+    ]
+
+    answer = await provider.generate_grounded_answer(
+        question="How does token verification work?",
+        project_context="### [SYMBOL] src/auth/service.py\nclass AuthService: def verify_token(self): pass",
+        evidence_items=grounded_evidence,
+        related_entities=["AuthService"],
+    )
+
+    assert answer.confidence == "HIGH"
+    assert answer.debug_signals.get("is_abstention") is not True
+    assert len(answer.evidence) == 1
+    assert "AuthService" in answer.content
+    assert "src/auth/service.py" in answer.content
+    assert "Observed Implementation Details" in answer.content
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_gate_preserves_customer_knowledge_when_code_evidence_weak():
+    """
+    Verify that explicit customer project knowledge prevents abstention
+    even if code candidates have weak relevance scores.
+    """
+    provider = ClaudeProvider(api_key=None)
+
+    weak_evidence = [
+        {
+            "type": "chunk",
+            "file": "apps/api/src/services/code_atom/temporal.py",
+            "lines": "50-75",
+            "relevance": 0.12,
+            "snippet": "pass",
+        }
+    ]
+
+    context_with_customer_knowledge = (
+        "<customer_project_knowledge>\n"
+        "### [CUSTOMER: Architectural Decision — Ingress Controller]\n"
+        "Content: Unotusk MVP intentionally avoids Kubernetes Helm charts in single-tenant local deployment.\n"
+        "</customer_project_knowledge>\n\n"
+        "## REPOSITORY CODE EVIDENCE\n"
+        "### [CHUNK] apps/api/src/services/code_atom/temporal.py\nRelevance Score: 0.12\n"
+    )
+
+    answer = await provider.generate_grounded_answer(
+        question="Why are Kubernetes Helm charts absent?",
+        project_context=context_with_customer_knowledge,
+        evidence_items=weak_evidence,
+        related_entities=[],
+    )
+
+    # Customer knowledge grounds the answer, so abstention does not fire
+    assert answer.debug_signals.get("is_abstention") is not True
+    assert "Unotusk MVP intentionally avoids Kubernetes Helm charts" in answer.content
+    assert "Customer Project Knowledge" in answer.content
+
+
+@pytest.mark.asyncio
+async def test_groq_and_claude_both_enforce_synthesis_gate_offline_and_mock_client():
+    """
+    Verify that both Claude and Groq providers enforce the synthesis gate and bypass API calls
+    when evidence is weak or unsupported.
+    """
+    weak_evidence = [{"type": "file", "file": "unknown.py", "lines": "1-10", "relevance": 0.14}]
+
+    claude_mock_client = MagicMock()
+    claude = ClaudeProvider(api_key="mock-claude-key")
+    claude._client = claude_mock_client
+
+    groq_mock_client = MagicMock()
+    groq = GroqProvider(api_key="mock-groq-key")
+    groq._client = groq_mock_client
+
+    ans_claude = await claude.generate_grounded_answer(
+        question="What is the legacy CORBA architecture?",
+        project_context="",
+        evidence_items=weak_evidence,
+        related_entities=[],
+    )
+    # Claude client should not be invoked on weakly grounded query (synthesis bypassed)
+    assert claude_mock_client.messages.create.call_count == 0
+    assert ans_claude.debug_signals.get("is_abstention") is True
+    assert ans_claude.confidence == "LOW"
+
+    ans_groq = await groq.generate_grounded_answer(
+        question="What is the legacy CORBA architecture?",
+        project_context="",
+        evidence_items=weak_evidence,
+        related_entities=[],
+    )
+    # Groq client should not be invoked on weakly grounded query (synthesis bypassed)
+    assert groq_mock_client.chat.completions.create.call_count == 0
+    assert ans_groq.debug_signals.get("is_abstention") is True
+    assert ans_groq.confidence == "LOW"
 
 

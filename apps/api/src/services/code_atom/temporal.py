@@ -36,10 +36,16 @@ TEMPORAL_KEYWORDS = {
     "deleted",
     "removed",
     "deprecated",
+    "introduced",
+    "introduction",
+    "initially",
+    "initial",
+    "originally",
+    "origin",
 }
 
 TEMPORAL_REGEX_PATTERNS = [
-    re.compile(r"\b(how|what)\s+(did|has|have|was|were)\s+.*?\b(change|evolve|modify|update|differ)\b", re.I),
+    re.compile(r"\b(how|what)\s+(did|has|have|was|were)\s+.*?\b(change|evolve|modify|update|differ|introduced?)\b", re.I),
     re.compile(r"\b(who|when)\s+.*?\b(changed|added|removed|deleted|created|modified|wrote|committed|introduced)\b", re.I),
     re.compile(r"\b(evolution|history|changes|commits|timeline)\s+of\b", re.I),
     re.compile(r"\bchanges\s+(in|to|for|across)\b", re.I),
@@ -53,28 +59,28 @@ TEMPORAL_REGEX_PATTERNS = [
 def classify_temporal_intent(query_text: str) -> tuple[bool, str | None, list[str]]:
     """
     Analyzes query text to detect temporal intent, intent type, and detected temporal tokens.
+    Leverages MemoTime (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
+    structured temporal intent parser while preserving the tuple interface.
     """
     if not query_text or not query_text.strip():
         return False, None, []
 
-    cleaned = query_text.strip()
-    words = re.findall(r"[A-Za-z0-9_.\-/]+", cleaned)
-    detected: list[str] = []
+    from apps.api.src.services.context_engine.memotime import MemoTimeService
 
-    for w in words:
-        clean_w = w.lower().strip(".,?!:;()[]{}'\"")
-        if clean_w in TEMPORAL_KEYWORDS:
-            detected.append(clean_w)
+    intent = MemoTimeService.parse_temporal_intent(query_text)
+    is_temporal = intent.is_temporal
+    intent_str = intent.intent_type.value if is_temporal else None
+    detected = list(intent.detected_keywords)
 
-    is_temporal = len(detected) > 0
     if not is_temporal:
+        cleaned = query_text.strip()
         for pat in TEMPORAL_REGEX_PATTERNS:
             if pat.search(cleaned):
                 is_temporal = True
+                intent_str = "EVOLUTION"
                 break
 
-    intent = "EVOLUTION" if is_temporal else None
-    return is_temporal, intent, list(dict.fromkeys(detected))
+    return is_temporal, intent_str, list(dict.fromkeys(detected))
 
 
 def parse_candidate_timestamp(cand: RetrievedCandidate) -> datetime | None:

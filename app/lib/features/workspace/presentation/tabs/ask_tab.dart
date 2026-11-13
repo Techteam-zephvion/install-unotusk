@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../domain/grounded_answer.dart';
+import '../../domain/feature_specification.dart';
 import '../../domain/project_file.dart';
 import '../../data/workspace_repository.dart';
 import '../workspace_controller.dart';
@@ -206,6 +207,87 @@ class _AskTabState extends ConsumerState<AskTab> {
 
     try {
       final repository = ref.read(workspaceRepositoryProvider);
+
+      final isBdd = text.toLowerCase().contains('bdd') ||
+          text.toLowerCase().contains('spec') ||
+          text.toLowerCase().contains('contract');
+
+      if (isBdd) {
+        try {
+          final FeatureSpecification spec = await repository.generateFeatureSpecification(
+            widget.projectId,
+            text,
+            thinkingTier: activeTier.name,
+          );
+          if (!mounted) return;
+
+          final bddData = spec.toBDDContractData(tier: '${activeTier.name.toUpperCase()} TIER');
+
+          final contentBuffer = StringBuffer();
+          contentBuffer.writeln('### ${spec.featureName}\n');
+          contentBuffer.writeln('${spec.intent}\n');
+          if (spec.warning != null && spec.warning!.isNotEmpty) {
+            contentBuffer.writeln('> ⚠️ **Grounding Notice**: ${spec.warning}\n');
+          }
+          if (spec.confirmedCodeFacts.isNotEmpty) {
+            contentBuffer.writeln('**Confirmed Code Facts:**');
+            for (final fact in spec.confirmedCodeFacts) {
+              contentBuffer.writeln('- $fact');
+            }
+            contentBuffer.writeln();
+          }
+          if (spec.inferredRequirements.isNotEmpty) {
+            contentBuffer.writeln('**Inferred Requirements:**');
+            for (final req in spec.inferredRequirements) {
+              contentBuffer.writeln('- $req');
+            }
+            contentBuffer.writeln();
+          }
+
+          final groundedAnswer = GroundedAnswer(
+            conversationId: 'spec-${spec.projectId}',
+            messageId: 'spec-msg-${DateTime.now().millisecondsSinceEpoch}',
+            role: 'assistant',
+            content: contentBuffer.toString().trim(),
+            evidence: spec.evidence,
+            relatedEntities: spec.citedFiles,
+            confidence: spec.confidence,
+            createdAt: spec.createdAt,
+          );
+
+          final reasoningData = ReasoningData(
+            compositeScore: spec.confidence == 'HIGH' ? 0.94 : (spec.confidence == 'LOW' ? 0.40 : 0.72),
+            components: [
+              ReasoningComponent(label: 'Coverage', score: spec.confidence == 'HIGH' ? 0.96 : (spec.confidence == 'LOW' ? 0.35 : 0.70)),
+              ReasoningComponent(label: 'Directness', score: spec.confidence == 'HIGH' ? 0.92 : (spec.confidence == 'LOW' ? 0.30 : 0.68)),
+              ReasoningComponent(label: 'Recency', score: spec.hasSupersededPrecursors ? 0.40 : 0.95),
+              ReasoningComponent(label: 'Authority', score: spec.confidence == 'HIGH' ? 0.93 : 0.60),
+            ],
+            routingPath: const ['Semantic Search', 'Vector Ingestion', 'Ontology Graph', 'Synthesized Verification'],
+            ontologyEdges: spec.citedFiles,
+            citations: spec.citedFiles,
+          );
+
+          setState(() {
+            final idx = _messages.indexWhere((m) => m.id == genId);
+            if (idx != -1) {
+              _messages[idx] = ChatMessageItem(
+                id: genId,
+                kind: 'response',
+                answer: groundedAnswer,
+                bdd: bddData,
+                reasoning: reasoningData,
+              );
+            }
+            _isGenerating = false;
+          });
+          _scrollToBottom();
+          return;
+        } catch (_) {
+          // If specification endpoint fails, gracefully fall through to standard askQuestion
+        }
+      }
+
       final groundedAnswer = await repository.askQuestion(
         widget.projectId,
         text,
@@ -213,31 +295,6 @@ class _AskTabState extends ConsumerState<AskTab> {
       );
 
       if (!mounted) return;
-
-      // Construct reasoning details and BDD contract if relevant
-      final isBdd = text.toLowerCase().contains('bdd') ||
-          text.toLowerCase().contains('spec') ||
-          text.toLowerCase().contains('rate-limiter');
-
-      final bddData = isBdd
-          ? const BDDContractData(
-              given: 'A downstream client making requests to Auth endpoints with a valid API key',
-              when: 'The client exceeds 100 requests per second window threshold',
-              then: 'The rate-limiter returns HTTP 429 Too Many Requests with Retry-After header within 5ms',
-              kpi: 'Enforce latency ceiling < 5ms under load',
-              kpiTag: 'SLA TARGET',
-              kpiNote: 'p99 < 8ms under 10k RPS',
-              testCases: [
-                BDDTestCase(id: 1, desc: 'Under-quota requests succeed with HTTP 200 within 2ms'),
-                BDDTestCase(id: 2, desc: 'Burst limit triggers HTTP 429 with correct Retry-After header'),
-                BDDTestCase(id: 3, desc: 'Token bucket replenishment follows leaky bucket arithmetic'),
-              ],
-              risks: [
-                BDDRiskItem(tag: 'CONFIRMED', text: 'Redis latency spike during token bucket eviction if under memory pressure'),
-                BDDRiskItem(tag: 'INFERRED', text: 'Potential distributed clock skew across multi-region edge nodes'),
-              ],
-            )
-          : null;
 
       final reasoningData = ReasoningData(
         compositeScore: 0.94,
@@ -261,7 +318,7 @@ class _AskTabState extends ConsumerState<AskTab> {
             id: genId,
             kind: 'response',
             answer: groundedAnswer,
-            bdd: bddData,
+            bdd: null,
             reasoning: reasoningData,
           );
         }

@@ -21,6 +21,7 @@ from apps.api.src.services.code_atom.embedding import (
     embed_atomic_code_chunk,
     format_atom_code_embedding_input,
     generate_atom_code_embedding,
+    generate_code_embedding,
 )
 from apps.api.src.services.context_engine.query_analyzer import analyze_query
 from apps.api.src.services.context_engine.retriever import (
@@ -338,7 +339,7 @@ def test_8_non_atom_code_chunks_remain_valid():
 def test_9_query_and_stored_vector_dimensions_match():
     """9. Query and stored ATOM vector dimensions match (both 1536) and compute_cosine_similarity works."""
     query = "session verification override token"
-    query_vector = generate_text_embedding(query)
+    query_vector = generate_code_embedding(query, input_type="query") or generate_text_embedding(query)
     assert len(query_vector) == 1536
 
     atom_vector = generate_atom_code_embedding(

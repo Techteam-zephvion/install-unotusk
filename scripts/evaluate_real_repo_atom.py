@@ -371,6 +371,16 @@ async def run_real_repo_evaluation() -> dict[str, Any]:
     # 3. Embedding Provider Verification
     active_backend = get_code_embedding_backend()
     voyage_target = VoyageCodeEmbeddingBackend(api_key="mock_key", model="voyage-code-2")
+    try:
+        from apps.api.src.config.settings import settings
+
+        has_creds = bool(
+            (os.environ.get("VOYAGE_API_KEY") or getattr(settings, "VOYAGE_API_KEY", "") or "").strip()
+        )
+    except Exception:
+        has_creds = bool((os.environ.get("VOYAGE_API_KEY") or "").strip())
+    if active_backend.provider_name == "voyage":
+        has_creds = True
 
     embedding_verification = {
         "active_provider_name": active_backend.provider_name,
@@ -379,7 +389,7 @@ async def run_real_repo_evaluation() -> dict[str, Any]:
         "voyage_target_model": voyage_target.model_name,
         "voyage_target_dimension": voyage_target.dimension,
         "is_voyage_configured": active_backend.provider_name == "voyage",
-        "live_credentials_available": False,
+        "live_credentials_available": has_creds,
         "fallback_mode_active": isinstance(active_backend, DevelopmentCodeEmbeddingBackend),
         "database_storage_layer": "PostgreSQL 16 + pgvector CompatibleVector(1536)",
         "external_vector_db_discarded": "Qdrant discarded per Unotusk MVP specification",

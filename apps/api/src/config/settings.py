@@ -59,6 +59,43 @@ class Settings(BaseSettings):
     # Context Budget
     CONTEXT_BUDGET_TOKENS: int = Field(default=3500)
 
+    # STAR-RAG Temporal Retrieval Settings (arXiv:2510.16715: "Right Answer at the Right Time — Temporal Retrieval-Augmented Generation via Graph Summarization")
+    STAR_RAG_ENABLED: bool = Field(default=False)
+    STAR_RAG_TOP_K1: int = Field(default=10)
+    STAR_RAG_TOP_K2: int = Field(default=5)
+    STAR_RAG_PPR_ALPHA: float = Field(default=0.2)
+    STAR_RAG_PPR_EPSILON: float = Field(default=1e-6)
+    STAR_RAG_MIN_SUPPORT: int = Field(default=2)
+    STAR_RAG_MIN_ANCHOR_SCORE: float = Field(
+        default=1.0,
+        description=(
+            "Minimum anchor relevance score to gate STAR-RAG graph reasoning. "
+            "Raw unnormalized anchor relevance uses threshold 1.0 (requires at least one solid keyword/symbol anchor). "
+            "When candidates carry precomputed normalized ranker scores [0, 1], effective gate scales to min(score, 0.40). "
+            "Note: this is distinct from the candidate background score (~0.15) and the separate synthesis gate."
+        ),
+    )
+    STAR_RAG_HUB_ATTENUATION: bool = Field(default=True)
+
+    # MemoTime Temporal Retrieval Settings (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
+    MEMOTIME_ENABLED: bool = Field(default=False)
+    MEMOTIME_MAX_PROPAGATION_HOPS: int = Field(default=5)
+
+    # EvoKG Temporal Knowledge Graph Settings (arXiv:2509.15464: "EvoReasoner: Temporal Reasoning with LLMs Augmented by Evolving Knowledge Graphs")
+    EVOKG_ENABLED: bool = Field(
+        default=False,
+        description="Enable incremental EvoKG temporal triplet extraction, contradiction resolution, and persistence.",
+    )
+
+    # EvoReasoner Multi-Route Query Planner Settings (arXiv:2509.15464 §3.3)
+    EVOREASONER_ENABLED: bool = Field(
+        default=False,
+        description="Enable EvoReasoner deterministic multi-route query planning and route cost estimation.",
+    )
+    EVOREASONER_MAX_CANDIDATES: int = Field(default=20)
+    EVOREASONER_MAX_SELECTED_ROUTES: int = Field(default=3)
+    EVOREASONER_MAX_ROUTE_HOPS: int = Field(default=4)
+
     # Code-Lane Embedding Settings ('voyage' or 'development')
     EMBEDDING_PROVIDER: str = Field(default="development")
     VOYAGE_API_KEY: str | None = Field(default=None)

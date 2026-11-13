@@ -9,9 +9,12 @@ from apps.api.src.schemas.code_atom import (
     GitCommitArtifact,
     GitDiffHunk,
     GitFileDiff,
+    PropertyExclusivity,
     RelationType,
+    ScopeKeyStrategy,
     SemanticCodeFact,
     TemporalCodeRelation,
+    TemporalSupersessionPolicy,
 )
 from apps.api.src.services.code_atom.chunk_mapper import (
     generate_deterministic_chunk_id,
@@ -28,6 +31,7 @@ from apps.api.src.services.code_atom.embedding import (
     format_atom_code_embedding_input,
     generate_atom_code_embedding,
     generate_code_embedding,
+    generate_code_embeddings_batch,
     get_code_embedding_backend,
     reembed_atom_code_chunks,
 )
@@ -63,6 +67,10 @@ from apps.api.src.services.code_atom.relation_resolver import (
     TemporalRelationResolver,
     reconcile_code_relationships,
 )
+from apps.api.src.services.code_atom.taxonomy import (
+    CodeRelationTaxonomy,
+    RelationTaxonomyEntry,
+)
 from apps.api.src.services.code_atom.temporal import (
     classify_temporal_intent,
     parse_candidate_timestamp,
@@ -78,6 +86,7 @@ __all__ = [
     "CodeDecompositionResult",
     "CodeEmbeddingBackend",
     "CodeEntityResolver",
+    "CodeRelationTaxonomy",
     "DevelopmentCodeEmbeddingBackend",
     "FactConfidence",
     "FactType",
@@ -85,12 +94,16 @@ __all__ = [
     "GitDiffHunk",
     "GitFileDiff",
     "InvalidBaseCommitError",
+    "PropertyExclusivity",
+    "RelationTaxonomyEntry",
     "RelationType",
+    "ScopeKeyStrategy",
     "SemanticCodeFact",
     "SemanticFactExtractor",
     "TemporalCodeRelation",
     "TemporalRelationExtractor",
     "TemporalRelationResolver",
+    "TemporalSupersessionPolicy",
     "VoyageCodeEmbeddingBackend",
     "classify_temporal_intent",
     "deduplicate_facts",
@@ -103,6 +116,7 @@ __all__ = [
     "generate_code_atom_fingerprint",
     "generate_code_atom_id",
     "generate_code_embedding",
+    "generate_code_embeddings_batch",
     "generate_deterministic_chunk_id",
     "generate_fact_fingerprint",
     "generate_fact_id",

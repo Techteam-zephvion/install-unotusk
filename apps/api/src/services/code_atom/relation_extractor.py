@@ -59,6 +59,7 @@ def generate_relation_fingerprint(
     t_start: datetime | None = None,
     t_end: datetime | None = None,
     t_obs: datetime | None = None,
+    scope_key: str | None = None,
 ) -> str:
     """Computes a deterministic, collision-resistant fingerprint for a temporal code relation."""
     norm_subj = re.sub(r"\s+", " ", subject.strip().lower())
@@ -72,7 +73,10 @@ def generate_relation_fingerprint(
     t_e_str = t_end.isoformat() if t_end else "none"
     t_o_str = t_obs.isoformat() if t_obs else "none"
 
-    content = f"{c_sha}:{clean_path}:{norm_subj}:{norm_rel}:{norm_obj}:{t_s_str}:{t_e_str}:{t_o_str}"
+    if scope_key and scope_key not in ("default", "concurrent", "global"):
+        content = f"{c_sha}:{clean_path}:{norm_subj}:{norm_rel}:{norm_obj}:{t_s_str}:{t_e_str}:{t_o_str}:{scope_key.strip().lower()}"
+    else:
+        content = f"{c_sha}:{clean_path}:{norm_subj}:{norm_rel}:{norm_obj}:{t_s_str}:{t_e_str}:{t_o_str}"
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
@@ -137,29 +141,13 @@ def normalize_relation_name(raw: str) -> RelationType:
     """
     Normalizes arbitrary relation strings into standard affirmative RelationType enum.
     Removals/negations are affirmatively normalized (e.g. 'stops_calling' -> CALLS).
+    Leverages CodeRelationTaxonomy for EvoKG relations and aliases.
     """
-    cleaned = raw.strip().upper()
-    if cleaned in RelationType.__members__:
-        return RelationType[cleaned]
+    from apps.api.src.services.code_atom.taxonomy import CodeRelationTaxonomy
 
-    cleaned_lower = raw.strip().lower()
-
-    if any(k in cleaned_lower for k in ("call", "invoke", "dispatch")):
-        return RelationType.CALLS
-    if any(k in cleaned_lower for k in ("import", "require", "include")):
-        return RelationType.IMPORTS
-    if any(k in cleaned_lower for k in ("define", "declare", "implement")):
-        return RelationType.DEFINES
-    if any(k in cleaned_lower for k in ("inherit", "extend", "subclass", "base")):
-        return RelationType.INHERITS
-    if any(k in cleaned_lower for k in ("mutate", "update", "set_", "modify", "touch")):
-        return RelationType.MUTATES
-    if any(k in cleaned_lower for k in ("config", "setting", "env")):
-        return RelationType.CONFIGURES
-    if any(k in cleaned_lower for k in ("validat", "check", "verify", "guard")):
-        return RelationType.VALIDATES
-    if any(k in cleaned_lower for k in ("raise", "throw", "error", "except")):
-        return RelationType.RAISES
+    canon = CodeRelationTaxonomy.normalize_predicate(raw)
+    if canon is not None:
+        return canon
 
     return RelationType.REFERENCES
 

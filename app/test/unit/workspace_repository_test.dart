@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/core/network/api_client.dart';
 import 'package:app/core/storage/storage_service.dart';
 import 'package:app/features/workspace/data/workspace_repository.dart';
+import 'package:app/features/workspace/domain/feature_specification.dart';
 import 'package:app/features/workspace/domain/discovery_summary.dart';
 import 'package:app/features/workspace/domain/project_dependency.dart';
 import 'package:app/features/workspace/domain/project_file.dart';
@@ -342,6 +343,71 @@ void main() {
       );
       final hotData = mockClient.lastData as Map<String, dynamic>;
       expect(hotData['thinking_tier'], 'hot');
+    });
+
+    test('generateFeatureSpecification deserializes response and converts to BDDContractData', () async {
+      mockClient.mockResponseData = {
+        'project_id': 'proj-123',
+        'feature_name': 'Retry-After Support',
+        'intent': 'Handle HTTP 429 Retry-After headers in requests',
+        'confidence': 'HIGH',
+        'confirmed_code_facts': [
+          'Confirmed existing: HTTPAdapter handles connection retries',
+        ],
+        'inferred_requirements': [
+          'Parse Retry-After header as integer seconds or HTTP-date',
+        ],
+        'scenarios': [
+          {
+            'id': 1,
+            'title': 'Server returns 429 with Retry-After',
+            'given': 'An outgoing request receives HTTP 429',
+            'when': 'The Retry-After header is present',
+            'then': 'Wait specified duration before retrying',
+            'cited_files': ['src/requests/adapters.py'],
+            'cited_symbols': ['HTTPAdapter.send'],
+          }
+        ],
+        'evidence': [
+          {
+            'type': 'symbol',
+            'file': 'src/requests/adapters.py',
+            'symbol': 'HTTPAdapter.send',
+            'lines': '100-150',
+            'relevance': 0.95,
+            'snippet': 'def send(self, request, ...): pass',
+          }
+        ],
+        'cited_files': ['src/requests/adapters.py'],
+        'cited_symbols': ['HTTPAdapter.send'],
+        'has_superseded_precursors': false,
+        'created_at': '2026-09-12T12:00:00Z',
+      };
+
+      final FeatureSpecification spec = await repository.generateFeatureSpecification(
+        'proj-123',
+        'Add Retry-After header support',
+        thinkingTier: 'cold',
+      );
+
+      expect(mockClient.lastPath, '/projects/proj-123/spec');
+      final data = mockClient.lastData as Map<String, dynamic>;
+      expect(data['feature_request'], 'Add Retry-After header support');
+      expect(data['thinking_tier'], 'cold');
+
+      expect(spec.featureName, 'Retry-After Support');
+      expect(spec.confidence, 'HIGH');
+      expect(spec.confirmedCodeFacts.length, 1);
+      expect(spec.scenarios.length, 1);
+      expect(spec.scenarios.first.given, 'An outgoing request receives HTTP 429');
+
+      final bdd = spec.toBDDContractData(tier: 'COLD TIER');
+      expect(bdd.featureName, 'Retry-After Support');
+      expect(bdd.tier, 'COLD TIER');
+      expect(bdd.confidence, 'HIGH');
+      expect(bdd.testCases.length, 1);
+      expect(bdd.testCases.first.desc, contains('Server returns 429 with Retry-After'));
+      expect(bdd.risks.first.tag, 'CONFIRMED');
     });
   });
 }

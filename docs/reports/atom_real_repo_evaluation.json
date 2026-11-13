@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-14T10:05:09.702640+00:00",
+  "timestamp": "2026-11-13T09:23:16.815337+00:00",
   "evaluation_scope": "Real-Repository Git Commits & End-to-End Code Retrieval (Phase 14)",
   "dataset_summary": {
     "total_cases": 10,
@@ -46,11 +46,11 @@
       "relation_jaccard": 1.0
     },
     "latency_ms": {
-      "decomposition_mean_ms": 1.37,
-      "resolution_mean_ms": 0.12,
-      "total_mean_ms": 1.49,
-      "min_ms": 0.29,
-      "max_ms": 6.41
+      "decomposition_mean_ms": 2.31,
+      "resolution_mean_ms": 0.14,
+      "total_mean_ms": 2.46,
+      "min_ms": 0.48,
+      "max_ms": 14.53
     }
   },
   "retrieval_evaluation": {
@@ -74,10 +74,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "OrchestratorService (MODIFY)",
         "top_1_path": "apps/api/src/services/orchestrator_service.py",
-        "total_ranked_candidates": 11,
+        "total_ranked_candidates": 20,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15610
+        "assembled_chars": 15832
       },
       {
         "case_id": "real_02_removal",
@@ -90,10 +90,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ProjectService (MODIFY)",
         "top_1_path": "apps/api/src/services/project_service.py",
-        "total_ranked_candidates": 40,
+        "total_ranked_candidates": 28,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15967
+        "assembled_chars": 14609
       },
       {
         "case_id": "real_03_method_replacement",
@@ -106,10 +106,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "_MermaidFullscreenDialogState (MODIFY)",
         "top_1_path": "app/lib/widgets/mermaid_diagram.dart",
-        "total_ranked_candidates": 18,
+        "total_ranked_candidates": 19,
         "provenance_intact": true,
         "relationship_expanded": false,
-        "assembled_chars": 15842
+        "assembled_chars": 15535
       },
       {
         "case_id": "real_04_imports_refactor",
@@ -121,10 +121,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "auth_service.py (MODIFY)",
         "top_1_path": "apps/api/src/services/auth_service.py",
-        "total_ranked_candidates": 23,
+        "total_ranked_candidates": 24,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 14923
+        "assembled_chars": 15567
       },
       {
         "case_id": "real_05_configuration",
@@ -137,10 +137,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ApiService (MODIFY)",
         "top_1_path": "app/lib/services/api_service.dart",
-        "total_ranked_candidates": 25,
+        "total_ranked_candidates": 23,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15607
+        "assembled_chars": 14205
       },
       {
         "case_id": "real_06_admin_guard",
@@ -153,10 +153,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "AuthService (MODIFY)",
         "top_1_path": "apps/api/src/services/auth_service.py",
-        "total_ranked_candidates": 29,
+        "total_ranked_candidates": 24,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15829
+        "assembled_chars": 15041
       },
       {
         "case_id": "real_07_rbac_isolation",
@@ -169,10 +169,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ProjectService (MODIFY)",
         "top_1_path": "apps/api/src/services/project_service.py",
-        "total_ranked_candidates": 40,
+        "total_ranked_candidates": 27,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15868
+        "assembled_chars": 15583
       },
       {
         "case_id": "real_08_file_rename",
@@ -184,10 +184,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "release.yml (RENAME)",
         "top_1_path": ".github/workflows/release.yml",
-        "total_ranked_candidates": 12,
+        "total_ranked_candidates": 19,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15970
+        "assembled_chars": 15667
       },
       {
         "case_id": "real_09_pipeline_integration",
@@ -200,10 +200,10 @@
         "reciprocal_rank": 1.0,
         "top_1_candidate": "ContextAssembler (MODIFY)",
         "top_1_path": "apps/api/src/services/context_engine/assembler.py",
-        "total_ranked_candidates": 24,
+        "total_ranked_candidates": 28,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 15196
+        "assembled_chars": 15209
       },
       {
         "case_id": "real_10_scope_resolution",
@@ -219,19 +219,19 @@
         "total_ranked_candidates": 35,
         "provenance_intact": true,
         "relationship_expanded": true,
-        "assembled_chars": 14898
+        "assembled_chars": 15297
       }
     ]
   },
   "embedding_provider_verification": {
-    "active_provider_name": "development",
-    "active_model_name": "deterministic-synthesizer-1536",
+    "active_provider_name": "voyage",
+    "active_model_name": "voyage-code-2",
     "vector_dimension": 1536,
     "voyage_target_model": "voyage-code-2",
     "voyage_target_dimension": 1536,
-    "is_voyage_configured": false,
-    "live_credentials_available": false,
-    "fallback_mode_active": true,
+    "is_voyage_configured": true,
+    "live_credentials_available": true,
+    "fallback_mode_active": false,
     "database_storage_layer": "PostgreSQL 16 + pgvector CompatibleVector(1536)",
     "external_vector_db_discarded": "Qdrant discarded per Unotusk MVP specification"
   }
