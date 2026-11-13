@@ -31,7 +31,7 @@ from apps.api.src.services.code_atom.embedding import (
 from apps.api.src.services.context_engine.retriever import compute_cosine_similarity
 from tests.conftest import TestSessionLocal
 
-VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
+VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY") or getattr(settings, "VOYAGE_API_KEY", None)
 VOYAGE_MODEL = getattr(settings, "VOYAGE_MODEL", "voyage-code-2")
 EXPECTED_DIM = getattr(settings, "EMBEDDING_DIMENSION", DEFAULT_VECTOR_DIM)
 
@@ -219,11 +219,12 @@ async def test_c_live_voyage_postgres_pgvector_storage(
     )
     db_session.add(repo)
 
+    commit_sha_c = "c001voyage1234567890abcdef1234567890abc"
+    commit_msg_c = "feat(webhook): live voyage test"
     snapshot = RepositorySnapshot(
         id=uuid.uuid4(),
         repository_id=repo.id,
-        commit_sha="c001voyage1234567890abcdef1234567890abc",
-        commit_message="feat(webhook): live voyage test",
+        commit_sha=commit_sha_c,
     )
     db_session.add(snapshot)
 
@@ -250,8 +251,8 @@ async def test_c_live_voyage_postgres_pgvector_storage(
         content=sample_code,
         start_line=1,
         end_line=5,
-        commit_sha=snapshot.commit_sha,
-        commit_message=snapshot.commit_message,
+        commit_sha=commit_sha_c,
+        commit_message=commit_msg_c,
         fingerprint=fingerprint,
         provenance={"test": "voyage_live_c"},
         embedding=live_vector,
@@ -267,7 +268,7 @@ async def test_c_live_voyage_postgres_pgvector_storage(
         assert len(fetched.embedding) == EXPECTED_DIM
         assert fetched.embedding[0] == pytest.approx(live_vector[0], abs=1e-5)
         assert fetched.fingerprint == fingerprint
-        assert fetched.commit_sha == snapshot.commit_sha
+        assert fetched.commit_sha == commit_sha_c
 
     print(f"\n[LIVE VOYAGE] Test C: Successfully persisted {EXPECTED_DIM}-dim live vector into PostgreSQL")
 
@@ -349,11 +350,12 @@ def compute_mesh_normal_vectors(vertices: list[tuple[float, float, float]]) -> l
     )
     db_session.add(repo)
 
+    commit_sha_d = "d001voyage1234567890abcdef1234567890abc"
+    commit_msg_d = "feat(payment): add stripe charge processor"
     snapshot = RepositorySnapshot(
         id=uuid.uuid4(),
         repository_id=repo.id,
-        commit_sha="d001voyage1234567890abcdef1234567890abc",
-        commit_message="feat(payment): add stripe charge processor",
+        commit_sha=commit_sha_d,
     )
     db_session.add(snapshot)
 
@@ -385,8 +387,8 @@ def compute_mesh_normal_vectors(vertices: list[tuple[float, float, float]]) -> l
         content=target_code,
         start_line=1,
         end_line=10,
-        commit_sha=snapshot.commit_sha,
-        commit_message=snapshot.commit_message,
+        commit_sha=commit_sha_d,
+        commit_message=commit_msg_d,
         fingerprint=f"fp-target-{uuid.uuid4().hex}",
         provenance={"symbol_name": "process_stripe_charge"},
         embedding=target_vec,
@@ -401,8 +403,8 @@ def compute_mesh_normal_vectors(vertices: list[tuple[float, float, float]]) -> l
         content=distractor_code,
         start_line=1,
         end_line=10,
-        commit_sha=snapshot.commit_sha,
-        commit_message=snapshot.commit_message,
+        commit_sha=commit_sha_d,
+        commit_message=commit_msg_d,
         fingerprint=f"fp-distractor-{uuid.uuid4().hex}",
         provenance={"symbol_name": "compute_mesh_normal_vectors"},
         embedding=distractor_vec,
@@ -443,3 +445,51 @@ def compute_mesh_normal_vectors(vertices: list[tuple[float, float, float]]) -> l
             f"\n[LIVE VOYAGE] Test D: Top match '{top_chunk.name}' (distance: {top_dist:.4f}), "
             f"distractor '{second_chunk.name}' (distance: {second_dist:.4f})"
         )
+
+
+# ==============================================================================
+# Test E — Live batch embedding generation
+# ==============================================================================
+
+
+@pytest.mark.skipif(
+    not VOYAGE_API_KEY,
+    reason="BLOCKED -- API key not configured: Set VOYAGE_API_KEY in environment to run live Voyage embedding integration test",
+)
+def test_e_live_voyage_batch_embedding():
+    """Test E: Verify live Voyage AI batch embedding generation for multiple code snippets."""
+    _check_key_configured()
+
+    backend = VoyageCodeEmbeddingBackend(
+        api_key=VOYAGE_API_KEY,
+        model=VOYAGE_MODEL,
+        dimension=EXPECTED_DIM,
+        timeout=25.0,
+    )
+
+    batch_inputs = [
+        "def parse_json_config(path: str) -> dict: return json.load(open(path))",
+        "def format_currency_amount(val: float) -> str: return f'${val:.2f}'",
+        "",  # blank item should yield None
+        "def send_sns_notification(topic: str, msg: str) -> bool: return sns.publish(topic, msg)",
+    ]
+
+    start_time = time.perf_counter()
+    vectors = backend.generate_embeddings_batch(batch_inputs, input_type="document")
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    assert len(vectors) == 4, f"Expected 4 results for 4 inputs, got {len(vectors)}"
+    assert vectors[0] is not None and len(vectors[0]) == EXPECTED_DIM
+    assert vectors[1] is not None and len(vectors[1]) == EXPECTED_DIM
+    assert vectors[2] is None, "Blank input in batch should evaluate to None"
+    assert vectors[3] is not None and len(vectors[3]) == EXPECTED_DIM
+
+    for idx in (0, 1, 3):
+        vec = vectors[idx]
+        assert all(isinstance(x, float) for x in vec)
+        assert all(not (math.isnan(x) or math.isinf(x)) for x in vec)
+        l2_norm = sum(x * x for x in vec) ** 0.5
+        assert abs(l2_norm - 1.0) < 0.05
+
+    print(f"\n[LIVE VOYAGE] Test E: Batch embeddings (3 valid + 1 blank) generated in {elapsed_ms:.2f} ms")
+

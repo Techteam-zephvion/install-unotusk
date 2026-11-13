@@ -59,6 +59,22 @@ class CodeEmbeddingBackend(ABC):
         """Convenience alias for generate_embedding."""
         return self.generate_embedding(text, input_type=input_type)
 
+    def generate_embeddings_batch(
+        self,
+        texts: list[str],
+        input_type: str | None = None,
+    ) -> list[list[float] | None]:
+        """Generates embedding vectors for a batch of texts or code snippets."""
+        return [self.generate_embedding(t, input_type=input_type) for t in texts]
+
+    def embed_batch(
+        self,
+        texts: list[str],
+        input_type: str | None = None,
+    ) -> list[list[float] | None]:
+        """Convenience alias for generate_embeddings_batch."""
+        return self.generate_embeddings_batch(texts, input_type=input_type)
+
 
 class DevelopmentCodeEmbeddingBackend(CodeEmbeddingBackend):
     """
@@ -129,159 +145,199 @@ class VoyageCodeEmbeddingBackend(CodeEmbeddingBackend):
             return text
         return text.replace(self.api_key, "[REDACTED]")
 
-    def generate_embedding(
+    def generate_embeddings_batch(
         self,
-        text: str,
+        texts: list[str],
         input_type: str | None = None,
-    ) -> list[float] | None:
-        if not text or not text.strip():
-            return None
+    ) -> list[list[float] | None]:
+        """
+        Generates embedding vectors for multiple texts via Voyage REST API using batching.
+        Respects Voyage API limit of up to 128 items per request.
+        Empty or whitespace-only inputs receive None without making API calls.
+        """
+        if not texts:
+            return []
 
-        clean_input = text.strip()
+        results: list[list[float] | None] = [None] * len(texts)
+        valid_indices: list[int] = []
+        valid_texts: list[str] = []
+
+        for idx, text in enumerate(texts):
+            if text and isinstance(text, str) and text.strip():
+                valid_indices.append(idx)
+                valid_texts.append(text.strip())
+
+        if not valid_texts:
+            return results
+
         effective_input_type = "query" if input_type == "query" else "document"
-
         url = "https://api.voyageai.com/v1/embeddings"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-        payload = {
-            "input": [clean_input],
-            "model": self.model_name,
-            "input_type": effective_input_type,
-        }
 
-        attempts = 0
-        max_attempts = 1 + self.max_retries
+        batch_chunk_size = 128
+        for batch_start in range(0, len(valid_texts), batch_chunk_size):
+            chunk_texts = valid_texts[batch_start : batch_start + batch_chunk_size]
+            chunk_indices = valid_indices[batch_start : batch_start + batch_chunk_size]
 
-        while attempts < max_attempts:
-            attempts += 1
-            try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    resp = client.post(url, json=payload, headers=headers)
+            payload = {
+                "input": chunk_texts,
+                "model": self.model_name,
+                "input_type": effective_input_type,
+            }
 
-                    if resp.status_code == 200:
-                        try:
-                            data = resp.json()
-                        except Exception as json_err:
-                            logger.warning(
-                                "Voyage AI returned invalid JSON payload: %s",
-                                self._redact_key(str(json_err)),
-                            )
-                            return None
+            attempts = 0
+            max_attempts = 1 + self.max_retries
 
-                        raw_data = data.get("data", [])
-                        if not isinstance(raw_data, list) or not raw_data or "embedding" not in raw_data[0]:
-                            logger.warning("Voyage AI response missing embedding data field")
-                            return None
+            while attempts < max_attempts:
+                attempts += 1
+                try:
+                    with httpx.Client(timeout=self.timeout) as client:
+                        resp = client.post(url, json=payload, headers=headers)
 
-                        # Model agreement check (warn on mismatch)
-                        returned_model = data.get("model")
-                        if returned_model and not (
-                            returned_model.startswith(self.model_name)
-                            or self.model_name.startswith(returned_model)
-                        ):
-                            logger.warning(
-                                "Voyage AI model discrepancy: requested '%s', received '%s'",
-                                self.model_name,
-                                returned_model,
-                            )
-
-                        vec = raw_data[0]["embedding"]
-                        if not isinstance(vec, list) or len(vec) != self.dimension:
-                            logger.warning(
-                                "Voyage AI dimension mismatch: expected %d, got %s",
-                                self.dimension,
-                                len(vec) if isinstance(vec, list) else type(vec),
-                            )
-                            return None
-
-                        # Numeric & finite validation (reject NaN, Inf, non-numeric)
-                        clean_vec: list[float] = []
-                        for x in vec:
+                        if resp.status_code == 200:
                             try:
-                                f_val = float(x)
-                                if math.isnan(f_val) or math.isinf(f_val):
-                                    logger.warning("Voyage AI returned non-finite embedding element (NaN/Inf)")
-                                    return None
-                                clean_vec.append(round(f_val, 6))
-                            except (TypeError, ValueError):
-                                logger.warning("Voyage AI returned non-numeric embedding element: %s", type(x))
-                                return None
+                                data = resp.json()
+                            except Exception as json_err:
+                                logger.warning(
+                                    "Voyage AI returned invalid JSON payload: %s",
+                                    self._redact_key(str(json_err)),
+                                )
+                                break
 
-                        return clean_vec
+                            raw_data = data.get("data", [])
+                            if not isinstance(raw_data, list):
+                                logger.warning("Voyage AI response missing embedding data field")
+                                break
 
-                    # Handle HTTP Status Errors
-                    if resp.status_code in (401, 403):
+                            returned_model = data.get("model")
+                            if returned_model and not (
+                                returned_model.startswith(self.model_name)
+                                or self.model_name.startswith(returned_model)
+                            ):
+                                logger.warning(
+                                    "Voyage AI model discrepancy: requested '%s', received '%s'",
+                                    self.model_name,
+                                    returned_model,
+                                )
+
+                            sorted_items = sorted(
+                                [item for item in raw_data if isinstance(item, dict) and "embedding" in item],
+                                key=lambda x: x.get("index", 0),
+                            )
+
+                            for sub_idx, item in enumerate(sorted_items):
+                                if sub_idx >= len(chunk_indices):
+                                    break
+                                vec = item.get("embedding")
+                                if not isinstance(vec, list) or len(vec) != self.dimension:
+                                    logger.warning(
+                                        "Voyage AI dimension mismatch: expected %d, got %s",
+                                        self.dimension,
+                                        len(vec) if isinstance(vec, list) else type(vec),
+                                    )
+                                    continue
+
+                                clean_vec: list[float] = []
+                                valid_numeric = True
+                                for x in vec:
+                                    try:
+                                        f_val = float(x)
+                                        if math.isnan(f_val) or math.isinf(f_val):
+                                            valid_numeric = False
+                                            break
+                                        clean_vec.append(round(f_val, 6))
+                                    except (TypeError, ValueError):
+                                        valid_numeric = False
+                                        break
+
+                                if valid_numeric:
+                                    results[chunk_indices[sub_idx]] = clean_vec
+
+                            break  # Batch chunk completed successfully
+
+                        if resp.status_code in (401, 403):
+                            logger.warning(
+                                "Voyage AI authentication failure (%d): Invalid or unauthorized credentials.",
+                                resp.status_code,
+                            )
+                            return results  # Permanent failure, do not retry
+
+                        if resp.status_code == 429:
+                            logger.warning(
+                                "Voyage AI rate limit reached (429) on attempt %d/%d.",
+                                attempts,
+                                max_attempts,
+                            )
+                            if attempts < max_attempts:
+                                time.sleep(0.5 * (2 ** (attempts - 1)))
+                                continue
+                            break
+
+                        if resp.status_code >= 500:
+                            logger.warning(
+                                "Voyage AI server error (%d) on attempt %d/%d: %s",
+                                resp.status_code,
+                                attempts,
+                                max_attempts,
+                                self._redact_key(resp.text[:200]),
+                            )
+                            if attempts < max_attempts:
+                                time.sleep(0.5 * (2 ** (attempts - 1)))
+                                continue
+                            break
+
                         logger.warning(
-                            "Voyage AI authentication failure (%d): Invalid or unauthorized credentials.",
+                            "Voyage AI unexpected status code (%d): %s",
                             resp.status_code,
-                        )
-                        return None  # Permanent auth failure, do not retry
-
-                    if resp.status_code == 429:
-                        logger.warning(
-                            "Voyage AI rate limit reached (429) on attempt %d/%d.",
-                            attempts,
-                            max_attempts,
-                        )
-                        if attempts < max_attempts:
-                            time.sleep(0.5 * (2 ** (attempts - 1)))
-                            continue
-                        return None
-
-                    if resp.status_code >= 500:
-                        logger.warning(
-                            "Voyage AI server error (%d) on attempt %d/%d: %s",
-                            resp.status_code,
-                            attempts,
-                            max_attempts,
                             self._redact_key(resp.text[:200]),
                         )
-                        if attempts < max_attempts:
-                            time.sleep(0.5 * (2 ** (attempts - 1)))
-                            continue
-                        return None
+                        break
 
+                except httpx.TimeoutException:
                     logger.warning(
-                        "Voyage AI unexpected status code (%d): %s",
-                        resp.status_code,
-                        self._redact_key(resp.text[:200]),
+                        "Voyage AI request timed out after %.1f seconds on attempt %d/%d.",
+                        self.timeout,
+                        attempts,
+                        max_attempts,
                     )
-                    return None
+                    if attempts < max_attempts:
+                        time.sleep(0.5 * (2 ** (attempts - 1)))
+                        continue
+                    break
 
-            except httpx.TimeoutException:
-                logger.warning(
-                    "Voyage AI request timed out after %.1f seconds on attempt %d/%d.",
-                    self.timeout,
-                    attempts,
-                    max_attempts,
-                )
-                if attempts < max_attempts:
-                    time.sleep(0.5 * (2 ** (attempts - 1)))
-                    continue
-                return None
+                except httpx.RequestError as req_err:
+                    logger.warning(
+                        "Voyage AI network request error on attempt %d/%d: %s",
+                        attempts,
+                        max_attempts,
+                        self._redact_key(str(req_err)),
+                    )
+                    if attempts < max_attempts:
+                        time.sleep(0.5 * (2 ** (attempts - 1)))
+                        continue
+                    break
 
-            except httpx.RequestError as req_err:
-                logger.warning(
-                    "Voyage AI network request error on attempt %d/%d: %s",
-                    attempts,
-                    max_attempts,
-                    self._redact_key(str(req_err)),
-                )
-                if attempts < max_attempts:
-                    time.sleep(0.5 * (2 ** (attempts - 1)))
-                    continue
-                return None
+                except Exception as exc:
+                    logger.warning(
+                        "Unexpected error during Voyage AI embedding generation: %s",
+                        self._redact_key(str(exc)),
+                    )
+                    break
 
-            except Exception as exc:
-                logger.warning(
-                    "Unexpected error during Voyage AI embedding generation: %s",
-                    self._redact_key(str(exc)),
-                )
-                return None
+        return results
 
-        return None
+    def generate_embedding(
+        self,
+        text: str,
+        input_type: str | None = None,
+    ) -> list[float] | None:
+        if not text or not isinstance(text, str) or not text.strip():
+            return None
+        res = self.generate_embeddings_batch([text], input_type=input_type)
+        return res[0] if res else None
 
 
 def get_code_embedding_backend() -> CodeEmbeddingBackend:
@@ -363,6 +419,38 @@ def generate_code_embedding(
     except Exception as exc:
         logger.warning(f"Failed to generate code embedding: {exc}", exc_info=True)
         return None
+
+
+def generate_code_embeddings_batch(
+    texts: list[str],
+    dim: int = DEFAULT_VECTOR_DIM,
+    input_type: str | None = None,
+    backend: CodeEmbeddingBackend | None = None,
+) -> list[list[float] | None]:
+    """
+    Provider-independent Code-Lane batch embedding interface:
+        generate_code_embeddings_batch(texts) -> list of vectors
+
+    Guarantees:
+    - Decoupled from provider-specific implementation details.
+    - Validates returned vector dimensions match dim.
+    - Gracefully isolates errors, populating None for failed vectors without corrupting caller data.
+    """
+    if not texts:
+        return []
+    active_backend = backend or get_code_embedding_backend()
+    try:
+        raw_vecs = active_backend.generate_embeddings_batch(texts, input_type=input_type)
+        clean_results: list[list[float] | None] = []
+        for vec in raw_vecs:
+            if vec is None or not isinstance(vec, list) or len(vec) != dim:
+                clean_results.append(None)
+            else:
+                clean_results.append(vec)
+        return clean_results
+    except Exception as exc:
+        logger.warning(f"Failed to generate batch code embeddings: {exc}", exc_info=True)
+        return [None] * len(texts)
 
 
 def format_atom_code_embedding_input(
@@ -498,32 +586,38 @@ async def reembed_atom_code_chunks(
     active_backend = backend or get_code_embedding_backend()
     reembedded_count = 0
 
-    for i, chunk in enumerate(atom_chunks):
-        resolved_symbol_name = None
-        if chunk.provenance and isinstance(chunk.provenance, dict):
-            resolved_symbol_name = chunk.provenance.get("symbol_name")
+    for batch_start in range(0, len(atom_chunks), batch_size):
+        chunk_slice = atom_chunks[batch_start : batch_start + batch_size]
+        texts_to_embed: list[str] = []
+        valid_chunk_targets: list[CodeChunk] = []
 
-        emb_text = format_atom_code_embedding_input(
-            commit_message=chunk.commit_message,
-            content=chunk.content,
-            file_path=chunk.path,
-            symbol_name=resolved_symbol_name,
-        )
-        if not emb_text.strip():
-            continue
+        for chunk in chunk_slice:
+            resolved_symbol_name = None
+            if chunk.provenance and isinstance(chunk.provenance, dict):
+                resolved_symbol_name = chunk.provenance.get("symbol_name")
 
-        new_vector = generate_code_embedding(
-            emb_text,
-            dim=DEFAULT_VECTOR_DIM,
-            input_type="document",
-            backend=active_backend,
-        )
-        if new_vector is not None:
-            chunk.embedding = new_vector
-            reembedded_count += 1
+            emb_text = format_atom_code_embedding_input(
+                commit_message=chunk.commit_message,
+                content=chunk.content,
+                file_path=chunk.path,
+                symbol_name=resolved_symbol_name,
+            )
+            if emb_text.strip():
+                texts_to_embed.append(emb_text)
+                valid_chunk_targets.append(chunk)
 
-        if (i + 1) % batch_size == 0:
-            await session.flush()
+        if texts_to_embed:
+            vectors = generate_code_embeddings_batch(
+                texts_to_embed,
+                dim=DEFAULT_VECTOR_DIM,
+                input_type="document",
+                backend=active_backend,
+            )
+            for target_chunk, vec in zip(valid_chunk_targets, vectors, strict=False):
+                if vec is not None:
+                    target_chunk.embedding = vec
+                    reembedded_count += 1
 
-    await session.flush()
+        await session.flush()
+
     return reembedded_count

@@ -31,6 +31,7 @@ from apps.api.src.services.code_atom.embedding import (
     format_atom_code_embedding_input,
     generate_atom_code_embedding,
     generate_code_embedding,
+    generate_code_embeddings_batch,
     get_code_embedding_backend,
     reembed_atom_code_chunks,
 )
@@ -115,6 +116,7 @@ __all__ = [
     "generate_code_atom_fingerprint",
     "generate_code_atom_id",
     "generate_code_embedding",
+    "generate_code_embeddings_batch",
     "generate_deterministic_chunk_id",
     "generate_fact_fingerprint",
     "generate_fact_id",

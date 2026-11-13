@@ -376,3 +376,76 @@ def test_development_backend_explicit_identification():
     vec = backend.generate_embedding("def test(): pass")
     assert vec is not None
     assert len(vec) == 1536
+
+
+# ==============================================================================
+# 6. Batch Embedding Support
+# ==============================================================================
+
+
+def test_voyage_batch_embedding_success():
+    """VoyageCodeEmbeddingBackend supports batch requests for multiple texts."""
+    backend = VoyageCodeEmbeddingBackend(api_key=FAKE_API_KEY)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "object": "list",
+        "data": [
+            {"embedding": [0.01] * 1536, "index": 0},
+            {"embedding": [0.02] * 1536, "index": 1},
+        ],
+        "model": "voyage-code-2",
+    }
+
+    with patch("httpx.Client.post", return_value=mock_resp) as mock_post:
+        results = backend.generate_embeddings_batch(["def func1(): pass", "def func2(): pass"])
+        assert len(results) == 2
+        assert results[0] is not None and len(results[0]) == 1536
+        assert results[1] is not None and len(results[1]) == 1536
+        assert results[0][0] == 0.01
+        assert results[1][0] == 0.02
+
+        mock_post.assert_called_once()
+        kwargs = mock_post.call_args[1]
+        assert kwargs["json"]["input"] == ["def func1(): pass", "def func2(): pass"]
+
+
+def test_voyage_batch_embedding_mixed_empty_and_valid():
+    """Empty or blank items in a batch receive None and are filtered from API call."""
+    backend = VoyageCodeEmbeddingBackend(api_key=FAKE_API_KEY)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "object": "list",
+        "data": [
+            {"embedding": [0.05] * 1536, "index": 0},
+        ],
+        "model": "voyage-code-2",
+    }
+
+    with patch("httpx.Client.post", return_value=mock_resp) as mock_post:
+        results = backend.generate_embeddings_batch(["", "  ", "def valid(): pass"])
+        assert len(results) == 3
+        assert results[0] is None
+        assert results[1] is None
+        assert results[2] is not None
+        assert len(results[2]) == 1536
+
+        mock_post.assert_called_once()
+        kwargs = mock_post.call_args[1]
+        assert kwargs["json"]["input"] == ["def valid(): pass"]
+
+
+def test_voyage_batch_embedding_all_empty_no_api_call():
+    """All-empty batch immediately returns all None without network calls."""
+    backend = VoyageCodeEmbeddingBackend(api_key=FAKE_API_KEY)
+
+    with patch("httpx.Client.post") as mock_post:
+        results = backend.generate_embeddings_batch(["", "   \n\t  "])
+        assert results == [None, None]
+        mock_post.assert_not_called()
+
+        assert backend.generate_embeddings_batch([]) == []
+
