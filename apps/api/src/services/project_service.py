@@ -327,10 +327,9 @@ class ProjectService:
             )
         organization_id = org_mem.organization_id
 
-        synced_ports = {s.port for s in data.servers}
         stale_slugs = {"orca", "syncguard", "unotusk-core"}
 
-        # 2. Clean up stale mock projects not in synced servers
+        # 2. Clean up stale mock projects (do NOT delete real user projects)
         existing_projects_query = (
             select(Project)
             .options(selectinload(Project.repositories))
@@ -340,7 +339,7 @@ class ProjectService:
         existing_projects = list(existing_res.scalars().all())
 
         for p in existing_projects:
-            if p.slug in stale_slugs or (p.port is not None and p.port not in synced_ports):
+            if p.slug in stale_slugs:
                 await session.delete(p)
         await session.flush()
 

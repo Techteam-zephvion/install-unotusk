@@ -626,7 +626,7 @@ class ApiService {
               if (isRunning) {
                 final currentHost = Uri.parse(ApiService.baseUrl).host;
                 final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
-                final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
+                final localRes = await _client.get(localUri, headers: _headers).timeout(const Duration(seconds: 2));
                 if (localRes.statusCode == 200) {
                   final localDecoded = jsonDecode(localRes.body);
                   List<dynamic> localList = [];
@@ -673,8 +673,32 @@ class ApiService {
               }
             } catch (_) {}
             
-            if (!mappedFromApi) {
-              // Only augment an EXISTING project that matches by name or id, NEVER resurrect a deleted server
+            if (!mappedFromApi && isRunning) {
+              bool isPortHealthy = false;
+              try {
+                final currentHost = Uri.parse(ApiService.baseUrl).host;
+                final healthUri = Uri.parse('http://$currentHost:${ls.apiPort}/health');
+                final healthRes = await _client.get(healthUri).timeout(const Duration(seconds: 2));
+                isPortHealthy = healthRes.statusCode == 200;
+              } catch (_) {}
+
+              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              if (idx != -1) {
+                final existing = projects[idx];
+                projects[idx] = existing.copyWith(
+                  port: existing.port ?? fallbackProj.port,
+                  repositoryName: existing.repositoryName ?? fallbackProj.repositoryName,
+                  upsStatus: (isPortHealthy || isRunning) ? 'READY' : existing.upsStatus,
+                  ingestionStatus: (isPortHealthy || isRunning) ? 'live' : existing.ingestionStatus,
+                );
+              } else if (isPortHealthy) {
+                // Live running server that wasn't yet returned in primary list
+                projects.add(fallbackProj.copyWith(
+                  upsStatus: 'READY',
+                  ingestionStatus: 'live',
+                ));
+              }
+            } else if (!mappedFromApi) {
               final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
               if (idx != -1) {
                 final existing = projects[idx];
