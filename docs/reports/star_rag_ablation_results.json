@@ -1,0 +1,42 @@
+{
+  "A_Baseline_ATOM": {
+    "MRR": 1.0,
+    "nDCG@3": 1.0,
+    "Precision@K": 1.0,
+    "Hit@1": 1.0,
+    "AvgLatencyMs": 0.12,
+    "NoiseSuppressedEdges": 0
+  },
+  "B_ATOM_plus_SNR": {
+    "MRR": 1.0,
+    "nDCG@3": 1.0,
+    "Precision@K": 1.0,
+    "Hit@1": 1.0,
+    "AvgLatencyMs": 1.83,
+    "NoiseSuppressedEdges": 3
+  },
+  "C_ATOM_plus_DTP": {
+    "MRR": 1.0,
+    "nDCG@3": 1.0,
+    "Precision@K": 1.0,
+    "Hit@1": 1.0,
+    "AvgLatencyMs": 0.33,
+    "NoiseSuppressedEdges": -5
+  },
+  "D_ATOM_plus_SSAF": {
+    "MRR": 1.0,
+    "nDCG@3": 1.0,
+    "Precision@K": 1.0,
+    "Hit@1": 1.0,
+    "AvgLatencyMs": 0.2,
+    "NoiseSuppressedEdges": -5
+  },
+  "E_Full_STAR_RAG": {
+    "MRR": 1.0,
+    "nDCG@3": 1.0,
+    "Precision@K": 1.0,
+    "Hit@1": 1.0,
+    "AvgLatencyMs": 1.56,
+    "NoiseSuppressedEdges": 3
+  }
+}

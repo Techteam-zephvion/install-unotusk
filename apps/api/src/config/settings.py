@@ -77,6 +77,16 @@ class Settings(BaseSettings):
     )
     STAR_RAG_HUB_ATTENUATION: bool = Field(default=True)
 
+    # Structure-Aware STAR-RAG Settings (MDPI Electronics 2026, 15(22), 5289: "STAR-RAG: Structure-Aware Graph Retrieval for Retrieval-Augmented Generation on Knowledge Graphs")
+    STRUCTURE_AWARE_STAR_RAG_ENABLED: bool = Field(default=False)
+    STRUCTURE_AWARE_SNR_ENABLED: bool = Field(default=True)
+    STRUCTURE_AWARE_DTP_ENABLED: bool = Field(default=True)
+    STRUCTURE_AWARE_SSAF_ENABLED: bool = Field(default=True)
+    STRUCTURE_AWARE_SNR_THRESHOLD: float = Field(default=0.30)
+    STRUCTURE_AWARE_DTP_MAX_DEPTH: int = Field(default=3)
+    STRUCTURE_AWARE_DTP_DECAY: float = Field(default=0.75)
+    STRUCTURE_AWARE_SSAF_CONFLICT_THRESHOLD: float = Field(default=0.40)
+
     # MemoTime Temporal Retrieval Settings (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
     MEMOTIME_ENABLED: bool = Field(default=False)
     MEMOTIME_MAX_PROPAGATION_HOPS: int = Field(default=5)

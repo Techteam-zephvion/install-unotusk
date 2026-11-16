@@ -34,6 +34,7 @@ class ProjectContextEngine:
         enable_star_rag: bool | None = None,
         enable_memotime: bool | None = None,
         enable_evoreasoner: bool | None = None,
+        enable_structure_aware_star_rag: bool | None = None,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -193,11 +194,54 @@ class ProjectContextEngine:
                     "error": str(exc),
                 }
 
-        # 4. Multi-Signal Ranking
-        ranked = MultiSignalRanker.rank_candidates(
-            candidates=expanded_candidates,
-            analyzed_query=analyzed,
+        # 4. Multi-Signal Ranking or Structure-Aware STAR-RAG
+        use_struct_star_rag = (
+            enable_structure_aware_star_rag
+            if enable_structure_aware_star_rag is not None
+            else getattr(settings, "STRUCTURE_AWARE_STAR_RAG_ENABLED", False)
         )
+        struct_star_rag_applied = False
+        struct_star_rag_diagnostics: dict[str, Any] = {}
+
+        if use_struct_star_rag:
+            try:
+                from apps.api.src.services.context_engine.star_rag_structure.service import (
+                    StructureAwareStarRagService,
+                )
+
+                ranked, star_struct_res = await StructureAwareStarRagService.run_pipeline_async(
+                    candidates=expanded_candidates,
+                    query_text=question,
+                    analyzed_query=analyzed,
+                    query_embedding=query_embedding,
+                    session=session,
+                    snapshot_id=snapshot_id,
+                    enable_snr=getattr(settings, "STRUCTURE_AWARE_SNR_ENABLED", True),
+                    enable_dtp=getattr(settings, "STRUCTURE_AWARE_DTP_ENABLED", True),
+                    enable_ssaf=getattr(settings, "STRUCTURE_AWARE_SSAF_ENABLED", True),
+                )
+                struct_star_rag_applied = not star_struct_res.is_fallback
+                struct_star_rag_diagnostics = {
+                    "is_fallback": star_struct_res.is_fallback,
+                    "fallback_reason": star_struct_res.fallback_reason,
+                    **star_struct_res.diagnostics,
+                }
+            except Exception as exc:
+                struct_star_rag_applied = False
+                struct_star_rag_diagnostics = {
+                    "exception_occurred": True,
+                    "is_fallback": True,
+                    "error": str(exc),
+                }
+                ranked = MultiSignalRanker.rank_candidates(
+                    candidates=expanded_candidates,
+                    analyzed_query=analyzed,
+                )
+        else:
+            ranked = MultiSignalRanker.rank_candidates(
+                candidates=expanded_candidates,
+                analyzed_query=analyzed,
+            )
 
         # 4b. EvoReasoner Multi-Route Planning, Beam Search & Proof-Chain Aggregation (arXiv:2509.15464)
         use_evoreasoner = (
@@ -336,6 +380,10 @@ class ProjectContextEngine:
                 "memotime_diagnostics": memotime_diagnostics,
                 "star_rag_used": star_rag_applied if use_star_rag else False,
                 "star_rag_diagnostics": star_rag_diagnostics,
+                "structure_aware_star_rag_used": (
+                    struct_star_rag_applied if use_struct_star_rag else False
+                ),
+                "structure_aware_star_rag_diagnostics": struct_star_rag_diagnostics,
                 "evoreasoner_used": evoreasoner_applied if use_evoreasoner else False,
                 "evoreasoner_diagnostics": evoreasoner_diagnostics,
                 "proof_chains_count": len(proof_chains),
