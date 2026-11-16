@@ -171,79 +171,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
-
-                    // 4 Quick Prompt Cards Grid
-                    LayoutBuilder(
-                      builder: (context, gridConstraints) {
-                        final isWide = gridConstraints.maxWidth > 500;
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: isWide ? 2 : 1,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: isWide ? 4.7 : 4.0,
-                          ),
-                    itemCount: ChatScreen.heroCards.length,
-                    itemBuilder: (context, index) {
-                      final item = ChatScreen.heroCards[index];
-                      return InkWell(
-                        onTap: () {
-                          _inputController.text = item.title;
-                          _handleSubmit();
-                        },
-                        borderRadius: BorderRadius.circular(14),
-                        hoverColor: widget.palette.accent.withValues(alpha: 0.05),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: widget.palette.bgSurface,
-                            border: Border.all(color: widget.palette.div),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    item.tag,
-                                    style: UnoTypography.mono(
-                                      color: widget.palette.textSec,
-                                      fontSize: 10,
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                  Icon(item.icon,
-                                      size: 14,
-                                      color: widget.palette.accent
-                                          .withValues(alpha: 0.8)),
-                                ],
-                              ),
-                              Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: UnoTypography.body(
-                                  color: widget.palette.text,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                          },
-                        );
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -255,158 +182,126 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildChatStream() {
-    return Stack(
-      children: [
-        // Messages scroll area
-        Positioned.fill(
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 180),
-            itemCount: widget.messages.length,
-            itemBuilder: (context, index) {
-              final msg = widget.messages[index];
-              return Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 680),
-                  child: _buildMessageItem(msg),
-                ),
-              );
-            },
-          ),
-        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentWidth = constraints.maxWidth * 0.80;
 
-        // Floating Bottom Input with Gradient Fade
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  widget.palette.bgBase.withValues(alpha: 0.0),
-                  widget.palette.bgBase.withValues(alpha: 0.95),
-                  widget.palette.bgBase,
-                ],
-                stops: const [0.0, 0.45, 1.0],
+        return Stack(
+          children: [
+            // Messages scroll area - fitted to 80% of window width
+            Positioned.fill(
+              child: ListView.builder(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(0, 24, 0, 180),
+                itemCount: widget.messages.length,
+                itemBuilder: (context, index) {
+                  final msg = widget.messages[index];
+                  return Center(
+                    child: SizedBox(
+                      width: contentWidth,
+                      child: _buildMessageItem(msg),
+                    ),
+                  );
+                },
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-            child: Center(
+
+            // Floating Bottom Input with Gradient Fade - fitted to 80% of window width
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 680),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_showScrollToBottom)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: InkWell(
-                          onTap: () {
-                            _scrollController.animateTo(
-                              _scrollController.position.maxScrollExtent,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOut,
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: widget.palette.bgSurface,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: widget.palette.div),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      widget.palette.bgBase.withValues(alpha: 0.0),
+                      widget.palette.bgBase.withValues(alpha: 0.95),
+                      widget.palette.bgBase,
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(0, 24, 0, 16),
+                child: Center(
+                  child: SizedBox(
+                    width: contentWidth,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_showScrollToBottom)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: InkWell(
+                              onTap: () {
+                                _scrollController.animateTo(
+                                  _scrollController.position.maxScrollExtent,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: widget.palette.bgSurface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: widget.palette.div),
+                                ),
+                                child: Icon(
+                                  LucideIcons.arrowDown,
+                                  size: 16,
+                                  color: widget.palette.text,
+                                ),
+                              ),
                             ),
-                            child: Icon(
-                              LucideIcons.arrowDown,
-                              size: 16,
-                              color: widget.palette.text,
+                          ),
+                        ChatInputBox(
+                          controller: _inputController,
+                          palette: widget.palette,
+                          onSubmit: _handleSubmit,
+                          onChipSelected: (prompt) {
+                            _inputController.text = prompt;
+                            _handleSubmit();
+                          },
+                          suggestions: ChatScreen.querySuggestions,
+                          placeholder:
+                              'Ask a follow-up about decisions, commits, or tickets…',
+                        ),
+                        const SizedBox(height: 8),
+                        Opacity(
+                          opacity: 0.75,
+                          child: Text(
+                            'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
+                            textAlign: TextAlign.center,
+                            style: UnoTypography.body(
+                              color: widget.palette.textSec,
+                              fontSize: 11,
                             ),
                           ),
                         ),
-                      ),
-                    ChatInputBox(
-                      controller: _inputController,
-                      palette: widget.palette,
-                      onSubmit: _handleSubmit,
-                      onChipSelected: (prompt) {
-                        _inputController.text = prompt;
-                        _handleSubmit();
-                      },
-                      suggestions: ChatScreen.querySuggestions,
-                      placeholder:
-                          'Ask a follow-up about decisions, commits, or tickets…',
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Opacity(
-                      opacity: 0.75,
-                      child: Text(
-                        'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
-                        textAlign: TextAlign.center,
-                        style: UnoTypography.body(
-                          color: widget.palette.textSec,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
   Widget _buildMessageItem(ChatMessage msg) {
     if (msg.kind == MessageKind.query) {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 24, top: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          constraints: const BoxConstraints(maxWidth: 580),
-          decoration: BoxDecoration(
-            color: widget.palette.bgSurface,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'YOUR QUERY',
-                style: UnoTypography.mono(
-                  color: widget.palette.accent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 4),
-              MarkdownText(
-                text: msg.text ?? '',
-                palette: widget.palette,
-                selectable: true,
-                baseStyle: UnoTypography.mono(
-                  color: widget.palette.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return _UserQueryBubble(
+        text: msg.text ?? '',
+        palette: widget.palette,
       );
     }
 
@@ -423,6 +318,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (msg.kind == MessageKind.response && msg.data != null) {
       return Container(
         margin: const EdgeInsets.only(bottom: 36),
+        width: double.infinity,
         child: _ResponseCard(
           data: msg.data!,
           palette: widget.palette,
@@ -431,6 +327,202 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return const SizedBox.shrink();
+  }
+}
+
+class _UserQueryBubble extends StatefulWidget {
+  final String text;
+  final UnoPalette palette;
+
+  const _UserQueryBubble({
+    required this.text,
+    required this.palette,
+  });
+
+  @override
+  State<_UserQueryBubble> createState() => _UserQueryBubbleState();
+}
+
+class _UserQueryBubbleState extends State<_UserQueryBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
+  bool _isHovered = false;
+  bool _copied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _fadeAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    ));
+    _animController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: widget.text));
+    setState(() => _copied = true);
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true),
+            onExit: (_) => setState(() => _isHovered = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.only(bottom: 24, top: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              constraints: const BoxConstraints(maxWidth: 680),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    widget.palette.bgElevated,
+                    const Color(0xFF262422),
+                  ],
+                ),
+                border: Border.all(
+                  color: _isHovered
+                      ? widget.palette.accent.withValues(alpha: 0.5)
+                      : widget.palette.div,
+                  width: 1.2,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(6),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: _isHovered ? 0.22 : 0.10),
+                    blurRadius: _isHovered ? 16 : 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: widget.palette.accent.withValues(alpha: 0.16),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: widget.palette.accent.withValues(alpha: 0.35),
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            LucideIcons.user,
+                            size: 10,
+                            color: widget.palette.accent,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        'You',
+                        style: UnoTypography.mono(
+                          color: widget.palette.textSec,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      if (_isHovered) ...[
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: _copy,
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _copied
+                                      ? LucideIcons.check
+                                      : LucideIcons.copy,
+                                  size: 11,
+                                  color: _copied
+                                      ? widget.palette.live
+                                      : widget.palette.textSec,
+                                ),
+                                if (_copied) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Copied',
+                                    style: UnoTypography.mono(
+                                      color: widget.palette.live,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  MarkdownText(
+                    text: widget.text,
+                    palette: widget.palette,
+                    selectable: true,
+                    baseStyle: UnoTypography.body(
+                      color: widget.palette.text,
+                      fontSize: 14.5,
+                      height: 1.5,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

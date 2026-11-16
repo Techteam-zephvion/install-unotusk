@@ -49,6 +49,11 @@ class ServerManagerController extends StateNotifier<ServerManagerState> {
     try {
       final servers = await registry.listServers();
       final updatedServers = await Future.wait(servers.map(_updateServerStatus));
+      for (final s in updatedServers) {
+        if (s.lastKnownState != ServerState.unknown) {
+          await registry.saveServer(s);
+        }
+      }
       state = state.copyWith(isLoading: false, servers: updatedServers);
       _syncToControlPlane(updatedServers);
     } catch (e) {

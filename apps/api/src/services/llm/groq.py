@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -117,25 +118,40 @@ class GroqProvider(LLMProvider):
                 )
                 messages.append({"role": "user", "content": user_prompt})
 
-                response = await self._client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    max_tokens=1500,
-                    temperature=0.1,
-                    reasoning_effort=policy.groq_reasoning_effort,
-                    reasoning_format=policy.groq_reasoning_format,
-                )
+                max_retries = 2
+                response = None
+                for attempt in range(max_retries + 1):
+                    try:
+                        response = await self._client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            max_tokens=750,
+                            temperature=0.1,
+                            reasoning_effort=policy.groq_reasoning_effort,
+                            reasoning_format=policy.groq_reasoning_format,
+                        )
+                        break
+                    except Exception as err:
+                        err_str = str(err)
+                        if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
+                            wait_sec = 3 * (attempt + 1)
+                            logger.warning(
+                                f"Groq 429 rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{max_retries})..."
+                            )
+                            await asyncio.sleep(wait_sec)
+                            continue
+                        raise
 
                 content = (
                     response.choices[0].message.content
-                    if response.choices and response.choices[0].message.content
+                    if response and response.choices and response.choices[0].message.content
                     else "No response generated."
                 )
                 prompt_tokens = (
-                    response.usage.prompt_tokens if response.usage else len(project_context) // 4
+                    response.usage.prompt_tokens if response and response.usage else len(project_context) // 4
                 )
                 completion_tokens = (
-                    response.usage.completion_tokens if response.usage else len(content) // 4
+                    response.usage.completion_tokens if response and response.usage else len(content) // 4
                 )
 
                 return GroundedAnswer(
@@ -158,6 +174,9 @@ class GroqProvider(LLMProvider):
                     f"Groq API call failed: {e}. Falling back to deterministic synthesis.",
                     exc_info=True,
                 )
+                last_error_reason = str(e)
+        else:
+            last_error_reason = "No API key configured"
 
         # Deterministic offline synthesis fallback (for tests, CI, or when API key is not configured)
         fallback_content = self._generate_offline_grounded_answer(
@@ -167,6 +186,7 @@ class GroqProvider(LLMProvider):
             project_context=project_context,
             confidence=confidence,
             policy=policy,
+            error_reason=last_error_reason,
         )
 
         return GroundedAnswer(
@@ -180,6 +200,7 @@ class GroqProvider(LLMProvider):
                 "thinking_tier": policy.tier.value,
                 "reasoning_effort": policy.groq_reasoning_effort,
                 "evidence_count": len(evidence_items),
+                "error_reason": last_error_reason,
             },
         )
 
@@ -191,6 +212,7 @@ class GroqProvider(LLMProvider):
         project_context: str,
         confidence: str,
         policy: ThinkingPolicy | None = None,
+        error_reason: str | None = None,
     ) -> str:
         customer_notes = extract_customer_notes(project_context)
 
@@ -241,10 +263,19 @@ class GroqProvider(LLMProvider):
         )
         symbols = [e["symbol"] for e in top_evidence if e.get("symbol")]
 
+        prefix = ""
+        if error_reason:
+            if "429" in error_reason or "rate_limit" in error_reason.lower():
+                prefix = "> [!WARNING]\n> **Groq Rate Limit**: Free-tier TPM limit reached. Displaying grounded context fallback. Wait ~30s for the rate-limit window to reset.\n\n"
+            elif "404" in error_reason or "model_not_found" in error_reason.lower():
+                prefix = f"> [!WARNING]\n> **Model Notice**: The model is not accessible on your API key ({error_reason[:80]}). Displaying grounded context fallback.\n\n"
+            elif error_reason != "No API key configured":
+                prefix = f"> [!NOTE]\n> **Offline Synthesis Fallback**: {error_reason[:100]}\n\n"
+
         # Fast/Lightest synthesis for HOT tier
         if policy and policy.tier == ThinkingTier.HOT:
             hot_lines = [
-                f"### Quick Summary: {question}\n",
+                f"{prefix}### Quick Summary: {question}\n",
                 f"Direct answer based on {len(top_evidence)} primary evidence sources:",
             ]
             if files:
@@ -261,7 +292,7 @@ class GroqProvider(LLMProvider):
             return "\n".join(hot_lines)
 
         lines = [
-            f"### Project Analysis: {question}\n",
+            f"{prefix}### Project Analysis: {question}\n",
             "Based on the indexed project context, the relevant architecture and implementation details are identified below:\n",
         ]
 
@@ -312,18 +343,29 @@ class GroqProvider(LLMProvider):
         if not self._client:
             return {}
         import json
-        try:
-            response = await self._client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format={"type": "json_object"},
-                max_tokens=1024,
-            )
-            content = response.choices[0].message.content
-            return json.loads(content)
-        except Exception as e:
-            logger.error(f"Groq generate_json error: {e}")
-            return {}
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                response = await self._client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    max_tokens=500,
+                )
+                content = response.choices[0].message.content
+                return json.loads(content)
+            except Exception as e:
+                err_str = str(e)
+                if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
+                    wait_sec = 3 * (attempt + 1)
+                    logger.warning(
+                        f"Groq generate_json 429 rate limit hit, retrying in {wait_sec}s..."
+                    )
+                    await asyncio.sleep(wait_sec)
+                    continue
+                logger.error(f"Groq generate_json error: {e}")
+                return {}
+        return {}

@@ -31,7 +31,7 @@ PostgreSQL 16 + pgvector         Redis 7 + Background Worker
 - **Backend API (`apps/api/`)**: FastAPI Python 3.12 async backend providing REST endpoints for auth, projects, repository ingestion, discovery, grounded ask, reports, and knowledge management.
 - **Worker (`services/workers/`)**: Lightweight Redis task consumer executing repository ingestion, discovery analysis, and report generation asynchronously.
 - **Database**: PostgreSQL 16 with `pgvector` extension.
-- **LLM Grounding**: Multi-provider (`apps/api/src/services/llm/`): Groq (`qwen/qwen3.8-27b` default) or Claude 3.5 Sonnet, with deterministic offline synthesizer fallback for zero-hallucination testing and offline environments.
+- **LLM Grounding**: Multi-provider (`apps/api/src/services/llm/`): Groq (`llama-3.1-8b-instant` default) or Claude 3.5 Sonnet, with deterministic offline synthesizer fallback for zero-hallucination testing and offline environments.
 
 ## 2. Explicitly Out of Scope for MVP
 

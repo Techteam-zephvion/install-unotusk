@@ -160,7 +160,7 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
                           style: AppTextStyles.labelOf(context).copyWith(color: palette.textSec),
                         ),
                         _buildProviderChip(
-                          label: 'Groq (Llama 3.3)',
+                          label: 'Groq (Qwen 3.8 27B)',
                           isSelected: configState.config.llmProvider == LlmProviderType.groq,
                           onTap: () => configNotifier.updateLlmProvider(LlmProviderType.groq),
                         ),
