@@ -26,9 +26,9 @@ from apps.api.src.services.code_atom import (
     InvalidBaseCommitError,
     extract_git_commit_artifact,
     extract_incremental_commit_artifacts,
+    generate_atom_code_embedding,
     resolve_and_map_atomic_changes,
 )
-from apps.api.src.services.context_engine.retriever import generate_text_embedding
 from apps.api.src.services.github_client import GitHubClient
 from apps.api.src.services.parser.dependency_extractor import (
     ExtractedDependency,
@@ -273,6 +273,12 @@ class IngestionService:
                                         sym.start_line - 1 : min(sym.end_line, len(content_lines))
                                     ]
                                     sym_chunk_content = _clean_null("\n".join(sym_lines)) or ""
+                                    sym_embedding = generate_atom_code_embedding(
+                                        commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                        content=sym_chunk_content,
+                                        file_path=_clean_null(repo_file.path) or "",
+                                        symbol_name=clean_sym_name or None,
+                                    )
                                     sym_chunk = CodeChunk(
                                         id=uuid.uuid4(),
                                         snapshot_id=snapshot.id,
@@ -284,7 +290,7 @@ class IngestionService:
                                         content=sym_chunk_content,
                                         start_line=sym.start_line,
                                         end_line=sym.end_line,
-                                        embedding=generate_text_embedding(sym_chunk_content),
+                                        embedding=sym_embedding,
                                     )
                                     session.add(sym_chunk)
 
@@ -313,6 +319,12 @@ class IngestionService:
                                             )
                                         ]
                                         child_chunk_content = _clean_null("\n".join(child_lines)) or ""
+                                        child_embedding = generate_atom_code_embedding(
+                                            commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                            content=child_chunk_content,
+                                            file_path=_clean_null(repo_file.path) or "",
+                                            symbol_name=clean_child_name or None,
+                                        )
                                         child_chunk = CodeChunk(
                                             id=uuid.uuid4(),
                                             snapshot_id=snapshot.id,
@@ -324,7 +336,7 @@ class IngestionService:
                                             content=child_chunk_content,
                                             start_line=child_sym.start_line,
                                             end_line=child_sym.end_line,
-                                            embedding=generate_text_embedding(child_chunk_content),
+                                            embedding=child_embedding,
                                         )
                                         session.add(child_chunk)
 
@@ -340,6 +352,12 @@ class IngestionService:
                         lines = _clean_null(content.decode("utf-8", errors="replace")).splitlines()[:100]
                         if lines:
                             file_chunk_content = _clean_null("\n".join(lines)) or ""
+                            file_embedding = generate_atom_code_embedding(
+                                commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                content=file_chunk_content,
+                                file_path=_clean_null(repo_file.path) or "",
+                                symbol_name=None,
+                            )
                             file_chunk = CodeChunk(
                                 id=uuid.uuid4(),
                                 snapshot_id=snapshot.id,
@@ -355,7 +373,7 @@ class IngestionService:
                                 content=file_chunk_content,
                                 start_line=1,
                                 end_line=len(lines),
-                                embedding=generate_text_embedding(file_chunk_content),
+                                embedding=file_embedding,
                             )
                             session.add(file_chunk)
 
