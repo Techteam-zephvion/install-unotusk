@@ -47,6 +47,41 @@ class FunctionGraphNode:
     commit_sha: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "node_id": self.node_id,
+            "name": self.name,
+            "qualified_name": self.qualified_name,
+            "node_type": self.node_type.value if hasattr(self.node_type, "value") else str(self.node_type),
+            "file_path": self.file_path,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "file_id": str(self.file_id) if self.file_id else None,
+            "symbol_id": str(self.symbol_id) if self.symbol_id else None,
+            "signature": self.signature,
+            "content": self.content,
+            "commit_sha": self.commit_sha,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> FunctionGraphNode:
+        return cls(
+            node_id=d["node_id"],
+            name=d.get("name", ""),
+            qualified_name=d.get("qualified_name", ""),
+            node_type=GraphNodeType(d["node_type"]) if d.get("node_type") in GraphNodeType._value2member_map_ else GraphNodeType.FUNCTION,
+            file_path=d.get("file_path", ""),
+            start_line=d.get("start_line", 1),
+            end_line=d.get("end_line", 1),
+            file_id=uuid.UUID(d["file_id"]) if d.get("file_id") else None,
+            symbol_id=uuid.UUID(d["symbol_id"]) if d.get("symbol_id") else None,
+            signature=d.get("signature", ""),
+            content=d.get("content", ""),
+            commit_sha=d.get("commit_sha"),
+            metadata=d.get("metadata", {}),
+        )
+
 
 @dataclass(frozen=True)
 class FunctionGraphEdge:
@@ -61,6 +96,33 @@ class FunctionGraphEdge:
     confidence: float = 1.0
     is_uncertain: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_id": self.source_id,
+            "target_id": self.target_id,
+            "relation_type": self.relation_type.value if hasattr(self.relation_type, "value") else str(self.relation_type),
+            "line_number": self.line_number,
+            "source_file": self.source_file,
+            "target_file": self.target_file,
+            "confidence": self.confidence,
+            "is_uncertain": self.is_uncertain,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> FunctionGraphEdge:
+        return cls(
+            source_id=d["source_id"],
+            target_id=d["target_id"],
+            relation_type=GraphRelationType(d["relation_type"]) if d.get("relation_type") in GraphRelationType._value2member_map_ else GraphRelationType.REFERENCES,
+            line_number=d.get("line_number", 1),
+            source_file=d.get("source_file", ""),
+            target_file=d.get("target_file", ""),
+            confidence=d.get("confidence", 1.0),
+            is_uncertain=d.get("is_uncertain", False),
+            metadata=d.get("metadata", {}),
+        )
 
 
 @dataclass
@@ -83,6 +145,21 @@ class FunctionGraph:
         self.edges.append(edge)
         self.out_edges.setdefault(edge.source_id, []).append(edge)
         self.in_edges.setdefault(edge.target_id, []).append(edge)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "nodes": [n.to_dict() for n in self.nodes.values()],
+            "edges": [e.to_dict() for e in self.edges],
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> FunctionGraph:
+        graph = cls()
+        for nd in d.get("nodes", []):
+            graph.add_node(FunctionGraphNode.from_dict(nd))
+        for ed in d.get("edges", []):
+            graph.add_edge(FunctionGraphEdge.from_dict(ed))
+        return graph
 
 
 @dataclass

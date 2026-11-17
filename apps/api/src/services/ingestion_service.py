@@ -508,6 +508,24 @@ class IngestionService:
                     f"Ingestion completed for repository {repository.full_name}, snapshot {snapshot.id}"
                 )
 
+                # 7. Precompute & Cache Structure-Aware AST Function Graph for STAR-RAG
+                try:
+                    from apps.api.src.services.context_engine.star_rag_structure.cache import (
+                        CodeGraphCache,
+                    )
+
+                    await CodeGraphCache.precompute_for_snapshot(
+                        session=session,
+                        snapshot_id=snapshot.id,
+                        commit_sha=snapshot.commit_sha,
+                    )
+                except Exception as cache_err:
+                    logger.warning(
+                        "CodeGraphCache precomputation failed for snapshot %s (non-fatal): %s",
+                        snapshot.id,
+                        cache_err,
+                    )
+
             except Exception as e:
                 logger.error(f"Ingestion failed for snapshot {snapshot_id}: {e}", exc_info=True)
                 try:

@@ -28,10 +28,12 @@ class SemanticStructuralAdaptiveFusion:
         conflict_threshold: float = 0.40,
         default_beta: float = 0.55,
         temperature: float = 1.0,
+        max_structural_weight: float = 0.15,
     ):
         self.conflict_threshold = conflict_threshold
         self.default_beta = default_beta
         self.temperature = max(1e-4, temperature)
+        self.max_structural_weight = max_structural_weight
 
         # Keywords triggering strong structural tracing intent
         self.structural_trigger_keywords = {
@@ -154,28 +156,62 @@ class SemanticStructuralAdaptiveFusion:
     ) -> tuple[list[RankedCandidate], list[SSAFFusionResult]]:
         """
         Applies SSAF to candidate list, returning sorted RankedCandidates and diagnostic results.
+        Preserves baseline ATOM ranking semantics (exact symbol, path, vector, test demotion)
+        and adds query-conditioned bounded structural contributions from DTP.
         """
-        structural_bias = self._determine_query_structural_bias(query_text, analyzed_query)
+        from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
+        analyzed = analyzed_query or AnalyzedQuery(raw_query=query_text)
+        structural_bias = self._determine_query_structural_bias(query_text, analyzed)
         fusion_results: list[SSAFFusionResult] = []
         ranked_candidates: list[RankedCandidate] = []
 
-        for cand in candidates:
+        # 1. Deduplicate redundant / overlapping candidates using ATOM logic
+        unique_candidates = MultiSignalRanker._deduplicate_candidates(candidates)
+
+        # 2. Compute authoritative baseline ATOM scores and matched reasons
+        atom_ranked = MultiSignalRanker.rank_candidates(
+            candidates=unique_candidates,
+            analyzed_query=analyzed,
+            noise_threshold=0.0,
+        )
+        atom_map: dict[str, RankedCandidate] = {
+            r.candidate.candidate_id: r for r in atom_ranked
+        }
+
+        for cand in unique_candidates:
+            r_atom = atom_map.get(cand.candidate_id)
+            score_atom = r_atom.score if r_atom else 0.0
+            atom_reasons = list(r_atom.matched_reasons) if r_atom else []
+
             sem_s = self.compute_candidate_semantic_score(cand)
             struct_s = self.compute_candidate_structural_score(cand)
 
             beta = self.compute_adaptive_beta(sem_s, struct_s, structural_bias)
 
-            # Adaptive fused score
-            fused_raw = (beta * sem_s) + ((1.0 - beta) * struct_s)
-            fused_score = min(1.0, max(0.0, round(fused_raw, 4)))
-
             # Conflict detection
             is_conflict = abs(sem_s - struct_s) >= self.conflict_threshold
-            explanation: list[str] = [
-                f"SSAF Adaptive Fusion (Score: {fused_score:.2f})",
-                f"Semantic Stream: {sem_s:.2f} (beta: {beta:.2f})",
-                f"Structural DTP Stream: {struct_s:.2f} (weight: {1.0 - beta:.2f})",
-            ]
+
+            # Bounded structural contribution:
+            # - If baseline ATOM score is very low (< 0.25), candidate is an irrelevant hub: 0 boost.
+            # - If conflict where structural is high but semantic is weak: 0 boost to prevent hub leapfrogging.
+            # - Otherwise: scaled contribution bounded by max_structural_weight (default 0.15).
+            if score_atom < 0.25:
+                struct_boost = 0.0
+            elif is_conflict and struct_s > sem_s and sem_s < 0.35:
+                struct_boost = 0.0
+            else:
+                effective_weight = min(self.max_structural_weight, (1.0 - beta) * 0.30)
+                struct_boost = round(struct_s * effective_weight, 4)
+
+            fused_score = min(1.0, max(0.0, round(score_atom + struct_boost, 4)))
+
+            explanation: list[str] = list(atom_reasons)
+            explanation.append(
+                f"SSAF Adaptive Fusion (Score: {fused_score:.2f}, ATOM Base: {score_atom:.2f}, Struct Boost: +{struct_boost:.2f})"
+            )
+            explanation.append(f"Semantic Stream: {sem_s:.2f} (beta: {beta:.2f})")
+            explanation.append(f"Structural DTP Stream: {struct_s:.2f} (weight: {1.0 - beta:.2f})")
 
             if is_conflict:
                 if sem_s > struct_s:
@@ -184,9 +220,9 @@ class SemanticStructuralAdaptiveFusion:
                     explanation.append("Conflict: Structural graph hub with low semantic relevance")
 
             if structural_bias > 0.2:
-                explanation.append("Query intent: Structural/Dependency tracing prioritized")
+                explanation.append("Structural/Dependency tracing prioritized")
             elif structural_bias < -0.2:
-                explanation.append("Query intent: Conceptual/Semantic search prioritized")
+                explanation.append("Conceptual/Semantic search prioritized")
 
             res = SSAFFusionResult(
                 candidate_id=cand.candidate_id,
@@ -208,8 +244,14 @@ class SemanticStructuralAdaptiveFusion:
                 )
             )
 
-        # Sort descending by fused score
-        ranked_candidates.sort(key=lambda r: r.score, reverse=True)
+        # Sort descending by fused score, using ATOM score as tie-breaker
+        ranked_candidates.sort(
+            key=lambda r: (
+                r.score,
+                atom_map.get(r.candidate.candidate_id).score if atom_map.get(r.candidate.candidate_id) else 0.0,
+            ),
+            reverse=True,
+        )
         fusion_results.sort(key=lambda f: f.fused_score, reverse=True)
 
         return ranked_candidates, fusion_results

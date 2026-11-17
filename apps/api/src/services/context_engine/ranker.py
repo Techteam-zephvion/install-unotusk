@@ -186,6 +186,10 @@ class MultiSignalRanker:
                 elif sig == "memotime_experience_relevance":
                     score += val * 1.5
                     reasons.append(f"MemoTime experience memory reuse ({round(val, 2)})")
+                elif sig == "dtp_structural":
+                    bounded_val = min(1.0, max(0.0, float(val)))
+                    score += bounded_val * 0.4
+                    reasons.append(f"Structure-Aware STAR-RAG topological context ({round(bounded_val, 2)})")
                 elif sig.startswith("graph_expansion_hop"):
                     try:
                         hop_num = int(sig.replace("graph_expansion_hop", ""))

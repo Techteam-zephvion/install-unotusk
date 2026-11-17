@@ -1,0 +1,6594 @@
+{
+  "benchmark_summary": {
+    "dataset_profile": {
+      "total_queries": 45,
+      "answerable_queries": 40,
+      "out_of_scope_queries": 5,
+      "calibration_total": 15,
+      "calibration_answerable": 14,
+      "evaluation_total": 30,
+      "evaluation_answerable": 26
+    },
+    "retrieval_comparison": {
+      "atom_baseline": {
+        "p_at_1": 0.675,
+        "p_at_3": 0.4833,
+        "r_at_3": 0.4367,
+        "r_at_5": 0.5092,
+        "hit_at_1": 0.675,
+        "mrr": 0.7531,
+        "ndcg_at_3": 0.5322,
+        "ndcg_at_5": 0.4945,
+        "avg_latency_ms": 237.29,
+        "median_latency_ms": 207.6,
+        "p95_latency_ms": 330.52
+      },
+      "star_rag": {
+        "p_at_1": 0.6,
+        "p_at_3": 0.5,
+        "r_at_3": 0.4342,
+        "r_at_5": 0.4992,
+        "hit_at_1": 0.6,
+        "mrr": 0.7291,
+        "ndcg_at_3": 0.5327,
+        "ndcg_at_5": 0.4976,
+        "avg_context_precision": 0.2077,
+        "avg_latency_ms": 424.21,
+        "median_latency_ms": 241.97,
+        "p95_latency_ms": 366.71
+      }
+    },
+    "split_comparison": {
+      "calibration_split": {
+        "count": 14,
+        "atom_p_at_1": 0.6429,
+        "star_p_at_1": 0.5,
+        "atom_p_at_3": 0.5,
+        "star_p_at_3": 0.4524,
+        "atom_r_at_3": 0.4787,
+        "star_r_at_3": 0.4752,
+        "atom_mrr": 0.7089,
+        "star_mrr": 0.6523,
+        "atom_ndcg_at_3": 0.5247,
+        "star_ndcg_at_3": 0.4665
+      },
+      "evaluation_held_out_split": {
+        "count": 26,
+        "atom_p_at_1": 0.6923,
+        "star_p_at_1": 0.6538,
+        "atom_p_at_3": 0.4744,
+        "star_p_at_3": 0.5256,
+        "atom_r_at_3": 0.4141,
+        "star_r_at_3": 0.4122,
+        "atom_mrr": 0.7769,
+        "star_mrr": 0.7705,
+        "atom_ndcg_at_3": 0.5362,
+        "star_ndcg_at_3": 0.5683
+      }
+    },
+    "deltas": {
+      "p_at_1_delta": -0.075,
+      "p_at_3_delta": 0.0167,
+      "r_at_3_delta": -0.0025,
+      "mrr_delta": -0.024,
+      "ndcg_at_3_delta": 0.0005
+    },
+    "five_way_ablation": {
+      "1_atom_baseline": {
+        "p_at_1": 0.675,
+        "p_at_3": 0.4833,
+        "r_at_3": 0.4367,
+        "mrr": 0.7531,
+        "ndcg_at_3": 0.5322
+      },
+      "2_atom_plus_snr": {
+        "p_at_1": 0.65,
+        "p_at_3": 0.4833,
+        "r_at_3": 0.4367,
+        "mrr": 0.7419,
+        "ndcg_at_3": 0.5294
+      },
+      "3_atom_plus_dtp": {
+        "p_at_1": 0.65,
+        "p_at_3": 0.4833,
+        "r_at_3": 0.4367,
+        "mrr": 0.7419,
+        "ndcg_at_3": 0.5294
+      },
+      "4_atom_plus_ssaf": {
+        "p_at_1": 0.6,
+        "p_at_3": 0.5,
+        "r_at_3": 0.4342,
+        "mrr": 0.7291,
+        "ndcg_at_3": 0.5327
+      },
+      "5_full_star_rag": {
+        "p_at_1": 0.6,
+        "p_at_3": 0.5,
+        "r_at_3": 0.4342,
+        "mrr": 0.7291,
+        "ndcg_at_3": 0.5327
+      }
+    },
+    "graph_quality_telemetry": {
+      "avg_nodes_count": 1492.3,
+      "avg_total_edges": 0.2,
+      "avg_snr_filtered_edges": 52.6,
+      "noise_suppression_rate_pct": 99.58,
+      "avg_ssaf_conflicts": 9.0,
+      "total_evidence_paths_discovered": 0
+    },
+    "out_of_scope_handling": {
+      "atom_top_score_avg": 0.896,
+      "star_rag_top_score_avg": 0.9159,
+      "atom_abstention_rate": 0.0,
+      "star_rag_abstention_rate": 0.0
+    },
+    "archetype_breakdown": {
+      "A_DIRECT_CODE_SEARCH": {
+        "count": 8,
+        "atom_p_at_1": 0.75,
+        "star_p_at_1": 0.625,
+        "atom_p_at_3": 0.5833,
+        "star_p_at_3": 0.5,
+        "atom_r_at_3": 0.7084,
+        "star_r_at_3": 0.6667,
+        "atom_mrr": 0.7917,
+        "star_mrr": 0.7292,
+        "atom_ndcg_at_3": 0.6173,
+        "star_ndcg_at_3": 0.5293
+      },
+      "B_SEMANTIC_CODE_SEARCH": {
+        "count": 8,
+        "atom_p_at_1": 0.5,
+        "star_p_at_1": 0.5,
+        "atom_p_at_3": 0.375,
+        "star_p_at_3": 0.5,
+        "atom_r_at_3": 0.4479,
+        "star_r_at_3": 0.5,
+        "atom_mrr": 0.6396,
+        "star_mrr": 0.6639,
+        "atom_ndcg_at_3": 0.389,
+        "star_ndcg_at_3": 0.5077
+      },
+      "C_DEPENDENCY_INVESTIGATION": {
+        "count": 8,
+        "atom_p_at_1": 0.875,
+        "star_p_at_1": 0.625,
+        "atom_p_at_3": 0.625,
+        "star_p_at_3": 0.5,
+        "atom_r_at_3": 0.3982,
+        "star_r_at_3": 0.3399,
+        "atom_mrr": 0.875,
+        "star_mrr": 0.7292,
+        "atom_ndcg_at_3": 0.6953,
+        "star_ndcg_at_3": 0.5409
+      },
+      "D_EXECUTION_FLOW_TRACING": {
+        "count": 8,
+        "atom_p_at_1": 0.75,
+        "star_p_at_1": 0.75,
+        "atom_p_at_3": 0.4167,
+        "star_p_at_3": 0.5,
+        "atom_r_at_3": 0.3083,
+        "star_r_at_3": 0.2833,
+        "atom_mrr": 0.7838,
+        "star_mrr": 0.8151,
+        "atom_ndcg_at_3": 0.5,
+        "star_ndcg_at_3": 0.574
+      },
+      "E_COMPLEX_ARCHITECTURAL": {
+        "count": 8,
+        "atom_p_at_1": 0.5,
+        "star_p_at_1": 0.5,
+        "atom_p_at_3": 0.4166,
+        "star_p_at_3": 0.5,
+        "atom_r_at_3": 0.3208,
+        "star_r_at_3": 0.3812,
+        "atom_mrr": 0.6756,
+        "star_mrr": 0.7083,
+        "atom_ndcg_at_3": 0.4593,
+        "star_ndcg_at_3": 0.5113
+      },
+      "F_UNKNOWN_LOW_CONFIDENCE": {
+        "count": 5,
+        "atom_top_score": 0.896,
+        "star_top_score": 0.9159,
+        "atom_abstention_rate": 0.0,
+        "star_abstention_rate": 0.0
+      }
+    }
+  },
+  "query_evaluations": [
+    {
+      "query_id": "Q01",
+      "query_text": "Where is MultiSignalRetriever defined and how does retrieve_candidates work?",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 21,
+      "expanded_candidates_count": 108,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7654,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRetriever",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "retrieve_candidates",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "investigate",
+            "path": "apps/api/src/services/context_engine/engine.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 951.17
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7654,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRetriever",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "retrieve_candidates",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "investigate",
+            "path": "apps/api/src/services/context_engine/engine.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1129,
+          "total_edges": 10,
+          "snr_filtered_edges": 2359,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 14,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1825,
+        "latency_breakdown_ms": {
+          "analysis": 50.34,
+          "retrieval": 779.87,
+          "expansion": 117.72,
+          "star_ranking": 6862.09,
+          "assembly": 0.46,
+          "total": 7810.49
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7654,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.87
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7654,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 28.0
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7654,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 11.8
+        }
+      }
+    },
+    {
+      "query_id": "Q02",
+      "query_text": "Find the definition of SemanticNoiseRouter and route_and_filter_edges",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 71,
+      "expanded_candidates_count": 76,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 1.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.3462,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "FindingResponse",
+            "path": "apps/api/src/schemas/discovery.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingUpdateStatusRequest",
+            "path": "apps/api/src/schemas/discovery.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticNoiseRouter",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 241.07
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 1.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.3633,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "FindingResponse",
+            "path": "apps/api/src/schemas/discovery.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingUpdateStatusRequest",
+            "path": "apps/api/src/schemas/discovery.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticNoiseRouter",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1166,
+          "total_edges": 0,
+          "snr_filtered_edges": 10,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 10,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2355,
+        "latency_breakdown_ms": {
+          "analysis": 0.62,
+          "retrieval": 211.87,
+          "expansion": 24.58,
+          "star_ranking": 43.42,
+          "assembly": 0.43,
+          "total": 280.92
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 1.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.3462,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.73
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 1.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.3462,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 108.83
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 1.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.3633,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.97
+        }
+      }
+    },
+    {
+      "query_id": "Q03",
+      "query_text": "Where is DecoupledTopologicalPropagator implemented?",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 22,
+      "expanded_candidates_count": 106,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8688,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "DecoupledTopologicalPropagator",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "propagate_and_score_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 286.12
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8688,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "DecoupledTopologicalPropagator",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "propagate_and_score_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1214,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 4,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2327,
+        "latency_breakdown_ms": {
+          "analysis": 0.39,
+          "retrieval": 171.36,
+          "expansion": 110.25,
+          "star_ranking": 32.76,
+          "assembly": 0.73,
+          "total": 315.49
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8688,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.84
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8688,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 39.7
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8688,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.19
+        }
+      }
+    },
+    {
+      "query_id": "Q04",
+      "query_text": "Find the class SemanticStructuralAdaptiveFusion and its fuse method",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 60,
+      "expanded_candidates_count": 72,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "SemanticStructuralAdaptiveFusion",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "Finding",
+            "path": "apps/api/src/models/finding.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingCategory",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 164.52
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "SemanticStructuralAdaptiveFusion",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingCategory",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingSeverity",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1242,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 14,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2319,
+        "latency_breakdown_ms": {
+          "analysis": 0.65,
+          "retrieval": 139.42,
+          "expansion": 21.45,
+          "star_ranking": 41.31,
+          "assembly": 0.5,
+          "total": 203.33
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.07
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 31.9
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.47
+        }
+      }
+    },
+    {
+      "query_id": "Q05",
+      "query_text": "Where is AuthService implemented and what does authenticate_user do?",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 49,
+      "expanded_candidates_count": 54,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.7227,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AuthService",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "login",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "signup",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 329.92
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.6164,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AuthService",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "login",
+            "path": "apps/api/src/api/routes/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "signup",
+            "path": "apps/api/src/api/routes/auth.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1266,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 6,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1064,
+        "latency_breakdown_ms": {
+          "analysis": 0.49,
+          "retrieval": 308.43,
+          "expansion": 19.04,
+          "star_ranking": 29.07,
+          "assembly": 0.38,
+          "total": 357.4
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.7227,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 2.34
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.7227,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 27.27
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.6164,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.27
+        }
+      }
+    },
+    {
+      "query_id": "Q06",
+      "query_text": "Where is GranularEvidencePathBuilder located?",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 25,
+      "expanded_candidates_count": 84,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8539,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "GranularEvidencePathBuilder",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "build_evidence_paths_for_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "EvidencePath",
+            "path": "apps/api/src/schemas/evoreasoner.py",
+            "score": 0.76
+          }
+        ],
+        "latency_ms": 330.52
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8539,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "GranularEvidencePathBuilder",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "build_evidence_paths_for_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "EvidencePath",
+            "path": "apps/api/src/schemas/evoreasoner.py",
+            "score": 0.87
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1302,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 3,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2428,
+        "latency_breakdown_ms": {
+          "analysis": 0.35,
+          "retrieval": 249.16,
+          "expansion": 77.98,
+          "star_ranking": 38.84,
+          "assembly": 0.38,
+          "total": 366.71
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8539,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.71
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8539,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 33.01
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8539,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.19
+        }
+      }
+    },
+    {
+      "query_id": "Q07",
+      "query_text": "Find the process_task function in the background worker",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 72,
+      "expanded_candidates_count": 79,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3904,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "process_task",
+            "path": "services/workers/worker.py",
+            "score": 1.0
+          },
+          {
+            "name": "Finding",
+            "path": "apps/api/src/models/finding.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingCategory",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 257.72
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.2463,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "get_task_status",
+            "path": "apps/api/src/api/routes/tasks.py",
+            "score": 1.0
+          },
+          {
+            "name": "worker.py",
+            "path": "services/workers/worker.py",
+            "score": 1.0
+          },
+          {
+            "name": "FindingCategory",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1322,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 6,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0937,
+        "latency_breakdown_ms": {
+          "analysis": 0.45,
+          "retrieval": 227.85,
+          "expansion": 25.56,
+          "star_ranking": 32.66,
+          "assembly": 0.99,
+          "total": 287.51
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3904,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.67
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3904,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 29.32
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.2463,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.5
+        }
+      }
+    },
+    {
+      "query_id": "Q08",
+      "query_text": "Where is VoyageEmbeddingProvider defined?",
+      "archetype": "A_DIRECT_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 18,
+      "expanded_candidates_count": 71,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 0.79,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "provider_name",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 0.79
+          },
+          {
+            "name": "IntegrationProvider",
+            "path": "apps/api/src/models/enums.py",
+            "score": 0.7
+          },
+          {
+            "name": "VoyageCodeEmbeddingBackend",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 0.64
+          }
+        ],
+        "latency_ms": 240.6
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 0.9175,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "provider_name",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 0.9175
+          },
+          {
+            "name": "IntegrationProvider",
+            "path": "apps/api/src/models/enums.py",
+            "score": 0.804
+          },
+          {
+            "name": "VoyageCodeEmbeddingBackend",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 0.7675
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1351,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 0,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0539,
+        "latency_breakdown_ms": {
+          "analysis": 0.49,
+          "retrieval": 183.03,
+          "expansion": 54.92,
+          "star_ranking": 28.17,
+          "assembly": 0.35,
+          "total": 266.96
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 0.85,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.28
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 0.85,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 28.96
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 0.9175,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.17
+        }
+      }
+    },
+    {
+      "query_id": "Q09",
+      "query_text": "How does vector similarity search with pgvector work in the repository chunk database?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 74,
+      "expanded_candidates_count": 83,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.6667,
+          "hit_at_1": 0.0,
+          "mrr": 0.25,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.3836,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "reindex_repository",
+            "path": "apps/api/src/api/routes/repository.py",
+            "score": 1.0
+          },
+          {
+            "name": "CompatibleVector",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 207.61
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.1111,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "reindex_repository",
+            "path": "apps/api/src/api/routes/repository.py",
+            "score": 1.0
+          },
+          {
+            "name": "Repository",
+            "path": "apps/api/src/models/repository.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_db",
+            "path": "apps/api/src/api/dependencies/database.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1376,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 4,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1597,
+        "latency_breakdown_ms": {
+          "analysis": 0.52,
+          "retrieval": 177.56,
+          "expansion": 24.45,
+          "star_ranking": 38.07,
+          "assembly": 0.58,
+          "total": 241.17
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.6667,
+            "hit_at_1": 0.0,
+            "mrr": 0.25,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.3836,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.13
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.6667,
+            "hit_at_1": 0.0,
+            "mrr": 0.25,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.3836,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 32.49
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.1111,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 10.6
+        }
+      }
+    },
+    {
+      "query_id": "Q10",
+      "query_text": "How are JWT access tokens and refresh tokens generated and signed?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 62,
+      "expanded_candidates_count": 71,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.25,
+          "r_at_5": 0.75,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.7095,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "create_access_token",
+            "path": "apps/api/src/auth/security.py",
+            "score": 1.0
+          },
+          {
+            "name": "decode_access_token",
+            "path": "apps/api/src/auth/security.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_optional_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 197.14
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.25,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.5414,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "create_access_token",
+            "path": "apps/api/src/auth/security.py",
+            "score": 1.0
+          },
+          {
+            "name": "decode_access_token",
+            "path": "apps/api/src/auth/security.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_optional_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1388,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 7,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1341,
+        "latency_breakdown_ms": {
+          "analysis": 0.69,
+          "retrieval": 172.21,
+          "expansion": 20.52,
+          "star_ranking": 30.13,
+          "assembly": 0.32,
+          "total": 223.88
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.25,
+            "r_at_5": 0.75,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.7095,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 12.51
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.25,
+            "r_at_5": 0.75,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.7095,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 36.23
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.25,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.5414,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.72
+        }
+      }
+    },
+    {
+      "query_id": "Q11",
+      "query_text": "How does the system prune irrelevant graph edges based on semantic threshold?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 51,
+      "expanded_candidates_count": 61,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.5,
+          "hit_at_1": 0.0,
+          "mrr": 0.2,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.151,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MdlGraphSelector",
+            "path": "apps/api/src/services/context_engine/star_rag.py",
+            "score": 1.0
+          },
+          {
+            "name": "TemporalRuleGraphBuilder",
+            "path": "apps/api/src/services/context_engine/star_rag.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticCodeFact",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 183.64
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 0.75,
+          "r_at_5": 0.75,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8319,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "SemanticNoiseRouter",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          },
+          {
+            "name": "route_and_filter_edges",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          },
+          {
+            "name": "evaluate_edge",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1405,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 5,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2245,
+        "latency_breakdown_ms": {
+          "analysis": 0.55,
+          "retrieval": 159.35,
+          "expansion": 21.28,
+          "star_ranking": 24.68,
+          "assembly": 0.34,
+          "total": 206.19
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.5,
+            "hit_at_1": 0.0,
+            "mrr": 0.25,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.1681,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.31
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.5,
+            "hit_at_1": 0.0,
+            "mrr": 0.25,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.1681,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 23.65
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.75,
+            "r_at_5": 0.75,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8319,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.77
+        }
+      }
+    },
+    {
+      "query_id": "Q12",
+      "query_text": "How is multi-hop structural score propagated across directed code graph connections?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 62,
+      "expanded_candidates_count": 77,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.7366,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "DecoupledTopologicalPropagator",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "compute_candidate_structural_score",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "propagate_and_score_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 154.02
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8319,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "compute_multi_order_connectivity",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "DecoupledTopologicalPropagator",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          },
+          {
+            "name": "propagate_and_score_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1413,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 2,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.238,
+        "latency_breakdown_ms": {
+          "analysis": 0.68,
+          "retrieval": 130.98,
+          "expansion": 19.85,
+          "star_ranking": 34.99,
+          "assembly": 0.58,
+          "total": 187.07
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.7537,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.36
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.7537,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 33.67
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8319,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.4
+        }
+      }
+    },
+    {
+      "query_id": "Q13",
+      "query_text": "How does dynamic beta weighting balance semantic score against structural topology?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 43,
+      "expanded_candidates_count": 48,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6992,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "SemanticStructuralAdaptiveFusion",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "compute_adaptive_beta",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticNoiseRouter",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 177.77
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.7227,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "compute_adaptive_beta",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticStructuralAdaptiveFusion",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1418,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 7,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2533,
+        "latency_breakdown_ms": {
+          "analysis": 0.7,
+          "retrieval": 145.38,
+          "expansion": 27.56,
+          "star_ranking": 34.98,
+          "assembly": 0.73,
+          "total": 209.36
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6992,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.68
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6992,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 31.06
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.7227,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.22
+        }
+      }
+    },
+    {
+      "query_id": "Q14",
+      "query_text": "How does the offline grounded answer synthesizer produce answers without an external LLM API?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 100,
+      "expanded_candidates_count": 109,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.1952,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "generate_grounded_answer",
+            "path": "apps/api/src/services/llm/claude.py",
+            "score": 1.0
+          },
+          {
+            "name": "GroundedAnswerResponse",
+            "path": "apps/api/src/schemas/intelligence.py",
+            "score": 1.0
+          },
+          {
+            "name": "_generate_offline_grounded_answer",
+            "path": "apps/api/src/services/llm/claude.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 224.19
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.3973,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "handle_generic_exception",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          },
+          {
+            "name": "GroqProvider",
+            "path": "apps/api/src/services/llm/groq.py",
+            "score": 1.0
+          },
+          {
+            "name": "ClaudeProvider",
+            "path": "apps/api/src/services/llm/claude.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1444,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 24,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1449,
+        "latency_breakdown_ms": {
+          "analysis": 0.63,
+          "retrieval": 193.95,
+          "expansion": 22.54,
+          "star_ranking": 33.93,
+          "assembly": 0.32,
+          "total": 251.36
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.1952,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.57
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.1952,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 44.26
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.3973,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.23
+        }
+      }
+    },
+    {
+      "query_id": "Q15",
+      "query_text": "How are code files parsed into AST symbols and code chunks during ingestion?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 75,
+      "expanded_candidates_count": 90,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.5856,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "IngestionService",
+            "path": "apps/api/src/services/ingestion_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_ingestion",
+            "path": "apps/api/src/services/ingestion_service.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 168.43
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.2463,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "_extract_python_ast_symbols",
+            "path": "apps/api/src/services/parser/symbol_extractor.py",
+            "score": 1.0
+          },
+          {
+            "name": "ingest_commit_atom_changes",
+            "path": "apps/api/src/services/ingestion_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "_extract_js_ts_symbols",
+            "path": "apps/api/src/services/parser/symbol_extractor.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1461,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 15,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.11,
+        "latency_breakdown_ms": {
+          "analysis": 0.65,
+          "retrieval": 134.1,
+          "expansion": 28.79,
+          "star_ranking": 34.85,
+          "assembly": 0.41,
+          "total": 198.81
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6367,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.95
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.6667,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6367,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 30.35
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.2463,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.54
+        }
+      }
+    },
+    {
+      "query_id": "Q16",
+      "query_text": "How are background ingestion and analysis tasks consumed from Redis queue?",
+      "archetype": "B_SEMANTIC_CODE_SEARCH",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 61,
+      "expanded_candidates_count": 64,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.1952,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "trigger_ingestion",
+            "path": "apps/api/src/services/repository_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "enqueue",
+            "path": "apps/api/src/workers/dispatcher.py",
+            "score": 1.0
+          },
+          {
+            "name": "delayed_requeue",
+            "path": "services/workers/worker.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 239.1
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.2,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.151,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "DiscoveryJobStatus",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_ingestion_status",
+            "path": "apps/api/src/api/routes/repository.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_redis",
+            "path": "apps/api/src/workers/dispatcher.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1469,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 16,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0958,
+        "latency_breakdown_ms": {
+          "analysis": 0.57,
+          "retrieval": 195.83,
+          "expansion": 28.18,
+          "star_ranking": 34.27,
+          "assembly": 0.69,
+          "total": 259.54
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.1952,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.38
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.1952,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 31.67
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.2,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.151,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.53
+        }
+      }
+    },
+    {
+      "query_id": "Q17",
+      "query_text": "What database models does IngestionService depend on and import?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 73,
+      "expanded_candidates_count": 84,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.2857,
+          "r_at_5": 0.2857,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.6548,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "IngestionService",
+            "path": "apps/api/src/services/ingestion_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ImportantDependency",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_ingestion",
+            "path": "apps/api/src/services/ingestion_service.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 201.96
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.2857,
+          "r_at_5": 0.2857,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.1696,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "reindex_repository",
+            "path": "apps/api/src/api/routes/repository.py",
+            "score": 1.0
+          },
+          {
+            "name": "Settings",
+            "path": "apps/api/src/config/settings.py",
+            "score": 1.0
+          },
+          {
+            "name": "IngestionService",
+            "path": "apps/api/src/services/ingestion_service.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1484,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 6,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1473,
+        "latency_breakdown_ms": {
+          "analysis": 0.56,
+          "retrieval": 173.84,
+          "expansion": 24.49,
+          "star_ranking": 32.97,
+          "assembly": 2.39,
+          "total": 234.26
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.2857,
+            "r_at_5": 0.2857,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.6548,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.76
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.2857,
+            "r_at_5": 0.2857,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.6548,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 33.01
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.2857,
+            "r_at_5": 0.2857,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.1696,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.45
+        }
+      }
+    },
+    {
+      "query_id": "Q18",
+      "query_text": "Which modules import and instantiate StructureAwareStarRagService?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 36,
+      "expanded_candidates_count": 92,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.9197,
+          "ndcg_at_5": 0.9197,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "StructureAwareStarRagService",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ImportantDependency",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_pipeline_async",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 193.89
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.9197,
+          "ndcg_at_5": 0.9197,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "StructureAwareStarRagService",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ImportantDependency",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_pipeline_async",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1496,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 3,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2097,
+        "latency_breakdown_ms": {
+          "analysis": 0.6,
+          "retrieval": 124.52,
+          "expansion": 65.61,
+          "star_ranking": 31.34,
+          "assembly": 0.38,
+          "total": 222.45
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.9197,
+            "ndcg_at_5": 0.9197,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.46
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.9197,
+            "ndcg_at_5": 0.9197,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 27.38
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.9197,
+            "ndcg_at_5": 0.9197,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.22
+        }
+      }
+    },
+    {
+      "query_id": "Q19",
+      "query_text": "What does MultiSignalRanker depend on to compute reciprocal rank fusion and structure scores?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 56,
+      "expanded_candidates_count": 67,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.5087,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRanker",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          },
+          {
+            "name": "compute_anchor_relevance",
+            "path": "apps/api/src/services/context_engine/star_rag.py",
+            "score": 1.0
+          },
+          {
+            "name": "rank_candidates",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 194.59
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.4852,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRanker",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticStructuralAdaptiveFusion",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "compute_anchor_relevance",
+            "path": "apps/api/src/services/context_engine/star_rag.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1504,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 4,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.155,
+        "latency_breakdown_ms": {
+          "analysis": 0.67,
+          "retrieval": 168.31,
+          "expansion": 22.76,
+          "star_ranking": 146.41,
+          "assembly": 0.57,
+          "total": 338.72
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.5087,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.27
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.5087,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 31.14
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.4852,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.51
+        }
+      }
+    },
+    {
+      "query_id": "Q20",
+      "query_text": "How does the auth API route depend on AuthService and database session dependency?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 94,
+      "expanded_candidates_count": 105,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.7227,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AuthService",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "signup",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "login",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 240.11
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AuthService",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "UnauthorizedException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1507,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 22,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2834,
+        "latency_breakdown_ms": {
+          "analysis": 0.73,
+          "retrieval": 209.72,
+          "expansion": 24.85,
+          "star_ranking": 49.05,
+          "assembly": 0.63,
+          "total": 284.99
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.7227,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.63
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.7227,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 36.39
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.24
+        }
+      }
+    },
+    {
+      "query_id": "Q21",
+      "query_text": "What components does StructureAwareStarRagService import from star_rag_structure?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 45,
+      "expanded_candidates_count": 48,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.25,
+          "r_at_5": 0.25,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "StructureAwareStarRagService",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_pipeline_async",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ImportantDependency",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 160.25
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.25,
+          "r_at_5": 0.25,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.5087,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "StructureAwareStarRagService",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ImportantDependency",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_pipeline_async",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1507,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 3,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.7744,
+        "latency_breakdown_ms": {
+          "analysis": 0.53,
+          "retrieval": 143.39,
+          "expansion": 14.47,
+          "star_ranking": 30.49,
+          "assembly": 0.47,
+          "total": 189.35
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.25,
+            "r_at_5": 0.25,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 1.93
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.25,
+            "r_at_5": 0.25,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 33.36
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.25,
+            "r_at_5": 0.25,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.5087,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 2.79
+        }
+      }
+    },
+    {
+      "query_id": "Q22",
+      "query_text": "What external libraries and packages are used by the Tree-sitter parser in parse_engine?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 37,
+      "expanded_candidates_count": 86,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "init_parsers",
+            "path": "apps/api/src/services/parser/tree_sitter_parser.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_parser",
+            "path": "apps/api/src/services/parser/tree_sitter_parser.py",
+            "score": 1.0
+          },
+          {
+            "name": "_extract_js_ts_tree_dependencies",
+            "path": "apps/api/src/services/parser/dependency_extractor.py",
+            "score": 0.71
+          }
+        ],
+        "latency_ms": 242.19
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "init_parsers",
+            "path": "apps/api/src/services/parser/tree_sitter_parser.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_parser",
+            "path": "apps/api/src/services/parser/tree_sitter_parser.py",
+            "score": 1.0
+          },
+          {
+            "name": "_extract_js_ts_tree_dependencies",
+            "path": "apps/api/src/services/parser/dependency_extractor.py",
+            "score": 0.8097
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1532,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 2,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.7,
+          "retrieval": 167.6,
+          "expansion": 70.0,
+          "star_ranking": 33.46,
+          "assembly": 0.5,
+          "total": 272.26
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.08
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 32.07
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.47
+        }
+      }
+    },
+    {
+      "query_id": "Q23",
+      "query_text": "How does the projects route import and verify current user credentials?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 82,
+      "expanded_candidates_count": 94,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.75,
+          "r_at_5": 0.75,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.6399,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "get_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_optional_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "list_projects",
+            "path": "apps/api/src/api/routes/projects.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 212.54
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.25,
+          "r_at_5": 0.25,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.5307,
+          "ndcg_at_5": 0.3836,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "verify_password",
+            "path": "apps/api/src/auth/security.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "User",
+            "path": "apps/api/src/models/user.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1543,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 7,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.131,
+        "latency_breakdown_ms": {
+          "analysis": 0.57,
+          "retrieval": 188.26,
+          "expansion": 20.04,
+          "star_ranking": 34.55,
+          "assembly": 0.55,
+          "total": 243.96
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.75,
+            "r_at_5": 0.75,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.6399,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.15
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.75,
+            "r_at_5": 0.75,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.6399,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 29.37
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.25,
+            "r_at_5": 0.25,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.5307,
+            "ndcg_at_5": 0.3836,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.95
+        }
+      }
+    },
+    {
+      "query_id": "Q24",
+      "query_text": "Which classes inherit from AppException in api exceptions?",
+      "archetype": "C_DEPENDENCY_INVESTIGATION",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 74,
+      "expanded_candidates_count": 85,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.4,
+          "r_at_5": 0.6,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6844,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AppException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "handle_generic_exception",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 172.06
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 0.6,
+          "r_at_5": 0.8,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 1.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AppException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "NotFoundException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "ConflictException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1547,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 29,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1392,
+        "latency_breakdown_ms": {
+          "analysis": 0.52,
+          "retrieval": 145.84,
+          "expansion": 22.63,
+          "star_ranking": 46.4,
+          "assembly": 0.83,
+          "total": 216.21
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.4,
+            "r_at_5": 0.6,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6844,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.35
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.4,
+            "r_at_5": 0.6,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6844,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 29.77
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.6,
+            "r_at_5": 0.8,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 1.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.07
+        }
+      }
+    },
+    {
+      "query_id": "Q25",
+      "query_text": "Trace the execution flow of a user question from /projects/{projectId}/ask through the context engine pipeline",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 76,
+      "expanded_candidates_count": 88,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0204,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "get_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "User",
+            "path": "apps/api/src/models/user.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_optional_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 272.59
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0204,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "User",
+            "path": "apps/api/src/models/user.py",
+            "score": 1.0
+          },
+          {
+            "name": "ask_project",
+            "path": "apps/api/src/api/routes/intelligence.py",
+            "score": 1.0
+          },
+          {
+            "name": "create_conversation",
+            "path": "apps/api/src/api/routes/intelligence.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1551,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 9,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.76,
+          "retrieval": 230.05,
+          "expansion": 35.25,
+          "star_ranking": 45.1,
+          "assembly": 0.67,
+          "total": 311.82
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0204,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.27
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0204,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 43.91
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0204,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.14
+        }
+      }
+    },
+    {
+      "query_id": "Q26",
+      "query_text": "Trace how StructureAwareStarRagService filters graph edges with SNR and propagates topology with DTP",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 52,
+      "expanded_candidates_count": 65,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.1667,
+          "r_at_5": 0.1667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "StructureAwareStarRagService",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "KnowledgeStatus",
+            "path": "apps/api/src/models/enums.py",
+            "score": 1.0
+          },
+          {
+            "name": "GraphResponse",
+            "path": "apps/api/src/schemas/graph.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 183.65
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "route_and_filter_edges",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+            "score": 1.0
+          },
+          {
+            "name": "GraphNodeType",
+            "path": "apps/api/src/schemas/graph.py",
+            "score": 1.0
+          },
+          {
+            "name": "GraphEdgeType",
+            "path": "apps/api/src/schemas/graph.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1551,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 2,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.5946,
+        "latency_breakdown_ms": {
+          "analysis": 0.96,
+          "retrieval": 157.39,
+          "expansion": 22.69,
+          "star_ranking": 30.6,
+          "assembly": 0.4,
+          "total": 212.05
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.1667,
+            "r_at_5": 0.1667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.56
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.1667,
+            "r_at_5": 0.1667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 29.9
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.3392,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.08
+        }
+      }
+    },
+    {
+      "query_id": "Q27",
+      "query_text": "Trace the authentication call chain when a user submits their login credentials",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 56,
+      "expanded_candidates_count": 66,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6992,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "login",
+            "path": "apps/api/src/api/routes/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "login",
+            "path": "apps/api/src/services/auth_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 207.6
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6844,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "login",
+            "path": "apps/api/src/api/routes/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "User",
+            "path": "apps/api/src/models/user.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1555,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 10,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2068,
+        "latency_breakdown_ms": {
+          "analysis": 0.59,
+          "retrieval": 173.35,
+          "expansion": 29.61,
+          "star_ranking": 37.99,
+          "assembly": 0.43,
+          "total": 241.97
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6992,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.1
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6992,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 30.49
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.6844,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.01
+        }
+      }
+    },
+    {
+      "query_id": "Q28",
+      "query_text": "Trace how the background worker receives a task from Redis and routes it to repository ingestion",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 82,
+      "expanded_candidates_count": 93,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.4,
+          "r_at_5": 0.4,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "process_task",
+            "path": "services/workers/worker.py",
+            "score": 1.0
+          },
+          {
+            "name": "trigger_ping_task",
+            "path": "apps/api/src/api/routes/tasks.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_task_status",
+            "path": "apps/api/src/api/routes/tasks.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 258.24
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.214,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "TaskResponse",
+            "path": "apps/api/src/api/routes/tasks.py",
+            "score": 1.0
+          },
+          {
+            "name": "Repository",
+            "path": "apps/api/src/models/repository.py",
+            "score": 1.0
+          },
+          {
+            "name": "PingTaskRequest",
+            "path": "apps/api/src/api/routes/tasks.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1555,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 18,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2437,
+        "latency_breakdown_ms": {
+          "analysis": 0.95,
+          "retrieval": 231.02,
+          "expansion": 21.09,
+          "star_ranking": 35.19,
+          "assembly": 0.38,
+          "total": 288.63
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.4,
+            "r_at_5": 0.4,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.26
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.4,
+            "r_at_5": 0.4,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 32.28
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.89
+        }
+      }
+    },
+    {
+      "query_id": "Q29",
+      "query_text": "Trace how SSAF combines semantic similarity and topological scores to produce final candidate ranks",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 46,
+      "expanded_candidates_count": 58,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.2,
+          "hit_at_1": 0.0,
+          "mrr": 0.25,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.2773,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "rank_candidates",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticCodeFact",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          },
+          {
+            "name": "RankedCandidate",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 210.75
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.2,
+          "r_at_5": 0.2,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "fuse_and_rank_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticStructuralAdaptiveFusion",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 1.0
+          },
+          {
+            "name": "SSAFFusionResult",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/types.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1556,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 3,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.3959,
+        "latency_breakdown_ms": {
+          "analysis": 0.88,
+          "retrieval": 183.7,
+          "expansion": 22.08,
+          "star_ranking": 31.39,
+          "assembly": 0.38,
+          "total": 238.43
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.2,
+            "hit_at_1": 0.0,
+            "mrr": 0.25,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.2773,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.96
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.2,
+            "hit_at_1": 0.0,
+            "mrr": 0.25,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.2773,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 31.97
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.2,
+            "r_at_5": 0.2,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.64
+        }
+      }
+    },
+    {
+      "query_id": "Q30",
+      "query_text": "Trace how GranularEvidencePathBuilder discovers call paths and formats evidence chains",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 46,
+      "expanded_candidates_count": 54,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "GranularEvidencePathBuilder",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "build_evidence_paths_for_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "EvidencePath",
+            "path": "apps/api/src/schemas/evoreasoner.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 191.22
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "GranularEvidencePathBuilder",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "build_evidence_paths_for_candidates",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py",
+            "score": 1.0
+          },
+          {
+            "name": "EvidencePath",
+            "path": "apps/api/src/schemas/evoreasoner.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1563,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 7,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2124,
+        "latency_breakdown_ms": {
+          "analysis": 0.73,
+          "retrieval": 162.87,
+          "expansion": 23.57,
+          "star_ranking": 30.46,
+          "assembly": 0.66,
+          "total": 218.29
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.85
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 43.03
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 8.06
+        }
+      }
+    },
+    {
+      "query_id": "Q31",
+      "query_text": "Trace how MultiSignalRetriever combines full-text SQL search and vector similarity into retrieved candidates",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 83,
+      "expanded_candidates_count": 89,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.4,
+          "r_at_5": 0.4,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7877,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRetriever",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "retrieve_candidates",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "rank_candidates",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 292.52
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.4,
+          "r_at_5": 0.4,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7877,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRetriever",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "retrieve_candidates",
+            "path": "apps/api/src/services/context_engine/retriever.py",
+            "score": 1.0
+          },
+          {
+            "name": "rank_candidates",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1578,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 31,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1624,
+        "latency_breakdown_ms": {
+          "analysis": 1.15,
+          "retrieval": 261.87,
+          "expansion": 22.5,
+          "star_ranking": 39.07,
+          "assembly": 0.46,
+          "total": 325.06
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.4,
+            "r_at_5": 0.4,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7877,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.8
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.4,
+            "r_at_5": 0.4,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7877,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 44.69
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.4,
+            "r_at_5": 0.4,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7877,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.25
+        }
+      }
+    },
+    {
+      "query_id": "Q32",
+      "query_text": "Trace how ContextAssembler builds the final prompt payload from ranked candidates and graph expansions",
+      "archetype": "D_EXECUTION_FLOW_TRACING",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 51,
+      "expanded_candidates_count": 63,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7654,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "ContextAssembler",
+            "path": "apps/api/src/services/context_engine/assembler.py",
+            "score": 1.0
+          },
+          {
+            "name": "assemble_context",
+            "path": "apps/api/src/services/context_engine/assembler.py",
+            "score": 1.0
+          },
+          {
+            "name": "ProjectContextEngine",
+            "path": "apps/api/src/services/context_engine/engine.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 215.02
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7654,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "ContextAssembler",
+            "path": "apps/api/src/services/context_engine/assembler.py",
+            "score": 1.0
+          },
+          {
+            "name": "assemble_context",
+            "path": "apps/api/src/services/context_engine/assembler.py",
+            "score": 1.0
+          },
+          {
+            "name": "ProjectContextEngine",
+            "path": "apps/api/src/services/context_engine/engine.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1581,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 3,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1426,
+        "latency_breakdown_ms": {
+          "analysis": 0.85,
+          "retrieval": 184.96,
+          "expansion": 25.04,
+          "star_ranking": 38.86,
+          "assembly": 0.43,
+          "total": 250.13
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7654,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.04
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7654,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 32.11
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.5,
+            "r_at_5": 0.5,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.7654,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.23
+        }
+      }
+    },
+    {
+      "query_id": "Q33",
+      "query_text": "Explain how the complete ATOM Code Lane architecture retrieves, ranks, expands and assembles codebase context",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 63,
+      "expanded_candidates_count": 77,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0714,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "SemanticCodeFact",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          },
+          {
+            "name": "AtomicCodeChange",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          },
+          {
+            "name": "format_atom_code_embedding_input",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 180.66
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.1667,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "generate_feature_specification",
+            "path": "apps/api/src/services/intelligence_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "StarRagContextService",
+            "path": "apps/api/src/services/context_engine/star_rag.py",
+            "score": 1.0
+          },
+          {
+            "name": "SemanticFactExtractor",
+            "path": "apps/api/src/services/code_atom/fact_decomposer.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1585,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 4,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1501,
+        "latency_breakdown_ms": {
+          "analysis": 1.04,
+          "retrieval": 151.31,
+          "expansion": 22.63,
+          "star_ranking": 35.97,
+          "assembly": 0.33,
+          "total": 211.28
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0714,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.99
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0714,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 158.11
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.1667,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.48
+        }
+      }
+    },
+    {
+      "query_id": "Q34",
+      "query_text": "How is Structure-Aware STAR-RAG gated by feature flag and integrated into MultiSignalRanker?",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 42,
+      "expanded_candidates_count": 49,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.1667,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.4852,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRanker",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          },
+          {
+            "name": "FeatureSpecRequest",
+            "path": "apps/api/src/schemas/intelligence.py",
+            "score": 1.0
+          },
+          {
+            "name": "FeatureSpecificationResponse",
+            "path": "apps/api/src/schemas/intelligence.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 216.96
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 0.5,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8688,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "MultiSignalRanker",
+            "path": "apps/api/src/services/context_engine/ranker.py",
+            "score": 1.0
+          },
+          {
+            "name": "run_pipeline_async",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          },
+          {
+            "name": "StructureAwareStarRagService",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/service.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1590,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 4,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.3276,
+        "latency_breakdown_ms": {
+          "analysis": 0.65,
+          "retrieval": 190.04,
+          "expansion": 22.3,
+          "star_ranking": 41.23,
+          "assembly": 0.28,
+          "total": 254.5
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.1667,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.4852,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.16
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.1667,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.4852,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 33.23
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 0.5,
+            "r_at_5": 0.6667,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 0.8688,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.86
+        }
+      }
+    },
+    {
+      "query_id": "Q35",
+      "query_text": "How does the system handle database session management and transaction lifecycle across async requests?",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 81,
+      "expanded_candidates_count": 91,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.214,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "handle_generic_exception",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_db_session",
+            "path": "apps/api/src/db/session.py",
+            "score": 1.0
+          },
+          {
+            "name": "handle_http_exception",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 236.2
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.0,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.6164,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "get_db",
+            "path": "apps/api/src/api/dependencies/database.py",
+            "score": 1.0
+          },
+          {
+            "name": "lifespan",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          },
+          {
+            "name": "database.py",
+            "path": "apps/api/src/api/dependencies/database.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1599,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 22,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1985,
+        "latency_breakdown_ms": {
+          "analysis": 0.59,
+          "retrieval": 208.01,
+          "expansion": 21.14,
+          "star_ranking": 36.09,
+          "assembly": 0.4,
+          "total": 266.23
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 8.49
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 37.45
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.0,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.4693,
+            "ndcg_at_5": 0.6164,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.58
+        }
+      }
+    },
+    {
+      "query_id": "Q36",
+      "query_text": "Explain the interaction between Tree-sitter parsing, code chunk persistence, and Voyage embedding generation",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 61,
+      "expanded_candidates_count": 72,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeChunkRead",
+            "path": "apps/api/src/schemas/context.py",
+            "score": 1.0
+          },
+          {
+            "name": "map_atomic_code_change_to_code_chunk",
+            "path": "apps/api/src/services/code_atom/chunk_mapper.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 167.19
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.214,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "embedding.py",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "embed_atomic_code_chunk",
+            "path": "apps/api/src/services/code_atom/embedding.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1606,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 5,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1988,
+        "latency_breakdown_ms": {
+          "analysis": 0.68,
+          "retrieval": 136.1,
+          "expansion": 27.6,
+          "star_ranking": 32.3,
+          "assembly": 0.43,
+          "total": 197.1
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.84
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7654,
+            "ndcg_at_5": 0.5531,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 34.36
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.3333,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.56
+        }
+      }
+    },
+    {
+      "query_id": "Q37",
+      "query_text": "How do ASTFunctionCallVisitor and CodeGraphExtractor reconstruct function call relationships from source files?",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "calibration",
+      "is_answerable": true,
+      "raw_candidates_count": 44,
+      "expanded_candidates_count": 50,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 1.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "ASTFunctionCallVisitor",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeGraphExtractor",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          },
+          {
+            "name": "extract_from_source",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 169.27
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.75,
+          "r_at_5": 1.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.5307,
+          "ndcg_at_5": 0.6608,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "RelationType",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          },
+          {
+            "name": "ASTFunctionCallVisitor",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeGraphExtractor",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1615,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 13,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.2589,
+        "latency_breakdown_ms": {
+          "analysis": 0.79,
+          "retrieval": 139.59,
+          "expansion": 26.14,
+          "star_ranking": 36.49,
+          "assembly": 0.28,
+          "total": 203.29
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 1.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.14
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 1.0,
+            "r_at_3": 1.0,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 1.0,
+            "ndcg_at_5": 1.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 36.76
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.75,
+            "r_at_5": 1.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.5307,
+            "ndcg_at_5": 0.6608,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 2.85
+        }
+      }
+    },
+    {
+      "query_id": "Q38",
+      "query_text": "How does the LLM provider factory select between Groq, Claude, and offline synthesizer fallback?",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 53,
+      "expanded_candidates_count": 64,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.6667,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.3156,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "FindingSynthesizer",
+            "path": "apps/api/src/services/discovery_engine/synthesizer.py",
+            "score": 1.0
+          },
+          {
+            "name": "LLMProvider",
+            "path": "apps/api/src/services/llm/base.py",
+            "score": 1.0
+          },
+          {
+            "name": "GroqProvider",
+            "path": "apps/api/src/services/llm/groq.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 196.54
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.6667,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.6548,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "GroqProvider",
+            "path": "apps/api/src/services/llm/groq.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_report_synthesizer",
+            "path": "apps/api/src/services/report_engine/synthesizer.py",
+            "score": 1.0
+          },
+          {
+            "name": "get_llm_provider",
+            "path": "apps/api/src/services/llm/factory.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1623,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 5,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.3494,
+        "latency_breakdown_ms": {
+          "analysis": 0.58,
+          "retrieval": 171.69,
+          "expansion": 21.43,
+          "star_ranking": 31.25,
+          "assembly": 0.51,
+          "total": 225.46
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.6667,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.3156,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.61
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.3333,
+            "r_at_5": 0.6667,
+            "hit_at_1": 0.0,
+            "mrr": 0.3333,
+            "ndcg_at_3": 0.2346,
+            "ndcg_at_5": 0.3156,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 41.23
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.6667,
+            "r_at_5": 1.0,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.6548,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 19.85
+        }
+      }
+    },
+    {
+      "query_id": "Q39",
+      "query_text": "Explain how RelationshipExpander uses 1-hop graph traversal to expand retrieved code symbols",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 62,
+      "expanded_candidates_count": 77,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.2,
+          "r_at_5": 0.2,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.6131,
+          "ndcg_at_5": 0.6131,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "RelationshipExpander",
+            "path": "apps/api/src/services/context_engine/graph_expander.py",
+            "score": 1.0
+          },
+          {
+            "name": "expand_candidates",
+            "path": "apps/api/src/services/context_engine/graph_expander.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeGraphExtractor",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 203.45
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.2,
+          "r_at_5": 0.6,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.3869,
+          "ndcg_at_5": 0.6241,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "expand_candidates",
+            "path": "apps/api/src/services/context_engine/graph_expander.py",
+            "score": 1.0
+          },
+          {
+            "name": "RelationshipExpander",
+            "path": "apps/api/src/services/context_engine/graph_expander.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeGraphExtractor",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1627,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 2,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.1331,
+        "latency_breakdown_ms": {
+          "analysis": 0.81,
+          "retrieval": 173.57,
+          "expansion": 25.61,
+          "star_ranking": 53.37,
+          "assembly": 0.63,
+          "total": 253.99
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.2,
+            "r_at_5": 0.2,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.6131,
+            "ndcg_at_5": 0.6131,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.05
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.2,
+            "r_at_5": 0.2,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.6131,
+            "ndcg_at_5": 0.6131,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 39.91
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.2,
+            "r_at_5": 0.6,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.3869,
+            "ndcg_at_5": 0.6241,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 7.09
+        }
+      }
+    },
+    {
+      "query_id": "Q40",
+      "query_text": "How does error handling and custom HTTPException mapping work across the FastAPI routes?",
+      "archetype": "E_COMPLEX_ARCHITECTURAL",
+      "split": "evaluation",
+      "is_answerable": true,
+      "raw_candidates_count": 85,
+      "expanded_candidates_count": 98,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.2,
+          "r_at_5": 0.2,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.214,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "ErrorResponse",
+            "path": "apps/api/src/schemas/error.py",
+            "score": 1.0
+          },
+          {
+            "name": "handle_validation_error",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          },
+          {
+            "name": "fastapi",
+            "path": "apps/api/src/api/routes/auth.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 181.5
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.6,
+          "r_at_5": 0.6,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.786,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "AppException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "ErrorResponse",
+            "path": "apps/api/src/schemas/error.py",
+            "score": 1.0
+          },
+          {
+            "name": "handle_http_exception",
+            "path": "apps/api/src/main.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1637,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 29,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.153,
+        "latency_breakdown_ms": {
+          "analysis": 0.72,
+          "retrieval": 157.09,
+          "expansion": 20.37,
+          "star_ranking": 40.62,
+          "assembly": 0.37,
+          "total": 219.16
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.2,
+            "r_at_5": 0.2,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.16
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.3333,
+            "r_at_3": 0.2,
+            "r_at_5": 0.2,
+            "hit_at_1": 0.0,
+            "mrr": 0.5,
+            "ndcg_at_3": 0.2961,
+            "ndcg_at_5": 0.214,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 43.82
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 1.0,
+            "p_at_3": 0.6667,
+            "r_at_3": 0.6,
+            "r_at_5": 0.6,
+            "hit_at_1": 1.0,
+            "mrr": 1.0,
+            "ndcg_at_3": 0.7039,
+            "ndcg_at_5": 0.786,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.74
+        }
+      }
+    },
+    {
+      "query_id": "Q41",
+      "query_text": "How does the Kubernetes Helm chart deploy the Phoenix observability cluster with mTLS?",
+      "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+      "split": "calibration",
+      "is_answerable": false,
+      "raw_candidates_count": 20,
+      "expanded_candidates_count": 67,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 0.48,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "is_data_plane",
+            "path": "apps/api/src/config/settings.py",
+            "score": 0.48
+          },
+          {
+            "name": "TestingAndDocs",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 0.48
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 0.48
+          }
+        ],
+        "latency_ms": 613.51
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 0.5797,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "is_data_plane",
+            "path": "apps/api/src/config/settings.py",
+            "score": 0.5797
+          },
+          {
+            "name": "TestingAndDocs",
+            "path": "apps/api/src/schemas/report.py",
+            "score": 0.5797
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py",
+            "score": 0.5797
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1649,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 3,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.72,
+          "retrieval": 558.76,
+          "expansion": 51.23,
+          "star_ranking": 34.0,
+          "assembly": 0.45,
+          "total": 645.17
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 0.55,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.45
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 0.55,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 37.69
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 0.5797,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 9.26
+        }
+      }
+    },
+    {
+      "query_id": "Q42",
+      "query_text": "Where is the Jira and Linear webhook bi-directional sync engine implemented?",
+      "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+      "split": "evaluation",
+      "is_answerable": false,
+      "raw_candidates_count": 75,
+      "expanded_candidates_count": 88,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "sync_servers",
+            "path": "apps/api/src/api/routes/projects.py",
+            "score": 1.0
+          },
+          {
+            "name": "sync_servers",
+            "path": "apps/api/src/services/project_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ProjectContextEngine",
+            "path": "apps/api/src/services/context_engine/engine.py",
+            "score": 0.97
+          }
+        ],
+        "latency_ms": 143.56
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "sync_servers",
+            "path": "apps/api/src/api/routes/projects.py",
+            "score": 1.0
+          },
+          {
+            "name": "sync_servers",
+            "path": "apps/api/src/services/project_service.py",
+            "score": 1.0
+          },
+          {
+            "name": "ProjectContextEngine",
+            "path": "apps/api/src/services/context_engine/engine.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1655,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 17,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.48,
+          "retrieval": 113.36,
+          "expansion": 24.45,
+          "star_ranking": 43.57,
+          "assembly": 0.34,
+          "total": 182.19
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.8
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 31.27
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 6.82
+        }
+      }
+    },
+    {
+      "query_id": "Q43",
+      "query_text": "How does the autonomous code mutation PR creator automatically rewrite buggy Python functions?",
+      "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+      "split": "evaluation",
+      "is_answerable": false,
+      "raw_candidates_count": 62,
+      "expanded_candidates_count": 77,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeChunkRead",
+            "path": "apps/api/src/schemas/context.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeAtomDecomposer",
+            "path": "apps/api/src/services/code_atom/decomposer.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 144.82
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeDependency",
+            "path": "apps/api/src/models/dependency.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeSymbol",
+            "path": "apps/api/src/models/symbol.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1661,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 2,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.79,
+          "retrieval": 119.94,
+          "expansion": 20.71,
+          "star_ranking": 36.34,
+          "assembly": 0.33,
+          "total": 178.11
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.55
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 40.94
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.77
+        }
+      }
+    },
+    {
+      "query_id": "Q44",
+      "query_text": "Where is the enterprise SAML SSO and Okta authentication bridge configured?",
+      "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+      "split": "evaluation",
+      "is_answerable": false,
+      "raw_candidates_count": 61,
+      "expanded_candidates_count": 67,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "get_current_user",
+            "path": "apps/api/src/api/dependencies/auth.py",
+            "score": 1.0
+          },
+          {
+            "name": "UnauthorizedException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "ServiceAssociateRepo",
+            "path": "apps/api/src/schemas/service.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 271.69
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "UnauthorizedException",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "__init__",
+            "path": "apps/api/src/api/exceptions.py",
+            "score": 1.0
+          },
+          {
+            "name": "Settings",
+            "path": "apps/api/src/config/settings.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1664,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 1,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.84,
+          "retrieval": 242.84,
+          "expansion": 23.59,
+          "star_ranking": 41.56,
+          "assembly": 0.43,
+          "total": 309.27
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.75
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 35.1
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 5.22
+        }
+      }
+    },
+    {
+      "query_id": "Q45",
+      "query_text": "How is quantum computing circuit simulation executed in the Code Lane?",
+      "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+      "split": "evaluation",
+      "is_answerable": false,
+      "raw_candidates_count": 61,
+      "expanded_candidates_count": 75,
+      "atom_baseline": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "SemanticCodeFact",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeChangeType",
+            "path": "apps/api/src/schemas/code_atom.py",
+            "score": 1.0
+          },
+          {
+            "name": "DataPlaneSecurityMiddleware",
+            "path": "apps/api/src/core/data_plane_middleware.py",
+            "score": 1.0
+          }
+        ],
+        "latency_ms": 150.0
+      },
+      "star_rag": {
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "top_candidates": [
+          {
+            "name": "CodeChunk",
+            "path": "apps/api/src/models/chunk.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeDependency",
+            "path": "apps/api/src/models/dependency.py",
+            "score": 1.0
+          },
+          {
+            "name": "CodeSymbol",
+            "path": "apps/api/src/models/symbol.py",
+            "score": 1.0
+          }
+        ],
+        "diagnostics": {
+          "nodes_count": 1666,
+          "total_edges": 0,
+          "snr_filtered_edges": 0,
+          "evidence_paths_found": 0,
+          "ssaf_conflicts_detected": 2,
+          "graph_cache_hit": true,
+          "hub_attenuation_enabled": true,
+          "snr_enabled": true,
+          "dtp_enabled": true,
+          "ssaf_enabled": true
+        },
+        "evidence_paths_count": 0,
+        "evidence_paths": [],
+        "context_assembly_precision": 0.0,
+        "latency_breakdown_ms": {
+          "analysis": 0.84,
+          "retrieval": 124.36,
+          "expansion": 22.12,
+          "star_ranking": 41.45,
+          "assembly": 0.33,
+          "total": 189.11
+        }
+      },
+      "ablations": {
+        "atom_plus_snr": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 3.23
+        },
+        "atom_plus_dtp": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 36.08
+        },
+        "atom_plus_ssaf": {
+          "metrics": {
+            "p_at_1": 0.0,
+            "p_at_3": 0.0,
+            "r_at_3": 0.0,
+            "r_at_5": 0.0,
+            "hit_at_1": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_3": 0.0,
+            "ndcg_at_5": 0.0,
+            "top_score": 1.0,
+            "abstention_success": 0.0
+          },
+          "latency_ms": 4.56
+        }
+      }
+    }
+  ]
+}

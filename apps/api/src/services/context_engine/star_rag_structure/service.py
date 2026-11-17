@@ -75,26 +75,31 @@ class StructureAwareStarRagService:
             return [], res
 
         try:
-            # 1. Graph Construction: Load from DB snapshot if available, or build from candidate contents
-            graph: FunctionGraph
-            if session is not None and snapshot_id is not None:
-                file_ids = [c.file_id for c in candidates if c.file_id]
-                graph = await CodeGraphExtractor.build_graph_for_snapshot(
-                    session=session,
-                    snapshot_id=snapshot_id,
-                    file_ids=file_ids,
+            # 1. Graph Construction / Retrieval: Use multi-tier cache (Memory + Redis)
+            graph = None
+            cache_hit = False
+            if snapshot_id is not None and getattr(settings, "STRUCTURE_AWARE_GRAPH_CACHE_ENABLED", True):
+                from apps.api.src.services.context_engine.star_rag_structure.cache import (
+                    CodeGraphCache,
                 )
-            else:
-                graph = FunctionGraph()
 
-            # Enrich graph with AST analysis of candidates having rich code content
-            for cand in candidates:
-                if cand.content and len(cand.content) > 30 and (cand.path.endswith(".py") or "def " in cand.content):
-                    ast_g = CodeGraphExtractor.extract_from_source(cand.path, cand.content)
-                    for n in ast_g.nodes.values():
-                        graph.add_node(n)
-                    for e in ast_g.edges:
-                        graph.add_edge(e)
+                graph = await CodeGraphCache.get_graph(
+                    snapshot_id=snapshot_id,
+                    session=session,
+                )
+                if graph is not None and len(graph.nodes) > 0:
+                    cache_hit = True
+
+            if graph is None:
+                if session is not None and snapshot_id is not None:
+                    file_ids = [c.file_id for c in candidates if c.file_id]
+                    graph = await CodeGraphExtractor.build_graph_for_snapshot(
+                        session=session,
+                        snapshot_id=snapshot_id,
+                        file_ids=file_ids,
+                    )
+                else:
+                    graph = FunctionGraph()
 
             # Ensure all candidates have a corresponding node in the graph
             for cand in candidates:
@@ -148,12 +153,19 @@ class StructureAwareStarRagService:
                     graph.out_edges.setdefault(e.source_id, []).append(e)
                     graph.in_edges.setdefault(e.target_id, []).append(e)
 
-            # 3. Decoupled Topological Propagation (DTP)
+            # 3. Decoupled Topological Propagation (DTP) with Hub Attenuation
             dtp_features = {}
             if enable_dtp:
                 max_hops = getattr(settings, "STRUCTURE_AWARE_DTP_MAX_DEPTH", 3)
                 dtp_decay = getattr(settings, "STRUCTURE_AWARE_DTP_DECAY", 0.75)
-                dtp = DecoupledTopologicalPropagator(max_hops=max_hops, decay_factor=dtp_decay)
+                hub_attenuation = getattr(settings, "STRUCTURE_AWARE_DTP_HUB_ATTENUATION", True)
+                attenuation_factor = getattr(settings, "STRUCTURE_AWARE_DTP_KAPPA", 0.75)
+                dtp = DecoupledTopologicalPropagator(
+                    max_hops=max_hops,
+                    decay_factor=dtp_decay,
+                    hub_attenuation=hub_attenuation,
+                    attenuation_factor=attenuation_factor,
+                )
                 dtp_features = dtp.extract_directed_features(graph.nodes, graph.edges)
                 dtp_features = dtp.compute_multi_order_connectivity(
                     graph.nodes, graph.edges, seed_ids, dtp_features
@@ -177,7 +189,11 @@ class StructureAwareStarRagService:
             ssaf_results = []
             if enable_ssaf:
                 conflict_thresh = getattr(settings, "STRUCTURE_AWARE_SSAF_CONFLICT_THRESHOLD", 0.40)
-                ssaf = SemanticStructuralAdaptiveFusion(conflict_threshold=conflict_thresh)
+                max_struct_weight = getattr(settings, "STRUCTURE_AWARE_SSAF_STRUCTURAL_WEIGHT", 0.15)
+                ssaf = SemanticStructuralAdaptiveFusion(
+                    conflict_threshold=conflict_thresh,
+                    max_structural_weight=max_struct_weight,
+                )
                 ranked_candidates, ssaf_results = ssaf.fuse_and_rank_candidates(
                     candidates=candidates,
                     query_text=query_text,
@@ -185,6 +201,7 @@ class StructureAwareStarRagService:
                 )
             else:
                 from apps.api.src.services.context_engine.ranker import MultiSignalRanker
+
                 ranked_candidates = MultiSignalRanker.rank_candidates(
                     candidates=candidates,
                     analyzed_query=analyzed_query or AnalyzedQuery(raw_query=query_text),
@@ -196,6 +213,8 @@ class StructureAwareStarRagService:
                 "snr_filtered_edges": len(snr_decisions) - len(active_edges),
                 "evidence_paths_found": len(evidence_paths),
                 "ssaf_conflicts_detected": sum(1 for s in ssaf_results if s.is_conflict),
+                "graph_cache_hit": cache_hit,
+                "hub_attenuation_enabled": getattr(settings, "STRUCTURE_AWARE_DTP_HUB_ATTENUATION", True),
                 "snr_enabled": enable_snr,
                 "dtp_enabled": enable_dtp,
                 "ssaf_enabled": enable_ssaf,
