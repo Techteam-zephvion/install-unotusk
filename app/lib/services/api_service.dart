@@ -111,7 +111,7 @@ class ApiService {
   }
 
   /// Sets custom base URL dynamically
-  static void setBaseUrl(String url) {
+  static void setBaseUrl(String url, {bool persist = true}) {
     var cleaned = url.trim();
     if (cleaned.endsWith('/')) cleaned = cleaned.substring(0, cleaned.length - 1);
     if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
@@ -119,11 +119,17 @@ class ApiService {
     }
     baseUrl = cleaned;
     serverHost = baseUrl.replaceAll('http://', '').replaceAll('https://', '');
-    try {
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.setString(ServerDiscoveryService.prefKeyServerUrl, baseUrl);
-      });
-    } catch (_) {}
+    
+    // Only persist if explicitly requested AND the port is the Control Plane (28000) or has no port
+    final uri = Uri.tryParse(baseUrl);
+    final isControlPlaneOrStandard = uri != null && (!uri.hasPort || uri.port == 28000);
+    if (persist && isControlPlaneOrStandard) {
+      try {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString(ServerDiscoveryService.prefKeyServerUrl, baseUrl);
+        });
+      } catch (_) {}
+    }
   }
 
   static ServerDiscoveryResult? get lastDiscoveryResult => ServerDiscoveryService.lastResult;
@@ -494,8 +500,24 @@ class ApiService {
     }
 
     try {
-      final uri = Uri.parse('$baseUrl/api/v1/projects');
-      final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+      final currentUri = Uri.parse(baseUrl);
+      // The Control Plane (port 28000) maintains the global projects catalog across all servers.
+      // If baseUrl was temporarily shifted to a project's dedicated data-plane port (e.g. 28100, 28150),
+      // we must fetch the full catalog from the Control Plane (port 28000).
+      Uri uri = Uri.parse('$baseUrl/api/v1/projects');
+      if (currentUri.hasPort && currentUri.port != 28000) {
+        uri = currentUri.replace(port: 28000, path: '/api/v1/projects');
+      }
+
+      http.Response res;
+      try {
+        res = await _client.get(uri, headers: _headers).timeout(_timeout);
+        if (res.statusCode != 200 && uri.toString() != '$baseUrl/api/v1/projects') {
+          res = await _client.get(Uri.parse('$baseUrl/api/v1/projects'), headers: _headers).timeout(_timeout);
+        }
+      } catch (_) {
+        res = await _client.get(Uri.parse('$baseUrl/api/v1/projects'), headers: _headers).timeout(_timeout);
+      }
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -546,41 +568,57 @@ class ApiService {
           );
         }).toList();
 
-        // Deep verification against actual project container / data plane
+        // Verification against actual project container / data plane
         final currentHost = Uri.parse(baseUrl).host;
         final verifiedProjects = await Future.wait(projects.map((proj) async {
           if (accessToken == null) return proj;
           try {
-            // 1. If project has a designated data-plane port, probe it directly
+            // 1. If project was already returned with READY status from the current server,
+            // it is definitively live on this server!
+            if (proj.upsStatus.toUpperCase() == 'READY') {
+              final currentUri = Uri.tryParse(baseUrl);
+              return proj.copyWith(
+                ingestionStatus: 'live',
+                port: proj.port ?? (currentUri?.hasPort == true ? currentUri!.port : 28000),
+              );
+            }
+
+            // 2. If project has a designated data-plane port, probe it directly
             if (proj.port != null && proj.port! > 0) {
-              try {
-                final portHealthUri = Uri.parse('http://$currentHost:${proj.port}/health');
-                final portRes = await _client.get(portHealthUri).timeout(const Duration(seconds: 2));
-                if (portRes.statusCode == 200) {
-                  return proj.copyWith(
-                    upsStatus: 'READY',
-                    ingestionStatus: 'live',
-                  );
-                }
-              } catch (_) {}
+              final hosts = <String>{'127.0.0.1', if (currentHost.isNotEmpty && currentHost != 'localhost') currentHost};
+              for (final h in hosts) {
+                try {
+                  final portHealthUri = Uri.parse('http://$h:${proj.port}/health');
+                  final portRes = await _client.get(portHealthUri).timeout(const Duration(milliseconds: 1200));
+                  if (portRes.statusCode == 200) {
+                    return proj.copyWith(
+                      upsStatus: 'READY',
+                      ingestionStatus: 'live',
+                    );
+                  }
+                } catch (_) {}
+              }
             }
 
             final dp = await fetchDataPlaneStatus(proj.id);
             if (dp.port != null && dp.port! > 0) {
-              try {
-                final portHealthUri = Uri.parse('http://$currentHost:${dp.port}/health');
-                final portRes = await _client.get(portHealthUri).timeout(const Duration(seconds: 2));
-                if (portRes.statusCode == 200) {
-                  return proj.copyWith(
-                    upsStatus: 'READY',
-                    ingestionStatus: 'live',
-                    port: dp.port,
-                  );
-                }
-              } catch (_) {}
+              final hosts = <String>{'127.0.0.1', if (currentHost.isNotEmpty && currentHost != 'localhost') currentHost};
+              for (final h in hosts) {
+                try {
+                  final portHealthUri = Uri.parse('http://$h:${dp.port}/health');
+                  final portRes = await _client.get(portHealthUri).timeout(const Duration(milliseconds: 1200));
+                  if (portRes.statusCode == 200) {
+                    return proj.copyWith(
+                      upsStatus: 'READY',
+                      ingestionStatus: 'live',
+                      port: dp.port,
+                    );
+                  }
+                } catch (_) {}
+              }
             }
 
-            if (!dp.isRunning) {
+            if (!dp.isRunning && proj.upsStatus.toUpperCase() != 'READY') {
               return proj.copyWith(
                 upsStatus: 'STOPPED',
                 ingestionStatus: 'stopped',
@@ -594,10 +632,7 @@ class ApiService {
               );
             }
           } catch (_) {
-            return proj.copyWith(
-              upsStatus: 'STOPPED',
-              ingestionStatus: 'stopped',
-            );
+            return proj;
           }
         }));
         projects
@@ -608,25 +643,43 @@ class ApiService {
           final localRegistry = LocalRegistryService();
           final localServers = await localRegistry.getRunningServers();
           for (final ls in localServers) {
-            final isRunning = ls.state == 'running' || ls.state == 'degraded' || ls.state == 'active';
             final fallbackProj = ProjectItem(
               id: ls.id,
               name: ls.name,
-              upsStatus: isRunning ? 'READY' : 'STOPPED',
-              ingestionStatus: isRunning ? 'live' : 'stopped',
+              upsStatus: 'STOPPED',
+              ingestionStatus: 'stopped',
               lastIngestion: 'Just now',
               fpr: 0.0,
               days: 1,
               port: ls.apiPort,
               repositoryName: ls.repoUrl,
             );
-            
+
+            // Probe health on both 127.0.0.1 and currentHost
+            final hostsToProbe = <String>{'127.0.0.1', if (currentHost.isNotEmpty && currentHost != 'localhost') currentHost};
+            bool isPortHealthy = false;
+            String healthyHost = '127.0.0.1';
+
+            for (final host in hostsToProbe) {
+              try {
+                final healthUri = Uri.parse('http://$host:${ls.apiPort}/health');
+                final healthRes = await _client.get(healthUri).timeout(const Duration(milliseconds: 1000));
+                if (healthRes.statusCode == 200) {
+                  isPortHealthy = true;
+                  healthyHost = host;
+                  break;
+                }
+              } catch (_) {}
+            }
+
+            final isLive = isPortHealthy || ls.state == 'running' || ls.state == 'degraded' || ls.state == 'active';
+
             bool mappedFromApi = false;
-            try {
-              if (isRunning) {
-                final currentHost = Uri.parse(ApiService.baseUrl).host;
-                final localUri = Uri.parse('http://$currentHost:${ls.apiPort}/api/v1/projects');
-                final localRes = await _client.get(localUri).timeout(const Duration(seconds: 2));
+            if (isPortHealthy) {
+              try {
+                // Try fetching without headers first to avoid 401 token cross-server rejection
+                final localUri = Uri.parse('http://$healthyHost:${ls.apiPort}/api/v1/projects');
+                final localRes = await _client.get(localUri).timeout(const Duration(milliseconds: 1500));
                 if (localRes.statusCode == 200) {
                   final localDecoded = jsonDecode(localRes.body);
                   List<dynamic> localList = [];
@@ -635,53 +688,66 @@ class ApiService {
                   } else if (localDecoded is Map && localDecoded['projects'] is List) {
                     localList = localDecoded['projects'];
                   }
-                
-                for (final p in localList) {
-                  final pm = Map<String, dynamic>.from(p as Map);
-                  final pName = pm['name']?.toString() ?? ls.name;
                   
-                  final localProj = ProjectItem(
-                    id: pm['id']?.toString() ?? ls.id,
-                    name: pName,
-                    upsStatus: pm['status']?.toString() ?? 'READY',
-                    ingestionStatus: 'live',
-                    lastIngestion: 'Just now',
-                    fpr: 0.0,
-                    days: 1,
-                    port: ls.apiPort,
-                    organizationId: pm['organization_id']?.toString(),
-                    slug: pm['slug']?.toString(),
-                    description: pm['description']?.toString(),
-                    role: pm['role']?.toString(),
-                    repositoryName: pm['repository'] is Map
-                        ? (pm['repository']['full_name']?.toString() ?? pm['repository']['name']?.toString())
-                        : ls.repoUrl,
-                    defaultBranch: pm['repository'] is Map
-                        ? pm['repository']['default_branch']?.toString()
-                        : null,
-                  );
+                  for (final p in localList) {
+                    final pm = Map<String, dynamic>.from(p as Map);
+                    final pName = pm['name']?.toString() ?? ls.name;
+                    
+                    final localProj = ProjectItem(
+                      id: pm['id']?.toString() ?? ls.id,
+                      name: pName,
+                      upsStatus: pm['status']?.toString() ?? 'READY',
+                      ingestionStatus: 'live',
+                      lastIngestion: 'Just now',
+                      fpr: 0.0,
+                      days: 1,
+                      port: ls.apiPort,
+                      organizationId: pm['organization_id']?.toString(),
+                      slug: pm['slug']?.toString(),
+                      description: pm['description']?.toString(),
+                      role: pm['role']?.toString(),
+                      repositoryName: pm['repository'] is Map
+                          ? (pm['repository']['full_name']?.toString() ?? pm['repository']['name']?.toString())
+                          : ls.repoUrl,
+                      defaultBranch: pm['repository'] is Map
+                          ? pm['repository']['default_branch']?.toString()
+                          : null,
+                    );
 
-                  mappedFromApi = true;
-                  if (!projects.any((p) => p.name == localProj.name || p.id == localProj.id)) {
-                    projects.add(localProj);
-                  } else {
-                    final idx = projects.indexWhere((p) => p.name == localProj.name || p.id == localProj.id);
-                    projects[idx] = localProj;
+                    mappedFromApi = true;
+                    final idx = projects.indexWhere((p) =>
+                        p.name.toLowerCase() == localProj.name.toLowerCase() ||
+                        p.id.toLowerCase() == localProj.id.toLowerCase() ||
+                        (p.port != null && p.port == localProj.port));
+                    if (idx == -1) {
+                      projects.add(localProj);
+                    } else {
+                      projects[idx] = localProj;
+                    }
                   }
                 }
-              }
-              }
-            } catch (_) {}
-            
+              } catch (_) {}
+            }
+
             if (!mappedFromApi) {
-              // Only augment an EXISTING project that matches by name or id, NEVER resurrect a deleted server
-              final idx = projects.indexWhere((p) => p.name == fallbackProj.name || p.id == fallbackProj.id);
+              final idx = projects.indexWhere((p) =>
+                  p.name.toLowerCase() == fallbackProj.name.toLowerCase() ||
+                  p.id.toLowerCase() == fallbackProj.id.toLowerCase() ||
+                  (p.port != null && p.port == fallbackProj.port));
+
               if (idx != -1) {
                 final existing = projects[idx];
                 projects[idx] = existing.copyWith(
                   port: existing.port ?? fallbackProj.port,
                   repositoryName: existing.repositoryName ?? fallbackProj.repositoryName,
+                  upsStatus: isLive ? 'READY' : 'STOPPED',
+                  ingestionStatus: isLive ? 'live' : 'stopped',
                 );
+              } else {
+                projects.add(fallbackProj.copyWith(
+                  upsStatus: isLive ? 'READY' : 'STOPPED',
+                  ingestionStatus: isLive ? 'live' : 'stopped',
+                ));
               }
             }
           }
@@ -735,6 +801,13 @@ class ApiService {
   /// Sets the currently active project
   static void setActiveProject(ProjectItem project) {
     activeProject = project;
+    if (project.port != null && project.port! > 0) {
+      final currentUri = Uri.tryParse(baseUrl);
+      if (currentUri != null && currentUri.port != project.port) {
+        baseUrl = currentUri.replace(port: project.port).toString().replaceAll(RegExp(r'/+$'), '');
+        serverHost = baseUrl.replaceAll('http://', '').replaceAll('https://', '');
+      }
+    }
   }
 
   /// Creates and connects a codebase to http://10.0.0.59:28000/api/v1/projects

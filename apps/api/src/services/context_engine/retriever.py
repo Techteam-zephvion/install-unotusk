@@ -82,8 +82,9 @@ def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
         meta["file_id"] = str(chunk.file_id)
     if getattr(chunk, "symbol_id", None):
         meta["symbol_id"] = str(chunk.symbol_id)
-    if getattr(chunk, "snapshot", None) and getattr(chunk.snapshot, "repository_id", None):
-        meta["repository_id"] = str(chunk.snapshot.repository_id)
+    snap_val = getattr(chunk, "__dict__", {}).get("snapshot")
+    if snap_val and getattr(snap_val, "repository_id", None):
+        meta["repository_id"] = str(snap_val.repository_id)
     if getattr(chunk, "commit_sha", None):
         meta["commit_sha"] = chunk.commit_sha
     if getattr(chunk, "commit_message", None):

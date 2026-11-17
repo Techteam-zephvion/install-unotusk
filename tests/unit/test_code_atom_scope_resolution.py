@@ -9,6 +9,7 @@ embedding backend routing, and provenance synchronization.
 
 import uuid
 
+from apps.api.src.config.settings import settings
 from apps.api.src.schemas.code_atom import GitCommitArtifact
 from apps.api.src.services.code_atom.chunk_mapper import (
     map_atomic_code_change_to_code_chunk,
@@ -326,7 +327,7 @@ index 1111111..2222222 100644
     assert chunk.start_line == 10
 
 
-def test_embedding_backend_routing_and_format():
+def test_embedding_backend_routing_and_format(monkeypatch):
     """Fidelity check on Voyage vs Development backend routing and embedding text formatting."""
     dev_backend = DevelopmentCodeEmbeddingBackend()
     assert dev_backend.provider_name == "development"
@@ -352,6 +353,20 @@ def test_embedding_backend_routing_and_format():
     assert "Symbol: calculate_tax" in formatted
     assert "rate = 0.15" in formatted
 
-    # Default backend resolution without VOYAGE_API_KEY defaults cleanly to Development
-    default_backend = get_code_embedding_backend()
-    assert isinstance(default_backend, DevelopmentCodeEmbeddingBackend)
+    # Case 1: Isolated Development backend resolution when Voyage is unavailable / not configured
+    monkeypatch.setattr(settings, "VOYAGE_API_KEY", "")
+    monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
+    monkeypatch.setattr(settings, "EMBEDDING_PROVIDER", "development")
+    dev_routed_backend = get_code_embedding_backend()
+    assert isinstance(dev_routed_backend, DevelopmentCodeEmbeddingBackend)
+    assert dev_routed_backend.provider_name == "development"
+    assert dev_routed_backend.dimension == 1536
+
+    # Case 2: Isolated Voyage backend resolution when valid credentials are configured
+    monkeypatch.setattr(settings, "VOYAGE_API_KEY", "pa-mock-valid-key-123456789012345678")
+    monkeypatch.setattr(settings, "EMBEDDING_PROVIDER", "voyage")
+    voyage_routed_backend = get_code_embedding_backend()
+    assert isinstance(voyage_routed_backend, VoyageCodeEmbeddingBackend)
+    assert voyage_routed_backend.provider_name == "voyage"
+    assert voyage_routed_backend.model_name == "voyage-code-2"
+    assert voyage_routed_backend.dimension == 1536

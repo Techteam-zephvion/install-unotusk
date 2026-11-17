@@ -26,18 +26,141 @@ class ChatInputBox extends StatefulWidget {
   State<ChatInputBox> createState() => _ChatInputBoxState();
 }
 
-class _ChatInputBoxState extends State<ChatInputBox> {
+class _ChatInputBoxState extends State<ChatInputBox>
+    with TickerProviderStateMixin {
   bool _thinkingEnabled = true;
   String _thinkingMode = 'warm'; // warm, cold, hot
-  String? _activeSearchMode; // research, web
+  String? _activeSearchMode; // research, web, project
   bool _showSuggestions = false;
   final List<String> _attachedFileNames = [];
 
+  final FocusNode _focusNode = FocusNode();
+  bool _isCardHovered = false;
+  bool _sendBtnHovered = false;
+  bool _plusBtnHovered = false;
+  bool _attachBtnHovered = false;
+  bool _thinkingToggleHovered = false;
+  bool _tierBtnHovered = false;
+
+  // Thinking Dropdown Animation & Overlay
+  late final AnimationController _thinkingAnim;
+  late final Animation<double> _thinkingFade;
+  late final Animation<double> _thinkingScale;
+  late final Animation<Offset> _thinkingSlide;
+  OverlayEntry? _thinkingMenuOverlay;
+
+  // Plus Menu Animation & Overlay
+  late final AnimationController _plusAnim;
+  late final Animation<double> _plusFade;
+  late final Animation<double> _plusScale;
+  late final Animation<Offset> _plusSlide;
+  late final Animation<double> _plusRotate;
+  OverlayEntry? _plusMenuOverlay;
+
+  final LayerLink _layerLink = LayerLink();
+  final LayerLink _thinkingButtonLink = LayerLink();
+  final LayerLink _plusButtonLink = LayerLink();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+    _focusNode.addListener(_onFocusChanged);
+
+    // Thinking Menu Animations
+    _thinkingAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      reverseDuration: const Duration(milliseconds: 160),
+    );
+    _thinkingFade = CurvedAnimation(
+      parent: _thinkingAnim,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    _thinkingScale = Tween<double>(begin: 0.94, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _thinkingAnim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+    _thinkingSlide = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _thinkingAnim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+
+    // Plus Menu Animations
+    _plusAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+      reverseDuration: const Duration(milliseconds: 150),
+    );
+    _plusFade = CurvedAnimation(
+      parent: _plusAnim,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    _plusScale = Tween<double>(begin: 0.93, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _plusAnim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+    _plusSlide = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _plusAnim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+    _plusRotate = Tween<double>(begin: 0.0, end: 0.125).animate(
+      CurvedAnimation(
+        parent: _plusAnim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _closeThinkingMenu(animated: false);
+    _closePlusMenu(animated: false);
+    _thinkingAnim.dispose();
+    _plusAnim.dispose();
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    widget.controller.removeListener(_onTextChanged);
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onTextChanged() {
+    final text = widget.controller.text.trim();
+    if (mounted) {
+      setState(() {
+        _showSuggestions = text.isNotEmpty && widget.suggestions.isNotEmpty;
+      });
+    }
+  }
+
   Future<void> _handlePickFiles() async {
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.any,
-      );
+      final result = await FilePicker.pickFiles(type: FileType.any);
       if (result.isNotEmpty) {
         setState(() {
           for (final f in result) {
@@ -52,52 +175,30 @@ class _ChatInputBoxState extends State<ChatInputBox> {
     }
   }
 
-  final LayerLink _layerLink = LayerLink();
-  final LayerLink _thinkingButtonLink = LayerLink();
-  OverlayEntry? _thinkingMenuOverlay;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTextChanged);
-  }
-
-  @override
-  void dispose() {
-    _closeThinkingMenu();
-    widget.controller.removeListener(_onTextChanged);
-    super.dispose();
-  }
-
+  // --- Thinking Menu Overlay ---
   void _toggleThinkingMenu() {
     if (_thinkingMenuOverlay != null) {
       _closeThinkingMenu();
     } else {
+      _closePlusMenu(animated: false);
       _openThinkingMenu();
     }
   }
 
-  void _closeThinkingMenu() {
-    _thinkingMenuOverlay?.remove();
-    _thinkingMenuOverlay = null;
-  }
-
   void _openThinkingMenu() {
-    _closeThinkingMenu();
+    _closeThinkingMenu(animated: false);
     final overlay = Overlay.of(context);
     _thinkingMenuOverlay = OverlayEntry(
       builder: (context) {
         return Stack(
           children: [
-            // Tap outside to dismiss
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: _closeThinkingMenu,
+                onTap: () => _closeThinkingMenu(),
                 child: const SizedBox.expand(),
               ),
             ),
-            // Floating menu positioned right above the button
             CompositedTransformFollower(
               link: _thinkingButtonLink,
               showWhenUnlinked: false,
@@ -106,11 +207,7 @@ class _ChatInputBoxState extends State<ChatInputBox> {
               offset: const Offset(0, -10),
               child: Material(
                 color: Colors.transparent,
-                child: StatefulBuilder(
-                  builder: (context, setMenuState) {
-                    return _buildThinkingMenuCard(setMenuState);
-                  },
-                ),
+                child: _buildThinkingMenuCard(),
               ),
             ),
           ],
@@ -118,111 +215,100 @@ class _ChatInputBoxState extends State<ChatInputBox> {
       },
     );
     overlay.insert(_thinkingMenuOverlay!);
+    _thinkingAnim.forward(from: 0.0);
+    setState(() {});
   }
 
-  Widget _buildThinkingMenuCard(StateSetter setMenuState) {
-    return Container(
-      width: 210,
-      decoration: BoxDecoration(
-        color: const Color(0xFF232321),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF383835)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
+  Future<void> _closeThinkingMenu({bool animated = true}) async {
+    if (_thinkingMenuOverlay == null) return;
+    if (animated) {
+      await _thinkingAnim.reverse();
+    }
+    _thinkingMenuOverlay?.remove();
+    _thinkingMenuOverlay = null;
+    if (mounted) setState(() {});
+  }
+
+  Widget _buildThinkingMenuCard() {
+    return AnimatedBuilder(
+      animation: _thinkingAnim,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _thinkingFade,
+          child: SlideTransition(
+            position: _thinkingSlide,
+            child: ScaleTransition(
+              scale: _thinkingScale,
+              alignment: Alignment.bottomLeft,
+              child: child,
+            ),
           ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header: "Thinking" + Toggle Switch
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        );
+      },
+      child: Container(
+        width: 230,
+        decoration: BoxDecoration(
+          color: widget.palette.bgElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.palette.div,
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 28,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(8),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Thinking',
-                style: UnoTypography.body(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              // Custom iOS/pill style Switch matching Screenshot 2
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _thinkingEnabled = !_thinkingEnabled;
-                  });
-                  setMenuState(() {});
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 44,
-                  height: 24,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: _thinkingEnabled
-                        ? const Color(0xFFDA7756)
-                        : const Color(0xFF3F3F46),
-                  ),
-                  child: Align(
-                    alignment: _thinkingEnabled
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _thinkingEnabled
-                            ? const Color(0xFFFEF3C7)
-                            : const Color(0xFFA1A1AA),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.cpu, size: 12, color: widget.palette.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'REASONING MODEL',
+                      style: UnoTypography.mono(
+                        color: widget.palette.textSec,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
                       ),
                     ),
-                  ),
+                  ],
                 ),
+              ),
+              _buildTierOption(
+                tier: 'hot',
+                title: 'Hot',
+                subtitle: 'Quick answers · Lowest latency',
+              ),
+              const SizedBox(height: 3),
+              _buildTierOption(
+                tier: 'warm',
+                title: 'Warm',
+                subtitle: 'Balanced · Standard depth',
+              ),
+              const SizedBox(height: 3),
+              _buildTierOption(
+                tier: 'cold',
+                title: 'Cold',
+                subtitle: 'Deep reasoning · Maximum facts',
               ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // Options: Hot, Warm, Cold
-          _buildTierOption(
-            tier: 'hot',
-            title: 'Hot',
-            subtitle: 'Quick answers',
-            dotColor: const Color(0xFFF87171),
-            accentColor: const Color(0xFFEF4444),
-            bgColor: const Color(0xFF4C2422),
-            setMenuState: setMenuState,
-          ),
-          const SizedBox(height: 4),
-          _buildTierOption(
-            tier: 'warm',
-            title: 'Warm',
-            subtitle: 'Balanced',
-            dotColor: const Color(0xFFFBBF24),
-            accentColor: const Color(0xFFEAB308),
-            bgColor: const Color(0xFF563F24),
-            setMenuState: setMenuState,
-          ),
-          const SizedBox(height: 4),
-          _buildTierOption(
-            tier: 'cold',
-            title: 'Cold',
-            subtitle: 'Deep reasoning',
-            dotColor: const Color(0xFF2DD4BF),
-            accentColor: const Color(0xFF14B8A6),
-            bgColor: const Color(0xFF1E3A37),
-            setMenuState: setMenuState,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -231,97 +317,270 @@ class _ChatInputBoxState extends State<ChatInputBox> {
     required String tier,
     required String title,
     required String subtitle,
-    required Color dotColor,
-    required Color accentColor,
-    required Color bgColor,
-    required StateSetter setMenuState,
   }) {
     final isSelected = _thinkingMode == tier && _thinkingEnabled;
 
-    return InkWell(
+    return _HoverableTile(
+      isSelected: isSelected,
+      selectedBgColor: widget.palette.bgSurface,
+      accentColor: widget.palette.accent,
+      palette: widget.palette,
       onTap: () {
         setState(() {
           _thinkingMode = tier;
           _thinkingEnabled = true;
         });
-        setMenuState(() {});
+        _closeThinkingMenu();
       },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected ? bgColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? accentColor : Colors.transparent,
-              width: 3.0,
+      child: Row(
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? widget.palette.accent
+                  : widget.palette.textSec.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
             ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title,
                   style: UnoTypography.body(
-                    color: isSelected ? dotColor : const Color(0xFFE4E4E7),
+                    color: isSelected
+                        ? widget.palette.text
+                        : widget.palette.text.withValues(alpha: 0.9),
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
                 Text(
                   subtitle,
                   style: UnoTypography.body(
-                    color: isSelected
-                        ? const Color(0xFFE4E4E7)
-                        : const Color(0xFFA1A1AA),
+                    color: widget.palette.textSec,
                     fontSize: 11,
                   ),
                 ),
               ],
             ),
+          ),
+          if (isSelected)
+            Icon(LucideIcons.check, size: 14, color: widget.palette.accent),
+        ],
+      ),
+    );
+  }
+
+  // --- Plus Menu Overlay ---
+  void _togglePlusMenu() {
+    if (_plusMenuOverlay != null) {
+      _closePlusMenu();
+    } else {
+      _closeThinkingMenu(animated: false);
+      _openPlusMenu();
+    }
+  }
+
+  void _openPlusMenu() {
+    _closePlusMenu(animated: false);
+    final overlay = Overlay.of(context);
+    _plusMenuOverlay = OverlayEntry(
+      builder: (context) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => _closePlusMenu(),
+                child: const SizedBox.expand(),
+              ),
+            ),
+            CompositedTransformFollower(
+              link: _plusButtonLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.topLeft,
+              followerAnchor: Alignment.bottomLeft,
+              offset: const Offset(0, -10),
+              child: Material(
+                color: Colors.transparent,
+                child: _buildPlusMenuCard(),
+              ),
+            ),
           ],
+        );
+      },
+    );
+    overlay.insert(_plusMenuOverlay!);
+    _plusAnim.forward(from: 0.0);
+    setState(() {});
+  }
+
+  Future<void> _closePlusMenu({bool animated = true}) async {
+    if (_plusMenuOverlay == null) return;
+    if (animated) {
+      await _plusAnim.reverse();
+    }
+    _plusMenuOverlay?.remove();
+    _plusMenuOverlay = null;
+    if (mounted) setState(() {});
+  }
+
+  Widget _buildPlusMenuCard() {
+    return AnimatedBuilder(
+      animation: _plusAnim,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _plusFade,
+          child: SlideTransition(
+            position: _plusSlide,
+            child: ScaleTransition(
+              scale: _plusScale,
+              alignment: Alignment.bottomLeft,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 200,
+        decoration: BoxDecoration(
+          color: widget.palette.bgElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: widget.palette.div, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 28,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(8),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+            _buildPlusMenuItem(
+              icon: LucideIcons.folderPlus,
+              title: 'Add to project',
+              subtitle: 'Link external repo folder',
+              isActive: false,
+              onTap: () {
+                _closePlusMenu();
+                _handlePickFiles();
+              },
+            ),
+            const SizedBox(height: 3),
+            _buildPlusMenuItem(
+              icon: LucideIcons.globe,
+              title: 'Web search',
+              subtitle: 'Ground with internet search',
+              isActive: _activeSearchMode == 'web',
+              onTap: () {
+                setState(() {
+                  _activeSearchMode =
+                      _activeSearchMode == 'web' ? null : 'web';
+                });
+                _closePlusMenu();
+              },
+            ),
+            const SizedBox(height: 3),
+            _buildPlusMenuItem(
+              icon: LucideIcons.bookOpen,
+              title: 'Deep research',
+              subtitle: 'Multi-signal code graph probe',
+              isActive: _activeSearchMode == 'research',
+              onTap: () {
+                setState(() {
+                  _activeSearchMode =
+                      _activeSearchMode == 'research' ? null : 'research';
+                });
+                _closePlusMenu();
+              },
+            ),
+          ],
+        ),
         ),
       ),
     );
   }
 
-  void _onTextChanged() {
-    final text = widget.controller.text.trim();
-    setState(() {
-      _showSuggestions = text.isNotEmpty && widget.suggestions.isNotEmpty;
-    });
+  Widget _buildPlusMenuItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return _HoverableTile(
+      isSelected: isActive,
+      selectedBgColor: widget.palette.accent.withValues(alpha: 0.15),
+      accentColor: widget.palette.accent,
+      palette: widget.palette,
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: isActive ? widget.palette.accent : widget.palette.textSec,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: UnoTypography.body(
+                    color: isActive ? widget.palette.accent : widget.palette.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: UnoTypography.body(
+                    color: widget.palette.textSec,
+                    fontSize: 10.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isActive)
+            Icon(LucideIcons.check, size: 13, color: widget.palette.accent),
+        ],
+      ),
+    );
   }
 
-  Color _tierColor() {
-    switch (_thinkingMode) {
-      case 'hot':
-        return const Color(0xFFF87171);
-      case 'cold':
-        return const Color(0xFF2DD4BF);
-      case 'warm':
-      default:
-        return const Color(0xFFE8A455);
-    }
+  void _handleSubmit() {
+    if (widget.controller.text.trim().isEmpty) return;
+    _closeThinkingMenu(animated: false);
+    _closePlusMenu(animated: false);
+    widget.onSubmit();
+    setState(() {
+      _showSuggestions = false;
+      _attachedFileNames.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final canSubmit = widget.controller.text.trim().isNotEmpty;
-    final tierColor = _tierColor();
+    final isFocused = _focusNode.hasFocus;
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -331,13 +590,15 @@ class _ChatInputBoxState extends State<ChatInputBox> {
         children: [
           // Active Search Mode Badge (if any)
           if (_activeSearchMode != null) ...[
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: widget.palette.accent.withValues(alpha: 0.12),
+                color: widget.palette.accent.withValues(alpha: 0.14),
                 border: Border.all(
-                  color: widget.palette.accent.withValues(alpha: 0.35),
+                  color: widget.palette.accent.withValues(alpha: 0.4),
+                  width: 1.2,
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -348,27 +609,31 @@ class _ChatInputBoxState extends State<ChatInputBox> {
                     _activeSearchMode == 'research'
                         ? LucideIcons.bookOpen
                         : LucideIcons.globe,
-                    size: 11,
+                    size: 12,
                     color: widget.palette.accent,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     _activeSearchMode == 'research'
-                        ? 'Research'
-                        : 'Web Search',
+                        ? 'Deep Research Active'
+                        : 'Web Search Active',
                     style: UnoTypography.body(
                       color: widget.palette.accent,
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   InkWell(
                     onTap: () => setState(() => _activeSearchMode = null),
-                    child: Icon(
-                      LucideIcons.x,
-                      size: 12,
-                      color: widget.palette.accent,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(
+                        LucideIcons.x,
+                        size: 12,
+                        color: widget.palette.accent,
+                      ),
                     ),
                   ),
                 ],
@@ -376,344 +641,499 @@ class _ChatInputBoxState extends State<ChatInputBox> {
             ),
           ],
 
-          // Main Card
-          Container(
-            decoration: BoxDecoration(
-              color: widget.palette.bgElevated,
-              border: Border.all(color: widget.palette.div),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
+          // Main Card with Smooth Animated Container Focus & Hover States
+          MouseRegion(
+            onEnter: (_) => setState(() => _isCardHovered = true),
+            onExit: (_) => setState(() => _isCardHovered = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: widget.palette.bgElevated,
+                border: Border.all(
+                  color: isFocused
+                      ? widget.palette.accent.withValues(alpha: 0.7)
+                      : (_isCardHovered
+                          ? widget.palette.accent.withValues(alpha: 0.35)
+                          : widget.palette.div),
+                  width: isFocused ? 1.4 : 1.0,
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Text input with Enter submission and Shift+Enter for newline
-                Focus(
-                  onKeyEvent: (node, event) {
-                    if (event is KeyDownEvent) {
-                      final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
-                          event.logicalKey == LogicalKeyboardKey.numpadEnter;
-                      if (isEnter) {
-                        if (HardwareKeyboard.instance.isShiftPressed) {
-                          // Allow multiline insertion on Shift+Enter
-                          return KeyEventResult.ignored;
-                        } else {
-                          // Submit on Enter keydown
-                          if (canSubmit) {
-                            widget.onSubmit();
-                            setState(() {
-                              _showSuggestions = false;
-                              _attachedFileNames.clear();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        }
-                      }
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: TextField(
-                    controller: widget.controller,
-                    maxLines: 4,
-                    minLines: 1,
-                    textInputAction: TextInputAction.send,
-                    style: UnoTypography.body(
-                      color: widget.palette.text,
-                      fontSize: 15,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: widget.placeholder ??
-                          'Ask about a merge, a ticket, or a decision on your project…',
-                      hintStyle: UnoTypography.body(
-                        color: widget.palette.textSec,
-                        fontSize: 15,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                    ),
-                    onSubmitted: (_) {
-                      if (canSubmit) {
-                        widget.onSubmit();
-                        setState(() {
-                          _showSuggestions = false;
-                          _attachedFileNames.clear();
-                        });
-                      }
-                    },
-                  ),
-                ),
-
-                if (_attachedFileNames.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _attachedFileNames.map((name) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: widget.palette.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: widget.palette.accent.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(LucideIcons.paperclip, size: 12, color: widget.palette.accent),
-                            const SizedBox(width: 4),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 160),
-                              child: Text(
-                                name,
-                                style: UnoTypography.mono(fontSize: 11, color: widget.palette.text),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              onTap: () => setState(() => _attachedFileNames.remove(name)),
-                              child: Icon(LucideIcons.x, size: 12, color: widget.palette.textSec),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: isFocused
+                        ? widget.palette.accent.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.06),
+                    blurRadius: isFocused ? 32 : 24,
+                    offset: const Offset(0, 8),
                   ),
                 ],
-
-                const SizedBox(height: 8),
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: widget.palette.div.withValues(alpha: 0.55),
-                ),
-                const SizedBox(height: 6),
-
-                // Bottom toolbar inside card
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Left buttons: Plus, Attach, Thinking Capsule
-                    Row(
-                      children: [
-                        // Plus button
-                        PopupMenuButton<String>(
-                          tooltip: 'Add context or search mode',
-                          offset: const Offset(0, -140),
-                          color: widget.palette.bgElevated,
-                          shape: RoundedRectangleBorder(
-                            side: BorderSide(color: widget.palette.div),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          onSelected: (mode) {
-                            if (mode == 'research' || mode == 'web') {
-                              setState(() => _activeSearchMode = mode);
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Text input with Enter submission and Shift+Enter for newline
+                  Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent) {
+                        final isEnter = event.logicalKey ==
+                                LogicalKeyboardKey.enter ||
+                            event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                        if (isEnter) {
+                          if (HardwareKeyboard.instance.isShiftPressed) {
+                            return KeyEventResult.ignored;
+                          } else {
+                            if (canSubmit) {
+                              _handleSubmit();
                             }
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'project',
-                              child: Row(
-                                children: [
-                                  Icon(LucideIcons.folderPlus,
-                                      size: 13, color: widget.palette.textSec),
-                                  const SizedBox(width: 8),
-                                  Text('Add to project',
-                                      style: UnoTypography.body(
-                                          color: widget.palette.text,
-                                          fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'web',
-                              child: Row(
-                                children: [
-                                  Icon(LucideIcons.globe,
-                                      size: 13, color: widget.palette.textSec),
-                                  const SizedBox(width: 8),
-                                  Text('Web search',
-                                      style: UnoTypography.body(
-                                          color: widget.palette.text,
-                                          fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'research',
-                              child: Row(
-                                children: [
-                                  Icon(LucideIcons.bookOpen,
-                                      size: 13, color: widget.palette.textSec),
-                                  const SizedBox(width: 8),
-                                  Text('Deep research',
-                                      style: UnoTypography.body(
-                                          color: widget.palette.text,
-                                          fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                          ],
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: widget.palette.div),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              LucideIcons.plus,
-                              size: 14,
-                              color: widget.palette.textSec,
-                            ),
-                          ),
+                            return KeyEventResult.handled;
+                          }
+                        }
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: TextField(
+                      focusNode: _focusNode,
+                      controller: widget.controller,
+                      maxLines: 5,
+                      minLines: 1,
+                      textInputAction: TextInputAction.send,
+                      style: UnoTypography.body(
+                        color: widget.palette.text,
+                        fontSize: 15,
+                        height: 1.45,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: widget.placeholder ??
+                            'Ask about a merge, a ticket, or a decision on your project…',
+                        hintStyle: UnoTypography.body(
+                          color: widget.palette.textSec.withValues(alpha: 0.8),
+                          fontSize: 15,
                         ),
-                        const SizedBox(width: 6),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 4),
+                      ),
+                      onSubmitted: (_) {
+                        if (canSubmit) {
+                          _handleSubmit();
+                        }
+                      },
+                    ),
+                  ),
 
-                        // Paperclip attach button
-                        Tooltip(
-                          message: 'Attach context file or ticket',
-                          child: InkWell(
-                            onTap: _handlePickFiles,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: widget.palette.div),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                LucideIcons.paperclip,
-                                size: 14,
-                                color: widget.palette.textSec,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Thinking Tier Button
-                        CompositedTransformTarget(
-                          link: _thinkingButtonLink,
-                          child: InkWell(
-                            onTap: _toggleThinkingMenu,
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              height: 32,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: _thinkingEnabled
-                                    ? tierColor.withValues(alpha: 0.12)
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: _thinkingEnabled
-                                      ? tierColor
-                                      : widget.palette.div,
-                                  width: 1.2,
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    LucideIcons.zap,
-                                    size: 12,
-                                    color: _thinkingEnabled
-                                        ? tierColor
-                                        : widget.palette.textSec,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _thinkingEnabled
-                                        ? '${_thinkingMode[0].toUpperCase()}${_thinkingMode.substring(1)} tier'
-                                        : 'Thinking',
-                                    style: UnoTypography.body(
-                                      color: _thinkingEnabled
-                                          ? tierColor
-                                          : widget.palette.textSec,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                  // Animated Attached Files Chips
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: _attachedFileNames.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: _attachedFileNames.map((name) {
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: widget.palette.accent
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: widget.palette.accent
+                                          .withValues(alpha: 0.35),
                                     ),
                                   ),
-                                  const SizedBox(width: 5),
-                                  Icon(
-                                    LucideIcons.chevronDown,
-                                    size: 11,
-                                    color: _thinkingEnabled
-                                        ? tierColor
-                                        : widget.palette.textSec,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(LucideIcons.paperclip,
+                                          size: 12,
+                                          color: widget.palette.accent),
+                                      const SizedBox(width: 5),
+                                      ConstrainedBox(
+                                        constraints:
+                                            const BoxConstraints(maxWidth: 180),
+                                        child: Text(
+                                          name,
+                                          style: UnoTypography.mono(
+                                            fontSize: 11,
+                                            color: widget.palette.text,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      InkWell(
+                                        onTap: () => setState(() =>
+                                            _attachedFileNames.remove(name)),
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(2),
+                                          child: Icon(
+                                            LucideIcons.x,
+                                            size: 12,
+                                            color: widget.palette.textSec,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                );
+                              }).toList(),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
 
-                    // Right buttons: Mic & Send
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: () {},
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: 32,
-                            height: 32,
-                            child: Center(
-                              child: Icon(
-                                LucideIcons.mic,
-                                size: 14,
-                                color: widget.palette.textSec,
+                  const SizedBox(height: 10),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: widget.palette.div.withValues(alpha: 0.55),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Bottom toolbar inside card
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Left controls: Plus, Attach, Thinking Toggle, Model Dropdown
+                      Row(
+                        children: [
+                          // Plus Button with Smooth Rotate and Animated Dropdown
+                          CompositedTransformTarget(
+                            link: _plusButtonLink,
+                            child: MouseRegion(
+                              onEnter: (_) =>
+                                  setState(() => _plusBtnHovered = true),
+                              onExit: (_) =>
+                                  setState(() => _plusBtnHovered = false),
+                              child: Tooltip(
+                                message: 'Add external context or search mode',
+                                child: InkWell(
+                                  onTap: _togglePlusMenu,
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: _plusMenuOverlay != null ||
+                                              _plusBtnHovered
+                                          ? widget.palette.accent
+                                              .withValues(alpha: 0.12)
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: _plusMenuOverlay != null ||
+                                                _plusBtnHovered
+                                            ? widget.palette.accent
+                                                .withValues(alpha: 0.4)
+                                            : widget.palette.div,
+                                        width: 1.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Center(
+                                      child: RotationTransition(
+                                        turns: _plusRotate,
+                                        child: Icon(
+                                          LucideIcons.plus,
+                                          size: 15,
+                                          color: _plusMenuOverlay != null ||
+                                                  _plusBtnHovered
+                                              ? widget.palette.accent
+                                              : widget.palette.textSec,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: canSubmit ? widget.onSubmit : null,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: canSubmit
-                                  ? widget.palette.accent
-                                  : widget.palette.div,
-                              shape: BoxShape.circle,
+                          const SizedBox(width: 8),
+
+                          // Paperclip attach button
+                          MouseRegion(
+                            onEnter: (_) =>
+                                setState(() => _attachBtnHovered = true),
+                            onExit: (_) =>
+                                setState(() => _attachBtnHovered = false),
+                            child: Tooltip(
+                              message: 'Attach files or context',
+                              child: InkWell(
+                                onTap: _handlePickFiles,
+                                borderRadius: BorderRadius.circular(10),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: _attachBtnHovered
+                                        ? widget.palette.accent
+                                            .withValues(alpha: 0.12)
+                                        : Colors.transparent,
+                                    border: Border.all(
+                                      color: _attachBtnHovered
+                                          ? widget.palette.accent
+                                              .withValues(alpha: 0.4)
+                                          : widget.palette.div,
+                                      width: 1.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      LucideIcons.paperclip,
+                                      size: 14,
+                                      color: _attachBtnHovered
+                                          ? widget.palette.accent
+                                          : widget.palette.textSec,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: Center(
-                              child: Icon(
-                                LucideIcons.arrowUp,
-                                size: 14,
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Thinking Toggle Button (Placed NEXT to the dropdown menu)
+                          MouseRegion(
+                            onEnter: (_) =>
+                                setState(() => _thinkingToggleHovered = true),
+                            onExit: (_) =>
+                                setState(() => _thinkingToggleHovered = false),
+                            child: Tooltip(
+                              message: _thinkingEnabled
+                                  ? 'Deep thinking is ON (Click to toggle)'
+                                  : 'Deep thinking is OFF (Click to toggle)',
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _thinkingEnabled = !_thinkingEnabled;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  height: 32,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: _thinkingEnabled
+                                        ? widget.palette.bgSurface
+                                        : (_thinkingToggleHovered
+                                            ? widget.palette.bgElevated
+                                            : Colors.transparent),
+                                    border: Border.all(
+                                      color: _thinkingEnabled
+                                          ? widget.palette.accent
+                                              .withValues(alpha: 0.5)
+                                          : (_thinkingToggleHovered
+                                              ? widget.palette.textSec
+                                                  .withValues(alpha: 0.4)
+                                              : widget.palette.div),
+                                      width: 1.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        LucideIcons.brain,
+                                        size: 13,
+                                        color: _thinkingEnabled
+                                            ? widget.palette.accent
+                                            : widget.palette.textSec,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Thinking',
+                                        style: UnoTypography.body(
+                                          color: _thinkingEnabled
+                                              ? widget.palette.text
+                                              : widget.palette.textSec,
+                                          fontSize: 12,
+                                          fontWeight: _thinkingEnabled
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      // Micro-pill switch indicator
+                                      AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        width: 24,
+                                        height: 14,
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(7),
+                                          color: _thinkingEnabled
+                                              ? widget.palette.accent
+                                              : widget.palette.div,
+                                        ),
+                                        child: Align(
+                                          alignment: _thinkingEnabled
+                                              ? Alignment.centerRight
+                                              : Alignment.centerLeft,
+                                          child: Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: const BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Model / Tier Dropdown Capsule
+                          CompositedTransformTarget(
+                            link: _thinkingButtonLink,
+                            child: MouseRegion(
+                              onEnter: (_) =>
+                                  setState(() => _tierBtnHovered = true),
+                              onExit: (_) =>
+                                  setState(() => _tierBtnHovered = false),
+                              child: Tooltip(
+                                message: 'Select reasoning model tier',
+                                child: InkWell(
+                                  onTap: _toggleThinkingMenu,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 200),
+                                    height: 32,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 11),
+                                    decoration: BoxDecoration(
+                                      color: _tierBtnHovered ||
+                                              _thinkingMenuOverlay != null
+                                          ? widget.palette.bgElevated
+                                          : widget.palette.bgSurface,
+                                      border: Border.all(
+                                        color: _tierBtnHovered ||
+                                                _thinkingMenuOverlay != null
+                                            ? widget.palette.textSec
+                                                .withValues(alpha: 0.45)
+                                            : widget.palette.div,
+                                        width: 1.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          LucideIcons.sparkles,
+                                          size: 12,
+                                          color: widget.palette.textSec,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${_thinkingMode[0].toUpperCase()}${_thinkingMode.substring(1)} tier',
+                                          style: UnoTypography.body(
+                                            color: widget.palette.text,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        AnimatedRotation(
+                                          turns:
+                                              _thinkingMenuOverlay != null
+                                                  ? 0.5
+                                                  : 0.0,
+                                          duration: const Duration(
+                                              milliseconds: 200),
+                                          child: Icon(
+                                            LucideIcons.chevronDown,
+                                            size: 12,
+                                            color: widget.palette.textSec,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Right toolbar: Mic button is removed, only smooth send button
+                      MouseRegion(
+                        onEnter: (_) => setState(() => _sendBtnHovered = true),
+                        onExit: (_) => setState(() => _sendBtnHovered = false),
+                        child: AnimatedScale(
+                          scale: canSubmit && _sendBtnHovered
+                              ? 1.08
+                              : (canSubmit ? 1.0 : 0.92),
+                          duration: const Duration(milliseconds: 180),
+                          child: InkWell(
+                            onTap: canSubmit ? _handleSubmit : null,
+                            borderRadius: BorderRadius.circular(17),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
                                 color: canSubmit
-                                    ? Colors.white
-                                    : widget.palette.textSec,
+                                    ? widget.palette.accent
+                                    : widget.palette.div.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
+                                boxShadow: canSubmit
+                                    ? [
+                                        BoxShadow(
+                                          color: widget.palette.accent
+                                              .withValues(alpha: 0.4),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  LucideIcons.arrowUp,
+                                  size: 15,
+                                  color: canSubmit
+                                      ? Colors.white
+                                      : widget.palette.textSec
+                                          .withValues(alpha: 0.6),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
 
           // Autocomplete suggestions popup
           if (_showSuggestions) ...[
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(top: 8),
               decoration: BoxDecoration(
                 color: widget.palette.bgElevated,
@@ -721,7 +1141,7 @@ class _ChatInputBoxState extends State<ChatInputBox> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.14),
+                    color: Colors.black.withValues(alpha: 0.18),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
@@ -757,6 +1177,66 @@ class _ChatInputBoxState extends State<ChatInputBox> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _HoverableTile extends StatefulWidget {
+  final bool isSelected;
+  final Color selectedBgColor;
+  final Color accentColor;
+  final UnoPalette palette;
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _HoverableTile({
+    required this.isSelected,
+    required this.selectedBgColor,
+    required this.accentColor,
+    required this.palette,
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  State<_HoverableTile> createState() => _HoverableTileState();
+}
+
+class _HoverableTileState extends State<_HoverableTile> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? widget.selectedBgColor
+                : (_isHovered
+                    ? widget.palette.accent.withValues(alpha: 0.08)
+                    : Colors.transparent),
+            borderRadius: BorderRadius.circular(10),
+            border: Border(
+              left: BorderSide(
+                color: widget.isSelected
+                    ? widget.accentColor
+                    : (_isHovered
+                        ? widget.palette.accent.withValues(alpha: 0.5)
+                        : Colors.transparent),
+                width: 3.0,
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: widget.child,
+        ),
       ),
     );
   }

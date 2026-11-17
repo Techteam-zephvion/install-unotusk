@@ -93,19 +93,32 @@ class DeployController extends StateNotifier<DeployState> {
       await serverRegistry.saveServer(instance);
 
       try {
+        final allServers = await serverRegistry.listServers();
+        final syncList = allServers.map((s) {
+          String? repoUrl;
+          try {
+            final envFile = File('${s.deploymentDir}/.env');
+            if (envFile.existsSync()) {
+              for (final line in envFile.readAsLinesSync()) {
+                if (line.startsWith('TARGET_REPO_URL=')) {
+                  repoUrl = line.substring('TARGET_REPO_URL='.length).trim();
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+          return {
+            'name': s.name,
+            'port': s.apiPort,
+            'state': (s.name == config.serverName) ? 'running' : s.lastKnownState.name,
+            'repo_url': repoUrl ?? (s.name == config.serverName ? config.repoUrl : null),
+          };
+        }).toList();
+
         final dio = Dio();
         await dio.post(
           'http://127.0.0.1:28000/api/v1/projects/sync-servers',
-          data: {
-            'servers': [
-              {
-                'name': config.serverName,
-                'port': config.serverPort,
-                'state': 'running',
-                'repo_url': config.repoUrl,
-              }
-            ]
-          },
+          data: {'servers': syncList},
           options: Options(
             sendTimeout: const Duration(seconds: 3),
             receiveTimeout: const Duration(seconds: 3),

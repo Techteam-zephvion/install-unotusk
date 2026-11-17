@@ -226,7 +226,7 @@ class _AppShellState extends State<AppShell> {
       final currentHost = Uri.parse(ApiService.baseUrl).host;
       final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {
-        ApiService.setBaseUrl(targetUrl);
+        ApiService.setBaseUrl(targetUrl, persist: false);
         try {
           // Signup acts as auto-login via our modified backend
           await ApiService.createOrganisation(

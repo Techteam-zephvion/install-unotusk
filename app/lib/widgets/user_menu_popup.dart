@@ -27,6 +27,7 @@ class UserMenuPopup extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
+      mouseCursor: SystemMouseCursors.click,
       hoverColor: palette.accent.withValues(alpha: 0.08),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
