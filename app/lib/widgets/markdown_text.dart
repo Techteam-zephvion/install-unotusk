@@ -65,8 +65,8 @@ class MarkdownText extends StatelessWidget {
     final effectiveBaseStyle = baseStyle ??
         UnoTypography.body(
           color: effectivePalette.text,
-          fontSize: 15,
-          height: 1.65,
+          fontSize: 15.5,
+          height: 1.7,
         );
 
     final blocks = _MarkdownParser.parse(text);
@@ -169,31 +169,31 @@ class MarkdownText extends StatelessWidget {
   Widget _buildHeading(_HeadingNode node, UnoPalette p, TextStyle base) {
     double size;
     FontWeight weight = FontWeight.w600;
-    double topPad = 12;
+    double topPad = 14;
 
     switch (node.level) {
       case 1:
-        size = 22;
-        weight = FontWeight.w700;
-        topPad = 16;
+        size = 22.5;
+        weight = FontWeight.w600;
+        topPad = 18;
         break;
       case 2:
-        size = 18;
-        weight = FontWeight.w700;
-        topPad = 14;
+        size = 19;
+        weight = FontWeight.w600;
+        topPad = 16;
         break;
       case 3:
-        size = 16;
+        size = 17;
         weight = FontWeight.w600;
-        topPad = 12;
+        topPad = 13;
         break;
       case 4:
-        size = 15;
+        size = 15.5;
         weight = FontWeight.w600;
         topPad = 10;
         break;
       default:
-        size = 14;
+        size = 15;
         weight = FontWeight.w600;
         topPad = 8;
     }
@@ -203,13 +203,12 @@ class MarkdownText extends StatelessWidget {
       child: _InlineRichText(
         text: node.text,
         palette: p,
-        style: base.copyWith(
+        style: UnoTypography.body(
           fontSize: size,
           fontWeight: weight,
           color: p.text,
           height: 1.35,
-          letterSpacing: -0.2,
-        ),
+        ).copyWith(letterSpacing: -0.25),
         selectable: selectable,
         onLinkTap: onLinkTap,
       ),
@@ -221,7 +220,7 @@ class MarkdownText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: node.items.map((item) {
         return Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          padding: const EdgeInsets.only(left: 2, bottom: 7),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -230,38 +229,37 @@ class MarkdownText extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 3, right: 10),
                   child: Icon(
                     item.isChecked ? LucideIcons.checkSquare : LucideIcons.square,
-                    size: 16,
+                    size: 15.5,
                     color: item.isChecked ? p.accent : p.textSec,
                   ),
                 )
               else if (node.isOrdered)
                 Padding(
-                  padding: const EdgeInsets.only(top: 2, right: 10),
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
+                  padding: const EdgeInsets.only(top: 0.5, right: 9),
+                  child: SizedBox(
+                    width: 20,
                     child: Text(
-                      item.prefix.replaceAll('.', ''),
-                      style: UnoTypography.mono(
-                        color: p.accent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                      item.prefix.endsWith('.') ? item.prefix : '${item.prefix}.',
+                      textAlign: TextAlign.right,
+                      style: UnoTypography.body(
+                        color: p.textSec,
+                        fontSize: (base.fontSize ?? 14.5) - 0.5,
+                        fontWeight: FontWeight.w600,
+                        height: base.height ?? 1.65,
                       ),
                     ),
                   ),
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, right: 8, left: 2),
-                  child: Icon(
-                    LucideIcons.chevronRight,
-                    size: 15,
-                    color: p.accent.withValues(alpha: 0.8),
+                  padding: const EdgeInsets.only(top: 10.5, right: 11, left: 6),
+                  child: Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: p.textSec.withValues(alpha: 0.72),
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
               Expanded(
@@ -281,13 +279,16 @@ class MarkdownText extends StatelessWidget {
   }
 
   Widget _buildQuote(_QuoteNode node, UnoPalette p, TextStyle base) {
+    final tintBase = p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.only(left: 14, top: 4, bottom: 4),
+      padding: const EdgeInsets.fromLTRB(14, 7, 12, 7),
       decoration: BoxDecoration(
+        color: tintBase.withValues(alpha: 0.03),
         border: Border(
-          left: BorderSide(color: p.accent.withValues(alpha: 0.8), width: 3),
+          left: BorderSide(color: p.accent.withValues(alpha: 0.45), width: 2.5),
         ),
+        borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
       ),
       child: _InlineRichText(
         text: node.text,
@@ -1124,22 +1125,24 @@ class _InlineRichText extends StatelessWidget {
           ),
         );
       } else if (token.startsWith('`') && token.endsWith('`')) {
+        final codeBgBase =
+            palette.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
         spans.add(
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-              margin: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
-                color: palette.bgElevated,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: palette.div, width: 0.8),
+                color: codeBgBase.withValues(alpha: palette.isDark ? 0.08 : 0.06),
+                borderRadius: BorderRadius.circular(4.5),
               ),
               child: Text(
                 token.substring(1, token.length - 1),
                 style: UnoTypography.mono(
-                  color: palette.accent,
-                  fontSize: (style.fontSize ?? 14) * 0.88,
+                  color: palette.isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20),
+                  fontSize: (style.fontSize ?? 15.5) * 0.86,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),

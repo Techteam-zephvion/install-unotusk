@@ -56,7 +56,7 @@ class _ThinkingScannerState extends State<ThinkingScanner>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.palette.bgBase == const Color(0xFF181816);
+    final isDark = widget.palette.isDark;
     final patternColor = isDark
         ? const Color(0xFFF5DDB0)
         : const Color(0xFFC97F2E);

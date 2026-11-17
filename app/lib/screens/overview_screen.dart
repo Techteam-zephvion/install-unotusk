@@ -238,7 +238,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: p.bgSurface,
+              gradient: p.sectionGradient,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: p.div),
             ),
@@ -509,7 +509,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: p.bgSurface,
+                    gradient: p.sectionGradient,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: p.div),
                   ),
@@ -580,7 +580,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: p.bgSurface,
+                    gradient: p.sectionGradient,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: p.div),
                   ),
@@ -663,7 +663,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: p.bgSurface,
+        gradient: p.elevatedCardGradient,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: p.div),
       ),

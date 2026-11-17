@@ -16,15 +16,15 @@ class UnotuskMark extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: const Color(0xFF21211E),
+        color: isDark ? const Color(0xFF161A29) : const Color(0xFFF5F2EB),
         borderRadius: BorderRadius.circular(size * 0.24),
         border: Border.all(
-          color: const Color(0xFF33332E),
+          color: isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -34,8 +34,8 @@ class UnotuskMark extends StatelessWidget {
         child: CustomPaint(
           size: Size(size * 0.65, size * 0.65),
           painter: _UnotuskMarkPainter(
-            accentColor: const Color(0xFFDA7756),
-            strokeColor: const Color(0xFFF0EFEA),
+            accentColor: isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20),
+            strokeColor: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20),
           ),
         ),
       ),

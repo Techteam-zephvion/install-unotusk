@@ -53,7 +53,12 @@ class TopNavBar extends StatelessWidget {
         left: showSidebarToggle ? 10 : 20,
         right: isDesktop ? 0 : 24,
       ),
-      color: Colors.transparent,
+      decoration: BoxDecoration(
+        gradient: palette.headerGradient,
+        border: Border(
+          bottom: BorderSide(color: palette.div.withValues(alpha: 0.45)),
+        ),
+      ),
       child: Row(
         children: [
           // ── Left: Sidebar toggle + Project Switcher ──
@@ -209,11 +214,13 @@ class TopNavBar extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 12),
-              // Theme toggle button
+              // Theme toggle button with smooth animated rotation
               InkWell(
                 onTap: onToggleTheme,
                 borderRadius: BorderRadius.circular(6),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
@@ -221,10 +228,16 @@ class TopNavBar extends StatelessWidget {
                     border: Border.all(color: palette.div),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Icon(
-                    isDark ? LucideIcons.moon : LucideIcons.sun,
-                    size: 14,
-                    color: palette.textSec,
+                  alignment: Alignment.center,
+                  child: AnimatedRotation(
+                    turns: isDark ? 0.0 : 0.5,
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      isDark ? LucideIcons.moon : LucideIcons.sun,
+                      size: 14,
+                      color: palette.textSec,
+                    ),
                   ),
                 ),
               ),

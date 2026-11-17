@@ -97,6 +97,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   // Connect Server & Workspace State
   final _serverUrlController = TextEditingController();
+  final _workspaceScrollController = ScrollController();
   bool _connectWorkspaceDialogOpen = false;
   List<ProjectItem> _availableBackendProjects = [];
   bool _isLoadingWorkspaceProjects = false;
@@ -220,36 +221,59 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     return Scaffold(
       backgroundColor: palette.bgBase,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // ─── Top Navigation Bar ───
-              _buildTopBar(palette, isNarrow),
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(gradient: palette.pageGradient),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // ─── Top Navigation Bar ───
+                _buildTopBar(palette, isNarrow),
 
-              // ─── Content Area ───
-              Expanded(
-                child: _activeTab == 'projects'
-                    ? _buildProjectsContent(palette, isNarrow)
-                    : _buildSettingsContent(palette),
-              ),
-            ],
-          ),
+                // ─── Content Area ───
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                      return Stack(
+                        alignment: Alignment.topCenter,
+                        children: <Widget>[
+                          ...previousChildren,
+                          ?currentChild,
+                        ],
+                      );
+                    },
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    child: KeyedSubtree(
+                      key: ValueKey<String>('$_activeTab-${widget.isDark}'),
+                      child: _activeTab == 'projects'
+                          ? _buildProjectsContent(palette, isNarrow)
+                          : _buildSettingsContent(palette),
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
+            // Connect Codebase Dialog Overlay
+            if (_connectDialogOpen)
+              _buildConnectCodebaseDialog(palette),
 
+            // Connect Workspace Dialog Overlay (Manager RBAC)
+            if (_connectWorkspaceDialogOpen)
+              _buildConnectWorkspaceDialog(palette),
 
-          // Connect Codebase Dialog Overlay
-          if (_connectDialogOpen)
-            _buildConnectCodebaseDialog(palette),
-
-          // Connect Workspace Dialog Overlay (Manager RBAC)
-          if (_connectWorkspaceDialogOpen)
-            _buildConnectWorkspaceDialog(palette),
-
-          // Manage Workspace Dialog Overlay (Manager RBAC)
-          if (_managingWorkspaceProject != null)
-            _buildManageWorkspaceModal(palette),
-        ],
+            // Manage Workspace Dialog Overlay (Manager RBAC)
+            if (_managingWorkspaceProject != null)
+              _buildManageWorkspaceModal(palette),
+          ],
+        ),
       ),
     );
   }
@@ -258,6 +282,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   void dispose() {
     _serverTimer?.cancel();
     _serverUrlController.dispose();
+    _workspaceScrollController.dispose();
     _searchMemberController.dispose();
     super.dispose();
   }
@@ -539,7 +564,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           child: Text(
                             'Connect',
                             style: UnoTypography.body(
-                              color: Colors.white,
+                              color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -561,10 +586,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   //  Connect Workspace Dialog (Manager RBAC)
   // ─────────────────────────────────────────────────
   Widget _buildConnectWorkspaceDialog(UnoPalette palette) {
+    final buttonFg = widget.isDark ? const Color(0xFF0A0F20) : Colors.white;
+
     return GestureDetector(
       onTap: () => setState(() => _connectWorkspaceDialogOpen = false),
       child: Container(
-        color: Colors.black.withValues(alpha: 0.55),
+        color: Colors.black.withValues(alpha: widget.isDark ? 0.65 : 0.4),
         child: Center(
           child: GestureDetector(
             onTap: () {}, // Absorb taps inside dialog
@@ -573,13 +600,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: palette.bgSurface,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: palette.div),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 32,
-                    offset: const Offset(0, 14),
+                    color: Colors.black.withValues(alpha: widget.isDark ? 0.45 : 0.18),
+                    blurRadius: 36,
+                    offset: const Offset(0, 16),
                   ),
                 ],
               ),
@@ -590,18 +617,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   // ── Header Row ──
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               color: palette.accent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
+                            alignment: Alignment.center,
                             child: Icon(
                               Icons.hub_outlined,
-                              size: 20,
+                              size: 19,
                               color: palette.accent,
                             ),
                           ),
@@ -613,10 +643,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                 'Connect Workspace',
                                 style: UnoTypography.body(
                                   color: palette.text,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 'Select backend projects to display in your workspace',
                                 style: UnoTypography.body(
@@ -632,10 +663,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         onTap: () =>
                             setState(() => _connectWorkspaceDialogOpen = false),
                         borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Icon(Icons.close,
-                              size: 20, color: palette.textSec),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: palette.textSec,
+                          ),
                         ),
                       ),
                     ],
@@ -643,10 +683,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Lead Account Pill Info
+                  // ── Minimal Admin Status Strip ──
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: palette.bgElevated,
                       borderRadius: BorderRadius.circular(8),
@@ -654,34 +693,36 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.shield_outlined,
-                            size: 16, color: palette.accent),
+                        Icon(
+                          Icons.shield_outlined,
+                          size: 14,
+                          color: palette.textSec,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Lead Account: ${widget.userName.isNotEmpty ? widget.userName : 'Lead Admin'}',
-                                style: UnoTypography.body(
-                                  color: palette.text,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          child: Text.rich(
+                            TextSpan(
+                              text: widget.userName.isNotEmpty ? widget.userName : 'Lead Admin',
+                              style: UnoTypography.body(
+                                color: palette.text,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                              Text(
-                                'Role: Workspace Administrator · Access: Full Management',
-                                style: UnoTypography.mono(
-                                  color: palette.textSec,
-                                  fontSize: 10.5,
+                              children: [
+                                TextSpan(
+                                  text: ' · Workspace Administrator',
+                                  style: UnoTypography.body(
+                                    color: palette.textSec,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w400,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: palette.live.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
@@ -690,8 +731,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             'LEAD',
                             style: UnoTypography.mono(
                               color: palette.live,
-                              fontSize: 9.5,
+                              fontSize: 9,
                               fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),
@@ -699,19 +741,41 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
                   // ── Projects Section Header ──
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'FETCHED BACKEND PROJECTS (${_availableBackendProjects.length})',
-                        style: UnoTypography.mono(
-                          color: palette.textSec,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'PROJECT SERVERS',
+                            style: UnoTypography.mono(
+                              color: palette.textSec,
+                              fontSize: 10.5,
+                              letterSpacing: 0.8,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: palette.bgElevated,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: palette.div),
+                            ),
+                            child: Text(
+                              '${_availableBackendProjects.length}',
+                              style: UnoTypography.mono(
+                                color: palette.textSec,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       Row(
                         children: [
@@ -722,49 +786,55 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: palette.accent.withValues(alpha: 0.12),
+                                color: palette.bgElevated,
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                    color: palette.accent.withValues(alpha: 0.3)),
+                                border: Border.all(color: palette.div),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.done_all,
-                                      size: 13, color: palette.accent),
-                                  const SizedBox(width: 4),
+                                      size: 13, color: palette.textSec),
+                                  const SizedBox(width: 5),
                                   Text(
-                                    'Connect All',
+                                    'Connect all',
                                     style: UnoTypography.body(
-                                      color: palette.accent,
+                                      color: palette.text,
                                       fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           InkWell(
                             onTap: _isRefreshingWorkspaceProjects
                                 ? null
                                 : () => _fetchAvailableWorkspaceProjects(isUserAction: true),
                             borderRadius: BorderRadius.circular(6),
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: palette.bgElevated,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: palette.div),
+                              ),
                               child: _isRefreshingWorkspaceProjects
                                   ? SizedBox(
-                                      width: 15,
-                                      height: 15,
+                                      width: 12,
+                                      height: 12,
                                       child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                                        strokeWidth: 1.8,
                                         valueColor: AlwaysStoppedAnimation<Color>(palette.accent),
                                       ),
                                     )
                                   : Icon(
                                       Icons.refresh,
-                                      size: 15,
+                                      size: 13,
                                       color: palette.textSec,
                                     ),
                             ),
@@ -776,14 +846,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                   const SizedBox(height: 10),
 
-                  // ── Scrollable Projects List ──
+                  // ── Clean, Minimal Server List ──
                   Container(
-                    constraints: const BoxConstraints(maxHeight: 270),
+                    constraints: const BoxConstraints(maxHeight: 280),
                     decoration: BoxDecoration(
                       color: palette.bgElevated,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: palette.div),
                     ),
+                    clipBehavior: Clip.antiAlias,
                     child: _isLoadingWorkspaceProjects
                         ? Center(
                             child: Padding(
@@ -801,7 +872,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Fetching projects from backend...',
+                                    'Fetching project servers...',
                                     style: UnoTypography.body(
                                       color: palette.textSec,
                                       fontSize: 12,
@@ -819,10 +890,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(Icons.folder_off_outlined,
-                                          size: 28, color: palette.textSec),
+                                          size: 26, color: palette.textSec),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'No projects found on http://${ApiService.serverHost}',
+                                        'No servers found on http://${ApiService.serverHost}',
                                         textAlign: TextAlign.center,
                                         style: UnoTypography.body(
                                           color: palette.text,
@@ -832,7 +903,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Ensure projects are created or registered on port 28000.',
+                                        'Ensure project servers are running on port 28000+.',
                                         textAlign: TextAlign.center,
                                         style: UnoTypography.body(
                                           color: palette.textSec,
@@ -843,247 +914,198 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                   ),
                                 ),
                               )
-                            : ListView.separated(
-                                shrinkWrap: true,
-                                padding: const EdgeInsets.all(8),
-                                itemCount: _availableBackendProjects.length,
-                                separatorBuilder: (_, unused) =>
-                                    const SizedBox(height: 6),
-                                itemBuilder: (context, idx) {
-                                  final project =
-                                      _availableBackendProjects[idx];
-                                  final isConnected = _projects.any((p) =>
-                                      p.id.toLowerCase() ==
-                                          project.id.toLowerCase() ||
-                                      p.name.toLowerCase() ==
-                                          project.name.toLowerCase());
+                            : ScrollConfiguration(
+                                behavior: ScrollConfiguration.of(context).copyWith(
+                                  scrollbars: false,
+                                ),
+                                child: RawScrollbar(
+                                  controller: _workspaceScrollController,
+                                  thumbVisibility: false,
+                                  trackVisibility: false,
+                                  thickness: 2.0,
+                                  radius: const Radius.circular(2),
+                                  thumbColor: palette.textSec.withValues(alpha: 0.25),
+                                  fadeDuration: const Duration(milliseconds: 250),
+                                  padding: const EdgeInsets.only(right: 2, top: 4, bottom: 4),
+                                  child: ListView.separated(
+                                    controller: _workspaceScrollController,
+                                    physics: const BouncingScrollPhysics(
+                                      parent: AlwaysScrollableScrollPhysics(),
+                                    ),
+                                    shrinkWrap: true,
+                                    padding: EdgeInsets.zero,
+                                    itemCount: _availableBackendProjects.length,
+                                    separatorBuilder: (_, unused) => Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: palette.div.withValues(alpha: 0.5),
+                                    ),
+                                    itemBuilder: (context, idx) {
+                                      final project = _availableBackendProjects[idx];
+                                      final isConnected = _projects.any((p) =>
+                                          p.id.toLowerCase() == project.id.toLowerCase() ||
+                                          p.name.toLowerCase() == project.name.toLowerCase());
 
-                                  final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
-                                      project.upsStatus.toUpperCase() == 'DELETED' ||
-                                      project.upsStatus.toUpperCase() == 'OFFLINE';
+                                      final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                                          project.upsStatus.toUpperCase() == 'DELETED' ||
+                                          project.upsStatus.toUpperCase() == 'OFFLINE';
 
-                                  return InkWell(
-                                    onTap: isStopped
-                                        ? null
-                                        : () => _toggleProjectConnection(project),
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
+                                      final isReady = !isStopped && (
+                                          project.upsStatus.toUpperCase() == 'READY' ||
+                                          project.upsStatus.toUpperCase() == 'ACTIVE' ||
+                                          project.ingestionStatus.toLowerCase() == 'live');
+
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 11),
                                         color: isConnected
-                                            ? palette.accent
-                                                .withValues(alpha: 0.08)
-                                            : palette.bgSurface,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: isConnected
-                                              ? palette.accent
-                                                  .withValues(alpha: 0.4)
-                                              : palette.div,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 32,
-                                            height: 32,
-                                            decoration: BoxDecoration(
-                                              color: palette.bgElevated,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              border: Border.all(
-                                                  color: palette.div),
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: Text(
-                                              '<>',
-                                              style: UnoTypography.mono(
-                                                color: palette.textSec,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
+                                            ? palette.accent.withValues(alpha: widget.isDark ? 0.05 : 0.08)
+                                            : Colors.transparent,
+                                        child: Row(
+                                          children: [
+                                            // Status dot indicator
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: isStopped
+                                                    ? palette.textSec.withValues(alpha: 0.35)
+                                                    : (isReady ? palette.live : palette.textSec),
+                                                boxShadow: isReady
+                                                    ? [
+                                                        BoxShadow(
+                                                          color: palette.live.withValues(alpha: 0.5),
+                                                          blurRadius: 4,
+                                                        ),
+                                                      ]
+                                                    : null,
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  project.name,
-                                                  style: UnoTypography.body(
-                                                    color: palette.text,
-                                                    fontSize: 13.5,
-                                                    fontWeight: FontWeight.w600,
+                                            const SizedBox(width: 12),
+                                            // Project title & details
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    project.name,
+                                                    style: UnoTypography.body(
+                                                      color: isStopped
+                                                          ? palette.textSec
+                                                          : palette.text,
+                                                      fontSize: 13.5,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    isStopped
+                                                        ? 'Offline · Data plane inactive'
+                                                        : (project.port != null
+                                                            ? 'Port ${project.port} · Active server'
+                                                            : 'Port 28000 · Ready'),
+                                                    style: UnoTypography.mono(
+                                                      color: palette.textSec.withValues(alpha: 0.75),
+                                                      fontSize: 10.5,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            // Action button / pill
+                                            if (isStopped)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.transparent,
+                                                  border: Border.all(
+                                                      color: palette.div.withValues(alpha: 0.6)),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'Offline',
+                                                  style: UnoTypography.mono(
+                                                    color: palette.textSec.withValues(alpha: 0.6),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w500,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 4),
-                                                Builder(
-                                                  builder: (context) {
-                                                    final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
-                                                        project.upsStatus.toUpperCase() == 'DELETED' ||
-                                                        project.upsStatus.toUpperCase() == 'OFFLINE';
-
-                                                    if (isStopped) {
-                                                      return Container(
-                                                        padding: const EdgeInsets.symmetric(
-                                                            horizontal: 6, vertical: 2),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.redAccent.withValues(alpha: 0.12),
-                                                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
-                                                          borderRadius: BorderRadius.circular(4),
-                                                        ),
-                                                        child: Text(
-                                                          'STOPPED',
-                                                          style: UnoTypography.mono(
-                                                            color: Colors.redAccent,
-                                                            fontSize: 9,
-                                                            fontWeight: FontWeight.w700,
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-
-                                                    final isReady = project.upsStatus.toUpperCase() == 'READY' ||
-                                                        project.upsStatus.toUpperCase() == 'ACTIVE' ||
-                                                        project.ingestionStatus.toLowerCase() == 'live';
-
-                                                    if (isReady) {
-                                                      return Tooltip(
-                                                        message: 'Ready',
-                                                        child: Container(
-                                                          width: 14,
-                                                          height: 14,
-                                                          decoration: BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: palette.live.withValues(alpha: 0.15),
-                                                            border: Border.all(
-                                                                color: palette.live.withValues(alpha: 0.45)),
-                                                          ),
-                                                          alignment: Alignment.center,
-                                                          child: Container(
-                                                            width: 6,
-                                                            height: 6,
-                                                            decoration: BoxDecoration(
-                                                              shape: BoxShape.circle,
-                                                              color: palette.live,
-                                                              boxShadow: [
-                                                                BoxShadow(
-                                                                  color: palette.live.withValues(alpha: 0.7),
-                                                                  blurRadius: 3,
-                                                                  spreadRadius: 0.5,
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-
-                                                    return Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                          horizontal: 6, vertical: 2),
-                                                      decoration: BoxDecoration(
-                                                        color: palette.bgBase,
-                                                        border: Border.all(color: palette.div),
-                                                        borderRadius: BorderRadius.circular(4),
+                                              )
+                                            else if (isConnected)
+                                              InkWell(
+                                                onTap: () => _toggleProjectConnection(project),
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 10, vertical: 5),
+                                                  decoration: BoxDecoration(
+                                                    color: palette.live.withValues(alpha: 0.12),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                        color: palette.live.withValues(alpha: 0.35)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.check,
+                                                        size: 13,
+                                                        color: palette.live,
                                                       ),
-                                                      child: Text(
-                                                        project.upsStatus.toUpperCase(),
-                                                        style: UnoTypography.mono(
-                                                          color: palette.textSec,
-                                                          fontSize: 9,
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Connected',
+                                                        style: UnoTypography.body(
+                                                          color: palette.live,
+                                                          fontSize: 11.5,
                                                           fontWeight: FontWeight.w600,
                                                         ),
                                                       ),
-                                                    );
-                                                  },
+                                                    ],
+                                                  ),
                                                 ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          // Connection state badge / button
-                                          if (isStopped)
-                                            const SizedBox.shrink()
-                                          else if (isConnected)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 9,
-                                                      vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: palette.live
-                                                    .withValues(alpha: 0.12),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: palette.live
-                                                      .withValues(alpha: 0.3),
+                                              )
+                                            else
+                                              InkWell(
+                                                onTap: () => _toggleProjectConnection(project),
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 12, vertical: 5),
+                                                  decoration: BoxDecoration(
+                                                    color: palette.accent,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.add,
+                                                        size: 13,
+                                                        color: buttonFg,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Connect',
+                                                        style: UnoTypography.body(
+                                                          color: buttonFg,
+                                                          fontSize: 11.5,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
-                                              child: Row(
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.check_circle,
-                                                    size: 13,
-                                                    color: palette.live,
-                                                  ),
-                                                  const SizedBox(width: 5),
-                                                  Text(
-                                                    'In Workspace',
-                                                    style: UnoTypography.body(
-                                                      color: palette.live,
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            )
-                                          else
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: palette.accent,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
-                                                children: [
-                                                  const Icon(
-                                                    Icons.add,
-                                                    size: 13,
-                                                    color: Colors.white,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    'Connect',
-                                                    style: UnoTypography.body(
-                                                      color: Colors.white,
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ),
                   ),
 
@@ -1094,7 +1116,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${_projects.length} project(s) displaying on workspace',
+                        '${_projects.length} project(s) connected to workspace',
                         style: UnoTypography.body(
                           color: palette.textSec,
                           fontSize: 12,
@@ -1106,7 +1128,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 9),
+                              horizontal: 22, vertical: 8),
                           decoration: BoxDecoration(
                             color: palette.accent,
                             borderRadius: BorderRadius.circular(8),
@@ -1114,7 +1136,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           child: Text(
                             'Done',
                             style: UnoTypography.body(
-                              color: Colors.white,
+                              color: buttonFg,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -2324,7 +2346,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     return Container(
       height: 52,
-      color: palette.bgBase,
+      decoration: BoxDecoration(
+        gradient: palette.headerGradient,
+        border: Border(
+          bottom: BorderSide(color: palette.div.withValues(alpha: 0.45)),
+        ),
+      ),
       padding: EdgeInsets.only(
         left: isNarrow ? 12 : 20,
         right: isDesktop ? 0 : (isNarrow ? 12 : 20),
@@ -2362,7 +2389,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           InkWell(
             onTap: widget.onToggleTheme,
             borderRadius: BorderRadius.circular(6),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
               width: 30,
               height: 30,
               decoration: BoxDecoration(
@@ -2370,10 +2399,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 border: Border.all(color: palette.div),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(
-                widget.isDark ? LucideIcons.moon : LucideIcons.sun,
-                size: 14,
-                color: palette.textSec,
+              alignment: Alignment.center,
+              child: AnimatedRotation(
+                turns: widget.isDark ? 0.0 : 0.5,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  widget.isDark ? LucideIcons.moon : LucideIcons.sun,
+                  size: 14,
+                  color: palette.textSec,
+                ),
               ),
             ),
           ),
@@ -2392,204 +2427,220 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   //  Projects Content
   // ─────────────────────────────────────────────────
   Widget _buildProjectsContent(UnoPalette palette, bool isNarrow) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(
-        horizontal: isNarrow ? 20 : 40,
-        vertical: 32,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header Row ──
-          Row(
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1400),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: isNarrow ? 20 : 40,
+            vertical: 24,
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Projects',
-                      style: UnoTypography.body(
-                        color: palette.text,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Software projects available in your workspace',
-                      style: UnoTypography.body(
-                        color: palette.textSec,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // ── Action Buttons ──
+              // ── Header Row ──
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildUserLoginButton(palette),
-                  const SizedBox(width: 10),
-                  _buildActionButton(
-                    icon: Icons.refresh,
-                    label: 'Refresh',
-                    palette: palette,
-                    filled: false,
-                    isLoading: _isRefreshingProjects,
-                    onTap: () => _fetchServerProjects(isSilent: false),
-                  ),
-                  if (_isManager) ...[
-                    const SizedBox(width: 10),
-                    _buildActionButton(
-                      icon: Icons.hub_outlined,
-                      label: 'Connect Workspace',
-                      palette: palette,
-                      filled: true,
-                      onTap: _openConnectWorkspaceDialog,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Projects',
+                          style: UnoTypography.body(
+                            color: palette.text,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Software projects available in your workspace',
+                          style: UnoTypography.body(
+                            color: palette.textSec,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
+                  // ── Action Buttons ──
+                  Row(
+                    children: [
+                      _buildUserLoginButton(palette),
+                      const SizedBox(width: 10),
+                      _buildActionButton(
+                        icon: Icons.refresh,
+                        label: 'Refresh',
+                        palette: palette,
+                        filled: false,
+                        isLoading: _isRefreshingProjects,
+                        onTap: () => _fetchServerProjects(isSilent: false),
+                      ),
+                      if (_isManager) ...[
+                        const SizedBox(width: 10),
+                        _buildActionButton(
+                          icon: Icons.hub_outlined,
+                          label: 'Connect Workspace',
+                          palette: palette,
+                          filled: true,
+                          onTap: _openConnectWorkspaceDialog,
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
 
-          const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-          // ── Filter Input ──
-          SizedBox(
-            width: 280,
-            height: 40,
-            child: TextField(
-              onChanged: (v) => setState(() => _filterText = v),
-              style: UnoTypography.body(
-                color: palette.text,
-                fontSize: 13,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Filter projects...',
-                hintStyle: UnoTypography.body(
-                  color: palette.textSec.withValues(alpha: 0.6),
-                  fontSize: 13,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: 18,
-                  color: palette.textSec,
-                ),
-                filled: true,
-                fillColor: palette.bgElevated,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: palette.div),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: palette.div),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: palette.accent, width: 1.5),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Project Cards ──
-          if (_isLoadingProjects)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Center(
-                child: Column(
-                  children: [
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Loading workspace...',
-                      style: UnoTypography.body(
-                        color: palette.textSec,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (_filteredProjects.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-              decoration: BoxDecoration(
-                color: palette.bgSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: palette.div),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    _filterText.isNotEmpty
-                        ? Icons.search_off_rounded
-                        : Icons.folder_open_rounded,
-                    size: 36,
-                    color: palette.textSec,
+              // ── Filter Input ──
+              SizedBox(
+                width: 280,
+                height: 40,
+                child: TextField(
+                  onChanged: (v) => setState(() => _filterText = v),
+                  style: UnoTypography.body(
+                    color: palette.text,
+                    fontSize: 13,
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _filterText.isNotEmpty
-                        ? 'No matching projects found'
-                        : 'No projects in workspace',
-                    style: UnoTypography.body(
-                      color: palette.text,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _filterText.isNotEmpty
-                        ? 'Try adjusting your search filter.'
-                        : (_isManager
-                            ? 'Connect backend projects to display them in your workspace.'
-                            : 'No projects have been connected to this workspace yet.'),
-                    textAlign: TextAlign.center,
-                    style: UnoTypography.body(
-                      color: palette.textSec,
+                  decoration: InputDecoration(
+                    hintText: 'Filter projects...',
+                    hintStyle: UnoTypography.body(
+                      color: palette.textSec.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      size: 18,
+                      color: palette.textSec,
+                    ),
+                    filled: true,
+                    fillColor: palette.bgElevated,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: palette.div),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: palette.div),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: palette.accent, width: 1.5),
+                    ),
                   ),
-                  if (_isManager && _filterText.isEmpty) ...[
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _openConnectWorkspaceDialog,
-                      icon: const Icon(Icons.hub_outlined, size: 16),
-                      label: const Text('Connect Workspace'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 11),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── Project Cards ──
+              if (_isLoadingProjects)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Loading workspace...',
+                          style: UnoTypography.body(
+                            color: palette.textSec,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (_filteredProjects.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+                  decoration: BoxDecoration(
+                    gradient: palette.sectionGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: palette.div),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _filterText.isNotEmpty
+                            ? Icons.search_off_rounded
+                            : Icons.folder_open_rounded,
+                        size: 36,
+                        color: palette.textSec,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _filterText.isNotEmpty
+                            ? 'No matching projects found'
+                            : 'No projects in workspace',
+                        style: UnoTypography.body(
+                          color: palette.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            )
-          else
-            ..._filteredProjects
-                .map((project) => _buildProjectCard(project, palette)),
-        ],
+                      const SizedBox(height: 6),
+                      Text(
+                        _filterText.isNotEmpty
+                            ? 'Try adjusting your search filter.'
+                            : (_isManager
+                                ? 'Connect backend projects to display them in your workspace.'
+                                : 'No projects have been connected to this workspace yet.'),
+                        textAlign: TextAlign.center,
+                        style: UnoTypography.body(
+                          color: palette.textSec,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (_isManager && _filterText.isEmpty) ...[
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _openConnectWorkspaceDialog,
+                          icon: Icon(
+                            Icons.hub_outlined,
+                            size: 16,
+                            color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
+                          ),
+                          label: Text(
+                            'Connect Workspace',
+                            style: TextStyle(
+                              color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: palette.accent,
+                            foregroundColor: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 11),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                )
+              else
+                ..._filteredProjects
+                    .map((project) => _buildProjectCard(project, palette)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2602,6 +2653,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     required VoidCallback onTap,
     bool isLoading = false,
   }) {
+    final Color buttonFg = filled
+        ? (widget.isDark ? const Color(0xFF0A0F20) : Colors.white)
+        : palette.text;
+    final Color iconColor = filled
+        ? (widget.isDark ? const Color(0xFF0A0F20) : Colors.white)
+        : palette.textSec;
+
     return InkWell(
       onTap: isLoading ? () {} : onTap,
       borderRadius: BorderRadius.circular(8),
@@ -2627,25 +2685,23 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         height: 13,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            filled ? Colors.white : palette.accent,
-                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(buttonFg),
                         ),
                       ),
                     )
                   : Icon(
                       icon,
                       size: 15,
-                      color: filled ? Colors.white : palette.textSec,
+                      color: iconColor,
                     ),
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: UnoTypography.body(
-                color: filled ? Colors.white : palette.text,
+                color: buttonFg,
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -2655,296 +2711,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Widget _buildProjectCard(ProjectItem project, UnoPalette palette) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: palette.bgSurface,
-        border: Border.all(color: palette.div),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          if (!palette.isDark)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Code icon
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: palette.bgElevated,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: palette.div),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '<>',
-              style: UnoTypography.mono(
-                color: palette.textSec,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 14),
-
-          // Project name & details
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                project.name,
-                style: UnoTypography.body(
-                  color: palette.text,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Row(
-                children: [
-                  if (project.description != null && project.description!.isNotEmpty) ...[
-                    Text(
-                      project.description!,
-                      style: UnoTypography.mono(
-                        color: palette.textSec,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                  if (project.port != null) ...[
-                    if (project.description != null && project.description!.isNotEmpty)
-                      Text(
-                        ' • ',
-                        style: UnoTypography.mono(color: palette.textSec, fontSize: 11),
-                      ),
-                    Text(
-                      'Port ${project.port}',
-                      style: UnoTypography.mono(
-                        color: palette.accent,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(width: 12),
-
-          // Ready Green Button / Status badge
-          Builder(
-            builder: (context) {
-              final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
-                  project.upsStatus.toUpperCase() == 'DELETED' ||
-                  project.upsStatus.toUpperCase() == 'OFFLINE' ||
-                  project.ingestionStatus.toLowerCase() == 'stopped' ||
-                  project.ingestionStatus.toLowerCase() == 'deleted';
-
-              if (isStopped) {
-                return Tooltip(
-                  message: 'Server Stopped on Backend',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.12),
-                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'STOPPED',
-                          style: UnoTypography.mono(
-                            color: Colors.redAccent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              final isReady = project.upsStatus.toUpperCase() == 'READY' ||
-                  project.upsStatus.toUpperCase() == 'ACTIVE' ||
-                  project.ingestionStatus.toLowerCase() == 'live';
-
-              if (isReady) {
-                return Tooltip(
-                  message: 'Ready',
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: palette.live.withValues(alpha: 0.15),
-                      border:
-                          Border.all(color: palette.live.withValues(alpha: 0.45)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: palette.live,
-                        boxShadow: [
-                          BoxShadow(
-                            color: palette.live.withValues(alpha: 0.7),
-                            blurRadius: 4,
-                            spreadRadius: 0.5,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                decoration: BoxDecoration(
-                  color: palette.bgElevated,
-                  border: Border.all(color: palette.div),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  project.upsStatus.toUpperCase(),
-                  style: UnoTypography.mono(
-                    color: palette.textSec,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              );
-            },
-          ),
-
-          const Spacer(),
-
-          // ── Manage Workspace Button (Manager Role Only) ──
-          if (_isManager) ...[
-            InkWell(
-              onTap: () => _openManageWorkspace(project),
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: palette.bgElevated,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: palette.div),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      LucideIcons.users,
-                      size: 13,
-                      color: palette.textSec,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Manage Workspace',
-                      style: UnoTypography.body(
-                        color: palette.text,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-          ],
-
-          // Open button / Server Stopped indicator
-          Builder(
-            builder: (context) {
-              final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
-                  project.upsStatus.toUpperCase() == 'DELETED' ||
-                  project.upsStatus.toUpperCase() == 'OFFLINE';
-
-              if (isStopped) {
-                return Tooltip(
-                  message: 'Cannot open: Project server is stopped on backend',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: palette.bgElevated,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: palette.div),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.power_off, size: 13, color: palette.textSec),
-                        const SizedBox(width: 5),
-                        Text(
-                          'Server Stopped',
-                          style: UnoTypography.body(
-                            color: palette.textSec,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return InkWell(
-                onTap: () => widget.onOpenProject(project),
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Open',
-                        style: UnoTypography.body(
-                          color: palette.accent,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward,
-                        size: 15,
-                        color: palette.accent,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+    return _OppositeProjectCard(
+      project: project,
+      isDark: widget.isDark,
+      isManager: _isManager,
+      onOpen: () => widget.onOpenProject(project),
+      onManageWorkspace: () => _openManageWorkspace(project),
     );
   }
 
@@ -3416,6 +3188,453 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Opposite-shade project card matching the Unotusk palette:
+/// - Light page (#F2EFE9) -> Dark Obsidian Navy card (#0A0F20)
+/// - Dark page  (#0A0F20) -> Light Sand Cream card   (#F5F2EB)
+class _OppositeProjectCard extends StatefulWidget {
+  final ProjectItem project;
+  final bool isDark;
+  final bool isManager;
+  final VoidCallback onOpen;
+  final VoidCallback onManageWorkspace;
+
+  const _OppositeProjectCard({
+    required this.project,
+    required this.isDark,
+    required this.isManager,
+    required this.onOpen,
+    required this.onManageWorkspace,
+  });
+
+  @override
+  State<_OppositeProjectCard> createState() => _OppositeProjectCardState();
+}
+
+class _OppositeProjectCardState extends State<_OppositeProjectCard> {
+  bool _isHovered = false;
+  bool _isManageHovered = false;
+  bool _isOpenHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final project = widget.project;
+    // Opposite shade to the page background
+    final isCardDark = !widget.isDark;
+
+    final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+        project.upsStatus.toUpperCase() == 'DELETED' ||
+        project.upsStatus.toUpperCase() == 'OFFLINE' ||
+        project.ingestionStatus.toLowerCase() == 'stopped' ||
+        project.ingestionStatus.toLowerCase() == 'deleted';
+
+    final isReady = !isStopped &&
+        (project.upsStatus.toUpperCase() == 'READY' ||
+            project.upsStatus.toUpperCase() == 'ACTIVE' ||
+            project.ingestionStatus.toLowerCase() == 'live');
+
+    // Exact palette tokens for opposite shade
+    final cardBg = isCardDark
+        ? (_isHovered ? const Color(0xFF12172A) : const Color(0xFF0A0F20))
+        : (_isHovered ? const Color(0xFFFFFFFF) : const Color(0xFFF5F2EB));
+
+    final cardBorder = isCardDark
+        ? (_isHovered ? const Color(0xFF3A3F52) : const Color(0xFF222533))
+        : (_isHovered ? const Color(0xFFD2C9BA) : const Color(0xFFE4DFD6));
+
+    final iconBoxBg =
+        isCardDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
+    final iconBoxBorder =
+        isCardDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+    final iconColor =
+        isCardDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
+
+    final titleColor =
+        isCardDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+    final subtitleColor =
+        isCardDark ? const Color(0xFF84878F) : const Color(0xFF6B686A);
+    final portColor =
+        isCardDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
+
+    final manageBg = isCardDark
+        ? (_isManageHovered ? const Color(0xFF1E2336) : const Color(0xFF161A29))
+        : (_isManageHovered ? const Color(0xFFF0ECE4) : const Color(0xFFFFFFFF));
+    final manageBorder =
+        isCardDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+    final manageFg =
+        isCardDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+
+    final openBg = isCardDark
+        ? (_isOpenHovered ? const Color(0xFFD8CFBF) : const Color(0xFFCBC1B4))
+        : (_isOpenHovered ? const Color(0xFF161A29) : const Color(0xFF0A0F20));
+    final openFg =
+        isCardDark ? const Color(0xFF0A0F20) : const Color(0xFFFFFFFF);
+
+    const liveGreen = Color(0xFF22C55E);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: isStopped ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: isStopped ? null : widget.onOpen,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            border: Border.all(color: cardBorder, width: 1.1),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: (isCardDark ? const Color(0xFF0A0F20) : Colors.black)
+                    .withValues(
+                  alpha: isCardDark
+                      ? (_isHovered ? 0.28 : 0.16)
+                      : (_isHovered ? 0.34 : 0.22),
+                ),
+                blurRadius: _isHovered ? 22 : 14,
+                offset: Offset(0, _isHovered ? 6 : 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Repository / Project icon
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconBoxBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: iconBoxBorder),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  LucideIcons.folderGit2,
+                  size: 18,
+                  color: iconColor,
+                ),
+              ),
+
+              const SizedBox(width: 15),
+
+              // Project name, status & metadata
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            project.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: UnoTypography.body(
+                              color: titleColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        if (isStopped)
+                          Tooltip(
+                            message: 'Server Stopped on Backend',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withValues(alpha: 0.14),
+                                border: Border.all(
+                                    color: Colors.redAccent
+                                        .withValues(alpha: 0.4)),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'STOPPED',
+                                    style: UnoTypography.mono(
+                                      color: Colors.redAccent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else if (isReady)
+                          Tooltip(
+                            message: 'Active & Ready',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: liveGreen.withValues(
+                                    alpha: isCardDark ? 0.12 : 0.14),
+                                border: Border.all(
+                                    color: liveGreen.withValues(alpha: 0.35)),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6.5,
+                                    height: 6.5,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: liveGreen,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: liveGreen.withValues(
+                                              alpha: 0.65),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Active',
+                                    style: UnoTypography.body(
+                                      color: isCardDark
+                                          ? const Color(0xFF4ADE80)
+                                          : const Color(0xFF15803D),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: iconBoxBg,
+                              border: Border.all(color: iconBoxBorder),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              project.upsStatus.toUpperCase(),
+                              style: UnoTypography.mono(
+                                color: subtitleColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if ((project.description != null &&
+                            project.description!.isNotEmpty) ||
+                        project.port != null) ...[
+                      const SizedBox(height: 3.5),
+                      Row(
+                        children: [
+                          if (project.description != null &&
+                              project.description!.isNotEmpty)
+                            Flexible(
+                              child: Text(
+                                project.description!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: UnoTypography.mono(
+                                  color: subtitleColor,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ),
+                          if (project.port != null) ...[
+                            if (project.description != null &&
+                                project.description!.isNotEmpty)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                                child: Text(
+                                  '·',
+                                  style: UnoTypography.mono(
+                                    color:
+                                        subtitleColor.withValues(alpha: 0.65),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            Text(
+                              'Port ${project.port}',
+                              style: UnoTypography.mono(
+                                color: portColor,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              // Manage Workspace button (Manager Role Only)
+              if (widget.isManager) ...[
+                MouseRegion(
+                  onEnter: (_) => setState(() => _isManageHovered = true),
+                  onExit: (_) => setState(() => _isManageHovered = false),
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: widget.onManageWorkspace,
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7.5),
+                      decoration: BoxDecoration(
+                        color: manageBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: manageBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            LucideIcons.users,
+                            size: 13.5,
+                            color: subtitleColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Manage Workspace',
+                            style: UnoTypography.body(
+                              color: manageFg,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+
+              // Primary Open CTA / Server Stopped indicator
+              if (isStopped)
+                Tooltip(
+                  message: 'Cannot open: Project server is stopped on backend',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7.5),
+                    decoration: BoxDecoration(
+                      color: iconBoxBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: iconBoxBorder),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.power_off, size: 13, color: subtitleColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Server Stopped',
+                          style: UnoTypography.body(
+                            color: subtitleColor,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                MouseRegion(
+                  onEnter: (_) => setState(() => _isOpenHovered = true),
+                  onExit: (_) => setState(() => _isOpenHovered = false),
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: widget.onOpen,
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7.5),
+                      decoration: BoxDecoration(
+                        color: openBg,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: openBg.withValues(
+                                alpha: _isOpenHovered ? 0.30 : 0.12),
+                            blurRadius: _isOpenHovered ? 10 : 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Open',
+                            style: UnoTypography.body(
+                              color: openFg,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          AnimatedSlide(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOutCubic,
+                            offset: _isOpenHovered
+                                ? const Offset(0.18, 0)
+                                : Offset.zero,
+                            child: Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 14.5,
+                              color: openFg,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

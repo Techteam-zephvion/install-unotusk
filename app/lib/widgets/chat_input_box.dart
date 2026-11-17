@@ -11,6 +11,10 @@ class ChatInputBox extends StatefulWidget {
   final Function(String) onChipSelected;
   final List<String> suggestions;
   final String? placeholder;
+  final bool thinkingEnabled;
+  final String thinkingTier;
+  final ValueChanged<bool>? onThinkingEnabledChanged;
+  final ValueChanged<String>? onThinkingTierChanged;
 
   const ChatInputBox({
     super.key,
@@ -20,6 +24,10 @@ class ChatInputBox extends StatefulWidget {
     required this.onChipSelected,
     this.suggestions = const [],
     this.placeholder,
+    this.thinkingEnabled = true,
+    this.thinkingTier = 'warm',
+    this.onThinkingEnabledChanged,
+    this.onThinkingTierChanged,
   });
 
   @override
@@ -28,9 +36,9 @@ class ChatInputBox extends StatefulWidget {
 
 class _ChatInputBoxState extends State<ChatInputBox>
     with TickerProviderStateMixin {
-  bool _thinkingEnabled = true;
-  String _thinkingMode = 'warm'; // warm, cold, hot
-  String? _activeSearchMode; // research, web, project
+  late bool _thinkingEnabled;
+  late String _selectedModel; // hot, warm, cold
+  String? _activeSearchMode; // research, web
   bool _showSuggestions = false;
   final List<String> _attachedFileNames = [];
 
@@ -40,14 +48,14 @@ class _ChatInputBoxState extends State<ChatInputBox>
   bool _plusBtnHovered = false;
   bool _attachBtnHovered = false;
   bool _thinkingToggleHovered = false;
-  bool _tierBtnHovered = false;
+  bool _modelBtnHovered = false;
 
-  // Thinking Dropdown Animation & Overlay
-  late final AnimationController _thinkingAnim;
-  late final Animation<double> _thinkingFade;
-  late final Animation<double> _thinkingScale;
-  late final Animation<Offset> _thinkingSlide;
-  OverlayEntry? _thinkingMenuOverlay;
+  // Model Dropdown Animation & Overlay
+  late final AnimationController _modelAnim;
+  late final Animation<double> _modelFade;
+  late final Animation<double> _modelScale;
+  late final Animation<Offset> _modelSlide;
+  OverlayEntry? _modelMenuOverlay;
 
   // Plus Menu Animation & Overlay
   late final AnimationController _plusAnim;
@@ -58,39 +66,54 @@ class _ChatInputBoxState extends State<ChatInputBox>
   OverlayEntry? _plusMenuOverlay;
 
   final LayerLink _layerLink = LayerLink();
-  final LayerLink _thinkingButtonLink = LayerLink();
+  final LayerLink _modelButtonLink = LayerLink();
   final LayerLink _plusButtonLink = LayerLink();
+
+  static const List<Map<String, String>> _models = [
+    {'id': 'hot', 'label': 'Hot'},
+    {'id': 'warm', 'label': 'Warm'},
+    {'id': 'cold', 'label': 'Cold'},
+  ];
+
+  String get _selectedModelLabel {
+    for (final m in _models) {
+      if (m['id'] == _selectedModel) return m['label']!;
+    }
+    return 'Warm';
+  }
 
   @override
   void initState() {
     super.initState();
+    _thinkingEnabled = widget.thinkingEnabled;
+    _selectedModel = widget.thinkingTier;
     widget.controller.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
 
-    // Thinking Menu Animations
-    _thinkingAnim = AnimationController(
+    // Model Menu Animations
+    _modelAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
-      reverseDuration: const Duration(milliseconds: 160),
+      duration: const Duration(milliseconds: 190),
+      reverseDuration: const Duration(milliseconds: 140),
     );
-    _thinkingFade = CurvedAnimation(
-      parent: _thinkingAnim,
+    _modelFade = CurvedAnimation(
+      parent: _modelAnim,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
-    _thinkingScale = Tween<double>(begin: 0.94, end: 1.0).animate(
+    _modelScale = Tween<double>(begin: 0.95, end: 1.0).animate(
       CurvedAnimation(
-        parent: _thinkingAnim,
+        parent: _modelAnim,
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       ),
     );
-    _thinkingSlide = Tween<Offset>(
+    _modelSlide = Tween<Offset>(
       begin: const Offset(0, 0.05),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
-        parent: _thinkingAnim,
+        parent: _modelAnim,
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       ),
@@ -99,15 +122,15 @@ class _ChatInputBoxState extends State<ChatInputBox>
     // Plus Menu Animations
     _plusAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
-      reverseDuration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 190),
+      reverseDuration: const Duration(milliseconds: 140),
     );
     _plusFade = CurvedAnimation(
       parent: _plusAnim,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
-    _plusScale = Tween<double>(begin: 0.93, end: 1.0).animate(
+    _plusScale = Tween<double>(begin: 0.95, end: 1.0).animate(
       CurvedAnimation(
         parent: _plusAnim,
         curve: Curves.easeOutCubic,
@@ -115,7 +138,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
       ),
     );
     _plusSlide = Tween<Offset>(
-      begin: const Offset(0, 0.06),
+      begin: const Offset(0, 0.05),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
@@ -134,10 +157,21 @@ class _ChatInputBoxState extends State<ChatInputBox>
   }
 
   @override
+  void didUpdateWidget(covariant ChatInputBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.thinkingEnabled != oldWidget.thinkingEnabled) {
+      _thinkingEnabled = widget.thinkingEnabled;
+    }
+    if (widget.thinkingTier != oldWidget.thinkingTier) {
+      _selectedModel = widget.thinkingTier;
+    }
+  }
+
+  @override
   void dispose() {
-    _closeThinkingMenu(animated: false);
+    _closeModelMenu(animated: false);
     _closePlusMenu(animated: false);
-    _thinkingAnim.dispose();
+    _modelAnim.dispose();
     _plusAnim.dispose();
     _focusNode.removeListener(_onFocusChanged);
     _focusNode.dispose();
@@ -175,70 +209,75 @@ class _ChatInputBoxState extends State<ChatInputBox>
     }
   }
 
-  // --- Thinking Menu Overlay ---
-  void _toggleThinkingMenu() {
-    if (_thinkingMenuOverlay != null) {
-      _closeThinkingMenu();
+  // --- Model Dropdown Overlay ---
+  void _toggleModelMenu() {
+    if (_modelMenuOverlay != null) {
+      _closeModelMenu();
     } else {
       _closePlusMenu(animated: false);
-      _openThinkingMenu();
+      _openModelMenu();
     }
   }
 
-  void _openThinkingMenu() {
-    _closeThinkingMenu(animated: false);
+  void _openModelMenu() {
+    _closeModelMenu(animated: false);
     final overlay = Overlay.of(context);
-    _thinkingMenuOverlay = OverlayEntry(
+    _modelMenuOverlay = OverlayEntry(
       builder: (context) {
         return Stack(
           children: [
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: () => _closeThinkingMenu(),
+                onTap: () => _closeModelMenu(),
                 child: const SizedBox.expand(),
               ),
             ),
             CompositedTransformFollower(
-              link: _thinkingButtonLink,
+              link: _modelButtonLink,
               showWhenUnlinked: false,
               targetAnchor: Alignment.topLeft,
               followerAnchor: Alignment.bottomLeft,
-              offset: const Offset(0, -10),
+              offset: const Offset(0, -8),
               child: Material(
                 color: Colors.transparent,
-                child: _buildThinkingMenuCard(),
+                child: _buildModelMenuCard(),
               ),
             ),
           ],
         );
       },
     );
-    overlay.insert(_thinkingMenuOverlay!);
-    _thinkingAnim.forward(from: 0.0);
+    overlay.insert(_modelMenuOverlay!);
+    _modelAnim.forward(from: 0.0);
     setState(() {});
   }
 
-  Future<void> _closeThinkingMenu({bool animated = true}) async {
-    if (_thinkingMenuOverlay == null) return;
+  Future<void> _closeModelMenu({bool animated = true}) async {
+    if (_modelMenuOverlay == null) return;
     if (animated) {
-      await _thinkingAnim.reverse();
+      await _modelAnim.reverse();
     }
-    _thinkingMenuOverlay?.remove();
-    _thinkingMenuOverlay = null;
+    _modelMenuOverlay?.remove();
+    _modelMenuOverlay = null;
     if (mounted) setState(() {});
   }
 
-  Widget _buildThinkingMenuCard() {
+  Widget _buildModelMenuCard() {
+    final isDark = widget.palette.isDark;
+    final menuBg = isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
+    final menuBorder =
+        isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+
     return AnimatedBuilder(
-      animation: _thinkingAnim,
+      animation: _modelAnim,
       builder: (context, child) {
         return FadeTransition(
-          opacity: _thinkingFade,
+          opacity: _modelFade,
           child: SlideTransition(
-            position: _thinkingSlide,
+            position: _modelSlide,
             child: ScaleTransition(
-              scale: _thinkingScale,
+              scale: _modelScale,
               alignment: Alignment.bottomLeft,
               child: child,
             ),
@@ -246,133 +285,66 @@ class _ChatInputBoxState extends State<ChatInputBox>
         );
       },
       child: Container(
-        width: 230,
+        width: 156,
         decoration: BoxDecoration(
-          color: widget.palette.bgElevated,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: widget.palette.div,
-            width: 1.2,
-          ),
+          color: menuBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: menuBorder, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 28,
+              color: const Color(0xFF0A0F20)
+                  .withValues(alpha: isDark ? 0.45 : 0.12),
+              blurRadius: 20,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(8),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.cpu, size: 12, color: widget.palette.accent),
-                    const SizedBox(width: 6),
-                    Text(
-                      'REASONING MODEL',
-                      style: UnoTypography.mono(
-                        color: widget.palette.textSec,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.8,
+        padding: const EdgeInsets.all(5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _models.map((m) {
+            final id = m['id']!;
+            final label = m['label']!;
+            final isSelected = _selectedModel == id && _thinkingEnabled;
+            return _MinimalMenuTile(
+              isSelected: isSelected,
+              palette: widget.palette,
+              onTap: () {
+                setState(() {
+                  _selectedModel = id;
+                  _thinkingEnabled = true;
+                });
+                widget.onThinkingTierChanged?.call(id);
+                widget.onThinkingEnabledChanged?.call(true);
+                _closeModelMenu();
+              },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: UnoTypography.body(
+                        color: isSelected
+                            ? widget.palette.text
+                            : widget.palette.textSec,
+                        fontSize: 13,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      LucideIcons.check,
+                      size: 13.5,
+                      color: widget.palette.accent,
+                    ),
+                ],
               ),
-              _buildTierOption(
-                tier: 'hot',
-                title: 'Hot',
-                subtitle: 'Quick answers · Lowest latency',
-              ),
-              const SizedBox(height: 3),
-              _buildTierOption(
-                tier: 'warm',
-                title: 'Warm',
-                subtitle: 'Balanced · Standard depth',
-              ),
-              const SizedBox(height: 3),
-              _buildTierOption(
-                tier: 'cold',
-                title: 'Cold',
-                subtitle: 'Deep reasoning · Maximum facts',
-              ),
-            ],
-          ),
+            );
+          }).toList(),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTierOption({
-    required String tier,
-    required String title,
-    required String subtitle,
-  }) {
-    final isSelected = _thinkingMode == tier && _thinkingEnabled;
-
-    return _HoverableTile(
-      isSelected: isSelected,
-      selectedBgColor: widget.palette.bgSurface,
-      accentColor: widget.palette.accent,
-      palette: widget.palette,
-      onTap: () {
-        setState(() {
-          _thinkingMode = tier;
-          _thinkingEnabled = true;
-        });
-        _closeThinkingMenu();
-      },
-      child: Row(
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? widget.palette.accent
-                  : widget.palette.textSec.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: UnoTypography.body(
-                    color: isSelected
-                        ? widget.palette.text
-                        : widget.palette.text.withValues(alpha: 0.9),
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: UnoTypography.body(
-                    color: widget.palette.textSec,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isSelected)
-            Icon(LucideIcons.check, size: 14, color: widget.palette.accent),
-        ],
       ),
     );
   }
@@ -382,7 +354,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
     if (_plusMenuOverlay != null) {
       _closePlusMenu();
     } else {
-      _closeThinkingMenu(animated: false);
+      _closeModelMenu(animated: false);
       _openPlusMenu();
     }
   }
@@ -406,7 +378,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
               showWhenUnlinked: false,
               targetAnchor: Alignment.topLeft,
               followerAnchor: Alignment.bottomLeft,
-              offset: const Offset(0, -10),
+              offset: const Offset(0, -8),
               child: Material(
                 color: Colors.transparent,
                 child: _buildPlusMenuCard(),
@@ -432,6 +404,11 @@ class _ChatInputBoxState extends State<ChatInputBox>
   }
 
   Widget _buildPlusMenuCard() {
+    final isDark = widget.palette.isDark;
+    final menuBg = isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
+    final menuBorder =
+        isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+
     return AnimatedBuilder(
       animation: _plusAnim,
       builder: (context, child) {
@@ -448,43 +425,37 @@ class _ChatInputBoxState extends State<ChatInputBox>
         );
       },
       child: Container(
-        width: 200,
+        width: 192,
         decoration: BoxDecoration(
-          color: widget.palette.bgElevated,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: widget.palette.div, width: 1.2),
+          color: menuBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: menuBorder, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 28,
+              color: const Color(0xFF0A0F20)
+                  .withValues(alpha: isDark ? 0.45 : 0.12),
+              blurRadius: 20,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(8),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        padding: const EdgeInsets.all(5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             _buildPlusMenuItem(
               icon: LucideIcons.folderPlus,
               title: 'Add to project',
-              subtitle: 'Link external repo folder',
               isActive: false,
               onTap: () {
                 _closePlusMenu();
                 _handlePickFiles();
               },
             ),
-            const SizedBox(height: 3),
             _buildPlusMenuItem(
               icon: LucideIcons.globe,
               title: 'Web search',
-              subtitle: 'Ground with internet search',
               isActive: _activeSearchMode == 'web',
               onTap: () {
                 setState(() {
@@ -494,11 +465,9 @@ class _ChatInputBoxState extends State<ChatInputBox>
                 _closePlusMenu();
               },
             ),
-            const SizedBox(height: 3),
             _buildPlusMenuItem(
               icon: LucideIcons.bookOpen,
               title: 'Deep research',
-              subtitle: 'Multi-signal code graph probe',
               isActive: _activeSearchMode == 'research',
               onTap: () {
                 setState(() {
@@ -510,7 +479,6 @@ class _ChatInputBoxState extends State<ChatInputBox>
             ),
           ],
         ),
-        ),
       ),
     );
   }
@@ -518,49 +486,33 @@ class _ChatInputBoxState extends State<ChatInputBox>
   Widget _buildPlusMenuItem({
     required IconData icon,
     required String title,
-    required String subtitle,
     required bool isActive,
     required VoidCallback onTap,
   }) {
-    return _HoverableTile(
+    return _MinimalMenuTile(
       isSelected: isActive,
-      selectedBgColor: widget.palette.accent.withValues(alpha: 0.15),
-      accentColor: widget.palette.accent,
       palette: widget.palette,
       onTap: onTap,
       child: Row(
         children: [
           Icon(
             icon,
-            size: 15,
+            size: 14.5,
             color: isActive ? widget.palette.accent : widget.palette.textSec,
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: UnoTypography.body(
-                    color: isActive ? widget.palette.accent : widget.palette.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: UnoTypography.body(
-                    color: widget.palette.textSec,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ],
+            child: Text(
+              title,
+              style: UnoTypography.body(
+                color: isActive ? widget.palette.text : widget.palette.textSec,
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              ),
             ),
           ),
           if (isActive)
-            Icon(LucideIcons.check, size: 13, color: widget.palette.accent),
+            Icon(LucideIcons.check, size: 13.5, color: widget.palette.accent),
         ],
       ),
     );
@@ -568,7 +520,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
 
   void _handleSubmit() {
     if (widget.controller.text.trim().isEmpty) return;
-    _closeThinkingMenu(animated: false);
+    _closeModelMenu(animated: false);
     _closePlusMenu(animated: false);
     widget.onSubmit();
     setState(() {
@@ -581,6 +533,14 @@ class _ChatInputBoxState extends State<ChatInputBox>
   Widget build(BuildContext context) {
     final canSubmit = widget.controller.text.trim().isNotEmpty;
     final isFocused = _focusNode.hasFocus;
+    final isDark = widget.palette.isDark;
+    final p = widget.palette;
+
+    // Zero-alpha matched base color to prevent muddy grey lerp artifacts
+    final accentBase = p.accent;
+    final sendIconColor = canSubmit
+        ? (isDark ? const Color(0xFF0A0F20) : Colors.white)
+        : p.textSec.withValues(alpha: 0.6);
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -595,10 +555,10 @@ class _ChatInputBoxState extends State<ChatInputBox>
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: widget.palette.accent.withValues(alpha: 0.14),
+                color: p.accent.withValues(alpha: 0.14),
                 border: Border.all(
-                  color: widget.palette.accent.withValues(alpha: 0.4),
-                  width: 1.2,
+                  color: p.accent.withValues(alpha: 0.4),
+                  width: 1,
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -610,7 +570,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                         ? LucideIcons.bookOpen
                         : LucideIcons.globe,
                     size: 12,
-                    color: widget.palette.accent,
+                    color: p.accent,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -618,7 +578,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                         ? 'Deep Research Active'
                         : 'Web Search Active',
                     style: UnoTypography.body(
-                      color: widget.palette.accent,
+                      color: p.accent,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -632,7 +592,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                       child: Icon(
                         LucideIcons.x,
                         size: 12,
-                        color: widget.palette.accent,
+                        color: p.accent,
                       ),
                     ),
                   ),
@@ -641,7 +601,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
             ),
           ],
 
-          // Main Card with Smooth Animated Container Focus & Hover States
+          // Main Prompt Bar with Thin Focus Border & Tight Subtle Outer Fade
           MouseRegion(
             onEnter: (_) => setState(() => _isCardHovered = true),
             onExit: (_) => setState(() => _isCardHovered = false),
@@ -649,25 +609,42 @@ class _ChatInputBoxState extends State<ChatInputBox>
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
-                color: widget.palette.bgElevated,
+                gradient: p.elevatedCardGradient,
                 border: Border.all(
                   color: isFocused
-                      ? widget.palette.accent.withValues(alpha: 0.7)
+                      ? accentBase.withValues(alpha: isDark ? 0.52 : 0.44)
                       : (_isCardHovered
-                          ? widget.palette.accent.withValues(alpha: 0.35)
-                          : widget.palette.div),
-                  width: isFocused ? 1.4 : 1.0,
+                          ? accentBase.withValues(alpha: isDark ? 0.28 : 0.24)
+                          : p.div),
+                  width: isFocused ? 0.75 : 0.9,
                 ),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: isFocused
-                        ? widget.palette.accent.withValues(alpha: 0.08)
-                        : Colors.black.withValues(alpha: 0.06),
-                    blurRadius: isFocused ? 32 : 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: isFocused
+                    ? [
+                        // Subtle, tight halo fading gently from the border color
+                        BoxShadow(
+                          color: accentBase.withValues(
+                              alpha: isDark ? 0.14 : 0.09),
+                          blurRadius: 10,
+                          spreadRadius: 0.5,
+                          offset: Offset.zero,
+                        ),
+                        BoxShadow(
+                          color: accentBase.withValues(
+                              alpha: isDark ? 0.055 : 0.035),
+                          blurRadius: 18,
+                          spreadRadius: 0,
+                          offset: Offset.zero,
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black
+                              .withValues(alpha: isDark ? 0.20 : 0.04),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
               ),
               padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
               child: Column(
@@ -700,16 +677,16 @@ class _ChatInputBoxState extends State<ChatInputBox>
                       minLines: 1,
                       textInputAction: TextInputAction.send,
                       style: UnoTypography.body(
-                        color: widget.palette.text,
-                        fontSize: 15,
-                        height: 1.45,
+                        color: p.text,
+                        fontSize: 15.5,
+                        height: 1.5,
                       ),
                       decoration: InputDecoration(
                         hintText: widget.placeholder ??
                             'Ask about a merge, a ticket, or a decision on your project…',
                         hintStyle: UnoTypography.body(
-                          color: widget.palette.textSec.withValues(alpha: 0.8),
-                          fontSize: 15,
+                          color: p.textSec.withValues(alpha: 0.8),
+                          fontSize: 15.5,
                         ),
                         border: InputBorder.none,
                         isDense: true,
@@ -740,20 +717,17 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: widget.palette.accent
-                                        .withValues(alpha: 0.12),
+                                    color: p.accent.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: widget.palette.accent
-                                          .withValues(alpha: 0.35),
+                                      color: p.accent.withValues(alpha: 0.35),
                                     ),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(LucideIcons.paperclip,
-                                          size: 12,
-                                          color: widget.palette.accent),
+                                          size: 12, color: p.accent),
                                       const SizedBox(width: 5),
                                       ConstrainedBox(
                                         constraints:
@@ -762,7 +736,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                           name,
                                           style: UnoTypography.mono(
                                             fontSize: 11,
-                                            color: widget.palette.text,
+                                            color: p.text,
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -777,7 +751,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                           child: Icon(
                                             LucideIcons.x,
                                             size: 12,
-                                            color: widget.palette.textSec,
+                                            color: p.textSec,
                                           ),
                                         ),
                                       ),
@@ -794,7 +768,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                   Divider(
                     height: 1,
                     thickness: 1,
-                    color: widget.palette.div.withValues(alpha: 0.55),
+                    color: p.div.withValues(alpha: 0.55),
                   ),
                   const SizedBox(height: 8),
 
@@ -802,39 +776,41 @@ class _ChatInputBoxState extends State<ChatInputBox>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Left controls: Plus, Attach, Thinking Toggle, Model Dropdown
+                      // Left controls: Plus, Attach, Minimal Model Selector
                       Row(
                         children: [
-                          // Plus Button with Smooth Rotate and Animated Dropdown
+                          // Plus Button
                           CompositedTransformTarget(
                             link: _plusButtonLink,
                             child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
                               onEnter: (_) =>
                                   setState(() => _plusBtnHovered = true),
                               onExit: (_) =>
                                   setState(() => _plusBtnHovered = false),
                               child: Tooltip(
-                                message: 'Add external context or search mode',
-                                child: InkWell(
+                                message: 'Add context',
+                                child: GestureDetector(
                                   onTap: _togglePlusMenu,
-                                  borderRadius: BorderRadius.circular(10),
+                                  behavior: HitTestBehavior.opaque,
                                   child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
+                                    duration: const Duration(milliseconds: 160),
+                                    curve: Curves.easeOutCubic,
                                     width: 32,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: _plusMenuOverlay != null ||
-                                              _plusBtnHovered
-                                          ? widget.palette.accent
-                                              .withValues(alpha: 0.12)
-                                          : Colors.transparent,
+                                      color: accentBase.withValues(
+                                        alpha: (_plusMenuOverlay != null ||
+                                                _plusBtnHovered)
+                                            ? 0.10
+                                            : 0.0,
+                                      ),
                                       border: Border.all(
                                         color: _plusMenuOverlay != null ||
                                                 _plusBtnHovered
-                                            ? widget.palette.accent
-                                                .withValues(alpha: 0.4)
-                                            : widget.palette.div,
-                                        width: 1.1,
+                                            ? accentBase.withValues(alpha: 0.35)
+                                            : p.div,
+                                        width: 1,
                                       ),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
@@ -846,8 +822,8 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                           size: 15,
                                           color: _plusMenuOverlay != null ||
                                                   _plusBtnHovered
-                                              ? widget.palette.accent
-                                              : widget.palette.textSec,
+                                              ? p.text
+                                              : p.textSec,
                                         ),
                                       ),
                                     ),
@@ -860,30 +836,30 @@ class _ChatInputBoxState extends State<ChatInputBox>
 
                           // Paperclip attach button
                           MouseRegion(
+                            cursor: SystemMouseCursors.click,
                             onEnter: (_) =>
                                 setState(() => _attachBtnHovered = true),
                             onExit: (_) =>
                                 setState(() => _attachBtnHovered = false),
                             child: Tooltip(
-                              message: 'Attach files or context',
-                              child: InkWell(
+                              message: 'Attach files',
+                              child: GestureDetector(
                                 onTap: _handlePickFiles,
-                                borderRadius: BorderRadius.circular(10),
+                                behavior: HitTestBehavior.opaque,
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
+                                  duration: const Duration(milliseconds: 160),
+                                  curve: Curves.easeOutCubic,
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
-                                    color: _attachBtnHovered
-                                        ? widget.palette.accent
-                                            .withValues(alpha: 0.12)
-                                        : Colors.transparent,
+                                    color: accentBase.withValues(
+                                      alpha: _attachBtnHovered ? 0.10 : 0.0,
+                                    ),
                                     border: Border.all(
                                       color: _attachBtnHovered
-                                          ? widget.palette.accent
-                                              .withValues(alpha: 0.4)
-                                          : widget.palette.div,
-                                      width: 1.1,
+                                          ? accentBase.withValues(alpha: 0.35)
+                                          : p.div,
+                                      width: 1,
                                     ),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -892,8 +868,8 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                       LucideIcons.paperclip,
                                       size: 14,
                                       color: _attachBtnHovered
-                                          ? widget.palette.accent
-                                          : widget.palette.textSec,
+                                          ? p.text
+                                          : p.textSec,
                                     ),
                                   ),
                                 ),
@@ -902,74 +878,82 @@ class _ChatInputBoxState extends State<ChatInputBox>
                           ),
                           const SizedBox(width: 8),
 
-                          // Thinking Toggle Button (Placed NEXT to the dropdown menu)
+                          // Thinking Toggle Button (Live end-to-end reasoning control)
                           MouseRegion(
+                            cursor: SystemMouseCursors.click,
                             onEnter: (_) =>
                                 setState(() => _thinkingToggleHovered = true),
                             onExit: (_) =>
                                 setState(() => _thinkingToggleHovered = false),
                             child: Tooltip(
                               message: _thinkingEnabled
-                                  ? 'Deep thinking is ON (Click to toggle)'
-                                  : 'Deep thinking is OFF (Click to toggle)',
-                              child: InkWell(
+                                  ? 'Deep reasoning enabled (click to disable)'
+                                  : 'Fast mode (click to enable deep reasoning)',
+                              child: GestureDetector(
                                 onTap: () {
-                                  setState(() {
-                                    _thinkingEnabled = !_thinkingEnabled;
-                                  });
+                                  final next = !_thinkingEnabled;
+                                  setState(() => _thinkingEnabled = next);
+                                  widget.onThinkingEnabledChanged?.call(next);
                                 },
-                                borderRadius: BorderRadius.circular(20),
+                                behavior: HitTestBehavior.opaque,
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
                                   height: 32,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10),
                                   decoration: BoxDecoration(
                                     color: _thinkingEnabled
-                                        ? widget.palette.bgSurface
-                                        : (_thinkingToggleHovered
-                                            ? widget.palette.bgElevated
-                                            : Colors.transparent),
+                                        ? accentBase.withValues(
+                                            alpha: isDark ? 0.12 : 0.08)
+                                        : accentBase.withValues(
+                                            alpha: _thinkingToggleHovered
+                                                ? 0.06
+                                                : 0.0),
                                     border: Border.all(
                                       color: _thinkingEnabled
-                                          ? widget.palette.accent
-                                              .withValues(alpha: 0.5)
+                                          ? accentBase.withValues(
+                                              alpha: isDark ? 0.42 : 0.32)
                                           : (_thinkingToggleHovered
-                                              ? widget.palette.textSec
-                                                  .withValues(alpha: 0.4)
-                                              : widget.palette.div),
-                                      width: 1.1,
+                                              ? accentBase.withValues(
+                                                  alpha: 0.25)
+                                              : p.div),
+                                      width: 1,
                                     ),
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         LucideIcons.brain,
-                                        size: 13,
+                                        size: 13.5,
                                         color: _thinkingEnabled
-                                            ? widget.palette.accent
-                                            : widget.palette.textSec,
+                                            ? p.accent
+                                            : (_thinkingToggleHovered
+                                                ? p.text
+                                                : p.textSec),
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Thinking',
                                         style: UnoTypography.body(
                                           color: _thinkingEnabled
-                                              ? widget.palette.text
-                                              : widget.palette.textSec,
-                                          fontSize: 12,
+                                              ? p.text
+                                              : (_thinkingToggleHovered
+                                                  ? p.text
+                                                  : p.textSec),
+                                          fontSize: 12.5,
                                           fontWeight: _thinkingEnabled
-                                              ? FontWeight.w600
+                                              ? FontWeight.w500
                                               : FontWeight.w400,
                                         ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      // Micro-pill switch indicator
+                                      const SizedBox(width: 7),
                                       AnimatedContainer(
                                         duration:
-                                            const Duration(milliseconds: 200),
+                                            const Duration(milliseconds: 180),
+                                        curve: Curves.easeOutCubic,
                                         width: 24,
                                         height: 14,
                                         padding: const EdgeInsets.all(2),
@@ -977,19 +961,26 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                           borderRadius:
                                               BorderRadius.circular(7),
                                           color: _thinkingEnabled
-                                              ? widget.palette.accent
-                                              : widget.palette.div,
+                                              ? p.accent
+                                              : p.div,
                                         ),
-                                        child: Align(
+                                        child: AnimatedAlign(
+                                          duration:
+                                              const Duration(milliseconds: 180),
+                                          curve: Curves.easeOutCubic,
                                           alignment: _thinkingEnabled
                                               ? Alignment.centerRight
                                               : Alignment.centerLeft,
                                           child: Container(
                                             width: 10,
                                             height: 10,
-                                            decoration: const BoxDecoration(
+                                            decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: Colors.white,
+                                              color: _thinkingEnabled
+                                                  ? (isDark
+                                                      ? const Color(0xFF0A0F20)
+                                                      : Colors.white)
+                                                  : p.bgElevated,
                                             ),
                                           ),
                                         ),
@@ -1002,69 +993,68 @@ class _ChatInputBoxState extends State<ChatInputBox>
                           ),
                           const SizedBox(width: 8),
 
-                          // Model / Tier Dropdown Capsule
+                          // Minimal Model Dropdown Pill
                           CompositedTransformTarget(
-                            link: _thinkingButtonLink,
+                            link: _modelButtonLink,
                             child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
                               onEnter: (_) =>
-                                  setState(() => _tierBtnHovered = true),
+                                  setState(() => _modelBtnHovered = true),
                               onExit: (_) =>
-                                  setState(() => _tierBtnHovered = false),
+                                  setState(() => _modelBtnHovered = false),
                               child: Tooltip(
-                                message: 'Select reasoning model tier',
-                                child: InkWell(
-                                  onTap: _toggleThinkingMenu,
-                                  borderRadius: BorderRadius.circular(20),
+                                message: 'Select model',
+                                child: GestureDetector(
+                                  onTap: _toggleModelMenu,
+                                  behavior: HitTestBehavior.opaque,
                                   child: AnimatedContainer(
                                     duration:
-                                        const Duration(milliseconds: 200),
+                                        const Duration(milliseconds: 160),
+                                    curve: Curves.easeOutCubic,
                                     height: 32,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 11),
                                     decoration: BoxDecoration(
-                                      color: _tierBtnHovered ||
-                                              _thinkingMenuOverlay != null
-                                          ? widget.palette.bgElevated
-                                          : widget.palette.bgSurface,
+                                      color: (_modelBtnHovered ||
+                                              _modelMenuOverlay != null)
+                                          ? p.bgSurface
+                                          : p.bgSurface.withValues(alpha: 0.6),
                                       border: Border.all(
-                                        color: _tierBtnHovered ||
-                                                _thinkingMenuOverlay != null
-                                            ? widget.palette.textSec
-                                                .withValues(alpha: 0.45)
-                                            : widget.palette.div,
-                                        width: 1.1,
+                                        color: (_modelBtnHovered ||
+                                                _modelMenuOverlay != null)
+                                            ? accentBase.withValues(alpha: 0.38)
+                                            : p.div,
+                                        width: 1,
                                       ),
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(
-                                          LucideIcons.sparkles,
-                                          size: 12,
-                                          color: widget.palette.textSec,
-                                        ),
-                                        const SizedBox(width: 6),
                                         Text(
-                                          '${_thinkingMode[0].toUpperCase()}${_thinkingMode.substring(1)} tier',
+                                          _thinkingEnabled
+                                              ? _selectedModelLabel
+                                              : 'Fast',
                                           style: UnoTypography.body(
-                                            color: widget.palette.text,
-                                            fontSize: 12,
+                                            color: _thinkingEnabled
+                                                ? p.text
+                                                : p.textSec,
+                                            fontSize: 12.5,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        const SizedBox(width: 5),
+                                        const SizedBox(width: 6),
                                         AnimatedRotation(
-                                          turns:
-                                              _thinkingMenuOverlay != null
-                                                  ? 0.5
-                                                  : 0.0,
+                                          turns: _modelMenuOverlay != null
+                                              ? 0.5
+                                              : 0.0,
                                           duration: const Duration(
-                                              milliseconds: 200),
+                                              milliseconds: 180),
+                                          curve: Curves.easeOutCubic,
                                           child: Icon(
                                             LucideIcons.chevronDown,
-                                            size: 12,
-                                            color: widget.palette.textSec,
+                                            size: 12.5,
+                                            color: p.textSec,
                                           ),
                                         ),
                                       ],
@@ -1077,46 +1067,48 @@ class _ChatInputBoxState extends State<ChatInputBox>
                         ],
                       ),
 
-                      // Right toolbar: Mic button is removed, only smooth send button
+                      // Right toolbar: Send button
                       MouseRegion(
+                        cursor: canSubmit
+                            ? SystemMouseCursors.click
+                            : SystemMouseCursors.basic,
                         onEnter: (_) => setState(() => _sendBtnHovered = true),
                         onExit: (_) => setState(() => _sendBtnHovered = false),
                         child: AnimatedScale(
                           scale: canSubmit && _sendBtnHovered
-                              ? 1.08
-                              : (canSubmit ? 1.0 : 0.92),
-                          duration: const Duration(milliseconds: 180),
-                          child: InkWell(
+                              ? 1.07
+                              : (canSubmit ? 1.0 : 0.94),
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          child: GestureDetector(
                             onTap: canSubmit ? _handleSubmit : null,
-                            borderRadius: BorderRadius.circular(17),
+                            behavior: HitTestBehavior.opaque,
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
                               width: 34,
                               height: 34,
                               decoration: BoxDecoration(
                                 color: canSubmit
-                                    ? widget.palette.accent
-                                    : widget.palette.div.withValues(alpha: 0.45),
+                                    ? p.accent
+                                    : p.div.withValues(alpha: 0.45),
                                 shape: BoxShape.circle,
                                 boxShadow: canSubmit
                                     ? [
                                         BoxShadow(
-                                          color: widget.palette.accent
-                                              .withValues(alpha: 0.4),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 3),
+                                          color: p.accent
+                                              .withValues(alpha: 0.32),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 2),
                                         ),
                                       ]
-                                    : null,
+                                    : const [],
                               ),
                               child: Center(
                                 child: Icon(
                                   LucideIcons.arrowUp,
                                   size: 15,
-                                  color: canSubmit
-                                      ? Colors.white
-                                      : widget.palette.textSec
-                                          .withValues(alpha: 0.6),
+                                  color: sendIconColor,
                                 ),
                               ),
                             ),
@@ -1136,8 +1128,8 @@ class _ChatInputBoxState extends State<ChatInputBox>
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(top: 8),
               decoration: BoxDecoration(
-                color: widget.palette.bgElevated,
-                border: Border.all(color: widget.palette.div),
+                color: p.bgElevated,
+                border: Border.all(color: p.div),
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
@@ -1166,7 +1158,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                             child: Text(
                               s,
                               style: UnoTypography.body(
-                                color: widget.palette.textSec,
+                                color: p.textSec,
                                 fontSize: 13,
                               ),
                             ),
@@ -1182,57 +1174,49 @@ class _ChatInputBoxState extends State<ChatInputBox>
   }
 }
 
-class _HoverableTile extends StatefulWidget {
+class _MinimalMenuTile extends StatefulWidget {
   final bool isSelected;
-  final Color selectedBgColor;
-  final Color accentColor;
   final UnoPalette palette;
   final VoidCallback onTap;
   final Widget child;
 
-  const _HoverableTile({
+  const _MinimalMenuTile({
     required this.isSelected,
-    required this.selectedBgColor,
-    required this.accentColor,
     required this.palette,
     required this.onTap,
     required this.child,
   });
 
   @override
-  State<_HoverableTile> createState() => _HoverableTileState();
+  State<_MinimalMenuTile> createState() => _MinimalMenuTileState();
 }
 
-class _HoverableTileState extends State<_HoverableTile> {
+class _MinimalMenuTileState extends State<_MinimalMenuTile> {
   bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.palette.isDark;
+    final hoverBase =
+        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+
+    final bgColor = widget.isSelected
+        ? hoverBase.withValues(alpha: isDark ? 0.08 : 0.06)
+        : hoverBase.withValues(alpha: _isHovered ? 0.05 : 0.0);
+
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: InkWell(
+      child: GestureDetector(
         onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(10),
+        behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
           decoration: BoxDecoration(
-            color: widget.isSelected
-                ? widget.selectedBgColor
-                : (_isHovered
-                    ? widget.palette.accent.withValues(alpha: 0.08)
-                    : Colors.transparent),
-            borderRadius: BorderRadius.circular(10),
-            border: Border(
-              left: BorderSide(
-                color: widget.isSelected
-                    ? widget.accentColor
-                    : (_isHovered
-                        ? widget.palette.accent.withValues(alpha: 0.5)
-                        : Colors.transparent),
-                width: 3.0,
-              ),
-            ),
+            color: bgColor,
+            borderRadius: BorderRadius.circular(8),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: widget.child,

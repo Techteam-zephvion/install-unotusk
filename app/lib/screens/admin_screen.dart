@@ -90,7 +90,7 @@ class _AdminScreenState extends State<AdminScreen> {
         Container(
           width: 210,
           decoration: BoxDecoration(
-            color: widget.palette.bgSurface,
+            gradient: widget.palette.sidebarGradient,
             border: Border(right: BorderSide(color: widget.palette.div)),
           ),
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -290,10 +290,10 @@ class _AdminScreenState extends State<AdminScreen> {
         const SizedBox(height: 10),
         Row(
           children: [
-            _buildAccentColor(const Color(0xFFDA7756), true),
-            _buildAccentColor(const Color(0xFF6EC8B8), false),
-            _buildAccentColor(const Color(0xFFD4909A), false),
-            _buildAccentColor(const Color(0xFF7B5EA7), false),
+            _buildAccentColor(const Color(0xFFCBC1B4), true),
+            _buildAccentColor(const Color(0xFF84878F), false),
+            _buildAccentColor(const Color(0xFF161A29), false),
+            _buildAccentColor(const Color(0xFF2E313C), false),
           ],
         ),
       ],

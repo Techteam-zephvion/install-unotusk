@@ -332,7 +332,11 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _handleSubmitQuery(String text) async {
+  void _handleSubmitQuery(
+    String text, {
+    String thinkingTier = 'warm',
+    bool thinkingEnabled = true,
+  }) async {
     if (text.trim().isEmpty || _isGenerating) return;
 
     final queryId = 'q-${DateTime.now().millisecondsSinceEpoch}';
@@ -363,7 +367,7 @@ class _AppShellState extends State<AppShell> {
       _messages.add(ChatMessage(
         id: genId,
         kind: MessageKind.generating,
-        phase: 'ingesting',
+        phase: thinkingEnabled ? 'ingesting' : 'scoring',
       ));
     });
 
@@ -372,6 +376,8 @@ class _AppShellState extends State<AppShell> {
         projectId: _openedProject?.id,
         question: text.trim(),
         conversationId: isFirstMessage ? null : _activeConversationId,
+        thinkingTier: thinkingTier,
+        thinkingEnabled: thinkingEnabled,
       );
 
       if (!mounted) return;
@@ -486,6 +492,8 @@ class _AppShellState extends State<AppShell> {
     if (_appStage == 'auth') {
       return AuthScreen(
         palette: palette,
+        isDark: widget.isDark,
+        onToggleTheme: widget.onToggleTheme,
         onAuthenticated: _handleAuthenticated,
       );
     }
@@ -511,41 +519,88 @@ class _AppShellState extends State<AppShell> {
 
     return Scaffold(
       backgroundColor: palette.bgBase,
-      body: Stack(
-        children: [
-          Row(
-            children: [
-                    // Sidebar (Desktop / Wide screen)
-                    if (!isMobile)
-                      UnoSidebar(
-                        open: _sidebarOpen,
-                        onToggle: () => setState(() => _sidebarOpen = !_sidebarOpen),
-                        onNewQuery: _handleNewQuery,
-                        palette: palette,
-                        activeView: _activeView,
-                        onViewChange: (v) => setState(() {
-                          if (v == 'projects') {
-                            _handleBackToProjects();
-                          } else {
-                            _activeView = v;
-                            _notificationsOpen = false;
-                          }
-                        }),
-                        onLoadRecentChat: _loadRecentChat,
-                        user: _user,
-                        onLogOut: _handleLogOut,
-                        onNavigateSettings: _openSettingsTab,
-                        onOpenArchivedModal: () =>
-                            setState(() => _archivedModalOpen = true),
-                        activeConversationId: _activeConversationId,
-                        projectId: _openedProject?.id,
-                      ),
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(gradient: palette.pageGradient),
+        child: Stack(
+          children: [
+            Row(
+              children: [
+                // Sidebar (Desktop / Wide screen)
+                if (!isMobile)
+                  UnoSidebar(
+                    open: _sidebarOpen,
+                    onToggle: () => setState(() => _sidebarOpen = !_sidebarOpen),
+                    onNewQuery: _handleNewQuery,
+                    palette: palette,
+                    activeView: _activeView,
+                    onViewChange: (v) => setState(() {
+                      if (v == 'projects') {
+                        _handleBackToProjects();
+                      } else {
+                        _activeView = v;
+                        _notificationsOpen = false;
+                      }
+                    }),
+                    onLoadRecentChat: _loadRecentChat,
+                    user: _user,
+                    onLogOut: _handleLogOut,
+                    onNavigateSettings: _openSettingsTab,
+                    onOpenArchivedModal: () =>
+                        setState(() => _archivedModalOpen = true),
+                    activeConversationId: _activeConversationId,
+                    projectId: _openedProject?.id,
+                  ),
 
-              // Main Application Area
-              Expanded(
-                child: isMobile
-                    ? SafeArea(
-                        child: Column(
+                // Main Application Area
+                Expanded(
+                  child: isMobile
+                      ? SafeArea(
+                          child: Column(
+                            children: [
+                              // Top sticky nav bar
+                              TopNavBar(
+                                palette: palette,
+                                isDark: widget.isDark,
+                                unreadCount: unreadCount,
+                                notificationsOpen: _notificationsOpen,
+                                onToggleNotifications: () => setState(
+                                    () => _notificationsOpen = !_notificationsOpen),
+                                onToggleTheme: widget.onToggleTheme,
+                                showSidebarToggle: isMobile,
+                                onToggleSidebar: () =>
+                                    setState(() => _sidebarOpen = !_sidebarOpen),
+                                projectName: _openedProjectName,
+                                repoFullName: (_openedProject?.repositoryName?.isNotEmpty == true)
+                                    ? _openedProject!.repositoryName
+                                    : _openedProjectName,
+                                branchName: 'main',
+                                onBackToProjects: _handleBackToProjects,
+                              ),
+
+                              // Active Screen Content with smooth fade transition
+                              Expanded(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 220),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  transitionBuilder: (child, animation) {
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    );
+                                  },
+                                  child: KeyedSubtree(
+                                    key: ValueKey<String>('$_activeView-${widget.isDark}'),
+                                    child: _buildCurrentScreen(palette),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Column(
                           children: [
                             // Top sticky nav bar
                             TopNavBar(
@@ -567,44 +622,29 @@ class _AppShellState extends State<AppShell> {
                               onBackToProjects: _handleBackToProjects,
                             ),
 
-                            // Active Screen Content
+                            // Active Screen Content with smooth fade transition
                             Expanded(
-                              child: _buildCurrentScreen(palette),
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 220),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                                child: KeyedSubtree(
+                                  key: ValueKey<String>('$_activeView-${widget.isDark}'),
+                                  child: _buildCurrentScreen(palette),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : Column(
-                        children: [
-                          // Top sticky nav bar
-                          TopNavBar(
-                            palette: palette,
-                            isDark: widget.isDark,
-                            unreadCount: unreadCount,
-                            notificationsOpen: _notificationsOpen,
-                            onToggleNotifications: () => setState(
-                                () => _notificationsOpen = !_notificationsOpen),
-                            onToggleTheme: widget.onToggleTheme,
-                            showSidebarToggle: isMobile,
-                            onToggleSidebar: () =>
-                                setState(() => _sidebarOpen = !_sidebarOpen),
-                            projectName: _openedProjectName,
-                            repoFullName: (_openedProject?.repositoryName?.isNotEmpty == true)
-                                ? _openedProject!.repositoryName
-                                : _openedProjectName,
-                            branchName: 'main',
-                            onBackToProjects: _handleBackToProjects,
-                          ),
-
-                          // Active Screen Content
-                          Expanded(
-                            child: _buildCurrentScreen(palette),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
 
           // Mobile Drawer overlay (if mobile and sidebar open)
           if (isMobile && _sidebarOpen) ...[
@@ -706,7 +746,8 @@ class _AppShellState extends State<AppShell> {
             ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildCurrentScreen(UnoPalette palette) {

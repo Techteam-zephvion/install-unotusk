@@ -127,4 +127,84 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'UnoSidebar excludes Discoveries/Knowledge/Spec History, aligns all nav icons identically, and opens profile menu',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              UnoSidebar(
+                open: true,
+                onToggle: () {},
+                onNewQuery: () {},
+                palette: UnoPalette.light,
+                activeView: 'chat',
+                onViewChange: (_) {},
+                onLoadRecentChat: (_) {},
+                user: const UserModel(name: 'Dev Lead', org: 'Acme Corporation'),
+                onLogOut: () {},
+                onNavigateSettings: (_) {},
+                onOpenArchivedModal: () {},
+              ),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Removed nav items are not displayed
+    expect(find.text('Discoveries'), findsNothing);
+    expect(find.text('Knowledge'), findsNothing);
+    expect(find.text('Spec History'), findsNothing);
+
+    // Remaining nav items are displayed
+    for (final label in [
+      'Projects',
+      'Overview',
+      'Ask AI',
+      'Files',
+      'Architecture',
+      'Ontology Graph',
+      'Ingestion Feed',
+      'Archived chats',
+    ]) {
+      expect(find.text(label), findsOneWidget);
+    }
+
+    // Active ('Ask AI') and inactive ('Projects', 'Overview', 'Files', 'Archived chats')
+    // icons all align to the exact same X coordinate
+    final projectsX = tester.getCenter(find.byIcon(LucideIcons.folder)).dx;
+    final overviewX =
+        tester.getCenter(find.byIcon(LucideIcons.layoutDashboard)).dx;
+    final askAiX = tester.getCenter(find.byIcon(LucideIcons.sparkles)).dx;
+    final filesX = tester.getCenter(find.byIcon(LucideIcons.folderTree)).dx;
+    final archivedX = tester.getCenter(find.byIcon(LucideIcons.archive)).dx;
+
+    expect(overviewX, closeTo(projectsX, 0.5));
+    expect(askAiX, closeTo(projectsX, 0.5));
+    expect(filesX, closeTo(projectsX, 0.5));
+    expect(archivedX, closeTo(projectsX, 0.5));
+
+    // Profile card displays monogram initials and opens popup smoothly on tap
+    expect(find.text('DL'), findsOneWidget);
+    expect(find.text('Dev Lead'), findsOneWidget);
+    expect(find.text('Acme Corporation'), findsOneWidget);
+
+    await tester.tap(find.text('Dev Lead'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Personalization'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+  });
 }
