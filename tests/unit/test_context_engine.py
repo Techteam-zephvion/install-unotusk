@@ -784,7 +784,9 @@ async def test_relationship_expander_multi_hop_bfs():
 
 
 @pytest.mark.asyncio
-async def test_multi_signal_retriever_semantic_embedding_generation_and_search():
+async def test_multi_signal_retriever_semantic_embedding_generation_and_search(monkeypatch):
+    from apps.api.src.config.settings import settings
+    monkeypatch.setattr(settings, 'EMBEDDING_PROVIDER', 'development')
     """Verify semantic text embedding generation, cosine similarity scoring, and auto-derivation."""
     from apps.api.src.services.context_engine.engine import ProjectContextEngine
     from apps.api.src.services.context_engine.retriever import generate_text_embedding

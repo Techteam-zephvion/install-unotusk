@@ -32,12 +32,16 @@ except ImportError:
     _HAS_PYTEST_ASYNCIO = False
     async_fixture = pytest.fixture
 
+# Set test environment
+from dotenv import load_dotenv
+
+load_dotenv(".env")
+
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-# Set test environment
 os.environ["APP_ENV"] = "test"
 os.environ["DEBUG"] = "true"
 TEST_DB_URL = os.getenv(

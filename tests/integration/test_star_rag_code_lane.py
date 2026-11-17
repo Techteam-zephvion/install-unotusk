@@ -193,7 +193,7 @@ async def test_structure_aware_star_rag_fallback_on_exception(monkeypatch):
     answer = await engine.investigate(
         session=session,
         snapshot_id=snapshot_id,
-        question="Any question",
+        question="Trace the dependency flow in fallback",
         enable_structure_aware_star_rag=True,
     )
 

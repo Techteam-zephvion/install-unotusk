@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from typing import Any
 
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 _MEMORY_CACHE_MAX_ENTRIES = 10
 _MEMORY_GRAPH_CACHE: dict[str, FunctionGraph] = {}
 
+# Circuit breaker for Redis availability
+_REDIS_UNREACHABLE_UNTIL: float = 0.0
+
 
 class CodeGraphCache:
     """
@@ -44,15 +48,20 @@ class CodeGraphCache:
 
     @classmethod
     async def _get_redis_client(cls) -> Any | None:
+        global _REDIS_UNREACHABLE_UNTIL
         if aioredis is None:
+            return None
+        if time.time() < _REDIS_UNREACHABLE_UNTIL:
             return None
         try:
             return aioredis.from_url(
                 settings.REDIS_URL,
                 decode_responses=True,
-                socket_timeout=2.0,
+                socket_timeout=0.5,
+                socket_connect_timeout=0.5,
             )
         except Exception as e:
+            _REDIS_UNREACHABLE_UNTIL = time.time() + 60.0
             logger.debug("Failed to initialize Redis client for graph cache: %s", e)
             return None
 
@@ -87,6 +96,8 @@ class CodeGraphCache:
                     await r.aclose()
                     return graph
             except Exception as e:
+                global _REDIS_UNREACHABLE_UNTIL
+                _REDIS_UNREACHABLE_UNTIL = time.time() + 60.0
                 logger.warning("Error reading graph from Redis for key %s: %s", key, e)
             finally:
                 try:
@@ -142,6 +153,8 @@ class CodeGraphCache:
                     len(graph.edges),
                 )
             except Exception as e:
+                global _REDIS_UNREACHABLE_UNTIL
+                _REDIS_UNREACHABLE_UNTIL = time.time() + 60.0
                 logger.warning("Failed to serialize and cache graph in Redis for %s: %s", key, e)
             finally:
                 try:
@@ -182,6 +195,8 @@ class CodeGraphCache:
                         break
                 logger.info("Invalidated Redis graph cache for snapshot %s", snapshot_id)
             except Exception as e:
+                global _REDIS_UNREACHABLE_UNTIL
+                _REDIS_UNREACHABLE_UNTIL = time.time() + 60.0
                 logger.warning("Error invalidating Redis cache for %s: %s", snapshot_id, e)
             finally:
                 try:

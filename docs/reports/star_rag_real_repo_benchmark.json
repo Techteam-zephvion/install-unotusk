@@ -19,9 +19,9 @@
         "mrr": 0.7531,
         "ndcg_at_3": 0.5322,
         "ndcg_at_5": 0.4945,
-        "avg_latency_ms": 237.29,
-        "median_latency_ms": 207.6,
-        "p95_latency_ms": 330.52
+        "avg_latency_ms": 82.39,
+        "median_latency_ms": 73.59,
+        "p95_latency_ms": 123.07
       },
       "star_rag": {
         "p_at_1": 0.6,
@@ -33,9 +33,9 @@
         "ndcg_at_3": 0.5327,
         "ndcg_at_5": 0.4976,
         "avg_context_precision": 0.2077,
-        "avg_latency_ms": 424.21,
-        "median_latency_ms": 241.97,
-        "p95_latency_ms": 366.71
+        "avg_latency_ms": 128.53,
+        "median_latency_ms": 85.63,
+        "p95_latency_ms": 150.1
       }
     },
     "split_comparison": {
@@ -238,7 +238,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 951.17
+        "latency_ms": 301.85
       },
       "star_rag": {
         "metrics": {
@@ -286,13 +286,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1825,
         "latency_breakdown_ms": {
-          "analysis": 50.34,
-          "retrieval": 779.87,
-          "expansion": 117.72,
-          "star_ranking": 6862.09,
-          "assembly": 0.46,
-          "total": 7810.49
+          "analysis": 15.86,
+          "retrieval": 241.21,
+          "expansion": 43.34,
+          "star_ranking": 1508.91,
+          "assembly": 0.17,
+          "total": 1809.49
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7654,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 1809.49
       },
       "ablations": {
         "atom_plus_snr": {
@@ -308,7 +325,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.87
+          "latency_ms": 3.42
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -323,7 +340,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 28.0
+          "latency_ms": 9.88
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -338,7 +355,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 11.8
+          "latency_ms": 3.6
         }
       }
     },
@@ -380,7 +397,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 241.07
+        "latency_ms": 80.97
       },
       "star_rag": {
         "metrics": {
@@ -428,13 +445,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2355,
         "latency_breakdown_ms": {
-          "analysis": 0.62,
-          "retrieval": 211.87,
-          "expansion": 24.58,
-          "star_ranking": 43.42,
-          "assembly": 0.43,
-          "total": 280.92
+          "analysis": 0.24,
+          "retrieval": 71.12,
+          "expansion": 8.34,
+          "star_ranking": 17.82,
+          "assembly": 0.31,
+          "total": 97.83
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 1.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.3462,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 80.97
       },
       "ablations": {
         "atom_plus_snr": {
@@ -450,7 +484,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.73
+          "latency_ms": 1.52
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -465,7 +499,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 108.83
+          "latency_ms": 64.09
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -480,7 +514,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.97
+          "latency_ms": 2.13
         }
       }
     },
@@ -522,7 +556,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 286.12
+        "latency_ms": 97.04
       },
       "star_rag": {
         "metrics": {
@@ -570,13 +604,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2327,
         "latency_breakdown_ms": {
-          "analysis": 0.39,
-          "retrieval": 171.36,
-          "expansion": 110.25,
-          "star_ranking": 32.76,
-          "assembly": 0.73,
-          "total": 315.49
+          "analysis": 0.2,
+          "retrieval": 61.24,
+          "expansion": 34.61,
+          "star_ranking": 10.35,
+          "assembly": 0.19,
+          "total": 106.57
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8688,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 97.04
       },
       "ablations": {
         "atom_plus_snr": {
@@ -592,7 +643,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.84
+          "latency_ms": 1.69
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -607,7 +658,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 39.7
+          "latency_ms": 9.45
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -622,7 +673,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.19
+          "latency_ms": 2.28
         }
       }
     },
@@ -664,7 +715,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 164.52
+        "latency_ms": 56.37
       },
       "star_rag": {
         "metrics": {
@@ -712,13 +763,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2319,
         "latency_breakdown_ms": {
-          "analysis": 0.65,
-          "retrieval": 139.42,
-          "expansion": 21.45,
-          "star_ranking": 41.31,
-          "assembly": 0.5,
-          "total": 203.33
+          "analysis": 0.18,
+          "retrieval": 47.56,
+          "expansion": 7.67,
+          "star_ranking": 9.61,
+          "assembly": 0.2,
+          "total": 65.22
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 56.37
       },
       "ablations": {
         "atom_plus_snr": {
@@ -734,7 +802,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.07
+          "latency_ms": 1.25
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -749,7 +817,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 31.9
+          "latency_ms": 10.53
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -764,7 +832,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.47
+          "latency_ms": 1.86
         }
       }
     },
@@ -806,7 +874,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 329.92
+        "latency_ms": 123.07
       },
       "star_rag": {
         "metrics": {
@@ -854,13 +922,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1064,
         "latency_breakdown_ms": {
-          "analysis": 0.49,
-          "retrieval": 308.43,
-          "expansion": 19.04,
-          "star_ranking": 29.07,
-          "assembly": 0.38,
-          "total": 357.4
+          "analysis": 0.18,
+          "retrieval": 114.71,
+          "expansion": 7.34,
+          "star_ranking": 9.25,
+          "assembly": 0.17,
+          "total": 131.66
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.6164,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 131.66
       },
       "ablations": {
         "atom_plus_snr": {
@@ -876,7 +961,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 2.34
+          "latency_ms": 0.96
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -891,7 +976,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 27.27
+          "latency_ms": 8.55
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -906,7 +991,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.27
+          "latency_ms": 1.39
         }
       }
     },
@@ -948,7 +1033,7 @@
             "score": 0.76
           }
         ],
-        "latency_ms": 330.52
+        "latency_ms": 98.07
       },
       "star_rag": {
         "metrics": {
@@ -996,13 +1081,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2428,
         "latency_breakdown_ms": {
-          "analysis": 0.35,
-          "retrieval": 249.16,
-          "expansion": 77.98,
-          "star_ranking": 38.84,
-          "assembly": 0.38,
-          "total": 366.71
+          "analysis": 0.15,
+          "retrieval": 74.15,
+          "expansion": 22.75,
+          "star_ranking": 12.16,
+          "assembly": 0.18,
+          "total": 109.38
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8539,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 98.07
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1018,7 +1120,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.71
+          "latency_ms": 1.44
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1033,7 +1135,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 33.01
+          "latency_ms": 9.93
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1048,7 +1150,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.19
+          "latency_ms": 2.1
         }
       }
     },
@@ -1090,7 +1192,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 257.72
+        "latency_ms": 84.09
       },
       "star_rag": {
         "metrics": {
@@ -1138,13 +1240,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0937,
         "latency_breakdown_ms": {
-          "analysis": 0.45,
-          "retrieval": 227.85,
-          "expansion": 25.56,
-          "star_ranking": 32.66,
-          "assembly": 0.99,
-          "total": 287.51
+          "analysis": 0.18,
+          "retrieval": 75.2,
+          "expansion": 7.62,
+          "star_ranking": 9.95,
+          "assembly": 0.29,
+          "total": 93.25
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3904,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 84.09
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1160,7 +1279,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.67
+          "latency_ms": 1.32
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1175,7 +1294,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 29.32
+          "latency_ms": 9.9
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1190,7 +1309,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.5
+          "latency_ms": 1.9
         }
       }
     },
@@ -1232,7 +1351,7 @@
             "score": 0.64
           }
         ],
-        "latency_ms": 240.6
+        "latency_ms": 92.16
       },
       "star_rag": {
         "metrics": {
@@ -1280,13 +1399,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0539,
         "latency_breakdown_ms": {
-          "analysis": 0.49,
-          "retrieval": 183.03,
-          "expansion": 54.92,
-          "star_ranking": 28.17,
-          "assembly": 0.35,
-          "total": 266.96
+          "analysis": 0.14,
+          "retrieval": 72.13,
+          "expansion": 19.15,
+          "star_ranking": 10.94,
+          "assembly": 0.16,
+          "total": 102.53
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 0.79,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 92.16
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1302,7 +1438,7 @@
             "top_score": 0.85,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.28
+          "latency_ms": 1.19
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1317,7 +1453,7 @@
             "top_score": 0.85,
             "abstention_success": 0.0
           },
-          "latency_ms": 28.96
+          "latency_ms": 9.47
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1332,7 +1468,7 @@
             "top_score": 0.9175,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.17
+          "latency_ms": 1.63
         }
       }
     },
@@ -1374,7 +1510,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 207.61
+        "latency_ms": 76.49
       },
       "star_rag": {
         "metrics": {
@@ -1422,13 +1558,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1597,
         "latency_breakdown_ms": {
-          "analysis": 0.52,
-          "retrieval": 177.56,
-          "expansion": 24.45,
-          "star_ranking": 38.07,
-          "assembly": 0.58,
-          "total": 241.17
+          "analysis": 0.23,
+          "retrieval": 66.51,
+          "expansion": 8.2,
+          "star_ranking": 12.05,
+          "assembly": 0.17,
+          "total": 87.15
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.6667,
+          "hit_at_1": 0.0,
+          "mrr": 0.25,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.3836,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 76.49
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1444,7 +1597,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.13
+          "latency_ms": 2.15
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1459,7 +1612,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 32.49
+          "latency_ms": 12.43
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1474,7 +1627,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 10.6
+          "latency_ms": 2.56
         }
       }
     },
@@ -1516,7 +1669,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 197.14
+        "latency_ms": 72.86
       },
       "star_rag": {
         "metrics": {
@@ -1564,13 +1717,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1341,
         "latency_breakdown_ms": {
-          "analysis": 0.69,
-          "retrieval": 172.21,
-          "expansion": 20.52,
-          "star_ranking": 30.13,
-          "assembly": 0.32,
-          "total": 223.88
+          "analysis": 0.21,
+          "retrieval": 63.78,
+          "expansion": 7.63,
+          "star_ranking": 10.95,
+          "assembly": 0.27,
+          "total": 82.85
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.25,
+          "r_at_5": 0.75,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.7095,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 72.86
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1586,7 +1756,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 12.51
+          "latency_ms": 1.56
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1601,7 +1771,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 36.23
+          "latency_ms": 11.25
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1616,7 +1786,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.72
+          "latency_ms": 3.76
         }
       }
     },
@@ -1658,7 +1828,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 183.64
+        "latency_ms": 82.33
       },
       "star_rag": {
         "metrics": {
@@ -1706,13 +1876,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2245,
         "latency_breakdown_ms": {
-          "analysis": 0.55,
-          "retrieval": 159.35,
-          "expansion": 21.28,
-          "star_ranking": 24.68,
-          "assembly": 0.34,
-          "total": 206.19
+          "analysis": 0.43,
+          "retrieval": 72.31,
+          "expansion": 8.47,
+          "star_ranking": 11.52,
+          "assembly": 0.2,
+          "total": 92.92
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 0.75,
+          "r_at_5": 0.75,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8319,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 92.92
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1728,7 +1915,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.31
+          "latency_ms": 1.41
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1743,7 +1930,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 23.65
+          "latency_ms": 10.78
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1758,7 +1945,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.77
+          "latency_ms": 1.96
         }
       }
     },
@@ -1800,7 +1987,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 154.02
+        "latency_ms": 57.34
       },
       "star_rag": {
         "metrics": {
@@ -1848,13 +2035,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.238,
         "latency_breakdown_ms": {
-          "analysis": 0.68,
-          "retrieval": 130.98,
-          "expansion": 19.85,
-          "star_ranking": 34.99,
-          "assembly": 0.58,
-          "total": 187.07
+          "analysis": 0.25,
+          "retrieval": 48.57,
+          "expansion": 7.51,
+          "star_ranking": 12.26,
+          "assembly": 0.16,
+          "total": 68.75
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 1.0,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 1.0,
+          "ndcg_at_5": 0.8319,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 68.75
       },
       "ablations": {
         "atom_plus_snr": {
@@ -1870,7 +2074,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.36
+          "latency_ms": 1.33
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -1885,7 +2089,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 33.67
+          "latency_ms": 10.63
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -1900,7 +2104,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.4
+          "latency_ms": 1.8
         }
       }
     },
@@ -1942,7 +2146,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 177.77
+        "latency_ms": 75.08
       },
       "star_rag": {
         "metrics": {
@@ -1990,13 +2194,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2533,
         "latency_breakdown_ms": {
-          "analysis": 0.7,
-          "retrieval": 145.38,
-          "expansion": 27.56,
-          "star_ranking": 34.98,
-          "assembly": 0.73,
-          "total": 209.36
+          "analysis": 0.25,
+          "retrieval": 65.23,
+          "expansion": 8.56,
+          "star_ranking": 11.41,
+          "assembly": 0.18,
+          "total": 85.63
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 1.0,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6992,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 75.08
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2012,7 +2233,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.68
+          "latency_ms": 1.31
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2027,7 +2248,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 31.06
+          "latency_ms": 11.95
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2042,7 +2263,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.22
+          "latency_ms": 1.57
         }
       }
     },
@@ -2084,7 +2305,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 224.19
+        "latency_ms": 78.69
       },
       "star_rag": {
         "metrics": {
@@ -2132,13 +2353,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1449,
         "latency_breakdown_ms": {
-          "analysis": 0.63,
-          "retrieval": 193.95,
-          "expansion": 22.54,
-          "star_ranking": 33.93,
-          "assembly": 0.32,
-          "total": 251.36
+          "analysis": 0.3,
+          "retrieval": 68.36,
+          "expansion": 7.99,
+          "star_ranking": 13.11,
+          "assembly": 0.15,
+          "total": 89.91
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.1952,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 78.69
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2154,7 +2392,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.57
+          "latency_ms": 2.49
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2169,7 +2407,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 44.26
+          "latency_ms": 13.62
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2184,7 +2422,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.23
+          "latency_ms": 3.09
         }
       }
     },
@@ -2226,7 +2464,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 168.43
+        "latency_ms": 59.04
       },
       "star_rag": {
         "metrics": {
@@ -2274,13 +2512,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.11,
         "latency_breakdown_ms": {
-          "analysis": 0.65,
-          "retrieval": 134.1,
-          "expansion": 28.79,
-          "star_ranking": 34.85,
-          "assembly": 0.41,
-          "total": 198.81
+          "analysis": 0.25,
+          "retrieval": 46.89,
+          "expansion": 10.45,
+          "star_ranking": 14.08,
+          "assembly": 0.14,
+          "total": 71.82
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.6667,
+          "r_at_5": 0.6667,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.5856,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 59.04
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2296,7 +2551,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.95
+          "latency_ms": 1.81
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2311,7 +2566,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 30.35
+          "latency_ms": 12.34
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2326,7 +2581,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.54
+          "latency_ms": 2.59
         }
       }
     },
@@ -2368,7 +2623,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 239.1
+        "latency_ms": 93.81
       },
       "star_rag": {
         "metrics": {
@@ -2416,13 +2671,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0958,
         "latency_breakdown_ms": {
-          "analysis": 0.57,
-          "retrieval": 195.83,
-          "expansion": 28.18,
-          "star_ranking": 34.27,
-          "assembly": 0.69,
-          "total": 259.54
+          "analysis": 0.25,
+          "retrieval": 82.06,
+          "expansion": 9.86,
+          "star_ranking": 13.9,
+          "assembly": 0.21,
+          "total": 106.28
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.1952,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 93.81
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2438,7 +2710,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.38
+          "latency_ms": 1.43
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2453,7 +2725,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 31.67
+          "latency_ms": 11.34
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2468,7 +2740,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.53
+          "latency_ms": 2.27
         }
       }
     },
@@ -2510,7 +2782,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 201.96
+        "latency_ms": 67.69
       },
       "star_rag": {
         "metrics": {
@@ -2558,13 +2830,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1473,
         "latency_breakdown_ms": {
-          "analysis": 0.56,
-          "retrieval": 173.84,
-          "expansion": 24.49,
-          "star_ranking": 32.97,
-          "assembly": 2.39,
-          "total": 234.26
+          "analysis": 0.19,
+          "retrieval": 58.61,
+          "expansion": 7.58,
+          "star_ranking": 12.06,
+          "assembly": 0.18,
+          "total": 78.62
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.2857,
+          "r_at_5": 0.2857,
+          "hit_at_1": 0.0,
+          "mrr": 0.3333,
+          "ndcg_at_3": 0.2346,
+          "ndcg_at_5": 0.1696,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 78.62
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2580,7 +2869,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.76
+          "latency_ms": 1.67
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2595,7 +2884,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 33.01
+          "latency_ms": 12.37
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2610,7 +2899,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.45
+          "latency_ms": 2.16
         }
       }
     },
@@ -2652,7 +2941,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 193.89
+        "latency_ms": 73.33
       },
       "star_rag": {
         "metrics": {
@@ -2700,13 +2989,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2097,
         "latency_breakdown_ms": {
-          "analysis": 0.6,
-          "retrieval": 124.52,
-          "expansion": 65.61,
-          "star_ranking": 31.34,
-          "assembly": 0.38,
-          "total": 222.45
+          "analysis": 0.18,
+          "retrieval": 47.29,
+          "expansion": 24.65,
+          "star_ranking": 12.25,
+          "assembly": 0.17,
+          "total": 84.54
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.9197,
+          "ndcg_at_5": 0.9197,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 73.33
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2722,7 +3028,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.46
+          "latency_ms": 1.67
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2737,7 +3043,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 27.38
+          "latency_ms": 11.57
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2752,7 +3058,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.22
+          "latency_ms": 2.23
         }
       }
     },
@@ -2794,7 +3100,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 194.59
+        "latency_ms": 71.94
       },
       "star_rag": {
         "metrics": {
@@ -2842,13 +3148,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.155,
         "latency_breakdown_ms": {
-          "analysis": 0.67,
-          "retrieval": 168.31,
-          "expansion": 22.76,
-          "star_ranking": 146.41,
-          "assembly": 0.57,
-          "total": 338.72
+          "analysis": 0.24,
+          "retrieval": 61.93,
+          "expansion": 8.51,
+          "star_ranking": 79.27,
+          "assembly": 0.16,
+          "total": 150.1
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.4852,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 150.1
       },
       "ablations": {
         "atom_plus_snr": {
@@ -2864,7 +3187,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.27
+          "latency_ms": 1.39
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -2879,7 +3202,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 31.14
+          "latency_ms": 10.67
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -2894,7 +3217,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.51
+          "latency_ms": 2.05
         }
       }
     },
@@ -2936,7 +3259,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 240.11
+        "latency_ms": 86.05
       },
       "star_rag": {
         "metrics": {
@@ -2984,13 +3307,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2834,
         "latency_breakdown_ms": {
-          "analysis": 0.73,
-          "retrieval": 209.72,
-          "expansion": 24.85,
-          "star_ranking": 49.05,
-          "assembly": 0.63,
-          "total": 284.99
+          "analysis": 0.22,
+          "retrieval": 75.99,
+          "expansion": 8.08,
+          "star_ranking": 15.31,
+          "assembly": 0.23,
+          "total": 99.83
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 99.83
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3006,7 +3346,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.63
+          "latency_ms": 2.02
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3021,7 +3361,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 36.39
+          "latency_ms": 11.9
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3036,7 +3376,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.24
+          "latency_ms": 2.61
         }
       }
     },
@@ -3078,7 +3418,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 160.25
+        "latency_ms": 55.73
       },
       "star_rag": {
         "metrics": {
@@ -3126,13 +3466,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.7744,
         "latency_breakdown_ms": {
-          "analysis": 0.53,
-          "retrieval": 143.39,
-          "expansion": 14.47,
-          "star_ranking": 30.49,
-          "assembly": 0.47,
-          "total": 189.35
+          "analysis": 0.2,
+          "retrieval": 49.65,
+          "expansion": 5.16,
+          "star_ranking": 11.36,
+          "assembly": 0.25,
+          "total": 66.61
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.25,
+          "r_at_5": 0.25,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 55.73
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3148,7 +3505,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 1.93
+          "latency_ms": 0.92
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3163,7 +3520,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 33.36
+          "latency_ms": 13.6
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3178,7 +3535,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 2.79
+          "latency_ms": 1.3
         }
       }
     },
@@ -3220,7 +3577,7 @@
             "score": 0.71
           }
         ],
-        "latency_ms": 242.19
+        "latency_ms": 82.56
       },
       "star_rag": {
         "metrics": {
@@ -3268,13 +3625,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.7,
-          "retrieval": 167.6,
-          "expansion": 70.0,
-          "star_ranking": 33.46,
-          "assembly": 0.5,
-          "total": 272.26
+          "analysis": 0.25,
+          "retrieval": 59.43,
+          "expansion": 21.65,
+          "star_ranking": 12.67,
+          "assembly": 0.16,
+          "total": 94.15
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 82.56
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3290,7 +3664,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.08
+          "latency_ms": 1.7
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3305,7 +3679,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 32.07
+          "latency_ms": 11.29
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3320,7 +3694,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.47
+          "latency_ms": 2.22
         }
       }
     },
@@ -3362,7 +3736,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 212.54
+        "latency_ms": 76.54
       },
       "star_rag": {
         "metrics": {
@@ -3410,13 +3784,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.131,
         "latency_breakdown_ms": {
-          "analysis": 0.57,
-          "retrieval": 188.26,
-          "expansion": 20.04,
-          "star_ranking": 34.55,
-          "assembly": 0.55,
-          "total": 243.96
+          "analysis": 0.21,
+          "retrieval": 67.08,
+          "expansion": 7.65,
+          "star_ranking": 14.08,
+          "assembly": 0.23,
+          "total": 89.25
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.75,
+          "r_at_5": 0.75,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.6399,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 76.54
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3432,7 +3823,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.15
+          "latency_ms": 1.88
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3447,7 +3838,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 29.37
+          "latency_ms": 11.39
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3462,7 +3853,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.95
+          "latency_ms": 2.45
         }
       }
     },
@@ -3504,7 +3895,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 172.06
+        "latency_ms": 60.07
       },
       "star_rag": {
         "metrics": {
@@ -3552,13 +3943,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1392,
         "latency_breakdown_ms": {
-          "analysis": 0.52,
-          "retrieval": 145.84,
-          "expansion": 22.63,
-          "star_ranking": 46.4,
-          "assembly": 0.83,
-          "total": 216.21
+          "analysis": 0.22,
+          "retrieval": 51.26,
+          "expansion": 7.62,
+          "star_ranking": 13.36,
+          "assembly": 0.29,
+          "total": 72.76
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "direct_symbol_lookup_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.4,
+          "r_at_5": 0.6,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6844,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 60.07
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3574,7 +3982,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.35
+          "latency_ms": 1.23
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3589,7 +3997,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 29.77
+          "latency_ms": 11.2
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3604,7 +4012,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.07
+          "latency_ms": 1.85
         }
       }
     },
@@ -3646,7 +4054,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 272.59
+        "latency_ms": 87.61
       },
       "star_rag": {
         "metrics": {
@@ -3694,13 +4102,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.76,
-          "retrieval": 230.05,
-          "expansion": 35.25,
-          "star_ranking": 45.1,
-          "assembly": 0.67,
-          "total": 311.82
+          "analysis": 0.29,
+          "retrieval": 77.72,
+          "expansion": 7.82,
+          "star_ranking": 12.61,
+          "assembly": 0.18,
+          "total": 98.62
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0204,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 98.62
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3716,7 +4141,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.27
+          "latency_ms": 2.15
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3731,7 +4156,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 43.91
+          "latency_ms": 13.6
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3746,7 +4171,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.14
+          "latency_ms": 2.69
         }
       }
     },
@@ -3788,7 +4213,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 183.65
+        "latency_ms": 70.92
       },
       "star_rag": {
         "metrics": {
@@ -3836,13 +4261,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.5946,
         "latency_breakdown_ms": {
-          "analysis": 0.96,
-          "retrieval": 157.39,
-          "expansion": 22.69,
-          "star_ranking": 30.6,
-          "assembly": 0.4,
-          "total": 212.05
+          "analysis": 0.25,
+          "retrieval": 62.28,
+          "expansion": 7.3,
+          "star_ranking": 11.59,
+          "assembly": 0.19,
+          "total": 81.6
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.3392,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 81.6
       },
       "ablations": {
         "atom_plus_snr": {
@@ -3858,7 +4300,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.56
+          "latency_ms": 1.37
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -3873,7 +4315,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 29.9
+          "latency_ms": 11.42
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -3888,7 +4330,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.08
+          "latency_ms": 1.75
         }
       }
     },
@@ -3930,7 +4372,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 207.6
+        "latency_ms": 73.59
       },
       "star_rag": {
         "metrics": {
@@ -3978,13 +4420,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2068,
         "latency_breakdown_ms": {
-          "analysis": 0.59,
-          "retrieval": 173.35,
-          "expansion": 29.61,
-          "star_ranking": 37.99,
-          "assembly": 0.43,
-          "total": 241.97
+          "analysis": 0.24,
+          "retrieval": 64.79,
+          "expansion": 7.46,
+          "star_ranking": 11.57,
+          "assembly": 0.21,
+          "total": 84.27
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.6844,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 84.27
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4000,7 +4459,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.1
+          "latency_ms": 1.29
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4015,7 +4474,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 30.49
+          "latency_ms": 10.92
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4030,7 +4489,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.01
+          "latency_ms": 1.76
         }
       }
     },
@@ -4072,7 +4531,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 258.24
+        "latency_ms": 82.45
       },
       "star_rag": {
         "metrics": {
@@ -4120,13 +4579,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2437,
         "latency_breakdown_ms": {
-          "analysis": 0.95,
-          "retrieval": 231.02,
-          "expansion": 21.09,
-          "star_ranking": 35.19,
-          "assembly": 0.38,
-          "total": 288.63
+          "analysis": 0.29,
+          "retrieval": 72.11,
+          "expansion": 8.13,
+          "star_ranking": 13.97,
+          "assembly": 0.18,
+          "total": 94.67
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.214,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 94.67
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4142,7 +4618,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.26
+          "latency_ms": 2.14
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4157,7 +4633,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 32.28
+          "latency_ms": 11.91
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4172,7 +4648,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.89
+          "latency_ms": 2.82
         }
       }
     },
@@ -4214,7 +4690,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 210.75
+        "latency_ms": 77.26
       },
       "star_rag": {
         "metrics": {
@@ -4262,13 +4738,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.3959,
         "latency_breakdown_ms": {
-          "analysis": 0.88,
-          "retrieval": 183.7,
-          "expansion": 22.08,
-          "star_ranking": 31.39,
-          "assembly": 0.38,
-          "total": 238.43
+          "analysis": 0.27,
+          "retrieval": 67.95,
+          "expansion": 7.58,
+          "star_ranking": 11.79,
+          "assembly": 0.15,
+          "total": 87.74
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.2,
+          "r_at_5": 0.2,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 87.74
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4284,7 +4777,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.96
+          "latency_ms": 1.61
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4299,7 +4792,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 31.97
+          "latency_ms": 12.35
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4314,7 +4807,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.64
+          "latency_ms": 1.95
         }
       }
     },
@@ -4356,7 +4849,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 191.22
+        "latency_ms": 66.31
       },
       "star_rag": {
         "metrics": {
@@ -4404,13 +4897,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2124,
         "latency_breakdown_ms": {
-          "analysis": 0.73,
-          "retrieval": 162.87,
-          "expansion": 23.57,
-          "star_ranking": 30.46,
-          "assembly": 0.66,
-          "total": 218.29
+          "analysis": 0.21,
+          "retrieval": 56.87,
+          "expansion": 8.11,
+          "star_ranking": 11.51,
+          "assembly": 0.16,
+          "total": 76.85
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.5531,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 76.85
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4426,7 +4936,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.85
+          "latency_ms": 1.26
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4441,7 +4951,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 43.03
+          "latency_ms": 11.98
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4456,7 +4966,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 8.06
+          "latency_ms": 1.54
         }
       }
     },
@@ -4498,7 +5008,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 292.52
+        "latency_ms": 92.5
       },
       "star_rag": {
         "metrics": {
@@ -4546,13 +5056,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1624,
         "latency_breakdown_ms": {
-          "analysis": 1.15,
-          "retrieval": 261.87,
-          "expansion": 22.5,
-          "star_ranking": 39.07,
-          "assembly": 0.46,
-          "total": 325.06
+          "analysis": 0.27,
+          "retrieval": 81.52,
+          "expansion": 7.93,
+          "star_ranking": 13.7,
+          "assembly": 0.16,
+          "total": 103.59
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.4,
+          "r_at_5": 0.4,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7877,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 103.59
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4568,7 +5095,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.8
+          "latency_ms": 3.07
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4583,7 +5110,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 44.69
+          "latency_ms": 13.44
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4598,7 +5125,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.25
+          "latency_ms": 3.62
         }
       }
     },
@@ -4640,7 +5167,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 215.02
+        "latency_ms": 71.18
       },
       "star_rag": {
         "metrics": {
@@ -4688,13 +5215,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1426,
         "latency_breakdown_ms": {
-          "analysis": 0.85,
-          "retrieval": 184.96,
-          "expansion": 25.04,
-          "star_ranking": 38.86,
-          "assembly": 0.43,
-          "total": 250.13
+          "analysis": 0.26,
+          "retrieval": 59.33,
+          "expansion": 9.87,
+          "star_ranking": 14.64,
+          "assembly": 0.19,
+          "total": 84.29
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.5,
+          "r_at_5": 0.5,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7654,
+          "ndcg_at_5": 0.7654,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 84.29
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4710,7 +5254,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.04
+          "latency_ms": 1.68
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4725,7 +5269,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 32.11
+          "latency_ms": 11.57
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4740,7 +5284,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.23
+          "latency_ms": 2.17
         }
       }
     },
@@ -4782,7 +5326,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 180.66
+        "latency_ms": 63.5
       },
       "star_rag": {
         "metrics": {
@@ -4830,13 +5374,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1501,
         "latency_breakdown_ms": {
-          "analysis": 1.04,
-          "retrieval": 151.31,
-          "expansion": 22.63,
-          "star_ranking": 35.97,
-          "assembly": 0.33,
-          "total": 211.28
+          "analysis": 0.28,
+          "retrieval": 52.68,
+          "expansion": 8.74,
+          "star_ranking": 13.25,
+          "assembly": 0.14,
+          "total": 75.08
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.1667,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 75.08
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4852,7 +5413,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.99
+          "latency_ms": 2.16
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -4867,7 +5428,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 158.11
+          "latency_ms": 90.11
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -4882,7 +5443,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.48
+          "latency_ms": 2.52
         }
       }
     },
@@ -4924,7 +5485,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 216.96
+        "latency_ms": 72.52
       },
       "star_rag": {
         "metrics": {
@@ -4972,13 +5533,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.3276,
         "latency_breakdown_ms": {
-          "analysis": 0.65,
-          "retrieval": 190.04,
-          "expansion": 22.3,
-          "star_ranking": 41.23,
-          "assembly": 0.28,
-          "total": 254.5
+          "analysis": 0.26,
+          "retrieval": 64.65,
+          "expansion": 6.48,
+          "star_ranking": 11.53,
+          "assembly": 0.14,
+          "total": 83.05
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.1667,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.4852,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 72.52
       },
       "ablations": {
         "atom_plus_snr": {
@@ -4994,7 +5572,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.16
+          "latency_ms": 1.39
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5009,7 +5587,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 33.23
+          "latency_ms": 11.31
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5024,7 +5602,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.86
+          "latency_ms": 1.61
         }
       }
     },
@@ -5066,7 +5644,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 236.2
+        "latency_ms": 86.82
       },
       "star_rag": {
         "metrics": {
@@ -5114,13 +5692,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1985,
         "latency_breakdown_ms": {
-          "analysis": 0.59,
-          "retrieval": 208.01,
-          "expansion": 21.14,
-          "star_ranking": 36.09,
-          "assembly": 0.4,
-          "total": 266.23
+          "analysis": 0.25,
+          "retrieval": 76.33,
+          "expansion": 7.46,
+          "star_ranking": 14.01,
+          "assembly": 0.17,
+          "total": 98.23
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.0,
+          "r_at_5": 0.3333,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.4693,
+          "ndcg_at_5": 0.6164,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 98.23
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5136,7 +5731,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 8.49
+          "latency_ms": 3.02
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5151,7 +5746,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 37.45
+          "latency_ms": 12.85
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5166,7 +5761,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.58
+          "latency_ms": 3.47
         }
       }
     },
@@ -5208,7 +5803,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 167.19
+        "latency_ms": 53.92
       },
       "star_rag": {
         "metrics": {
@@ -5256,13 +5851,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1988,
         "latency_breakdown_ms": {
-          "analysis": 0.68,
-          "retrieval": 136.1,
-          "expansion": 27.6,
-          "star_ranking": 32.3,
-          "assembly": 0.43,
-          "total": 197.1
+          "analysis": 0.26,
+          "retrieval": 45.27,
+          "expansion": 7.19,
+          "star_ranking": 12.82,
+          "assembly": 0.16,
+          "total": 65.71
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.3333,
+          "r_at_5": 0.3333,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.2961,
+          "ndcg_at_5": 0.214,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 65.71
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5278,7 +5890,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.84
+          "latency_ms": 1.33
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5293,7 +5905,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 34.36
+          "latency_ms": 11.41
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5308,7 +5920,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.56
+          "latency_ms": 1.9
         }
       }
     },
@@ -5350,7 +5962,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 169.27
+        "latency_ms": 60.37
       },
       "star_rag": {
         "metrics": {
@@ -5398,13 +6010,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.2589,
         "latency_breakdown_ms": {
-          "analysis": 0.79,
-          "retrieval": 139.59,
-          "expansion": 26.14,
-          "star_ranking": 36.49,
-          "assembly": 0.28,
-          "total": 203.29
+          "analysis": 0.25,
+          "retrieval": 51.42,
+          "expansion": 7.93,
+          "star_ranking": 11.35,
+          "assembly": 0.13,
+          "total": 71.07
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.75,
+          "r_at_5": 1.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.5307,
+          "ndcg_at_5": 0.6608,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 71.07
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5420,7 +6049,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.14
+          "latency_ms": 0.86
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5435,7 +6064,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 36.76
+          "latency_ms": 11.55
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5450,7 +6079,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 2.85
+          "latency_ms": 1.12
         }
       }
     },
@@ -5492,7 +6121,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 196.54
+        "latency_ms": 68.38
       },
       "star_rag": {
         "metrics": {
@@ -5540,13 +6169,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.3494,
         "latency_breakdown_ms": {
-          "analysis": 0.58,
-          "retrieval": 171.69,
-          "expansion": 21.43,
-          "star_ranking": 31.25,
-          "assembly": 0.51,
-          "total": 225.46
+          "analysis": 0.24,
+          "retrieval": 59.37,
+          "expansion": 7.68,
+          "star_ranking": 12.39,
+          "assembly": 0.15,
+          "total": 79.84
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.6667,
+          "r_at_5": 1.0,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.6548,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 79.84
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5562,7 +6208,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.61
+          "latency_ms": 1.32
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5577,7 +6223,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 41.23
+          "latency_ms": 11.81
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5592,7 +6238,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 19.85
+          "latency_ms": 1.74
         }
       }
     },
@@ -5634,7 +6280,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 203.45
+        "latency_ms": 52.04
       },
       "star_rag": {
         "metrics": {
@@ -5682,13 +6328,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.1331,
         "latency_breakdown_ms": {
-          "analysis": 0.81,
-          "retrieval": 173.57,
-          "expansion": 25.61,
-          "star_ranking": 53.37,
-          "assembly": 0.63,
-          "total": 253.99
+          "analysis": 0.25,
+          "retrieval": 43.53,
+          "expansion": 7.18,
+          "star_ranking": 13.32,
+          "assembly": 0.18,
+          "total": 64.46
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "structural_tracing_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.3333,
+          "r_at_3": 0.2,
+          "r_at_5": 0.6,
+          "hit_at_1": 0.0,
+          "mrr": 0.5,
+          "ndcg_at_3": 0.3869,
+          "ndcg_at_5": 0.6241,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 64.46
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5704,7 +6367,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.05
+          "latency_ms": 1.33
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5719,7 +6382,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 39.91
+          "latency_ms": 11.54
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5734,7 +6397,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 7.09
+          "latency_ms": 1.81
         }
       }
     },
@@ -5776,7 +6439,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 181.5
+        "latency_ms": 66.45
       },
       "star_rag": {
         "metrics": {
@@ -5824,13 +6487,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.153,
         "latency_breakdown_ms": {
-          "analysis": 0.72,
-          "retrieval": 157.09,
-          "expansion": 20.37,
-          "star_ranking": 40.62,
-          "assembly": 0.37,
-          "total": 219.16
+          "analysis": 0.25,
+          "retrieval": 57.09,
+          "expansion": 7.87,
+          "star_ranking": 13.5,
+          "assembly": 0.17,
+          "total": 78.87
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 1.0,
+          "p_at_3": 0.6667,
+          "r_at_3": 0.6,
+          "r_at_5": 0.6,
+          "hit_at_1": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_3": 0.7039,
+          "ndcg_at_5": 0.786,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 78.87
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5846,7 +6526,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.16
+          "latency_ms": 1.53
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -5861,7 +6541,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 43.82
+          "latency_ms": 11.94
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -5876,7 +6556,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.74
+          "latency_ms": 2.15
         }
       }
     },
@@ -5918,7 +6598,7 @@
             "score": 0.48
           }
         ],
-        "latency_ms": 613.51
+        "latency_ms": 219.22
       },
       "star_rag": {
         "metrics": {
@@ -5966,13 +6646,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.72,
-          "retrieval": 558.76,
-          "expansion": 51.23,
-          "star_ranking": 34.0,
-          "assembly": 0.45,
-          "total": 645.17
+          "analysis": 0.24,
+          "retrieval": 199.42,
+          "expansion": 18.39,
+          "star_ranking": 12.72,
+          "assembly": 0.24,
+          "total": 231.02
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 0.5797,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 231.02
       },
       "ablations": {
         "atom_plus_snr": {
@@ -5988,7 +6685,7 @@
             "top_score": 0.55,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.45
+          "latency_ms": 1.68
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -6003,7 +6700,7 @@
             "top_score": 0.55,
             "abstention_success": 0.0
           },
-          "latency_ms": 37.69
+          "latency_ms": 14.2
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -6018,7 +6715,7 @@
             "top_score": 0.5797,
             "abstention_success": 0.0
           },
-          "latency_ms": 9.26
+          "latency_ms": 2.14
         }
       }
     },
@@ -6060,7 +6757,7 @@
             "score": 0.97
           }
         ],
-        "latency_ms": 143.56
+        "latency_ms": 49.94
       },
       "star_rag": {
         "metrics": {
@@ -6108,13 +6805,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.48,
-          "retrieval": 113.36,
-          "expansion": 24.45,
-          "star_ranking": 43.57,
-          "assembly": 0.34,
-          "total": 182.19
+          "analysis": 0.22,
+          "retrieval": 40.37,
+          "expansion": 8.02,
+          "star_ranking": 12.98,
+          "assembly": 0.15,
+          "total": 61.75
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 61.75
       },
       "ablations": {
         "atom_plus_snr": {
@@ -6130,7 +6844,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.8
+          "latency_ms": 1.59
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -6145,7 +6859,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 31.27
+          "latency_ms": 11.95
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -6160,7 +6874,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 6.82
+          "latency_ms": 2.12
         }
       }
     },
@@ -6202,7 +6916,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 144.82
+        "latency_ms": 49.09
       },
       "star_rag": {
         "metrics": {
@@ -6250,13 +6964,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.79,
-          "retrieval": 119.94,
-          "expansion": 20.71,
-          "star_ranking": 36.34,
-          "assembly": 0.33,
-          "total": 178.11
+          "analysis": 0.26,
+          "retrieval": 40.29,
+          "expansion": 7.32,
+          "star_ranking": 13.91,
+          "assembly": 0.28,
+          "total": 62.07
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 49.09
       },
       "ablations": {
         "atom_plus_snr": {
@@ -6272,7 +7003,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.55
+          "latency_ms": 1.69
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -6287,7 +7018,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 40.94
+          "latency_ms": 12.0
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -6302,7 +7033,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.77
+          "latency_ms": 1.92
         }
       }
     },
@@ -6344,7 +7075,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 271.69
+        "latency_ms": 90.61
       },
       "star_rag": {
         "metrics": {
@@ -6392,13 +7123,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.84,
-          "retrieval": 242.84,
-          "expansion": 23.59,
-          "star_ranking": 41.56,
-          "assembly": 0.43,
-          "total": 309.27
+          "analysis": 0.26,
+          "retrieval": 81.31,
+          "expansion": 7.64,
+          "star_ranking": 13.48,
+          "assembly": 0.2,
+          "total": 102.89
         }
+      },
+      "combined_selective": {
+        "should_route_star": false,
+        "routing_reason": "standard_retrieval_atom",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 90.61
       },
       "ablations": {
         "atom_plus_snr": {
@@ -6414,7 +7162,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.75
+          "latency_ms": 1.56
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -6429,7 +7177,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 35.1
+          "latency_ms": 12.37
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -6444,7 +7192,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 5.22
+          "latency_ms": 2.18
         }
       }
     },
@@ -6486,7 +7234,7 @@
             "score": 1.0
           }
         ],
-        "latency_ms": 150.0
+        "latency_ms": 49.55
       },
       "star_rag": {
         "metrics": {
@@ -6534,13 +7282,30 @@
         "evidence_paths": [],
         "context_assembly_precision": 0.0,
         "latency_breakdown_ms": {
-          "analysis": 0.84,
-          "retrieval": 124.36,
-          "expansion": 22.12,
-          "star_ranking": 41.45,
-          "assembly": 0.33,
-          "total": 189.11
+          "analysis": 0.23,
+          "retrieval": 40.92,
+          "expansion": 7.33,
+          "star_ranking": 12.54,
+          "assembly": 0.14,
+          "total": 61.17
         }
+      },
+      "combined_selective": {
+        "should_route_star": true,
+        "routing_reason": "multi_entity_relational_intent",
+        "metrics": {
+          "p_at_1": 0.0,
+          "p_at_3": 0.0,
+          "r_at_3": 0.0,
+          "r_at_5": 0.0,
+          "hit_at_1": 0.0,
+          "mrr": 0.0,
+          "ndcg_at_3": 0.0,
+          "ndcg_at_5": 0.0,
+          "top_score": 1.0,
+          "abstention_success": 0.0
+        },
+        "latency_ms": 61.17
       },
       "ablations": {
         "atom_plus_snr": {
@@ -6556,7 +7321,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 3.23
+          "latency_ms": 1.38
         },
         "atom_plus_dtp": {
           "metrics": {
@@ -6571,7 +7336,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 36.08
+          "latency_ms": 12.53
         },
         "atom_plus_ssaf": {
           "metrics": {
@@ -6586,7 +7351,7 @@
             "top_score": 1.0,
             "abstention_success": 0.0
           },
-          "latency_ms": 4.56
+          "latency_ms": 1.71
         }
       }
     }
