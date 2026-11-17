@@ -1,0 +1,760 @@
+[
+  {
+    "query_id": "Q01",
+    "query_text": "Where is MultiSignalRetriever defined and how does retrieve_candidates work?",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/retriever.py"
+    ],
+    "target_symbols": [
+      "MultiSignalRetriever",
+      "retrieve_candidates"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Direct class and method lookup in context engine retriever.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q02",
+    "query_text": "Find the definition of SemanticNoiseRouter and route_and_filter_edges",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/snr_router.py"
+    ],
+    "target_symbols": [
+      "SemanticNoiseRouter",
+      "route_and_filter_edges"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Direct lookup of SNR router class and method.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q03",
+    "query_text": "Where is DecoupledTopologicalPropagator implemented?",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py"
+    ],
+    "target_symbols": [
+      "DecoupledTopologicalPropagator",
+      "propagate"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Direct lookup of DTP propagator.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q04",
+    "query_text": "Find the class SemanticStructuralAdaptiveFusion and its fuse method",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py"
+    ],
+    "target_symbols": [
+      "SemanticStructuralAdaptiveFusion",
+      "fuse"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Direct lookup of SSAF fusion module.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q05",
+    "query_text": "Where is AuthService implemented and what does authenticate_user do?",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/auth_service.py"
+    ],
+    "target_symbols": [
+      "AuthService",
+      "authenticate_user"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Authentication service lookup.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q06",
+    "query_text": "Where is GranularEvidencePathBuilder located?",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py"
+    ],
+    "target_symbols": [
+      "GranularEvidencePathBuilder",
+      "build_evidence_paths"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Evidence path builder lookup.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q07",
+    "query_text": "Find the process_task function in the background worker",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "services/workers/worker.py"
+    ],
+    "target_symbols": [
+      "process_task",
+      "run_worker"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Worker task processing lookup.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q08",
+    "query_text": "Where is VoyageEmbeddingProvider defined?",
+    "archetype": "A_DIRECT_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/embedding/voyage.py"
+    ],
+    "target_symbols": [
+      "VoyageEmbeddingProvider",
+      "generate_embedding",
+      "generate_embeddings_batch"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Voyage embedding provider implementation.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q09",
+    "query_text": "How does vector similarity search with pgvector work in the repository chunk database?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/retriever.py"
+    ],
+    "target_symbols": [
+      "MultiSignalRetriever",
+      "_semantic_vector_search"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Semantic search for cosine distance pgvector logic.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q10",
+    "query_text": "How are JWT access tokens and refresh tokens generated and signed?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/auth_service.py"
+    ],
+    "target_symbols": [
+      "AuthService",
+      "create_token_pair",
+      "create_access_token"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Semantic query describing token creation logic.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q11",
+    "query_text": "How does the system prune irrelevant graph edges based on semantic threshold?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/snr_router.py"
+    ],
+    "target_symbols": [
+      "SemanticNoiseRouter",
+      "compute_edge_relevance",
+      "route_and_filter_edges"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "SNR edge filtering concept.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q12",
+    "query_text": "How is multi-hop structural score propagated across directed code graph connections?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py"
+    ],
+    "target_symbols": [
+      "DecoupledTopologicalPropagator",
+      "propagate"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "DTP forward and backward propagation logic.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q13",
+    "query_text": "How does dynamic beta weighting balance semantic score against structural topology?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py"
+    ],
+    "target_symbols": [
+      "SemanticStructuralAdaptiveFusion",
+      "compute_adaptive_beta"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "SSAF adaptive beta calculation.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q14",
+    "query_text": "How does the offline grounded answer synthesizer produce answers without an external LLM API?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/llm/groq.py"
+    ],
+    "target_symbols": [
+      "GroqProvider",
+      "_generate_offline_grounded_answer"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Offline deterministic answer generation.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q15",
+    "query_text": "How are code files parsed into AST symbols and code chunks during ingestion?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "apps/api/src/services/ingestion_service.py"
+    ],
+    "target_symbols": [
+      "IngestionService",
+      "_extract_ast_symbols_and_chunks"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "AST chunk extraction logic.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q16",
+    "query_text": "How are background ingestion and analysis tasks consumed from Redis queue?",
+    "archetype": "B_SEMANTIC_CODE_SEARCH",
+    "target_files": [
+      "services/workers/worker.py"
+    ],
+    "target_symbols": [
+      "run_worker",
+      "process_task"
+    ],
+    "expected_hop_count": 0,
+    "is_answerable": true,
+    "evaluation_notes": "Redis queue consumer loop.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q17",
+    "query_text": "What database models does IngestionService depend on and import?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/services/ingestion_service.py",
+      "apps/api/src/models/chunk.py",
+      "apps/api/src/models/symbol.py"
+    ],
+    "target_symbols": [
+      "IngestionService",
+      "CodeChunk",
+      "CodeSymbol",
+      "RepositoryFile"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "IngestionService imports and interacts with Chunk and Symbol models.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q18",
+    "query_text": "Which modules import and instantiate StructureAwareStarRagService?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/service.py",
+      "apps/api/src/services/context_engine/ranker.py"
+    ],
+    "target_symbols": [
+      "StructureAwareStarRagService",
+      "MultiSignalRanker"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Ranker imports and delegates to StructureAwareStarRagService.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q19",
+    "query_text": "What does MultiSignalRanker depend on to compute reciprocal rank fusion and structure scores?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/services/context_engine/ranker.py",
+      "apps/api/src/services/context_engine/star_rag_structure/service.py"
+    ],
+    "target_symbols": [
+      "MultiSignalRanker",
+      "RankedCandidate"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Ranker dependencies and scoring mechanisms.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q20",
+    "query_text": "How does the auth API route depend on AuthService and database session dependency?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/api/routes/auth.py",
+      "apps/api/src/services/auth_service.py",
+      "apps/api/src/db/session.py"
+    ],
+    "target_symbols": [
+      "login",
+      "get_db_session",
+      "AuthService"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Auth route dependencies on service and session.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q21",
+    "query_text": "What components does StructureAwareStarRagService import from star_rag_structure?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/service.py",
+      "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+      "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py",
+      "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py"
+    ],
+    "target_symbols": [
+      "StructureAwareStarRagService",
+      "SemanticNoiseRouter",
+      "DecoupledTopologicalPropagator",
+      "SemanticStructuralAdaptiveFusion"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "StarRagService internal composition.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q22",
+    "query_text": "What external libraries and packages are used by the Tree-sitter parser in parse_engine?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/services/parse_engine/tree_sitter_parser.py"
+    ],
+    "target_symbols": [
+      "TreeSitterParser",
+      "parse_file"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Tree-sitter bindings and language libraries.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q23",
+    "query_text": "How does the projects route import and verify current user credentials?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/api/routes/projects.py",
+      "apps/api/src/services/auth_service.py"
+    ],
+    "target_symbols": [
+      "get_current_user",
+      "list_projects"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "User dependency injection in projects route.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q24",
+    "query_text": "Which classes inherit from AppException in api exceptions?",
+    "archetype": "C_DEPENDENCY_INVESTIGATION",
+    "target_files": [
+      "apps/api/src/api/exceptions.py"
+    ],
+    "target_symbols": [
+      "AppException",
+      "UnauthorizedException",
+      "NotFoundException",
+      "ValidationException"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Exception hierarchy inheritance.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q25",
+    "query_text": "Trace the execution flow of a user question from /projects/{projectId}/ask through the context engine pipeline",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/api/routes/grounded_ask.py",
+      "apps/api/src/services/context_engine/retriever.py",
+      "apps/api/src/services/context_engine/ranker.py",
+      "apps/api/src/services/context_engine/expander.py",
+      "apps/api/src/services/context_engine/assembler.py"
+    ],
+    "target_symbols": [
+      "grounded_ask",
+      "retrieve_candidates",
+      "rank_candidates",
+      "expand_relationships",
+      "assemble_context"
+    ],
+    "expected_hop_count": 3,
+    "is_answerable": true,
+    "evaluation_notes": "Full end-to-end call chain for grounded ask endpoint.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q26",
+    "query_text": "Trace how StructureAwareStarRagService filters graph edges with SNR and propagates topology with DTP",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/service.py",
+      "apps/api/src/services/context_engine/star_rag_structure/snr_router.py",
+      "apps/api/src/services/context_engine/star_rag_structure/dtp_propagator.py"
+    ],
+    "target_symbols": [
+      "run_pipeline_async",
+      "route_and_filter_edges",
+      "propagate"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Multi-hop flow between orchestrator, SNR, and DTP.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q27",
+    "query_text": "Trace the authentication call chain when a user submits their login credentials",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/api/routes/auth.py",
+      "apps/api/src/services/auth_service.py"
+    ],
+    "target_symbols": [
+      "login",
+      "authenticate_user",
+      "verify_password",
+      "create_token_pair"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Route -> AuthService.authenticate_user -> password check -> token generation.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q28",
+    "query_text": "Trace how the background worker receives a task from Redis and routes it to repository ingestion",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "services/workers/worker.py",
+      "apps/api/src/services/ingestion_service.py"
+    ],
+    "target_symbols": [
+      "run_worker",
+      "process_task",
+      "ingest_repository"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Worker pop -> task router -> IngestionService execution.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q29",
+    "query_text": "Trace how SSAF combines semantic similarity and topological scores to produce final candidate ranks",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/service.py",
+      "apps/api/src/services/context_engine/star_rag_structure/ssaf_fusion.py"
+    ],
+    "target_symbols": [
+      "run_pipeline_async",
+      "fuse",
+      "compute_adaptive_beta"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Fusion computation and dynamic thresholding.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q30",
+    "query_text": "Trace how GranularEvidencePathBuilder discovers call paths and formats evidence chains",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/evidence_paths.py"
+    ],
+    "target_symbols": [
+      "build_evidence_paths",
+      "_find_paths_between",
+      "_format_chain_label"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Evidence path traversal across BFS/DFS paths.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q31",
+    "query_text": "Trace how MultiSignalRetriever combines full-text SQL search and vector similarity into retrieved candidates",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/services/context_engine/retriever.py"
+    ],
+    "target_symbols": [
+      "retrieve_candidates",
+      "_semantic_vector_search",
+      "_full_text_search",
+      "_combine_signals"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Dual-signal retrieval aggregation inside retriever.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q32",
+    "query_text": "Trace how ContextAssembler builds the final prompt payload from ranked candidates and graph expansions",
+    "archetype": "D_EXECUTION_FLOW_TRACING",
+    "target_files": [
+      "apps/api/src/services/context_engine/assembler.py"
+    ],
+    "target_symbols": [
+      "assemble_context",
+      "_format_candidate_block",
+      "_format_evidence_paths"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Prompt assembling and token budget management.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q33",
+    "query_text": "Explain how the complete ATOM Code Lane architecture retrieves, ranks, expands and assembles codebase context",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/services/context_engine/retriever.py",
+      "apps/api/src/services/context_engine/ranker.py",
+      "apps/api/src/services/context_engine/expander.py",
+      "apps/api/src/services/context_engine/assembler.py"
+    ],
+    "target_symbols": [
+      "MultiSignalRetriever",
+      "MultiSignalRanker",
+      "RelationshipExpander",
+      "ContextAssembler"
+    ],
+    "expected_hop_count": 3,
+    "is_answerable": true,
+    "evaluation_notes": "The 4 core components of ATOM Code Lane.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q34",
+    "query_text": "How is Structure-Aware STAR-RAG gated by feature flag and integrated into MultiSignalRanker?",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/config/settings.py",
+      "apps/api/src/services/context_engine/ranker.py",
+      "apps/api/src/services/context_engine/star_rag_structure/service.py"
+    ],
+    "target_symbols": [
+      "STRUCTURE_AWARE_STAR_RAG_ENABLED",
+      "rank_candidates",
+      "run_pipeline_async"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Settings flag gating Ranker delegation to STAR-RAG.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q35",
+    "query_text": "How does the system handle database session management and transaction lifecycle across async requests?",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/db/session.py",
+      "apps/api/src/api/routes/grounded_ask.py",
+      "apps/api/src/api/routes/projects.py"
+    ],
+    "target_symbols": [
+      "get_db_session",
+      "AsyncSessionLocal",
+      "async_engine"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "SQLAlchemy async engine and session dependency injection.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q36",
+    "query_text": "Explain the interaction between Tree-sitter parsing, code chunk persistence, and Voyage embedding generation",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/services/ingestion_service.py",
+      "apps/api/src/services/embedding/voyage.py",
+      "apps/api/src/models/chunk.py"
+    ],
+    "target_symbols": [
+      "IngestionService",
+      "VoyageEmbeddingProvider",
+      "CodeChunk"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Ingestion pipeline subsystem coordination.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q37",
+    "query_text": "How do ASTFunctionCallVisitor and CodeGraphExtractor reconstruct function call relationships from source files?",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/services/context_engine/star_rag_structure/graph_extractor.py"
+    ],
+    "target_symbols": [
+      "ASTFunctionCallVisitor",
+      "CodeGraphExtractor",
+      "extract_from_source"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Static AST visitor call resolution.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q38",
+    "query_text": "How does the LLM provider factory select between Groq, Claude, and offline synthesizer fallback?",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/services/llm/factory.py",
+      "apps/api/src/services/llm/groq.py",
+      "apps/api/src/services/llm/claude.py"
+    ],
+    "target_symbols": [
+      "get_llm_provider",
+      "GroqProvider",
+      "ClaudeProvider"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "Multi-provider LLM abstraction and offline fallback.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q39",
+    "query_text": "Explain how RelationshipExpander uses 1-hop graph traversal to expand retrieved code symbols",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/services/context_engine/expander.py",
+      "apps/api/src/models/dependency.py"
+    ],
+    "target_symbols": [
+      "RelationshipExpander",
+      "expand_relationships",
+      "CodeDependency"
+    ],
+    "expected_hop_count": 2,
+    "is_answerable": true,
+    "evaluation_notes": "1-hop dependency expansion in ATOM baseline.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q40",
+    "query_text": "How does error handling and custom HTTPException mapping work across the FastAPI routes?",
+    "archetype": "E_COMPLEX_ARCHITECTURAL",
+    "target_files": [
+      "apps/api/src/api/exceptions.py",
+      "apps/api/src/main.py"
+    ],
+    "target_symbols": [
+      "AppException",
+      "app_exception_handler",
+      "validation_exception_handler"
+    ],
+    "expected_hop_count": 1,
+    "is_answerable": true,
+    "evaluation_notes": "Global exception handler architecture.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q41",
+    "query_text": "How does the Kubernetes Helm chart deploy the Phoenix observability cluster with mTLS?",
+    "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+    "target_files": [],
+    "target_symbols": [],
+    "expected_hop_count": 0,
+    "is_answerable": false,
+    "evaluation_notes": "Kubernetes Helm and Phoenix mTLS were discarded for this MVP per AGENTS.md.",
+    "split": "calibration"
+  },
+  {
+    "query_id": "Q42",
+    "query_text": "Where is the Jira and Linear webhook bi-directional sync engine implemented?",
+    "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+    "target_files": [],
+    "target_symbols": [],
+    "expected_hop_count": 0,
+    "is_answerable": false,
+    "evaluation_notes": "External tool connectors (Jira/Linear) are explicitly out of scope for MVP.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q43",
+    "query_text": "How does the autonomous code mutation PR creator automatically rewrite buggy Python functions?",
+    "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+    "target_files": [],
+    "target_symbols": [],
+    "expected_hop_count": 0,
+    "is_answerable": false,
+    "evaluation_notes": "Autonomous PR creation bots are explicitly out of scope per AGENTS.md.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q44",
+    "query_text": "Where is the enterprise SAML SSO and Okta authentication bridge configured?",
+    "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+    "target_files": [],
+    "target_symbols": [],
+    "expected_hop_count": 0,
+    "is_answerable": false,
+    "evaluation_notes": "Enterprise SAML/Okta federation is out of scope; uses local email + bcrypt JWT.",
+    "split": "evaluation"
+  },
+  {
+    "query_id": "Q45",
+    "query_text": "How is quantum computing circuit simulation executed in the Code Lane?",
+    "archetype": "F_UNKNOWN_LOW_CONFIDENCE",
+    "target_files": [],
+    "target_symbols": [],
+    "expected_hop_count": 0,
+    "is_answerable": false,
+    "evaluation_notes": "Completely non-existent concept, must produce low confidence / unknown signal.",
+    "split": "evaluation"
+  }
+]

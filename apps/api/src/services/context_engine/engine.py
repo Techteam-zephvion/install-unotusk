@@ -35,6 +35,7 @@ class ProjectContextEngine:
         enable_memotime: bool | None = None,
         enable_evoreasoner: bool | None = None,
         enable_structure_aware_star_rag: bool | None = None,
+        force_structure_aware_star_rag: bool = False,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -194,16 +195,32 @@ class ProjectContextEngine:
                     "error": str(exc),
                 }
 
-        # 4. Multi-Signal Ranking or Structure-Aware STAR-RAG
-        use_struct_star_rag = (
+        # 4. Multi-Signal Ranking or Structure-Aware STAR-RAG (Selective Intent Routing)
+        star_rag_flag = (
             enable_structure_aware_star_rag
             if enable_structure_aware_star_rag is not None
             else getattr(settings, "STRUCTURE_AWARE_STAR_RAG_ENABLED", False)
         )
-        struct_star_rag_applied = False
-        struct_star_rag_diagnostics: dict[str, Any] = {}
 
-        if use_struct_star_rag:
+        from apps.api.src.services.context_engine.star_rag_structure.selective_router import (
+            StarRagSelectiveRouter,
+        )
+
+        should_route_star, route_reason = StarRagSelectiveRouter.should_route_to_star_rag(
+            query_text=question,
+            analyzed_query=analyzed,
+            candidates=expanded_candidates,
+            flag_enabled=star_rag_flag,
+            force_star_rag=force_structure_aware_star_rag,
+        )
+
+        struct_star_rag_applied = False
+        struct_star_rag_diagnostics: dict[str, Any] = {
+            "routing_decision": route_reason,
+            "selective_routing_applied": True,
+        }
+
+        if should_route_star:
             try:
                 from apps.api.src.services.context_engine.star_rag_structure.service import (
                     StructureAwareStarRagService,
@@ -221,18 +238,22 @@ class ProjectContextEngine:
                     enable_ssaf=getattr(settings, "STRUCTURE_AWARE_SSAF_ENABLED", True),
                 )
                 struct_star_rag_applied = not star_struct_res.is_fallback
-                struct_star_rag_diagnostics = {
-                    "is_fallback": star_struct_res.is_fallback,
-                    "fallback_reason": star_struct_res.fallback_reason,
-                    **star_struct_res.diagnostics,
-                }
+                struct_star_rag_diagnostics.update(
+                    {
+                        "is_fallback": star_struct_res.is_fallback,
+                        "fallback_reason": star_struct_res.fallback_reason,
+                        **star_struct_res.diagnostics,
+                    }
+                )
             except Exception as exc:
                 struct_star_rag_applied = False
-                struct_star_rag_diagnostics = {
-                    "exception_occurred": True,
-                    "is_fallback": True,
-                    "error": str(exc),
-                }
+                struct_star_rag_diagnostics.update(
+                    {
+                        "exception_occurred": True,
+                        "is_fallback": True,
+                        "error": str(exc),
+                    }
+                )
                 ranked = MultiSignalRanker.rank_candidates(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
@@ -381,9 +402,10 @@ class ProjectContextEngine:
                 "star_rag_used": star_rag_applied if use_star_rag else False,
                 "star_rag_diagnostics": star_rag_diagnostics,
                 "structure_aware_star_rag_used": (
-                    struct_star_rag_applied if use_struct_star_rag else False
+                    struct_star_rag_applied if should_route_star else False
                 ),
                 "structure_aware_star_rag_diagnostics": struct_star_rag_diagnostics,
+                "star_rag_routing_decision": route_reason,
                 "evoreasoner_used": evoreasoner_applied if use_evoreasoner else False,
                 "evoreasoner_diagnostics": evoreasoner_diagnostics,
                 "proof_chains_count": len(proof_chains),

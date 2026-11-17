@@ -33,11 +33,15 @@ class DecoupledTopologicalPropagator:
         decay_factor: float = 0.75,
         in_degree_weight: float = 0.60,
         out_degree_weight: float = 0.40,
+        hub_attenuation: bool = True,
+        attenuation_factor: float = 0.75,
     ):
         self.max_hops = max_hops
         self.decay_factor = decay_factor
         self.in_degree_weight = in_degree_weight
         self.out_degree_weight = out_degree_weight
+        self.hub_attenuation = hub_attenuation
+        self.attenuation_factor = attenuation_factor
 
     def extract_directed_features(
         self,
@@ -130,22 +134,25 @@ class DecoupledTopologicalPropagator:
 
             current_prob = next_prob
 
-        # Calculate final decoupled structural score for each node
-        for _nid, feat in features.items():
+        # Calculate final decoupled structural score for each node with hub attenuation
+        for nid, feat in features.items():
             hop_sum = 0.0
             for hop, p in feat.multi_order_reachability.items():
                 hop_weight = self.decay_factor ** (hop - 1)
                 hop_sum += p * hop_weight
 
-            # Normalize degree component: hubs and incoming targets get structural credit
-            degree_factor = (
-                self.in_degree_weight * math.tanh(feat.in_degree / 3.0)
-                + self.out_degree_weight * math.tanh(feat.out_degree / 5.0)
-            )
+            is_seed = nid in seed_node_ids
+            if is_seed:
+                # Direct query seeds retain structural priority and are never penalized as utility hubs
+                raw_struct = max(0.50, hop_sum)
+            elif self.hub_attenuation and feat.in_degree > 0:
+                # In-degree hub attenuation: suppress high-degree utility sinks (e.g. settings, session, exceptions)
+                attenuation = 1.0 / (1.0 + self.attenuation_factor * math.log1p(feat.in_degree))
+                raw_struct = hop_sum * attenuation
+            else:
+                raw_struct = hop_sum
 
-            # Combined decoupled structural score bounded in [0.0, 1.0]
-            raw_struct = (hop_sum * 0.70) + (degree_factor * 0.30)
-            feat.structural_score = min(1.0, round(raw_struct, 4))
+            feat.structural_score = min(1.0, max(0.0, round(raw_struct, 4)))
 
         return features
 

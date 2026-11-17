@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     STRUCTURE_AWARE_DTP_MAX_DEPTH: int = Field(default=3)
     STRUCTURE_AWARE_DTP_DECAY: float = Field(default=0.75)
     STRUCTURE_AWARE_SSAF_CONFLICT_THRESHOLD: float = Field(default=0.40)
+    STRUCTURE_AWARE_DTP_HUB_ATTENUATION: bool = Field(default=True)
+    STRUCTURE_AWARE_DTP_KAPPA: float = Field(default=0.75)
+    STRUCTURE_AWARE_SSAF_STRUCTURAL_WEIGHT: float = Field(default=0.15)
+    STRUCTURE_AWARE_GRAPH_CACHE_ENABLED: bool = Field(default=True)
 
     # MemoTime Temporal Retrieval Settings (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
     MEMOTIME_ENABLED: bool = Field(default=False)
