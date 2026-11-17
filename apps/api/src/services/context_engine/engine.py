@@ -251,6 +251,7 @@ class ProjectContextEngine:
                     {
                         "exception_occurred": True,
                         "is_fallback": True,
+                        "fallback_reason": str(exc),
                         "error": str(exc),
                     }
                 )
