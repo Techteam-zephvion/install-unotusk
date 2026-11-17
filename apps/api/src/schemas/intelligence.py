@@ -53,6 +53,18 @@ class GroundedAskRequest(BaseModel):
         default="warm",
         description="Reasoning thinking tier: 'hot' (fast/light), 'warm' (balanced/default), 'cold' (deep/thorough)",
     )
+    enable_structure_aware_star_rag: bool | None = Field(
+        default=None,
+        description="Optional override for structure-aware STAR-RAG retrieval (default inherits settings.STRUCTURE_AWARE_STAR_RAG_ENABLED)",
+    )
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, v: str) -> str:
+        v_clean = v.strip()
+        if len(v_clean) < 2:
+            raise ValueError("Question cannot be empty or whitespace only and must be at least 2 characters.")
+        return v_clean
 
     @field_validator("thinking_tier")
     @classmethod

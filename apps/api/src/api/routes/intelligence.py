@@ -43,6 +43,7 @@ async def ask_project(
         question=payload.question,
         conversation_id=payload.conversation_id,
         thinking_tier=payload.thinking_tier,
+        enable_structure_aware_star_rag=payload.enable_structure_aware_star_rag,
     )
 
 
