@@ -131,7 +131,7 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
                       return Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: widget.palette.bgSurface,
+                          gradient: widget.palette.sectionGradient,
                           border: Border.all(color: widget.palette.div),
                           borderRadius: BorderRadius.circular(10),
                         ),

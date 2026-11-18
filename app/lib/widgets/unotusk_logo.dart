@@ -23,14 +23,14 @@ class UnotuskLogo extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: const Color(0xFFDA7756),
+            color: onDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20),
             borderRadius: BorderRadius.circular(size * 0.28),
           ),
           child: Center(
             child: Text(
               'U',
               style: TextStyle(
-                color: Colors.white,
+                color: onDark ? const Color(0xFF0A0F20) : Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: size * 0.55,
                 fontFamily: 'serif',

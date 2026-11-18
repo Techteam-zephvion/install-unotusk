@@ -39,7 +39,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
   Color _getNodeColor(int id) {
     switch (id) {
       case 0:
-        return const Color(0xFFDA7756); // Warm terracotta
+        return widget.palette.accent;
       case 1:
       case 7:
         return const Color(0xFF5BA495); // Mint Teal (Services)
@@ -103,7 +103,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
               Container(
                 height: 560,
                 decoration: BoxDecoration(
-                  color: widget.palette.bgSurface,
+                  gradient: widget.palette.sectionGradient,
                   border: Border.all(color: widget.palette.div),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -192,10 +192,10 @@ class _OntologyGraphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (nodes.isEmpty) return;
 
-    final isDark = palette.bgBase == const Color(0xFF181816);
+    final isDark = palette.isDark;
     final inactiveEdgeColor =
-        isDark ? const Color(0xFF2E2E2A) : palette.div.withValues(alpha: 0.6);
-    const activeEdgeColor = Color(0xFFDA7756); // Warm terracotta
+        isDark ? palette.div : palette.div.withValues(alpha: 0.6);
+    final activeEdgeColor = palette.accent;
 
     // ─────────────────────────────────────────────────────────
     // 1. Draw Inactive Edges (behind)
@@ -270,10 +270,10 @@ class _OntologyGraphPainter extends CustomPainter {
       // Monospace label below
       final textSpan = TextSpan(
         text: node.label,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'monospace',
           fontSize: 9.5,
-          color: Color(0xFF8A8A82),
+          color: palette.textSec,
           letterSpacing: 0.2,
         ),
       );
@@ -301,24 +301,24 @@ class _OntologyGraphPainter extends CustomPainter {
 
         // Glow halo (radial blur)
         final glowPaint = Paint()
-          ..color = const Color(0xFFDA7756).withValues(alpha: 0.38)
+          ..color = palette.accent.withValues(alpha: 0.38)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
         canvas.drawCircle(center, 22.0, glowPaint);
 
-        // Solid terracotta circle
+        // Solid accent circle
         final fillPaint = Paint()
-          ..color = const Color(0xFFDA7756)
+          ..color = palette.accent
           ..style = PaintingStyle.fill;
         canvas.drawCircle(center, radius, fillPaint);
 
         // Pill badge background with monospace label
         final textSpan = TextSpan(
           text: activeNode.label,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 10.0,
             fontWeight: FontWeight.w600,
-            color: Color(0xFFEDEDEA),
+            color: palette.text,
             letterSpacing: 0.2,
           ),
         );
@@ -338,13 +338,13 @@ class _OntologyGraphPainter extends CustomPainter {
 
         // Pill background
         final pillBgPaint = Paint()
-          ..color = isDark ? const Color(0xFF141412) : palette.bgBase
+          ..color = palette.bgBase
           ..style = PaintingStyle.fill;
         canvas.drawRRect(rrect, pillBgPaint);
 
         // Pill border
         final pillBorderPaint = Paint()
-          ..color = isDark ? const Color(0xFF383832) : palette.div
+          ..color = palette.div
           ..strokeWidth = 1.0
           ..style = PaintingStyle.stroke;
         canvas.drawRRect(rrect, pillBorderPaint);

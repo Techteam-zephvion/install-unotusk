@@ -131,15 +131,15 @@ class _ConstellationPainter extends CustomPainter {
   ];
 
   static const List<Color> nodeColors = [
-    Color(0xFFDA7756), // 0: Terracotta
-    Color(0xFF6EC8B8), // 1: Sage
-    Color(0xFFE8A455), // 2: Amber
-    Color(0xFF52B788), // 3: Green
-    Color(0xFFDA7756), // 4: Terracotta
-    Color(0xFF68A090), // 5: Teal
-    Color(0xFFE8A455), // 6: Amber
-    Color(0xFF6EC8B8), // 7: Sage
-    Color(0xFF52B788), // 8: Green
+    Color(0xFFCBC1B4), // 0: Warm Sand
+    Color(0xFF84878F), // 1: Cool Slate
+    Color(0xFFE4DFD6), // 2: Sand Tint
+    Color(0xFFC0B7AB), // 3: Soft Sand
+    Color(0xFFCBC1B4), // 4: Warm Sand
+    Color(0xFF84878F), // 5: Cool Slate
+    Color(0xFFE4DFD6), // 6: Sand Tint
+    Color(0xFFC0B7AB), // 7: Soft Sand
+    Color(0xFFCBC1B4), // 8: Warm Sand
   ];
 
   _ConstellationPainter({

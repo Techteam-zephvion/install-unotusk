@@ -87,7 +87,7 @@ class _FilesScreenState extends State<FilesScreen> {
         Container(
           width: 280,
           decoration: BoxDecoration(
-            color: p.bgSurface,
+            gradient: p.sidebarGradient,
             border: Border(right: BorderSide(color: p.div)),
           ),
           child: Column(

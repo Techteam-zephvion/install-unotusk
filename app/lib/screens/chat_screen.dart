@@ -13,7 +13,11 @@ class ChatScreen extends StatefulWidget {
   final UnoPalette palette;
   final List<ChatMessage> messages;
   final bool isGenerating;
-  final Function(String) onSubmitQuery;
+  final void Function(
+    String query, {
+    String thinkingTier,
+    bool thinkingEnabled,
+  }) onSubmitQuery;
 
   static const List<String> querySuggestions = [
     'What are the primary components in this repository?',
@@ -66,6 +70,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToBottom = false;
+  bool _thinkingEnabled = true;
+  String _thinkingTier = 'warm';
 
   @override
   void initState() {
@@ -90,7 +96,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty || widget.isGenerating) return;
     _inputController.clear();
-    widget.onSubmitQuery(text);
+    widget.onSubmitQuery(
+      text,
+      thinkingTier: _thinkingEnabled ? _thinkingTier : 'hot',
+      thinkingEnabled: _thinkingEnabled,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -118,60 +128,76 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 680),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${_getGreeting()}, $name',
-                      textAlign: TextAlign.center,
-                      style: UnoTypography.displaySerif(
-                        palette: widget.palette,
-                        fontSize: 30,
+        final heroWidth =
+            (constraints.maxWidth * 0.72).clamp(320.0, 820.0);
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: widget.palette.heroGlowGradient,
+          ),
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Container(
+                  width: heroWidth,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${_getGreeting()}, $name',
+                        textAlign: TextAlign.center,
+                        style: UnoTypography.displaySerif(
+                          palette: widget.palette,
+                          fontSize: 33,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.projectName != null && widget.projectName!.isNotEmpty
-                          ? 'Investigate ${widget.projectName}, architecture, or code decisions'
-                          : 'Investigate your project, architecture, or code decisions',
-                      textAlign: TextAlign.center,
-                      style: UnoTypography.body(
-                        color: widget.palette.textSec,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ChatInputBox(
-                      controller: _inputController,
-                      palette: widget.palette,
-                      onSubmit: _handleSubmit,
-                      onChipSelected: (prompt) {
-                        _inputController.text = prompt;
-                        _handleSubmit();
-                      },
-                      suggestions: ChatScreen.querySuggestions,
-                    ),
-                    const SizedBox(height: 10),
-                    Opacity(
-                      opacity: 0.75,
-                      child: Text(
-                        'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.projectName != null &&
+                                widget.projectName!.isNotEmpty
+                            ? 'Investigate ${widget.projectName}, architecture, or code decisions'
+                            : 'Investigate your project, architecture, or code decisions',
                         textAlign: TextAlign.center,
                         style: UnoTypography.body(
                           color: widget.palette.textSec,
-                          fontSize: 11,
+                          fontSize: 15,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 26),
+                      ChatInputBox(
+                        controller: _inputController,
+                        palette: widget.palette,
+                        thinkingEnabled: _thinkingEnabled,
+                        thinkingTier: _thinkingTier,
+                        onThinkingEnabledChanged: (val) =>
+                            setState(() => _thinkingEnabled = val),
+                        onThinkingTierChanged: (tier) =>
+                            setState(() => _thinkingTier = tier),
+                        onSubmit: _handleSubmit,
+                        onChipSelected: (prompt) {
+                          _inputController.text = prompt;
+                          _handleSubmit();
+                        },
+                        suggestions: ChatScreen.querySuggestions,
+                      ),
+                      const SizedBox(height: 10),
+                      Opacity(
+                        opacity: 0.75,
+                        child: Text(
+                          'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
+                          textAlign: TextAlign.center,
+                          style: UnoTypography.body(
+                            color: widget.palette.textSec,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -184,114 +210,161 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildChatStream() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final contentWidth = constraints.maxWidth * 0.80;
+        final contentWidth =
+            (constraints.maxWidth * 0.80).clamp(320.0, constraints.maxWidth - 32);
 
-        return Stack(
-          children: [
-            // Messages scroll area - fitted to 80% of window width
-            Positioned.fill(
-              child: ListView.builder(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.fromLTRB(0, 24, 0, 180),
-                itemCount: widget.messages.length,
-                itemBuilder: (context, index) {
-                  final msg = widget.messages[index];
-                  return Center(
-                    child: SizedBox(
-                      width: contentWidth,
-                      child: _buildMessageItem(msg),
+        return Container(
+          decoration: BoxDecoration(
+            gradient: widget.palette.heroGlowGradient,
+          ),
+          child: Stack(
+            children: [
+              // Messages scroll area — 80% of available width
+              Positioned.fill(
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context).copyWith(
+                    scrollbars: false,
+                  ),
+                  child: RawScrollbar(
+                    controller: _scrollController,
+                    thumbVisibility: false,
+                    trackVisibility: false,
+                    thickness: 2.0,
+                    radius: const Radius.circular(2),
+                    thumbColor: widget.palette.textSec.withValues(alpha: 0.25),
+                    fadeDuration: const Duration(milliseconds: 250),
+                    padding: const EdgeInsets.only(right: 4, top: 8, bottom: 8),
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(0, 28, 0, 196),
+                      itemCount: widget.messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = widget.messages[index];
+                        return Center(
+                          child: SizedBox(
+                            width: contentWidth,
+                            child: _buildMessageItem(msg),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-            ),
-
-            // Floating Bottom Input with Gradient Fade - fitted to 80% of window width
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      widget.palette.bgBase.withValues(alpha: 0.0),
-                      widget.palette.bgBase.withValues(alpha: 0.95),
-                      widget.palette.bgBase,
-                    ],
-                    stops: const [0.0, 0.45, 1.0],
                   ),
                 ),
-                padding: const EdgeInsets.fromLTRB(0, 24, 0, 16),
-                child: Center(
-                  child: SizedBox(
-                    width: contentWidth,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_showScrollToBottom)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: InkWell(
-                              onTap: () {
-                                _scrollController.animateTo(
-                                  _scrollController.position.maxScrollExtent,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOutCubic,
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: widget.palette.bgSurface,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: widget.palette.div),
-                                ),
-                                child: Icon(
-                                  LucideIcons.arrowDown,
-                                  size: 16,
-                                  color: widget.palette.text,
+              ),
+
+              // Floating Bottom Input with Soft Tonal Gradient Fade
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        widget.palette.bgBase.withValues(alpha: 0.0),
+                        (widget.palette.isDark
+                                ? const Color(0xFF0E1428)
+                                : const Color(0xFFEDE7DC))
+                            .withValues(alpha: 0.94),
+                        widget.palette.isDark
+                            ? const Color(0xFF10172D)
+                            : const Color(0xFFE9E2D7),
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(0, 28, 0, 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: contentWidth,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_showScrollToBottom)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    _scrollController.animateTo(
+                                      _scrollController
+                                          .position.maxScrollExtent,
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      curve: Curves.easeOutCubic,
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      gradient:
+                                          widget.palette.elevatedCardGradient,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: widget.palette.div, width: 1),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.12),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      LucideIcons.arrowDown,
+                                      size: 14.5,
+                                      color: widget.palette.text,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
+                          ChatInputBox(
+                            controller: _inputController,
+                            palette: widget.palette,
+                            thinkingEnabled: _thinkingEnabled,
+                            thinkingTier: _thinkingTier,
+                            onThinkingEnabledChanged: (val) =>
+                                setState(() => _thinkingEnabled = val),
+                            onThinkingTierChanged: (tier) =>
+                                setState(() => _thinkingTier = tier),
+                            onSubmit: _handleSubmit,
+                            onChipSelected: (prompt) {
+                              _inputController.text = prompt;
+                              _handleSubmit();
+                            },
+                            suggestions: ChatScreen.querySuggestions,
+                            placeholder:
+                                'Ask a follow-up about decisions, commits, or tickets…',
                           ),
-                        ChatInputBox(
-                          controller: _inputController,
-                          palette: widget.palette,
-                          onSubmit: _handleSubmit,
-                          onChipSelected: (prompt) {
-                            _inputController.text = prompt;
-                            _handleSubmit();
-                          },
-                          suggestions: ChatScreen.querySuggestions,
-                          placeholder:
-                              'Ask a follow-up about decisions, commits, or tickets…',
-                        ),
-                        const SizedBox(height: 8),
-                        Opacity(
-                          opacity: 0.75,
-                          child: Text(
-                            'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
-                            textAlign: TextAlign.center,
-                            style: UnoTypography.body(
-                              color: widget.palette.textSec,
-                              fontSize: 11,
+                          const SizedBox(height: 8),
+                          Opacity(
+                            opacity: 0.72,
+                            child: Text(
+                              'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
+                              textAlign: TextAlign.center,
+                              style: UnoTypography.body(
+                                color: widget.palette.textSec,
+                                fontSize: 11.5,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -388,136 +461,99 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.palette.isDark;
+    // Opposite shade to the page background for crisp visual separation
+    final bubbleBg =
+        isDark ? const Color(0xFFF5F2EB) : const Color(0xFF0A0F20);
+    final bubbleText =
+        isDark ? const Color(0xFF0A0F20) : const Color(0xFFFFFFFF);
+    final bubblePalette = isDark ? UnoPalette.light : UnoPalette.dark;
+    final hoverBase =
+        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+
     return FadeTransition(
       opacity: _fadeAnim,
       child: SlideTransition(
         position: _slideAnim,
-        child: Align(
-          alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 26),
           child: MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(bottom: 24, top: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              constraints: const BoxConstraints(maxWidth: 680),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    widget.palette.bgElevated,
-                    const Color(0xFF262422),
-                  ],
-                ),
-                border: Border.all(
-                  color: _isHovered
-                      ? widget.palette.accent.withValues(alpha: 0.5)
-                      : widget.palette.div,
-                  width: 1.2,
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(6),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: _isHovered ? 0.22 : 0.10),
-                    blurRadius: _isHovered ? 16 : 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 18,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          color: widget.palette.accent.withValues(alpha: 0.16),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: widget.palette.accent.withValues(alpha: 0.35),
-                            width: 1,
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            LucideIcons.user,
-                            size: 10,
-                            color: widget.palette.accent,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        'You',
-                        style: UnoTypography.mono(
-                          color: widget.palette.textSec,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      if (_isHovered) ...[
-                        const SizedBox(width: 8),
-                        InkWell(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Subtle hover-only Copy button outside the pill
+                AnimatedOpacity(
+                  opacity: (_isHovered || _copied) ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Tooltip(
+                      message: _copied ? 'Copied' : 'Copy prompt',
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
                           onTap: _copy,
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _copied
-                                      ? LucideIcons.check
-                                      : LucideIcons.copy,
-                                  size: 11,
-                                  color: _copied
-                                      ? widget.palette.live
-                                      : widget.palette.textSec,
-                                ),
-                                if (_copied) ...[
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Copied',
-                                    style: UnoTypography.mono(
-                                      color: widget.palette.live,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                          behavior: HitTestBehavior.opaque,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: hoverBase.withValues(
+                                  alpha: _copied ? 0.08 : 0.045),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _copied ? LucideIcons.check : LucideIcons.copy,
+                              size: 13,
+                              color: _copied
+                                  ? widget.palette.live
+                                  : widget.palette.textSec,
                             ),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  MarkdownText(
-                    text: widget.text,
-                    palette: widget.palette,
-                    selectable: true,
-                    baseStyle: UnoTypography.body(
-                      color: widget.palette.text,
-                      fontSize: 14.5,
-                      height: 1.5,
-                      fontWeight: FontWeight.w400,
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+
+                // Clean minimal opposite-shade prompt pill
+                Flexible(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 680),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: bubbleBg,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0A0F20)
+                              .withValues(alpha: isDark ? 0.28 : 0.12),
+                          blurRadius: 14,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: MarkdownText(
+                      text: widget.text,
+                      palette: bubblePalette,
+                      selectable: true,
+                      baseStyle: UnoTypography.body(
+                        color: bubbleText,
+                        fontSize: 15.5,
+                        height: 1.52,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -540,17 +576,20 @@ class _ResponseCardState extends State<_ResponseCard> {
   bool _copied = false;
   String? _feedback; // up, down
   bool _thoughtExpanded = false;
+  bool _thoughtHovered = false;
   final Set<String> _expandedSteps = {};
 
   String _sanitizeMeta(String meta) {
     if (meta.isEmpty) return meta;
     var cleaned = meta
         // Remove "via http://..." or "via 10.0.0.59:28000" or "via 127.0.0.1:..."
-        .replaceAll(RegExp(r'\bvia\s+(https?://)?[^\s·]+', caseSensitive: false), '')
+        .replaceAll(
+            RegExp(r'\bvia\s+(https?://)?[^\s·]+', caseSensitive: false), '')
         // Remove any remaining URLs like http://... or https://...
         .replaceAll(RegExp(r'https?://[^\s·]+', caseSensitive: false), '')
         // Remove raw IPs with or without port e.g. 10.0.0.59:28000 or 127.0.0.1
-        .replaceAll(RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b'), '')
+        .replaceAll(
+            RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b'), '')
         // Remove leftover port numbers like :28000 or :28101
         .replaceAll(RegExp(r':\d{4,5}\b'), '')
         // Clean up redundant dots/separators
@@ -575,13 +614,15 @@ class _ResponseCardState extends State<_ResponseCard> {
 
   @override
   Widget build(BuildContext context) {
+    final p = widget.palette;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Reasoning Thought Process Drawer (if available)
+        // Minimal, quiet Reasoning / Thought Process disclosure
         if (widget.data.reasoning != null) ...[
           _buildThoughtProcessDrawer(widget.data.reasoning!),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
         ],
 
         // BDD Spec Viewer (if available)
@@ -590,7 +631,7 @@ class _ResponseCardState extends State<_ResponseCard> {
           const SizedBox(height: 16),
         ],
 
-        // Segment text paragraphs
+        // Clean Editorial Response Prose (Sans-serif body, not monospace!)
         if (widget.data.bdd == null) ...[
           ...widget.data.segments.map((seg) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -601,86 +642,72 @@ class _ResponseCardState extends State<_ResponseCard> {
                     citations: widget.data.reasoning?.citations ?? const [],
                     evidence: widget.data.reasoning?.evidence ?? const [],
                   ),
-                  palette: widget.palette,
+                  palette: p,
                   selectable: true,
-                  baseStyle: UnoTypography.mono(
-                    color: widget.palette.text,
-                    fontSize: 14,
-                    height: 1.65,
+                  baseStyle: UnoTypography.body(
+                    color: p.text,
+                    fontSize: 15.5,
+                    height: 1.7,
+                    fontWeight: FontWeight.w400,
                   ),
                   trailing: seg.tag != null
                       ? TagBadge(
                           tag: seg.tag!,
-                          palette: widget.palette,
+                          palette: p,
                         )
                       : null,
                 ),
               )),
         ],
 
-        // Footer Meta Bar
-        Container(
-          padding: const EdgeInsets.only(top: 10),
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: widget.palette.div)),
-          ),
+        // Minimal, quiet Response Action Strip
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              _ResponseActionButton(
+                icon: _copied ? LucideIcons.check : LucideIcons.copy,
+                label: _copied ? 'Copied' : null,
+                tooltip: 'Copy response',
+                palette: p,
+                activeColor: _copied ? p.live : null,
+                onTap: _copyToClipboard,
+              ),
+              const SizedBox(width: 4),
+              _ResponseActionButton(
+                icon: LucideIcons.thumbsUp,
+                tooltip: 'Helpful',
+                palette: p,
+                isActive: _feedback == 'up',
+                onTap: () {
+                  setState(() {
+                    _feedback = _feedback == 'up' ? null : 'up';
+                  });
+                },
+              ),
+              const SizedBox(width: 4),
+              _ResponseActionButton(
+                icon: LucideIcons.thumbsDown,
+                tooltip: 'Needs improvement',
+                palette: p,
+                isActive: _feedback == 'down',
+                onTap: () {
+                  setState(() {
+                    _feedback = _feedback == 'down' ? null : 'down';
+                  });
+                },
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   _sanitizeMeta(widget.data.meta),
-                  style: UnoTypography.mono(
-                    color: widget.palette.textSec,
-                    fontSize: 11,
-                    letterSpacing: 0.2,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: UnoTypography.body(
+                    color: p.textSec.withValues(alpha: 0.75),
+                    fontSize: 12,
                   ),
                 ),
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _copied ? LucideIcons.check : LucideIcons.copy,
-                      size: 14,
-                      color: _copied
-                          ? widget.palette.live
-                          : widget.palette.textSec,
-                    ),
-                    onPressed: _copyToClipboard,
-                    tooltip: 'Copy response',
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      LucideIcons.thumbsUp,
-                      size: 14,
-                      color: _feedback == 'up'
-                          ? widget.palette.accent
-                          : widget.palette.textSec,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _feedback = _feedback == 'up' ? null : 'up';
-                      });
-                    },
-                    tooltip: 'Good response',
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      LucideIcons.thumbsDown,
-                      size: 14,
-                      color: _feedback == 'down'
-                          ? widget.palette.inferred
-                          : widget.palette.textSec,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _feedback = _feedback == 'down' ? null : 'down';
-                      });
-                    },
-                    tooltip: 'Needs improvement',
-                  ),
-                ],
               ),
             ],
           ),
@@ -690,724 +717,316 @@ class _ResponseCardState extends State<_ResponseCard> {
   }
 
   Widget _buildThoughtProcessDrawer(ReasoningModel reasoning) {
-    const thoughtTime = '2.6';
-    final allStepIds = [
-      'routing',
-      'ontology',
-      'score',
-      'citations',
-      if (reasoning.evidence.isNotEmpty) 'evidence',
-      'vulnerability',
-    ];
+    final p = widget.palette;
+    final isDark = p.isDark;
+    final hoverBase =
+        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+    final isActive = _thoughtExpanded || _thoughtHovered;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Drawer toggle button (Pill)
-        InkWell(
-          onTap: () => setState(() => _thoughtExpanded = !_thoughtExpanded),
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: widget.palette.bgSurface,
-              border: Border.all(color: widget.palette.div),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(LucideIcons.zap, size: 13, color: Color(0xFFDA7756)),
-                const SizedBox(width: 7),
-                Text(
-                  'Thought process for ${thoughtTime}s',
-                  style: UnoTypography.body(
-                    color: widget.palette.text,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+        // Whisper-quiet inline disclosure trigger
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _thoughtHovered = true),
+          onExit: (_) => setState(() => _thoughtHovered = false),
+          child: GestureDetector(
+            onTap: () => setState(() => _thoughtExpanded = !_thoughtExpanded),
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: hoverBase.withValues(alpha: isActive ? 0.05 : 0.0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    LucideIcons.sparkles,
+                    size: 13,
+                    color: isActive ? p.text : p.textSec,
                   ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  _thoughtExpanded
-                      ? LucideIcons.chevronUp
-                      : LucideIcons.chevronDown,
-                  size: 13,
-                  color: widget.palette.textSec,
-                ),
-              ],
+                  const SizedBox(width: 7),
+                  Text(
+                    'Thought for 2.6s',
+                    style: UnoTypography.body(
+                      color: isActive ? p.text : p.textSec,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  AnimatedRotation(
+                    turns: _thoughtExpanded ? 0.25 : 0.0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      LucideIcons.chevronRight,
+                      size: 13,
+                      color: isActive ? p.text : p.textSec,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
 
-        // Expanded details - Claude-style Step-by-Step Dropdown Tree
-        if (_thoughtExpanded) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: widget.palette.bgSurface,
-              border: Border.all(color: widget.palette.div),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Summary line & Expand/Collapse all toggle (Claude-style header)
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Routed ${reasoning.routingPath.length} stages · ${reasoning.ontologyEdges.length} ontology nodes · ${reasoning.compositeScore.toStringAsFixed(2)} verification score',
-                        style: UnoTypography.body(
-                          color: widget.palette.textSec,
-                          fontSize: 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (_expandedSteps.length == allStepIds.length) {
-                            _expandedSteps.clear();
-                          } else {
-                            _expandedSteps.addAll(allStepIds);
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        child: Text(
-                          _expandedSteps.length == allStepIds.length
-                              ? 'Collapse all'
-                              : 'Expand all',
-                          style: UnoTypography.mono(
-                            color: widget.palette.accent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
+        // Smooth animated minimal disclosure panel (left guide rail, no noisy boxes/pills)
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topLeft,
+          child: _thoughtExpanded
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 14, top: 8, bottom: 4),
+                  child: Container(
+                    padding: const EdgeInsets.only(left: 14, top: 2, bottom: 2),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: p.div,
+                          width: 1.5,
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Step 1: Pipeline Routing Path
-                _buildTimelineStep(
-                  id: 'routing',
-                  icon: LucideIcons.workflow,
-                  title: 'Pipeline routing path',
-                  badgeText: '${reasoning.routingPath.length} stages',
-                  badgeColor: widget.palette.accent,
-                  badgeBg: const Color(0xFF271C17),
-                  isFirst: true,
-                  isLast: false,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ROUTING PATH',
-                        style: UnoTypography.mono(
-                          color: widget.palette.textSec,
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (int i = 0; i < reasoning.routingPath.length; i++) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: widget.palette.bgSurface,
-                                border: Border.all(color: widget.palette.div),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                reasoning.routingPath[i],
-                                style: UnoTypography.body(
-                                  color: widget.palette.text,
-                                  fontSize: 11.5,
-                                ),
-                              ),
-                            ),
-                            if (i < reasoning.routingPath.length - 1)
-                              Text(
-                                '→',
-                                style: TextStyle(
-                                  color: widget.palette.textSec,
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Step 2: Ontology Graph Connections
-                _buildTimelineStep(
-                  id: 'ontology',
-                  icon: LucideIcons.network,
-                  title: 'Ontology graph connections',
-                  badgeText: '${reasoning.ontologyEdges.length} edges',
-                  badgeColor: const Color(0xFF4ADE80),
-                  badgeBg: const Color(0xFF142921),
-                  isFirst: false,
-                  isLast: false,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ONTOLOGY EDGES',
-                        style: UnoTypography.mono(
-                          color: widget.palette.textSec,
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: reasoning.ontologyEdges.map((edge) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF142921),
-                              border: Border.all(color: const Color(0xFF2C5E48)),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              edge,
-                              style: UnoTypography.mono(
-                                color: const Color(0xFF4ADE80),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Step 3: Composite Verification Score
-                _buildTimelineStep(
-                  id: 'score',
-                  icon: LucideIcons.shieldCheck,
-                  title: 'Verification score',
-                  badgeText:
-                      '${reasoning.compositeScore.toStringAsFixed(2)} CONFIRMED',
-                  badgeColor: const Color(0xFFDA7756),
-                  badgeBg: const Color(0xFF38231C),
-                  isFirst: false,
-                  isLast: false,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'COMPOSITE SCORE',
-                        style: UnoTypography.mono(
-                          color: widget.palette.textSec,
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: widget.palette.div,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor:
-                                    reasoning.compositeScore.clamp(0.0, 1.0),
-                                child: Container(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (reasoning.citations.isNotEmpty)
+                          _buildReasoningRow(
+                            id: 'citations',
+                            icon: LucideIcons.fileText,
+                            title: 'Sources',
+                            summary: '${reasoning.citations.length} files',
+                            content: Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: reasoning.citations.map((cite) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3.5),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFDA7756),
-                                    borderRadius: BorderRadius.circular(4),
+                                    color: hoverBase.withValues(alpha: 0.045),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            reasoning.compositeScore.toStringAsFixed(2),
-                            style: UnoTypography.mono(
-                              color: widget.palette.text,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF38231C),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'CONFIRMED',
-                              style: UnoTypography.mono(
-                                color: const Color(0xFFDA7756),
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (reasoning.components.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        ...reasoning.components.map((c) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 85,
                                   child: Text(
-                                    c.label,
-                                    style: UnoTypography.body(
-                                      color: widget.palette.textSec,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Container(
-                                    height: 5,
-                                    decoration: BoxDecoration(
-                                      color: widget.palette.div,
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: c.score.clamp(0.0, 1.0),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF5BA495),
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: 38,
-                                  child: Text(
-                                    c.score.toStringAsFixed(2),
-                                    textAlign: TextAlign.right,
+                                    cite,
                                     style: UnoTypography.mono(
-                                      color: widget.palette.textSec,
+                                      color: p.text,
                                       fontSize: 11,
                                     ),
                                   ),
-                                ),
-                              ],
+                                );
+                              }).toList(),
                             ),
-                          );
-                        }),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // Step 4: Grounding Sources Cited
-                _buildTimelineStep(
-                  id: 'citations',
-                  icon: LucideIcons.fileText,
-                  title: 'Grounding sources cited',
-                  badgeText: '${reasoning.citations.length} files',
-                  badgeColor: const Color(0xFFDA7756),
-                  badgeBg: const Color(0xFF271C17),
-                  isFirst: false,
-                  isLast: reasoning.evidence.isEmpty,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SOURCES CITED',
-                        style: UnoTypography.mono(
-                          color: widget.palette.textSec,
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: reasoning.citations.map((cite) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF271C17),
-                              border:
-                                  Border.all(color: const Color(0xFF573324)),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              cite,
-                              style: UnoTypography.mono(
-                                color: const Color(0xFFDA7756),
-                                fontSize: 11,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Step 5: Real Code Evidence (if present)
-                if (reasoning.evidence.isNotEmpty)
-                  _buildTimelineStep(
-                    id: 'evidence',
-                    icon: LucideIcons.fileCode,
-                    title: 'AST code evidence',
-                    badgeText: '${reasoning.evidence.length} snippets',
-                    badgeColor: widget.palette.accent,
-                    badgeBg: widget.palette.accent.withValues(alpha: 0.12),
-                    isFirst: false,
-                    isLast: false,
-                    content: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'GROUNDED CODE EVIDENCE',
-                          style: UnoTypography.mono(
-                            color: widget.palette.accent,
-                            fontSize: 10,
-                            letterSpacing: 0.8,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...reasoning.evidence.map((ev) {
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: widget.palette.bgSurface,
-                              border: Border.all(color: widget.palette.div),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(LucideIcons.fileCode,
-                                        size: 12, color: widget.palette.accent),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
+                        if (reasoning.evidence.isNotEmpty)
+                          _buildReasoningRow(
+                            id: 'evidence',
+                            icon: LucideIcons.code,
+                            title: 'Code evidence',
+                            summary: '${reasoning.evidence.length} snippets',
+                            content: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: reasoning.evidence.take(5).map((ev) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: hoverBase.withValues(alpha: 0.035),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
                                         ev.file +
                                             (ev.lines != null
                                                 ? ':${ev.lines}'
                                                 : ''),
                                         style: UnoTypography.mono(
-                                          color: widget.palette.text,
+                                          color: p.text,
                                           fontSize: 11,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                    if (ev.symbol != null &&
-                                        ev.symbol!.isNotEmpty) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: widget.palette.accent
-                                              .withValues(alpha: 0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          ev.symbol!,
+                                      if (ev.snippet != null &&
+                                          ev.snippet!.isNotEmpty) ...[
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          ev.snippet!,
                                           style: UnoTypography.mono(
-                                            color: widget.palette.accent,
-                                            fontSize: 10,
+                                            color: p.textSec,
+                                            fontSize: 10.5,
+                                            height: 1.45,
                                           ),
+                                          maxLines: 4,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
+                                      ],
                                     ],
-                                  ],
-                                ),
-                                if (ev.snippet != null &&
-                                    ev.snippet!.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: widget.palette.bgElevated,
-                                      borderRadius: BorderRadius.circular(4),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        if (reasoning.ontologyEdges.isNotEmpty)
+                          _buildReasoningRow(
+                            id: 'ontology',
+                            icon: LucideIcons.gitFork,
+                            title: 'Graph context',
+                            summary:
+                                '${reasoning.ontologyEdges.length} connections',
+                            content: Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: reasoning.ontologyEdges.map((edge) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3.5),
+                                  decoration: BoxDecoration(
+                                    color: hoverBase.withValues(alpha: 0.045),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    edge,
+                                    style: UnoTypography.mono(
+                                      color: p.textSec,
+                                      fontSize: 11,
                                     ),
-                                    child: Text(
-                                      ev.snippet!,
-                                      style: UnoTypography.mono(
-                                        color: widget.palette.textSec,
-                                        fontSize: 10,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        _buildReasoningRow(
+                          id: 'score',
+                          icon: LucideIcons.shieldCheck,
+                          title: 'Verification',
+                          summary:
+                              '${(reasoning.compositeScore * 100).round()}% grounded',
+                          content: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: LinearProgressIndicator(
+                                        value: reasoning.compositeScore
+                                            .clamp(0.0, 1.0),
+                                        minHeight: 4,
+                                        backgroundColor: p.div,
+                                        valueColor: AlwaysStoppedAnimation(
+                                            p.accent),
                                       ),
-                                      maxLines: 6,
-                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    reasoning.compositeScore.toStringAsFixed(2),
+                                    style: UnoTypography.mono(
+                                      color: p.text,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
+                              ),
+                              if (reasoning.components.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                ...reasoning.components.map((c) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 2),
+                                      child: Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 90,
+                                            child: Text(
+                                              c.label,
+                                              style: UnoTypography.body(
+                                                color: p.textSec,
+                                                fontSize: 11.5,
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(2),
+                                              child: LinearProgressIndicator(
+                                                value: c.score.clamp(0.0, 1.0),
+                                                minHeight: 3,
+                                                backgroundColor: p.div,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation(
+                                                        p.textSec.withValues(
+                                                            alpha: 0.65)),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          SizedBox(
+                                            width: 34,
+                                            child: Text(
+                                              c.score.toStringAsFixed(2),
+                                              textAlign: TextAlign.right,
+                                              style: UnoTypography.mono(
+                                                color: p.textSec,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )),
                               ],
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-
-                // Step 6: Security & Vulnerability Scan Audit
-                _buildTimelineStep(
-                  id: 'vulnerability',
-                  icon: LucideIcons.shield,
-                  title: 'Security & vulnerability audit',
-                  badgeText: '0 flagged',
-                  badgeColor: const Color(0xFF4ADE80),
-                  badgeBg: const Color(0xFF142921),
-                  isFirst: false,
-                  isLast: true,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'VULNERABILITY SCAN — SUPPLEMENTARY',
-                        style: UnoTypography.mono(
-                          color: const Color(0xFF4ADE80),
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'No vulnerabilities identified beyond the locked Risk Report. Verified 12 decision-events for unresolved security implications.',
-                        style: UnoTypography.body(
-                          color: widget.palette.textSec,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Telemetry & Backend status
-                if (reasoning.debugSignals != null &&
-                    reasoning.debugSignals!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6, top: 4),
-                    child: Row(
-                      children: [
-                        Icon(LucideIcons.server,
-                            size: 11, color: widget.palette.textSec),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Model: ${reasoning.debugSignals?['model'] ?? 'Qwen 3.8-27b'} · Grounding: Active',
-                            style: UnoTypography.mono(
-                              color: widget.palette.textSec,
-                              fontSize: 9.5,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
-        ],
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }
 
-  Widget _buildTimelineStep({
+  Widget _buildReasoningRow({
     required String id,
     required IconData icon,
     required String title,
-    required String badgeText,
-    required Color badgeColor,
-    required Color badgeBg,
+    required String summary,
     required Widget content,
-    required bool isFirst,
-    required bool isLast,
   }) {
     final isExpanded = _expandedSteps.contains(id);
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Left timeline column
-          SizedBox(
-            width: 24,
-            child: Column(
-              children: [
-                // Line above node (if not first)
-                Container(
-                  width: 1.5,
-                  height: 4,
-                  color: isFirst ? Colors.transparent : widget.palette.div,
-                ),
-                // Node icon box
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: isExpanded
-                        ? widget.palette.accent.withValues(alpha: 0.15)
-                        : widget.palette.bgElevated,
-                    border: Border.all(
-                      color: isExpanded
-                          ? widget.palette.accent.withValues(alpha: 0.6)
-                          : widget.palette.div,
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 11,
-                    color: isExpanded
-                        ? widget.palette.accent
-                        : widget.palette.textSec,
-                  ),
-                ),
-                // Line below node
-                Expanded(
-                  child: Container(
-                    width: 1.5,
-                    color: isLast && !isExpanded
-                        ? Colors.transparent
-                        : widget.palette.div,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Right content column
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Clickable step row
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        _expandedSteps.remove(id);
-                      } else {
-                        _expandedSteps.add(id);
-                      }
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(6),
-                  hoverColor: widget.palette.bgElevated.withValues(alpha: 0.5),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
-                    child: Row(
-                      children: [
-                        Text(
-                          title,
-                          style: UnoTypography.body(
-                            color: widget.palette.text,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: badgeBg,
-                            border: Border.all(
-                                color: badgeColor.withValues(alpha: 0.3)),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            badgeText,
-                            style: UnoTypography.mono(
-                              color: badgeColor,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          isExpanded
-                              ? LucideIcons.chevronUp
-                              : LucideIcons.chevronDown,
-                          size: 13,
-                          color: widget.palette.textSec,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Inset Dropdown Container
-                if (isExpanded) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: widget.palette.bgElevated,
-                      border: Border.all(color: widget.palette.div),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: content,
-                  ),
-                ] else ...[
-                  const SizedBox(height: 6),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _MinimalReasoningStep(
+      icon: icon,
+      title: title,
+      summary: summary,
+      isExpanded: isExpanded,
+      palette: widget.palette,
+      onToggle: () {
+        setState(() {
+          if (isExpanded) {
+            _expandedSteps.remove(id);
+          } else {
+            _expandedSteps.add(id);
+          }
+        });
+      },
+      content: content,
     );
   }
 
@@ -1668,6 +1287,194 @@ class _ResponseCardState extends State<_ResponseCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ResponseActionButton extends StatefulWidget {
+  final IconData icon;
+  final String? label;
+  final String tooltip;
+  final UnoPalette palette;
+  final bool isActive;
+  final Color? activeColor;
+  final VoidCallback onTap;
+
+  const _ResponseActionButton({
+    required this.icon,
+    this.label,
+    required this.tooltip,
+    required this.palette,
+    this.isActive = false,
+    this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  State<_ResponseActionButton> createState() => _ResponseActionButtonState();
+}
+
+class _ResponseActionButtonState extends State<_ResponseActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.palette;
+    final hoverBase =
+        p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+    final fg = widget.activeColor ??
+        (widget.isActive ? p.accent : (_hovered ? p.text : p.textSec));
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            height: 28,
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.label != null ? 9 : 7,
+            ),
+            decoration: BoxDecoration(
+              color: hoverBase.withValues(
+                alpha: (_hovered || widget.isActive) ? 0.06 : 0.0,
+              ),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, size: 13.5, color: fg),
+                if (widget.label != null) ...[
+                  const SizedBox(width: 5),
+                  Text(
+                    widget.label!,
+                    style: UnoTypography.body(
+                      color: fg,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MinimalReasoningStep extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String summary;
+  final bool isExpanded;
+  final UnoPalette palette;
+  final VoidCallback onToggle;
+  final Widget content;
+
+  const _MinimalReasoningStep({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.isExpanded,
+    required this.palette,
+    required this.onToggle,
+    required this.content,
+  });
+
+  @override
+  State<_MinimalReasoningStep> createState() => _MinimalReasoningStepState();
+}
+
+class _MinimalReasoningStepState extends State<_MinimalReasoningStep> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.palette;
+    final hoverBase =
+        p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+    final highlighted = _hovered || widget.isExpanded;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            onTap: widget.onToggle,
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: hoverBase.withValues(alpha: _hovered ? 0.04 : 0.0),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.icon,
+                    size: 13,
+                    color: highlighted ? p.text : p.textSec,
+                  ),
+                  const SizedBox(width: 9),
+                  Text(
+                    widget.title,
+                    style: UnoTypography.body(
+                      color: highlighted ? p.text : p.textSec,
+                      fontSize: 13,
+                      fontWeight:
+                          widget.isExpanded ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    widget.summary,
+                    style: UnoTypography.body(
+                      color: p.textSec.withValues(alpha: 0.78),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  AnimatedRotation(
+                    turns: widget.isExpanded ? 0.25 : 0.0,
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      LucideIcons.chevronRight,
+                      size: 12,
+                      color: p.textSec,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topLeft,
+          child: widget.isExpanded
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(30, 4, 8, 10),
+                  child: widget.content,
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 }

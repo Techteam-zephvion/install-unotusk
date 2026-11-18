@@ -900,12 +900,16 @@ class ApiService {
     String? projectId,
     required String question,
     String? conversationId,
+    String thinkingTier = 'warm',
+    bool thinkingEnabled = true,
   }) async {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
+    final effectiveTier = thinkingEnabled ? thinkingTier.toLowerCase() : 'hot';
 
     final bodyPayload = <String, dynamic>{
       'question': question,
+      'thinking_tier': effectiveTier,
     };
     if (conversationId != null &&
         conversationId.isNotEmpty &&
@@ -995,9 +999,9 @@ class ApiService {
         ],
         meta:
             'Grounded · ${citations.length} sources · ${promptTokens + completionTokens} tokens · $confidence',
-        queryType: 'hot',
+        queryType: effectiveTier,
         confidence: confidence.toLowerCase(),
-        reasoning: reasoning,
+        reasoning: thinkingEnabled ? reasoning : null,
       );
     } else {
       final errorBody = res.body;

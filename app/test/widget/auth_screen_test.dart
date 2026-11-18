@@ -57,4 +57,48 @@ void main() {
     expect(find.text('Sign up to Unotusk'), findsOneWidget);
     expect(find.text('Organisation Name'), findsOneWidget);
   });
+
+  testWidgets('AuthScreen toggles dark and light mode smoothly without layout errors', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    bool isDark = true;
+
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return MaterialApp(
+            home: AuthScreen(
+              palette: isDark ? UnoPalette.dark : UnoPalette.light,
+              isDark: isDark,
+              onToggleTheme: () => setState(() => isDark = !isDark),
+              onAuthenticated: (_) {},
+            ),
+          );
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // In dark mode, card has 'Dark' indicator and sign in text
+    expect(find.text('Dark'), findsOneWidget);
+    expect(find.text('Sign in to Unotusk'), findsOneWidget);
+
+    // Tap theme toggle button
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    // After toggle, now in light mode
+    expect(find.text('Light'), findsOneWidget);
+    expect(find.text('Sign in to Unotusk'), findsOneWidget);
+
+    // Verify textfield vertical alignment and centered padding
+    final emailFieldFinder = find.byType(TextField).first;
+    final emailField = tester.widget<TextField>(emailFieldFinder);
+    expect(emailField.textAlignVertical, TextAlignVertical.center);
+    expect(emailField.decoration?.contentPadding, const EdgeInsets.symmetric(vertical: 12));
+    expect(emailField.decoration?.isDense, isTrue);
+  });
 }

@@ -284,8 +284,9 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? p.accent.withValues(alpha: 0.08)
-                                    : p.bgSurface,
+                                    ? p.accent.withValues(alpha: 0.10)
+                                    : null,
+                                gradient: isSelected ? null : p.sectionGradient,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: isSelected ? p.accent : p.div,
@@ -341,7 +342,7 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
         Container(
           width: 380,
           decoration: BoxDecoration(
-            color: p.bgSurface,
+            gradient: p.sidebarGradient,
             border: Border(left: BorderSide(color: p.div)),
           ),
           child: _selectedComponent == null
