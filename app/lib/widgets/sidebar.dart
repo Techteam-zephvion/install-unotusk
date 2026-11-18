@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -54,411 +55,622 @@ class UnoSidebar extends StatefulWidget {
   State<UnoSidebar> createState() => _UnoSidebarState();
 }
 
-class _UnoSidebarState extends State<UnoSidebar> {
-  bool _userMenuOpen = false;
+class _UnoSidebarState extends State<UnoSidebar>
+    with SingleTickerProviderStateMixin {
+  static const double _collapsedWidth = 72.0;
+  static const double _expandedWidth = 264.0;
+  static const double _horizontalPad = 16.0;
+  static const double _expandedInnerWidth = _expandedWidth - _horizontalPad * 2;
 
-  // Nav items: Projects + 6 core workspace views
+  bool _userMenuOpen = false;
+  late final AnimationController _expandController;
+  late final Animation<double> _expandAnim;
+
+  // Nav items: Projects + 5 core workspace views
   final List<Map<String, dynamic>> _navItems = const [
     {'id': 'projects', 'label': 'Projects', 'icon': LucideIcons.folder},
     {'id': 'overview', 'label': 'Overview', 'icon': LucideIcons.layoutDashboard},
     {'id': 'chat', 'label': 'Ask AI', 'icon': LucideIcons.sparkles},
     {'id': 'files', 'label': 'Files', 'icon': LucideIcons.folderTree},
-    {'id': 'architecture', 'label': 'Architecture', 'icon': LucideIcons.boxes},
-    {'id': 'graph', 'label': 'Ontology Graph', 'icon': LucideIcons.gitFork},
+    {'id': 'graph', 'label': 'Architecture', 'icon': LucideIcons.gitFork},
     {'id': 'feed', 'label': 'Ingestion Feed', 'icon': LucideIcons.radio},
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final width = widget.open ? 264.0 : 72.0;
-    final isDark = widget.palette.isDark;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: const Cubic(0.4, 0.0, 0.2, 1.0),
-      width: width,
-      decoration: BoxDecoration(
-        gradient: widget.palette.sidebarGradient,
-        border: Border(right: BorderSide(color: widget.palette.div)),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          ClipRect(
-            child: SizedBox(
-              width: width,
-              height: double.infinity,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                switchInCurve: Curves.easeIn,
-                switchOutCurve: Curves.easeOut,
-                layoutBuilder: (currentChild, previousChildren) {
-                  return Stack(
-                    alignment: Alignment.topLeft,
-                    children: [
-                      ...previousChildren,
-                      ?currentChild,
-                    ],
-                  );
-                },
-                child: widget.open
-                    ? KeyedSubtree(
-                        key: const ValueKey('expanded'),
-                        child: OverflowBox(
-                          alignment: Alignment.topLeft,
-                          minWidth: 264.0,
-                          maxWidth: 264.0,
-                          child: _buildExpanded(isDark),
-                        ),
-                      )
-                    : KeyedSubtree(
-                        key: const ValueKey('narrow'),
-                        child: OverflowBox(
-                          alignment: Alignment.topLeft,
-                          minWidth: 72.0,
-                          maxWidth: 72.0,
-                          child: _buildNarrow(isDark),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: widget.open ? 12 : 80,
-            bottom: widget.open ? 74 : 16,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.05),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: ScaleTransition(
-                      scale: Tween<double>(begin: 0.96, end: 1.0)
-                          .animate(animation),
-                      alignment: Alignment.bottomLeft,
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-              child: _userMenuOpen
-                  ? UserMenuPopup(
-                      key: const ValueKey('user-menu-open'),
-                      palette: widget.palette,
-                      user: widget.user,
-                      onNavigateSettings: widget.onNavigateSettings,
-                      onLogOut: widget.onLogOut,
-                      onClose: () => setState(() => _userMenuOpen = false),
-                    )
-                  : const SizedBox.shrink(key: ValueKey('user-menu-closed')),
-            ),
-          ),
-        ],
-      ),
+  void initState() {
+    super.initState();
+    _expandController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: widget.open ? 1.0 : 0.0,
+    );
+    _expandAnim = CurvedAnimation(
+      parent: _expandController,
+      curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+      reverseCurve: const Cubic(0.22, 1.0, 0.36, 1.0),
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  //  EXPANDED — 264px width, crisp Swiss-grid alignment
-  // ═══════════════════════════════════════════════════════
-  Widget _buildExpanded(bool isDark) {
-    final isMacOS = !kIsWeb && Platform.isMacOS;
+  @override
+  void didUpdateWidget(covariant UnoSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.open != oldWidget.open) {
+      if (widget.open) {
+        _expandController.forward();
+      } else {
+        _expandController.reverse();
+      }
+    }
+  }
 
-    return SizedBox(
-      width: 264.0,
-      height: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 1. Header (Logo + Title + Collapse Button)
-          Padding(
-            padding: EdgeInsets.fromLTRB(12, isMacOS ? 36 : 12, 12, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: DragToMoveArea(
-                    child: _HoverableBrandLogo(
-                      palette: widget.palette,
-                      isDark: isDark,
-                      onTap: () => widget.onViewChange('projects'),
-                    ),
-                  ),
-                ),
-                _HoverableIconButton(
-                  onTap: widget.onToggle,
-                  tooltip: 'Collapse sidebar',
-                  palette: widget.palette,
-                  icon: LucideIcons.panelLeftClose,
-                  size: 16,
-                ),
-              ],
+  @override
+  void dispose() {
+    _expandController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.palette;
+    final isDark = p.isDark;
+    final isCollapsed = !widget.open;
+
+    return AnimatedBuilder(
+      animation: _expandAnim,
+      builder: (context, _) {
+        final t = _expandAnim.value;
+        final width = lerpDouble(_collapsedWidth, _expandedWidth, t)!;
+        final innerWidth = width - _horizontalPad * 2;
+        // Labels fade in cleanly during the upper portion of expansion
+        final labelOpacity = ((t - 0.28) / 0.56).clamp(0.0, 1.0);
+
+        return Container(
+          width: width,
+          decoration: BoxDecoration(
+            gradient: p.sidebarGradient,
+            border: Border(
+              right: BorderSide(color: p.div.withValues(alpha: 0.65)),
             ),
           ),
-
-          // 2. Solid Filled "New Query" Button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-            child: _SolidNewQueryButton(
-              palette: widget.palette,
-              onTap: widget.onNewQuery,
-            ),
-          ),
-
-          // 3. Scrollable Navigation List (Pixel-aligned icons, zero lerp artifacts)
-          Expanded(
-            child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(context).copyWith(
-                scrollbars: false,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                physics: const BouncingScrollPhysics(),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // ── Single Unified Fluid Layout (Icons locked at x = 36.0) ──
+              SizedBox(
+                width: width,
+                height: double.infinity,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (int i = 0; i < _navItems.length; i++) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: _SidebarNavItem(
-                          icon: _navItems[i]['icon'] as IconData,
-                          label: _navItems[i]['label'] as String,
-                          active: widget.activeView == _navItems[i]['id'],
-                          isDark: isDark,
-                          palette: widget.palette,
-                          onTap: () =>
-                              widget.onViewChange(_navItems[i]['id'] as String),
-                        ),
+                    // 1. Header: Unotusk Brand (morphs to Open button on hover when collapsed)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        _horizontalPad,
+                        (!kIsWeb && Platform.isMacOS) ? 36 : 14,
+                        _horizontalPad,
+                        14,
                       ),
-                      if (i == 0)
-                        Padding(
+                      child: _UnifiedBrandHeader(
+                        palette: p,
+                        isDark: isDark,
+                        isCollapsed: isCollapsed,
+                        expandT: t,
+                        labelOpacity: labelOpacity,
+                        innerWidth: innerWidth,
+                        expandedInnerWidth: _expandedInnerWidth,
+                        onBrandTap: () => widget.onViewChange('projects'),
+                        onToggle: widget.onToggle,
+                      ),
+                    ),
+
+                    // 2. Unified Morphing "New Query" Button
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        _horizontalPad,
+                        0,
+                        _horizontalPad,
+                        16,
+                      ),
+                      child: _UnifiedNewQueryButton(
+                        palette: p,
+                        isCollapsed: isCollapsed,
+                        expandT: t,
+                        labelOpacity: labelOpacity,
+                        innerWidth: innerWidth,
+                        onTap: widget.onNewQuery,
+                      ),
+                    ),
+
+                    // 3. Scrollable Unified Navigation List
+                    Expanded(
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(
+                          scrollbars: false,
+                        ),
+                        child: SingleChildScrollView(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 8),
-                          child: Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: widget.palette.div.withValues(alpha: 0.7),
+                            horizontal: _horizontalPad,
+                            vertical: 2,
+                          ),
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (int i = 0; i < _navItems.length; i++) ...[
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 2.5),
+                                  child: _UnifiedNavItem(
+                                    icon: _navItems[i]['icon'] as IconData,
+                                    label: _navItems[i]['label'] as String,
+                                    active:
+                                        widget.activeView == _navItems[i]['id'],
+                                    isDark: isDark,
+                                    isCollapsed: isCollapsed,
+                                    expandT: t,
+                                    labelOpacity: labelOpacity,
+                                    innerWidth: innerWidth,
+                                    expandedInnerWidth: _expandedInnerWidth,
+                                    palette: p,
+                                    onTap: () => widget.onViewChange(
+                                        _navItems[i]['id'] as String),
+                                  ),
+                                ),
+                                if (i == 0) const SizedBox(height: 10),
+                              ],
+                            ],
                           ),
                         ),
-                    ],
+                      ),
+                    ),
+
+                    // 4. Archived Chats Button (Exact same x = 36.0 icon axis)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        _horizontalPad,
+                        4,
+                        _horizontalPad,
+                        6,
+                      ),
+                      child: _UnifiedNavItem(
+                        icon: LucideIcons.archive,
+                        label: 'Archived chats',
+                        active: false,
+                        isDark: isDark,
+                        isCollapsed: isCollapsed,
+                        expandT: t,
+                        labelOpacity: labelOpacity,
+                        innerWidth: innerWidth,
+                        expandedInnerWidth: _expandedInnerWidth,
+                        palette: p,
+                        onTap: widget.onOpenArchivedModal,
+                      ),
+                    ),
+
+                    // 5. Unified Morphing User Profile Footer
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        lerpDouble(_horizontalPad, 12.0, t)!,
+                        6,
+                        lerpDouble(_horizontalPad, 12.0, t)!,
+                        14,
+                      ),
+                      child: _UnifiedUserFooter(
+                        palette: p,
+                        user: widget.user,
+                        isOpen: _userMenuOpen,
+                        isCollapsed: isCollapsed,
+                        expandT: t,
+                        labelOpacity: labelOpacity,
+                        onTap: () =>
+                            setState(() => _userMenuOpen = !_userMenuOpen),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ),
 
-          // 4. Archived Chats Button (Aligned identically to nav buttons)
-          _ArchivedChatsButton(
-            palette: widget.palette,
-            onTap: widget.onOpenArchivedModal,
-          ),
-
-          // 5. Elevated Interactive User Profile Footer
-          _HoverableUserFooter(
-            palette: widget.palette,
-            user: widget.user,
-            isOpen: _userMenuOpen,
-            onTap: () => setState(() => _userMenuOpen = !_userMenuOpen),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════
-  //  COLLAPSED — 72px width, centered icons & smooth micro-interactions
-  // ═══════════════════════════════════════════════════════
-  Widget _buildNarrow(bool isDark) {
-    final isMacOS = !kIsWeb && Platform.isMacOS;
-
-    return SizedBox(
-      width: 72.0,
-      height: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(height: isMacOS ? 36 : 12),
-          // Logo
-          DragToMoveArea(
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: InkWell(
-                onTap: () => widget.onViewChange('projects'),
-                borderRadius: BorderRadius.circular(6),
-                child: Tooltip(
-                  message: 'Projects',
-                  child: UnotuskLogo(size: 22, onDark: isDark),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Expand button (36x36, centered)
-          _CollapsedIconButton(
-            onTap: widget.onToggle,
-            tooltip: 'Expand sidebar',
-            palette: widget.palette,
-            child: Icon(
-              LucideIcons.chevronRight,
-              size: 14,
-              color: widget.palette.textSec,
-            ),
-          ),
-
-          // Divider
-          Container(
-            width: 24,
-            height: 1,
-            color: widget.palette.div,
-            margin: const EdgeInsets.symmetric(vertical: 10),
-          ),
-
-          // Solid New Query Button in Collapsed Mode (36x36, centered)
-          _CollapsedIconButton(
-            onTap: widget.onNewQuery,
-            tooltip: 'New Query',
-            highlight: true,
-            palette: widget.palette,
-            child: Icon(
-              LucideIcons.plus,
-              size: 15,
-              color: isDark ? const Color(0xFF0A0F20) : Colors.white,
-            ),
-          ),
-
-          // Divider
-          Container(
-            width: 24,
-            height: 1,
-            color: widget.palette.div,
-            margin: const EdgeInsets.symmetric(vertical: 10),
-          ),
-
-          // Scrollable Nav Items
-          Expanded(
-            child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(context).copyWith(
-                scrollbars: false,
-              ),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: _navItems.map((item) {
-                    final active = widget.activeView == item['id'];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: _CollapsedNavItem(
-                        icon: item['icon'] as IconData,
-                        label: item['label'] as String,
-                        active: active,
-                        palette: widget.palette,
-                        onTap: () => widget.onViewChange(item['id'] as String),
+              // ── Animated User Profile Menu Popup ──
+              Positioned(
+                left: lerpDouble(80.0, 12.0, t)!,
+                bottom: lerpDouble(16.0, 74.0, t)!,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.05),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: ScaleTransition(
+                          scale: Tween<double>(begin: 0.96, end: 1.0)
+                              .animate(animation),
+                          alignment: Alignment.bottomLeft,
+                          child: child,
+                        ),
                       ),
                     );
-                  }).toList(),
+                  },
+                  child: _userMenuOpen
+                      ? UserMenuPopup(
+                          key: const ValueKey('user-menu-open'),
+                          palette: p,
+                          user: widget.user,
+                          onNavigateSettings: widget.onNavigateSettings,
+                          onLogOut: widget.onLogOut,
+                          onClose: () => setState(() => _userMenuOpen = false),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('user-menu-closed')),
                 ),
               ),
-            ),
+            ],
           ),
-
-          // Archived Chats Button in Collapsed Mode
-          _CollapsedIconButton(
-            onTap: widget.onOpenArchivedModal,
-            tooltip: 'Archived chats',
-            palette: widget.palette,
-            child: Icon(
-              LucideIcons.archive,
-              size: 15,
-              color: widget.palette.textSec,
-            ),
-          ),
-
-          // Divider
-          Container(
-            width: 24,
-            height: 1,
-            color: widget.palette.div,
-            margin: const EdgeInsets.symmetric(vertical: 10),
-          ),
-
-          // User Monogram Avatar
-          _HoverableCollapsedUserAvatar(
-            palette: widget.palette,
-            user: widget.user,
-            isOpen: _userMenuOpen,
-            onTap: () => setState(() => _userMenuOpen = !_userMenuOpen),
-          ),
-
-          const SizedBox(height: 16),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────
-//  Interactive Brand Header Logo with Hover Highlight
+//  Right-Side Floating Hover Tooltip (Never covers adjacent icons)
 // ─────────────────────────────────────────────────────────
-class _HoverableBrandLogo extends StatefulWidget {
+class _SidebarRightTooltip extends StatefulWidget {
+  final String label;
+  final bool enabled;
   final UnoPalette palette;
-  final bool isDark;
-  final VoidCallback onTap;
+  final Widget child;
 
-  const _HoverableBrandLogo({
+  const _SidebarRightTooltip({
+    required this.label,
+    required this.enabled,
     required this.palette,
-    required this.isDark,
-    required this.onTap,
+    required this.child,
   });
 
   @override
-  State<_HoverableBrandLogo> createState() => _HoverableBrandLogoState();
+  State<_SidebarRightTooltip> createState() => _SidebarRightTooltipState();
 }
 
-class _HoverableBrandLogoState extends State<_HoverableBrandLogo> {
+class _SidebarRightTooltipState extends State<_SidebarRightTooltip> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
   bool _hovered = false;
+
+  void _showOverlay() {
+    if (!widget.enabled || _overlayEntry != null || !mounted) return;
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    final p = widget.palette;
+    final bgColor =
+        p.isDark ? const Color(0xFF182238) : const Color(0xFF111728);
+    final borderColor =
+        p.isDark ? const Color(0xFF2B3754) : const Color(0xFF232C42);
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          left: 0,
+          top: 0,
+          child: IgnorePointer(
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.centerRight,
+              followerAnchor: Alignment.centerLeft,
+              offset: const Offset(18, 0),
+              child: Material(
+                color: Colors.transparent,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, child) {
+                    return Opacity(
+                      opacity: v,
+                      child: Transform.translate(
+                        offset: Offset(-5.0 * (1.0 - v), 0.0),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 6.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF040712)
+                              .withValues(alpha: p.isDark ? 0.42 : 0.20),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      widget.label,
+                      style: UnoTypography.body(
+                        color: const Color(0xFFF4F1EC),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    overlay.insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SidebarRightTooltip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled ||
+        widget.label != oldWidget.label ||
+        widget.palette != oldWidget.palette) {
+      _removeOverlay();
+      if (_hovered && widget.enabled) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _hovered && widget.enabled) {
+            _showOverlay();
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hoverBase =
-        widget.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          _hovered = true;
+          if (widget.enabled) _showOverlay();
+        },
+        onExit: (_) {
+          _hovered = false;
+          _removeOverlay();
+        },
+        child: widget.child,
+      ),
+    );
+  }
+}
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: hoverBase.withValues(alpha: _hovered ? 0.05 : 0.0),
-            borderRadius: BorderRadius.circular(8),
-          ),
+// ─────────────────────────────────────────────────────────
+//  Unified Brand Header — Logo morphs to Open Button on hover when collapsed
+// ─────────────────────────────────────────────────────────
+class _UnifiedBrandHeader extends StatefulWidget {
+  final UnoPalette palette;
+  final bool isDark;
+  final bool isCollapsed;
+  final double expandT;
+  final double labelOpacity;
+  final double innerWidth;
+  final double expandedInnerWidth;
+  final VoidCallback onBrandTap;
+  final VoidCallback onToggle;
+
+  const _UnifiedBrandHeader({
+    required this.palette,
+    required this.isDark,
+    required this.isCollapsed,
+    required this.expandT,
+    required this.labelOpacity,
+    required this.innerWidth,
+    required this.expandedInnerWidth,
+    required this.onBrandTap,
+    required this.onToggle,
+  });
+
+  @override
+  State<_UnifiedBrandHeader> createState() => _UnifiedBrandHeaderState();
+}
+
+class _UnifiedBrandHeaderState extends State<_UnifiedBrandHeader> {
+  bool _logoHovered = false;
+  bool _logoPressed = false;
+  bool _collapseHovered = false;
+  bool _collapsePressed = false;
+
+  @override
+  void didUpdateWidget(covariant _UnifiedBrandHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isCollapsed != oldWidget.isCollapsed) {
+      _logoHovered = false;
+      _logoPressed = false;
+      _collapseHovered = false;
+      _collapsePressed = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.palette;
+    final isDark = widget.isDark;
+    final isCollapsed = widget.isCollapsed;
+    final showOpenOnHover = isCollapsed && widget.expandT < 0.15 && _logoHovered;
+
+    return SizedBox(
+      height: 40,
+      width: widget.innerWidth,
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.centerLeft,
+          minWidth: widget.expandedInnerWidth,
+          maxWidth: widget.expandedInnerWidth,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedScale(
-                scale: _hovered ? 1.05 : 1.0,
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                child: UnotuskLogo(size: 22, onDark: widget.isDark),
+              // ── Leading 40×40 Logo / Borderless Hover-to-Open Slot (Locked at x = 36.0) ──
+              _SidebarRightTooltip(
+                label: 'Open sidebar',
+                enabled: isCollapsed,
+                palette: p,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _logoHovered = true),
+                  onExit: (_) => setState(() {
+                    _logoHovered = false;
+                    _logoPressed = false;
+                  }),
+                  child: GestureDetector(
+                    onTapDown: (_) => setState(() => _logoPressed = true),
+                    onTapUp: (_) => setState(() => _logoPressed = false),
+                    onTapCancel: () => setState(() => _logoPressed = false),
+                    onTap: isCollapsed ? widget.onToggle : widget.onBrandTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedScale(
+                      scale: _logoPressed ? 0.90 : 1.0,
+                      duration: const Duration(milliseconds: 100),
+                      curve: Curves.easeOutCubic,
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween<double>(
+                            end: showOpenOnHover ? 1.0 : 0.0,
+                          ),
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeInOutCubic,
+                          builder: (context, morph, _) {
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (morph < 0.99)
+                                  Opacity(
+                                    opacity: (1.0 - morph).clamp(0.0, 1.0),
+                                    child: Transform.scale(
+                                      scale: lerpDouble(1.0, 0.82, morph)!,
+                                      child: UnotuskLogo(
+                                        size: 22,
+                                        onDark: isDark,
+                                      ),
+                                    ),
+                                  ),
+                                if (morph > 0.01)
+                                  Opacity(
+                                    opacity: morph.clamp(0.0, 1.0),
+                                    child: Transform.scale(
+                                      scale: lerpDouble(0.82, 1.0, morph)!,
+                                      child: Icon(
+                                        LucideIcons.panelLeftOpen,
+                                        size: 18,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 9),
-              Text(
-                'Unotusk',
-                style: UnoTypography.brandSerif(
-                  palette: widget.palette,
-                  fontSize: 17,
+
+              // ── Wordmark & Draggable Area (fades smoothly during collapse) ──
+              Expanded(
+                child: IgnorePointer(
+                  ignoring: widget.expandT < 0.5,
+                  child: Opacity(
+                    opacity: widget.labelOpacity,
+                    child: DragToMoveArea(
+                      child: GestureDetector(
+                        onTap: widget.onBrandTap,
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Unotusk',
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: UnoTypography.brandSerif(
+                                palette: p,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Collapse Sidebar Button (Right side when expanded) ──
+              IgnorePointer(
+                ignoring: widget.expandT < 0.5,
+                child: Opacity(
+                  opacity: widget.labelOpacity,
+                  child: Tooltip(
+                    message: 'Collapse sidebar',
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (_) => setState(() => _collapseHovered = true),
+                      onExit: (_) => setState(() {
+                        _collapseHovered = false;
+                        _collapsePressed = false;
+                      }),
+                      child: GestureDetector(
+                        onTapDown: (_) =>
+                            setState(() => _collapsePressed = true),
+                        onTapUp: (_) =>
+                            setState(() => _collapsePressed = false),
+                        onTapCancel: () =>
+                            setState(() => _collapsePressed = false),
+                        onTap: widget.onToggle,
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedScale(
+                          scale: _collapsePressed
+                              ? 0.90
+                              : (_collapseHovered ? 1.08 : 1.0),
+                          duration: const Duration(milliseconds: 140),
+                          curve: Curves.easeOutCubic,
+                          child: SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: Center(
+                              child: Icon(
+                                LucideIcons.panelLeftClose,
+                                size: 17,
+                                color: _collapseHovered ? p.accent : p.textSec,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -470,154 +682,130 @@ class _HoverableBrandLogoState extends State<_HoverableBrandLogo> {
 }
 
 // ─────────────────────────────────────────────────────────
-//  Hoverable Icon Button (Collapse & Action Icons)
+//  Unified Morphing "New Query" Button (40x40 '+' <-> Full Pill)
 // ─────────────────────────────────────────────────────────
-class _HoverableIconButton extends StatefulWidget {
-  final VoidCallback onTap;
-  final String? tooltip;
+class _UnifiedNewQueryButton extends StatefulWidget {
   final UnoPalette palette;
-  final IconData icon;
-  final double size;
-
-  const _HoverableIconButton({
-    required this.onTap,
-    this.tooltip,
-    required this.palette,
-    required this.icon,
-    this.size = 16,
-  });
-
-  @override
-  State<_HoverableIconButton> createState() => _HoverableIconButtonState();
-}
-
-class _HoverableIconButtonState extends State<_HoverableIconButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.palette;
-    final hoverBase =
-        p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
-
-    final button = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: hoverBase.withValues(alpha: _hovered ? 0.07 : 0.0),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            widget.icon,
-            size: widget.size,
-            color: _hovered ? p.text : p.textSec,
-          ),
-        ),
-      ),
-    );
-
-    if (widget.tooltip != null) {
-      return Tooltip(message: widget.tooltip!, child: button);
-    }
-    return button;
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-//  Solid Filled "New Query" Button with Smooth Hover Dynamics
-// ─────────────────────────────────────────────────────────
-class _SolidNewQueryButton extends StatefulWidget {
-  final UnoPalette palette;
+  final bool isCollapsed;
+  final double expandT;
+  final double labelOpacity;
+  final double innerWidth;
   final VoidCallback onTap;
 
-  const _SolidNewQueryButton({
+  const _UnifiedNewQueryButton({
     required this.palette,
+    required this.isCollapsed,
+    required this.expandT,
+    required this.labelOpacity,
+    required this.innerWidth,
     required this.onTap,
   });
 
   @override
-  State<_SolidNewQueryButton> createState() => _SolidNewQueryButtonState();
+  State<_UnifiedNewQueryButton> createState() => _UnifiedNewQueryButtonState();
 }
 
-class _SolidNewQueryButtonState extends State<_SolidNewQueryButton> {
+class _UnifiedNewQueryButtonState extends State<_UnifiedNewQueryButton> {
   bool _hovered = false;
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.palette.isDark;
-    final accent = widget.palette.accent;
-    final fgColor = isDark ? const Color(0xFF0A0F20) : Colors.white;
+    final p = widget.palette;
+    final isDark = p.isDark;
+    final accent = p.accent;
+    final fgColor =
+        isDark ? const Color(0xFF0B1020) : const Color(0xFFF4F1EC);
     final bgColor = _pressed
-        ? Color.lerp(accent, Colors.black, 0.12)!
+        ? Color.lerp(accent, Colors.black, 0.10)!
         : _hovered
-            ? Color.lerp(accent, isDark ? Colors.white : Colors.white, 0.08)!
+            ? Color.lerp(
+                accent, isDark ? Colors.white : const Color(0xFF1E263D), 0.14)!
             : accent;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() {
-        _hovered = false;
-        _pressed = false;
-      }),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _pressed ? 0.985 : 1.0,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeOutCubic,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+    return _SidebarRightTooltip(
+      label: 'New Query',
+      enabled: widget.isCollapsed,
+      palette: p,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() {
+          _hovered = false;
+          _pressed = false;
+        }),
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedScale(
+            scale: _pressed ? 0.97 : 1.0,
+            duration: const Duration(milliseconds: 95),
             curve: Curves.easeOutCubic,
-            height: 40,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: _hovered ? 0.34 : 0.18),
-                  blurRadius: _hovered ? 12 : 6,
-                  offset: Offset(0, _hovered ? 3 : 1.5),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedScale(
-                  scale: _hovered ? 1.1 : 1.0,
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: Icon(
-                    LucideIcons.plus,
-                    size: 16,
-                    color: fgColor,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 170),
+              curve: Curves.easeOutCubic,
+              width: widget.innerWidth,
+              height: 40,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF050814).withValues(
+                      alpha: isDark
+                          ? (_hovered ? 0.30 : 0.16)
+                          : (_hovered ? 0.14 : 0.07),
+                    ),
+                    blurRadius: _hovered ? 10 : 5,
+                    offset: Offset(0, _hovered ? 3 : 1.5),
+                  ),
+                ],
+              ),
+              child: ClipRect(
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedScale(
+                        scale: _hovered ? 1.08 : 1.0,
+                        duration: const Duration(milliseconds: 170),
+                        curve: Curves.easeOutCubic,
+                        child: Icon(
+                          LucideIcons.plus,
+                          size: 16,
+                          color: fgColor,
+                        ),
+                      ),
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: widget.expandT.clamp(0.0, 1.0),
+                          child: Opacity(
+                            opacity: widget.labelOpacity,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Text(
+                                'New Query',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: UnoTypography.body(
+                                  color: fgColor,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'New Query',
-                  style: UnoTypography.body(
-                    color: fgColor,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -627,30 +815,40 @@ class _SolidNewQueryButtonState extends State<_SolidNewQueryButton> {
 }
 
 // ─────────────────────────────────────────────────────────
-//  Sidebar Navigation Item — Pixel-Aligned & Smooth Transitions
+//  Unified Sidebar Nav Item — Single Tree, Pixel-Locked Icons, Right Tooltip
 // ─────────────────────────────────────────────────────────
-class _SidebarNavItem extends StatefulWidget {
+class _UnifiedNavItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool active;
   final bool isDark;
+  final bool isCollapsed;
+  final double expandT;
+  final double labelOpacity;
+  final double innerWidth;
+  final double expandedInnerWidth;
   final UnoPalette palette;
   final VoidCallback onTap;
 
-  const _SidebarNavItem({
+  const _UnifiedNavItem({
     required this.icon,
     required this.label,
     required this.active,
     required this.isDark,
+    required this.isCollapsed,
+    required this.expandT,
+    required this.labelOpacity,
+    required this.innerWidth,
+    required this.expandedInnerWidth,
     required this.palette,
     required this.onTap,
   });
 
   @override
-  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+  State<_UnifiedNavItem> createState() => _UnifiedNavItemState();
 }
 
-class _SidebarNavItemState extends State<_SidebarNavItem> {
+class _UnifiedNavItemState extends State<_UnifiedNavItem> {
   bool _hovered = false;
   bool _pressed = false;
 
@@ -660,164 +858,32 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     final active = widget.active;
     final p = widget.palette;
 
-    // Avoid Colors.transparent (0x00000000) lerping artifacts by matching RGB base
+    // Zero-alpha matched RGB base prevents muddy grey lerp flashes
     final hoverBase =
-        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFE9DFD0) : const Color(0xFF0B1020);
 
     final bgColor = active
-        ? (isDark ? const Color(0xFF1E2336) : const Color(0xFFFFFFFF))
+        ? p.bgElevated
         : hoverBase.withValues(alpha: _hovered ? 0.055 : 0.0);
 
     final borderColor = active
-        ? (isDark
-            ? const Color(0xFFCBC1B4).withValues(alpha: 0.28)
-            : const Color(0xFFE4DFD6))
+        ? (isDark ? p.accent.withValues(alpha: 0.18) : p.div)
         : (isDark
-            ? const Color(0xFFCBC1B4).withValues(alpha: 0.0)
-            : const Color(0xFFE4DFD6).withValues(alpha: 0.0));
+            ? p.accent.withValues(alpha: 0.0)
+            : p.div.withValues(alpha: 0.0));
 
     final iconColor = active
-        ? (isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20))
-        : (_hovered ? p.text : p.textSec);
+        ? p.accent
+        : (_hovered
+            ? p.accent
+            : (isDark ? p.accentMuted.withValues(alpha: 0.78) : p.textSec));
 
     final textColor = active ? p.text : (_hovered ? p.text : p.textSec);
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() {
-        _hovered = false;
-        _pressed = false;
-      }),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedScale(
-          scale: _pressed ? 0.985 : 1.0,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeOutCubic,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 170),
-            curve: Curves.easeOutCubic,
-            height: 38,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: borderColor, width: 1),
-              boxShadow: active
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF0A0F20)
-                            .withValues(alpha: isDark ? 0.22 : 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : const [],
-            ),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                // Left edge active pill — positioned independently so icons never shift
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      width: active ? 3.0 : 0.0,
-                      height: active ? 18.0 : 0.0,
-                      decoration: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: const BorderRadius.horizontal(
-                          right: Radius.circular(3),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Uniformly aligned icon + label row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: Center(
-                          child: Icon(
-                            widget.icon,
-                            size: 16,
-                            color: iconColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 170),
-                          curve: Curves.easeOutCubic,
-                          style: UnoTypography.body(
-                            color: textColor,
-                            fontSize: 13.5,
-                            fontWeight: active
-                                ? FontWeight.w600
-                                : (_hovered
-                                    ? FontWeight.w500
-                                    : FontWeight.w400),
-                          ),
-                          child: Text(
-                            widget.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-//  Archived Chats Action Button — Exact Same Alignment Grid
-// ─────────────────────────────────────────────────────────
-class _ArchivedChatsButton extends StatefulWidget {
-  final UnoPalette palette;
-  final VoidCallback onTap;
-
-  const _ArchivedChatsButton({
-    required this.palette,
-    required this.onTap,
-  });
-
-  @override
-  State<_ArchivedChatsButton> createState() => _ArchivedChatsButtonState();
-}
-
-class _ArchivedChatsButtonState extends State<_ArchivedChatsButton> {
-  bool _hovered = false;
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.palette;
-    final hoverBase =
-        p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+    return _SidebarRightTooltip(
+      label: widget.label,
+      enabled: widget.isCollapsed,
+      palette: p,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hovered = true),
@@ -832,46 +898,98 @@ class _ArchivedChatsButtonState extends State<_ArchivedChatsButton> {
           onTap: widget.onTap,
           behavior: HitTestBehavior.opaque,
           child: AnimatedScale(
-            scale: _pressed ? 0.985 : 1.0,
-            duration: const Duration(milliseconds: 100),
+            scale: _pressed ? 0.975 : 1.0,
+            duration: const Duration(milliseconds: 95),
             curve: Curves.easeOutCubic,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOutCubic,
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              width: widget.innerWidth,
+              height: 40,
               decoration: BoxDecoration(
-                color: hoverBase.withValues(alpha: _hovered ? 0.055 : 0.0),
-                border: Border.all(
-                  color: hoverBase.withValues(alpha: 0.0),
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(9),
+                color: bgColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: borderColor, width: 1),
               ),
-              child: Row(
+              child: Stack(
+                alignment: Alignment.centerLeft,
                 children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
+                  // Left-edge active accent indicator (smoothly fades out in collapsed tile mode)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
                     child: Center(
-                      child: Icon(
-                        LucideIcons.archive,
-                        size: 16,
-                        color: _hovered ? p.text : p.textSec,
+                      child: Opacity(
+                        opacity: widget.expandT,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          width: active ? 2.5 : 0.0,
+                          height: active ? 18.0 : 0.0,
+                          decoration: BoxDecoration(
+                            color: p.accent,
+                            borderRadius: const BorderRadius.horizontal(
+                              right: Radius.circular(3),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: Text(
-                      'Archived chats',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: UnoTypography.body(
-                        color: _hovered ? p.text : p.textSec,
-                        fontSize: 13.5,
-                        fontWeight:
-                            _hovered ? FontWeight.w500 : FontWeight.w400,
+
+                  // Unified Icon + Smoothly Fading Label (Icon center locked at x = 36.0)
+                  ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.centerLeft,
+                      minWidth: widget.expandedInnerWidth,
+                      maxWidth: widget.expandedInnerWidth,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(
+                              child: AnimatedScale(
+                                scale: (widget.isCollapsed && _hovered)
+                                    ? 1.08
+                                    : 1.0,
+                                duration: const Duration(milliseconds: 160),
+                                curve: Curves.easeOutCubic,
+                                child: Icon(
+                                  widget.icon,
+                                  size: 16.5,
+                                  color: iconColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Opacity(
+                              opacity: widget.labelOpacity,
+                              child: AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 160),
+                                curve: Curves.easeOutCubic,
+                                style: UnoTypography.body(
+                                  color: textColor,
+                                  fontSize: 13.5,
+                                  fontWeight: active
+                                      ? FontWeight.w600
+                                      : (_hovered
+                                          ? FontWeight.w500
+                                          : FontWeight.w400),
+                                ),
+                                child: Text(
+                                  widget.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
                       ),
                     ),
                   ),
@@ -886,26 +1004,32 @@ class _ArchivedChatsButtonState extends State<_ArchivedChatsButton> {
 }
 
 // ─────────────────────────────────────────────────────────
-//  Professional Elevated User Profile Footer Card
+//  Unified Morphing User Profile Footer (Avatar <-> Full Card)
 // ─────────────────────────────────────────────────────────
-class _HoverableUserFooter extends StatefulWidget {
+class _UnifiedUserFooter extends StatefulWidget {
   final UnoPalette palette;
   final UserModel user;
   final bool isOpen;
+  final bool isCollapsed;
+  final double expandT;
+  final double labelOpacity;
   final VoidCallback onTap;
 
-  const _HoverableUserFooter({
+  const _UnifiedUserFooter({
     required this.palette,
     required this.user,
     required this.isOpen,
+    required this.isCollapsed,
+    required this.expandT,
+    required this.labelOpacity,
     required this.onTap,
   });
 
   @override
-  State<_HoverableUserFooter> createState() => _HoverableUserFooterState();
+  State<_UnifiedUserFooter> createState() => _UnifiedUserFooterState();
 }
 
-class _HoverableUserFooterState extends State<_HoverableUserFooter> {
+class _UnifiedUserFooterState extends State<_UnifiedUserFooter> {
   bool _hovered = false;
   bool _pressed = false;
 
@@ -914,6 +1038,7 @@ class _HoverableUserFooterState extends State<_HoverableUserFooter> {
     final p = widget.palette;
     final isDark = p.isDark;
     final isActive = widget.isOpen || _hovered;
+    final t = widget.expandT;
 
     final displayName =
         widget.user.name.isNotEmpty ? widget.user.name : 'User';
@@ -921,31 +1046,43 @@ class _HoverableUserFooterState extends State<_HoverableUserFooter> {
         widget.user.org.isNotEmpty ? widget.user.org : widget.user.email;
     final initials = _computeUserInitials(displayName);
 
-    final cardBg = isDark
-        ? (isActive ? const Color(0xFF232940) : const Color(0xFF1E2336))
-        : (isActive ? const Color(0xFFFFFFFF) : const Color(0xFFFAF8F4));
+    final cardBgExpanded = isDark
+        ? (isActive ? const Color(0xFF1D263E) : const Color(0xFF141C2F))
+        : (isActive ? const Color(0xFFFFFFFF) : const Color(0xFFFAF7F2));
+    final cardBg = Color.lerp(
+      cardBgExpanded.withValues(alpha: 0.0),
+      cardBgExpanded,
+      t,
+    )!;
 
-    final cardBorder = isDark
+    final cardCutout = isDark
+        ? (t > 0.5
+            ? (isActive ? const Color(0xFF1D263E) : const Color(0xFF141C2F))
+            : p.bgSidebar)
+        : (t > 0.5 ? const Color(0xFFFAF7F2) : p.bgSidebar);
+
+    final cardBorderBase = isDark
         ? (isActive
-            ? const Color(0xFFCBC1B4).withValues(alpha: 0.38)
-            : const Color(0xFF2E313C))
-        : (isActive ? const Color(0xFFCBC1B4) : const Color(0xFFE4DFD6));
+            ? p.accent.withValues(alpha: 0.28)
+            : p.div.withValues(alpha: 0.85))
+        : (isActive
+            ? const Color(0xFF0B1020).withValues(alpha: 0.24)
+            : const Color(0xFFE2DBD0));
+    final cardBorder = Color.lerp(
+      cardBorderBase.withValues(alpha: 0.0),
+      cardBorderBase,
+      t,
+    )!;
 
-    final avatarBg =
-        isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
+    final avatarBg = isDark ? p.accent : const Color(0xFF0B1020);
     final avatarFg =
-        isDark ? const Color(0xFF0A0F20) : const Color(0xFFCBC1B4);
+        isDark ? const Color(0xFF0B1020) : const Color(0xFFE9DFD0);
+    final menuIndicatorBase = isDark ? p.accent : const Color(0xFF0B1020);
 
-    final chevronPillBase =
-        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: p.div.withValues(alpha: 0.75)),
-        ),
-      ),
+    return _SidebarRightTooltip(
+      label: displayName,
+      enabled: widget.isCollapsed && !widget.isOpen,
+      palette: p,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hovered = true),
@@ -960,432 +1097,150 @@ class _HoverableUserFooterState extends State<_HoverableUserFooter> {
           onTap: widget.onTap,
           behavior: HitTestBehavior.opaque,
           child: AnimatedScale(
-            scale: _pressed ? 0.98 : 1.0,
-            duration: const Duration(milliseconds: 110),
+            scale: _pressed ? 0.97 : 1.0,
+            duration: const Duration(milliseconds: 95),
             curve: Curves.easeOutCubic,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Container(
+              height: 54,
+              padding: EdgeInsets.symmetric(
+                horizontal: lerpDouble(0.0, 9.0, t)!,
+              ),
               decoration: BoxDecoration(
                 color: cardBg,
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: cardBorder, width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0A0F20).withValues(
-                      alpha: isDark
-                          ? (isActive ? 0.34 : 0.18)
-                          : (isActive ? 0.09 : 0.04),
-                    ),
-                    blurRadius: isActive ? 14 : 6,
-                    offset: Offset(0, isActive ? 4 : 2),
-                  ),
-                ],
               ),
-              child: Row(
-                children: [
-                  // Squircle Monogram Avatar + Online Status Dot
-                  AnimatedScale(
-                    scale: isActive ? 1.04 : 1.0,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: avatarBg,
-                            borderRadius: BorderRadius.circular(9),
-                            boxShadow: [
-                              BoxShadow(
-                                color: avatarBg.withValues(alpha: 0.22),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: 222,
+                  maxWidth: 222,
+                  child: Row(
+                    children: [
+                      // Circular Monogram Avatar (centered inside 40px slot at x = 36.0)
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Center(
+                          child: AnimatedScale(
+                            scale: isActive ? 1.06 : 1.0,
+                            duration: const Duration(milliseconds: 170),
+                            curve: Curves.easeOutCubic,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: avatarBg,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isActive
+                                          ? avatarBg.withValues(alpha: 0.45)
+                                          : avatarBg.withValues(alpha: 0.0),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    initials,
+                                    style: UnoTypography.body(
+                                      color: avatarFg,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: -1,
+                                  bottom: -1,
+                                  child: Container(
+                                    width: 9.5,
+                                    height: 9.5,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF22C55E),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: cardCutout,
+                                        width: 1.8,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Name & Organization (fades cleanly out on collapse)
+                      Expanded(
+                        child: Opacity(
+                          opacity: widget.labelOpacity,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: UnoTypography.body(
+                                  color: p.text,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
+                              if (subtitle.isNotEmpty) ...[
+                                const SizedBox(height: 1.5),
+                                Text(
+                                  subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: UnoTypography.body(
+                                    color: p.textSec,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            initials,
-                            style: UnoTypography.body(
-                              color: avatarFg,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
                         ),
-                        Positioned(
-                          right: -2,
-                          bottom: -2,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: cardBg,
-                                width: 1.8,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 11),
-
-                  // Name & Organization (clean sans-serif)
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: UnoTypography.body(
-                            color: p.text,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 1.5),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: UnoTypography.body(
-                              color: p.textSec,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  // Interactive Dual-Chevron Indicator
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: chevronPillBase.withValues(
-                          alpha: isActive ? 0.08 : 0.0),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    alignment: Alignment.center,
-                    child: AnimatedRotation(
-                      turns: widget.isOpen ? 0.5 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      child: Icon(
-                        LucideIcons.chevronsUpDown,
-                        size: 13.5,
-                        color: isActive ? p.text : p.textSec,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-// ─────────────────────────────────────────────────────────
-//  Collapsed Mode: Hoverable Icon Button (36x36)
-// ─────────────────────────────────────────────────────────
-class _CollapsedIconButton extends StatefulWidget {
-  final VoidCallback onTap;
-  final Widget child;
-  final String? tooltip;
-  final bool highlight;
-  final UnoPalette palette;
+                      const SizedBox(width: 4),
 
-  const _CollapsedIconButton({
-    required this.onTap,
-    required this.child,
-    this.tooltip,
-    this.highlight = false,
-    required this.palette,
-  });
-
-  @override
-  State<_CollapsedIconButton> createState() => _CollapsedIconButtonState();
-}
-
-class _CollapsedIconButtonState extends State<_CollapsedIconButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.palette;
-    final highlight = widget.highlight;
-
-    final bgColor = highlight
-        ? (_hovered ? Color.lerp(p.accent, Colors.white, 0.08)! : p.accent)
-        : (_hovered ? p.bgElevated : p.bgElevated.withValues(alpha: 0.7));
-
-    final borderColor = highlight
-        ? p.accent
-        : (_hovered ? p.textSec.withValues(alpha: 0.3) : p.div);
-
-    final button = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 170),
-          curve: Curves.easeOutCubic,
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: bgColor,
-            border: Border.all(color: borderColor),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: highlight
-                ? [
-                    BoxShadow(
-                      color: p.accent.withValues(alpha: _hovered ? 0.38 : 0.20),
-                      blurRadius: _hovered ? 10 : 5,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : const [],
-          ),
-          child: Center(
-            child: AnimatedScale(
-              scale: _hovered ? 1.08 : 1.0,
-              duration: const Duration(milliseconds: 170),
-              curve: Curves.easeOutCubic,
-              child: widget.child,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (widget.tooltip != null) {
-      return Tooltip(
-        message: widget.tooltip!,
-        preferBelow: false,
-        child: button,
-      );
-    }
-    return button;
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-//  Collapsed Mode: Nav Item (36x36)
-// ─────────────────────────────────────────────────────────
-class _CollapsedNavItem extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final UnoPalette palette;
-  final VoidCallback onTap;
-
-  const _CollapsedNavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.palette,
-    required this.onTap,
-  });
-
-  @override
-  State<_CollapsedNavItem> createState() => _CollapsedNavItemState();
-}
-
-class _CollapsedNavItemState extends State<_CollapsedNavItem> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.palette;
-    final active = widget.active;
-    final hoverBase =
-        p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
-
-    final bgColor = active
-        ? (p.isDark ? const Color(0xFF1E2336) : const Color(0xFFFFFFFF))
-        : hoverBase.withValues(alpha: _hovered ? 0.06 : 0.0);
-
-    final borderColor = active
-        ? (p.isDark
-            ? const Color(0xFFCBC1B4).withValues(alpha: 0.35)
-            : const Color(0xFFE4DFD6))
-        : (p.isDark
-            ? const Color(0xFFCBC1B4).withValues(alpha: 0.0)
-            : const Color(0xFFE4DFD6).withValues(alpha: 0.0));
-
-    final iconColor = active
-        ? (p.isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20))
-        : (_hovered ? p.text : p.textSec);
-
-    return Tooltip(
-      message: widget.label,
-      preferBelow: false,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 170),
-            curve: Curves.easeOutCubic,
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: bgColor,
-              border: Border.all(color: borderColor),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Center(
-              child: AnimatedScale(
-                scale: _hovered ? 1.08 : 1.0,
-                duration: const Duration(milliseconds: 170),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  widget.icon,
-                  size: 16,
-                  color: iconColor,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-//  Collapsed Mode: Hoverable Squircle User Avatar (36x36)
-// ─────────────────────────────────────────────────────────
-class _HoverableCollapsedUserAvatar extends StatefulWidget {
-  final UnoPalette palette;
-  final UserModel user;
-  final bool isOpen;
-  final VoidCallback onTap;
-
-  const _HoverableCollapsedUserAvatar({
-    required this.palette,
-    required this.user,
-    required this.isOpen,
-    required this.onTap,
-  });
-
-  @override
-  State<_HoverableCollapsedUserAvatar> createState() =>
-      _HoverableCollapsedUserAvatarState();
-}
-
-class _HoverableCollapsedUserAvatarState
-    extends State<_HoverableCollapsedUserAvatar> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.palette;
-    final isDark = p.isDark;
-    final displayName =
-        widget.user.name.isNotEmpty ? widget.user.name : 'User';
-    final initials = _computeUserInitials(displayName);
-    final avatarBg =
-        isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
-    final avatarFg =
-        isDark ? const Color(0xFF0A0F20) : const Color(0xFFCBC1B4);
-
-    return Tooltip(
-      message: displayName,
-      preferBelow: false,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedScale(
-            scale: _hovered ? 1.07 : 1.0,
-            duration: const Duration(milliseconds: 170),
-            curve: Curves.easeOutCubic,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 170),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: avatarBg,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: widget.isOpen
-                          ? p.text
-                          : (_hovered
-                              ? p.textSec.withValues(alpha: 0.6)
-                              : p.div.withValues(alpha: 0.4)),
-                      width: widget.isOpen ? 1.8 : 1.0,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: avatarBg.withValues(
-                            alpha: _hovered ? 0.35 : 0.18),
-                        blurRadius: _hovered ? 10 : 4,
-                        offset: const Offset(0, 2),
+                      // Quiet three-dot overflow indicator (zero up/down arrows)
+                      Opacity(
+                        opacity: widget.labelOpacity,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: menuIndicatorBase.withValues(
+                                alpha: isActive ? 0.10 : 0.0),
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            LucideIcons.ellipsis,
+                            size: 14,
+                            color: isActive
+                                ? p.accent
+                                : p.textMuted.withValues(alpha: 0.7),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initials,
-                    style: UnoTypography.body(
-                      color: avatarFg,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
                 ),
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: p.bgSurface,
-                        width: 1.8,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

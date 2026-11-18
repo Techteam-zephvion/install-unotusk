@@ -141,8 +141,8 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Center(
                 child: Container(
                   width: heroWidth,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 40),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -159,7 +159,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       Text(
                         widget.projectName != null &&
                                 widget.projectName!.isNotEmpty
-                            ? 'Investigate ${widget.projectName}, architecture, or code decisions'
+                            ? 'Investigate ${formatDisplayTitle(widget.projectName!)}, architecture, or code decisions'
                             : 'Investigate your project, architecture, or code decisions',
                         textAlign: TextAlign.center,
                         style: UnoTypography.body(
@@ -185,15 +185,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         suggestions: ChatScreen.querySuggestions,
                       ),
                       const SizedBox(height: 10),
-                      Opacity(
-                        opacity: 0.75,
-                        child: Text(
-                          'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
-                          textAlign: TextAlign.center,
-                          style: UnoTypography.body(
-                            color: widget.palette.textSec,
-                            fontSize: 11.5,
-                          ),
+                      Text(
+                        'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
+                        textAlign: TextAlign.center,
+                        style: UnoTypography.body(
+                          color: widget.palette.textMuted,
+                          fontSize: 11.5,
                         ),
                       ),
                     ],
@@ -210,8 +207,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildChatStream() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final contentWidth =
-            (constraints.maxWidth * 0.80).clamp(320.0, constraints.maxWidth - 32);
+        final contentWidth = (constraints.maxWidth * 0.80)
+            .clamp(320.0, (constraints.maxWidth - 32).clamp(320.0, 960.0));
 
         return Container(
           decoration: BoxDecoration(
@@ -219,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: Stack(
             children: [
-              // Messages scroll area — 80% of available width
+              // Messages scroll area — comfortable reading column
               Positioned.fill(
                 child: ScrollConfiguration(
                   behavior: ScrollConfiguration.of(context).copyWith(
@@ -255,7 +252,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
 
-              // Floating Bottom Input with Soft Tonal Gradient Fade
+              // Floating Bottom Input with Seamless Canvas Fade
               Positioned(
                 left: 0,
                 right: 0,
@@ -267,18 +264,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       end: Alignment.bottomCenter,
                       colors: [
                         widget.palette.bgBase.withValues(alpha: 0.0),
-                        (widget.palette.isDark
-                                ? const Color(0xFF0E1428)
-                                : const Color(0xFFEDE7DC))
-                            .withValues(alpha: 0.94),
-                        widget.palette.isDark
-                            ? const Color(0xFF10172D)
-                            : const Color(0xFFE9E2D7),
+                        widget.palette.bgBase.withValues(alpha: 0.94),
+                        widget.palette.bgBase,
                       ],
-                      stops: const [0.0, 0.45, 1.0],
+                      stops: const [0.0, 0.42, 1.0],
                     ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(0, 28, 0, 16),
+                  padding: const EdgeInsets.fromLTRB(0, 26, 0, 14),
                   child: Center(
                     child: SizedBox(
                       width: contentWidth,
@@ -304,15 +296,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                     width: 32,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      gradient:
-                                          widget.palette.elevatedCardGradient,
+                                      color: widget.palette.bgElevated,
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                           color: widget.palette.div, width: 1),
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black
-                                              .withValues(alpha: 0.12),
+                                              .withValues(alpha: 0.16),
                                           blurRadius: 10,
                                           offset: const Offset(0, 3),
                                         ),
@@ -321,7 +312,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     child: Icon(
                                       LucideIcons.arrowDown,
                                       size: 14.5,
-                                      color: widget.palette.text,
+                                      color: widget.palette.accent,
                                     ),
                                   ),
                                 ),
@@ -346,15 +337,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                 'Ask a follow-up about decisions, commits, or tickets…',
                           ),
                           const SizedBox(height: 8),
-                          Opacity(
-                            opacity: 0.72,
-                            child: Text(
-                              'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
-                              textAlign: TextAlign.center,
-                              style: UnoTypography.body(
-                                color: widget.palette.textSec,
-                                fontSize: 11.5,
-                              ),
+                          Text(
+                            'Unotusk can make mistakes. Verify important project decisions, ADRs, and tickets.',
+                            textAlign: TextAlign.center,
+                            style: UnoTypography.body(
+                              color: widget.palette.textMuted,
+                              fontSize: 11.5,
                             ),
                           ),
                         ],
@@ -462,21 +450,21 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
   @override
   Widget build(BuildContext context) {
     final isDark = widget.palette.isDark;
-    // Opposite shade to the page background for crisp visual separation
+    // Refined warm ivory conversation card in Dark Mode; midnight navy in Light Mode
     final bubbleBg =
-        isDark ? const Color(0xFFF5F2EB) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFE9DFD0) : const Color(0xFF0B1020);
     final bubbleText =
-        isDark ? const Color(0xFF0A0F20) : const Color(0xFFFFFFFF);
+        isDark ? const Color(0xFF0B1020) : const Color(0xFFF4F1EC);
     final bubblePalette = isDark ? UnoPalette.light : UnoPalette.dark;
     final hoverBase =
-        isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFE9DFD0) : const Color(0xFF0B1020);
 
     return FadeTransition(
       opacity: _fadeAnim,
       child: SlideTransition(
         position: _slideAnim,
         child: Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 26),
+          padding: const EdgeInsets.only(top: 12, bottom: 28),
           child: MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
@@ -484,13 +472,13 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Subtle hover-only Copy button outside the pill
+                // Subtle hover-only Copy button outside the card
                 AnimatedOpacity(
                   opacity: (_isHovered || _copied) ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOutCubic,
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: 10),
                     child: Tooltip(
                       message: _copied ? 'Copied' : 'Copy prompt',
                       child: MouseRegion(
@@ -504,8 +492,12 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
                             height: 28,
                             decoration: BoxDecoration(
                               color: hoverBase.withValues(
-                                  alpha: _copied ? 0.08 : 0.045),
-                              borderRadius: BorderRadius.circular(8),
+                                  alpha: _copied ? 0.10 : 0.05),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(
+                                color: widget.palette.div.withValues(alpha: 0.6),
+                                width: 1,
+                              ),
                             ),
                             alignment: Alignment.center,
                             child: Icon(
@@ -522,21 +514,21 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
                   ),
                 ),
 
-                // Clean minimal opposite-shade prompt pill
+                // Refined warm-ivory conversation card
                 Flexible(
                   child: Container(
-                    constraints: const BoxConstraints(maxWidth: 680),
+                    constraints: const BoxConstraints(maxWidth: 620),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 13),
+                        horizontal: 19, vertical: 12),
                     decoration: BoxDecoration(
                       color: bubbleBg,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0A0F20)
-                              .withValues(alpha: isDark ? 0.28 : 0.12),
-                          blurRadius: 14,
-                          offset: const Offset(0, 3),
+                          color: const Color(0xFF050814)
+                              .withValues(alpha: isDark ? 0.22 : 0.10),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -546,9 +538,9 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
                       selectable: true,
                       baseStyle: UnoTypography.body(
                         color: bubbleText,
-                        fontSize: 15.5,
-                        height: 1.52,
-                        fontWeight: FontWeight.w400,
+                        fontSize: 14.8,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -631,7 +623,7 @@ class _ResponseCardState extends State<_ResponseCard> {
           const SizedBox(height: 16),
         ],
 
-        // Clean Editorial Response Prose (Sans-serif body, not monospace!)
+        // Clean Editorial Response Prose (Calm, readable technical document)
         if (widget.data.bdd == null) ...[
           ...widget.data.segments.map((seg) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -645,9 +637,11 @@ class _ResponseCardState extends State<_ResponseCard> {
                   palette: p,
                   selectable: true,
                   baseStyle: UnoTypography.body(
-                    color: p.text,
-                    fontSize: 15.5,
-                    height: 1.7,
+                    color: p.isDark
+                        ? p.text.withValues(alpha: 0.90)
+                        : p.text.withValues(alpha: 0.92),
+                    fontSize: 15.0,
+                    height: 1.72,
                     fontWeight: FontWeight.w400,
                   ),
                   trailing: seg.tag != null
@@ -737,37 +731,37 @@ class _ResponseCardState extends State<_ResponseCard> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
                 color: hoverBase.withValues(alpha: isActive ? 0.05 : 0.0),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(7),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     LucideIcons.sparkles,
-                    size: 13,
-                    color: isActive ? p.text : p.textSec,
+                    size: 13.5,
+                    color: isActive ? p.accent : p.accentMuted,
                   ),
                   const SizedBox(width: 7),
                   Text(
                     'Thought for 2.6s',
                     style: UnoTypography.body(
                       color: isActive ? p.text : p.textSec,
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 4),
                   AnimatedRotation(
                     turns: _thoughtExpanded ? 0.25 : 0.0,
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOutCubic,
                     child: Icon(
                       LucideIcons.chevronRight,
-                      size: 13,
-                      color: isActive ? p.text : p.textSec,
+                      size: 12.5,
+                      color: isActive ? p.text : p.textMuted,
                     ),
                   ),
                 ],

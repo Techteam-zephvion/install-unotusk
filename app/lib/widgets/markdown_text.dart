@@ -125,13 +125,19 @@ class MarkdownText extends StatelessWidget {
           baseStyle: effectiveBaseStyle,
           onLinkTap: onLinkTap,
         );
+      } else if (block is _ConfidenceNode) {
+        blockWidget = _UnoConfidenceBanner(
+          node: block,
+          palette: effectivePalette,
+          selectable: selectable,
+        );
       } else if (block is _HeadingNode) {
         blockWidget = _buildHeading(block, effectivePalette, effectiveBaseStyle);
       } else if (block is _DividerNode) {
         blockWidget = Padding(
           padding: const EdgeInsets.symmetric(vertical: 14),
           child: Divider(
-            color: effectivePalette.div,
+            color: effectivePalette.div.withValues(alpha: 0.7),
             height: 1,
             thickness: 1,
           ),
@@ -155,7 +161,7 @@ class MarkdownText extends StatelessWidget {
 
       // Spacing between blocks
       if (!isLastBlock && block is! _DividerNode) {
-        children.add(const SizedBox(height: 10));
+        children.add(const SizedBox(height: 12));
       }
     }
 
@@ -168,47 +174,51 @@ class MarkdownText extends StatelessWidget {
 
   Widget _buildHeading(_HeadingNode node, UnoPalette p, TextStyle base) {
     double size;
-    FontWeight weight = FontWeight.w600;
     double topPad = 14;
+    final bool useSerif = node.level <= 3;
 
     switch (node.level) {
       case 1:
-        size = 22.5;
-        weight = FontWeight.w600;
+        size = 22.0;
         topPad = 18;
         break;
       case 2:
-        size = 19;
-        weight = FontWeight.w600;
+        size = 19.5;
         topPad = 16;
         break;
       case 3:
-        size = 17;
-        weight = FontWeight.w600;
-        topPad = 13;
+        size = 17.5;
+        topPad = 14;
         break;
       case 4:
         size = 15.5;
-        weight = FontWeight.w600;
-        topPad = 10;
+        topPad = 12;
         break;
       default:
-        size = 15;
-        weight = FontWeight.w600;
-        topPad = 8;
+        size = 15.0;
+        topPad = 10;
     }
 
+    final headingStyle = useSerif
+        ? UnoTypography.headingSerif(
+            color: p.text,
+            fontSize: size,
+            fontWeight: FontWeight.w600,
+            height: 1.32,
+          )
+        : UnoTypography.body(
+            fontSize: size,
+            fontWeight: FontWeight.w600,
+            color: p.text,
+            height: 1.35,
+          ).copyWith(letterSpacing: -0.2);
+
     return Padding(
-      padding: EdgeInsets.only(top: topPad, bottom: 4),
+      padding: EdgeInsets.only(top: topPad, bottom: 2),
       child: _InlineRichText(
         text: node.text,
         palette: p,
-        style: UnoTypography.body(
-          fontSize: size,
-          fontWeight: weight,
-          color: p.text,
-          height: 1.35,
-        ).copyWith(letterSpacing: -0.25),
+        style: headingStyle,
         selectable: selectable,
         onLinkTap: onLinkTap,
       ),
@@ -220,7 +230,7 @@ class MarkdownText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: node.items.map((item) {
         return Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 7),
+          padding: const EdgeInsets.only(left: 10, bottom: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -235,29 +245,29 @@ class MarkdownText extends StatelessWidget {
                 )
               else if (node.isOrdered)
                 Padding(
-                  padding: const EdgeInsets.only(top: 0.5, right: 9),
+                  padding: const EdgeInsets.only(top: 0.5, right: 10),
                   child: SizedBox(
                     width: 20,
                     child: Text(
                       item.prefix.endsWith('.') ? item.prefix : '${item.prefix}.',
                       textAlign: TextAlign.right,
                       style: UnoTypography.body(
-                        color: p.textSec,
-                        fontSize: (base.fontSize ?? 14.5) - 0.5,
-                        fontWeight: FontWeight.w600,
-                        height: base.height ?? 1.65,
+                        color: p.accentMuted,
+                        fontSize: (base.fontSize ?? 15.0) - 0.5,
+                        fontWeight: FontWeight.w500,
+                        height: base.height ?? 1.7,
                       ),
                     ),
                   ),
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.only(top: 10.5, right: 11, left: 6),
+                  padding: const EdgeInsets.only(top: 10.5, right: 12, left: 4),
                   child: Container(
-                    width: 5,
-                    height: 5,
+                    width: 4.5,
+                    height: 4.5,
                     decoration: BoxDecoration(
-                      color: p.textSec.withValues(alpha: 0.72),
+                      color: p.accentMuted.withValues(alpha: 0.8),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -356,12 +366,16 @@ class _UnoCodeBlockState extends State<_UnoCodeBlock> {
     final displayLang = widget.node.language.toUpperCase();
     final hasFilename = widget.node.filename != null && widget.node.filename!.isNotEmpty;
 
+    final codeBg = const Color(0xFF0E1526);
+    final codeHeaderBg = const Color(0xFF151E33);
+    final codeBorder = const Color(0xFF242D42);
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF131311),
+        color: codeBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: p.div, width: 1),
+        border: Border.all(color: codeBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -371,20 +385,21 @@ class _UnoCodeBlockState extends State<_UnoCodeBlock> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF1D1C19),
-              border: Border(bottom: BorderSide(color: p.div, width: 0.8)),
+              color: codeHeaderBg,
+              border: Border(bottom: BorderSide(color: codeBorder, width: 0.8)),
             ),
             child: Row(
               children: [
                 if (hasFilename) ...[
-                  Icon(LucideIcons.fileCode, size: 14, color: p.accent),
+                  const Icon(LucideIcons.fileCode,
+                      size: 14, color: Color(0xFFE9DFD0)),
                   const SizedBox(width: 8),
                   InkWell(
                     onTap: () => widget.onFileTap?.call(widget.node.filename!),
                     child: Text(
                       widget.node.filename!,
                       style: UnoTypography.mono(
-                        color: p.text,
+                        color: const Color(0xFFF4F1EC),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -396,14 +411,14 @@ class _UnoCodeBlockState extends State<_UnoCodeBlock> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: p.bgElevated,
+                      color: const Color(0xFF1D263A),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: p.div, width: 0.6),
+                      border: Border.all(color: codeBorder, width: 0.6),
                     ),
                     child: Text(
                       displayLang,
                       style: UnoTypography.mono(
-                        color: p.textSec,
+                        color: const Color(0xFFC8BCA9),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -422,13 +437,17 @@ class _UnoCodeBlockState extends State<_UnoCodeBlock> {
                         Icon(
                           _copied ? LucideIcons.check : LucideIcons.copy,
                           size: 13,
-                          color: _copied ? p.confirmed : p.textSec,
+                          color: _copied
+                              ? const Color(0xFFE9DFD0)
+                              : const Color(0xFFA5A5AE),
                         ),
                         const SizedBox(width: 5),
                         Text(
                           _copied ? 'Copied!' : 'Copy code',
                           style: UnoTypography.mono(
-                            color: _copied ? p.confirmed : p.textSec,
+                            color: _copied
+                                ? const Color(0xFFE9DFD0)
+                                : const Color(0xFFA5A5AE),
                             fontSize: 11,
                           ),
                         ),
@@ -1091,7 +1110,7 @@ class _InlineRichText extends StatelessWidget {
           TextSpan(
             text: token.substring(2, token.length - 2),
             style: style.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: palette.text,
             ),
           ),
@@ -1107,7 +1126,7 @@ class _InlineRichText extends StatelessWidget {
         spans.add(
           TextSpan(
             text: token.substring(2, token.length - 2),
-            style: style.copyWith(fontWeight: FontWeight.w700, color: palette.text),
+            style: style.copyWith(fontWeight: FontWeight.w600, color: palette.text),
           ),
         );
       } else if (token.startsWith('_') && token.endsWith('_')) {
@@ -1125,24 +1144,33 @@ class _InlineRichText extends StatelessWidget {
           ),
         );
       } else if (token.startsWith('`') && token.endsWith('`')) {
-        final codeBgBase =
-            palette.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+        final codeBg = palette.isDark
+            ? const Color(0xFF1D263A)
+            : const Color(0xFFEAE3D8);
+        final codeBorder = palette.isDark
+            ? const Color(0xFF2B354D)
+            : const Color(0xFFDDD5C7);
+        final codeText = palette.isDark
+            ? const Color(0xFFDFD4C3)
+            : const Color(0xFF0B1020);
         spans.add(
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              margin: const EdgeInsets.symmetric(horizontal: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
               decoration: BoxDecoration(
-                color: codeBgBase.withValues(alpha: palette.isDark ? 0.08 : 0.06),
-                borderRadius: BorderRadius.circular(4.5),
+                color: codeBg,
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: codeBorder, width: 0.7),
               ),
               child: Text(
                 token.substring(1, token.length - 1),
                 style: UnoTypography.mono(
-                  color: palette.isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20),
-                  fontSize: (style.fontSize ?? 15.5) * 0.86,
-                  fontWeight: FontWeight.w500,
+                  color: codeText,
+                  fontSize: (style.fontSize ?? 15.0) * 0.85,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0.1,
                 ),
               ),
             ),
@@ -1260,6 +1288,85 @@ class _CalloutNode extends _MarkdownNode {
   final String kind;
   final String text;
   _CalloutNode({required this.kind, required this.text});
+}
+
+class _ConfidenceNode extends _MarkdownNode {
+  final String level;
+  final String detail;
+  _ConfidenceNode({required this.level, required this.detail});
+}
+
+/// Restrained information banner for AI confidence indicators
+/// e.g. "Confidence: HIGH (that the evidence is absent)"
+class _UnoConfidenceBanner extends StatelessWidget {
+  final _ConfidenceNode node;
+  final UnoPalette palette;
+  final bool selectable;
+
+  const _UnoConfidenceBanner({
+    required this.node,
+    required this.palette,
+    this.selectable = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    final bg = p.isDark ? const Color(0xFF131B2D) : const Color(0xFFFAF7F1);
+    final border = p.accent.withValues(alpha: p.isDark ? 0.24 : 0.18);
+    final iconColor = p.isDark ? p.accent : p.text;
+
+    final span = TextSpan(
+      children: [
+        TextSpan(
+          text: 'Confidence: ${node.level}',
+          style: UnoTypography.body(
+            color: p.text,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            height: 1.45,
+          ),
+        ),
+        if (node.detail.isNotEmpty)
+          TextSpan(
+            text: ' ${node.detail}',
+            style: UnoTypography.body(
+              color: p.isDark ? p.text.withValues(alpha: 0.82) : p.textSec,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              height: 1.45,
+            ),
+          ),
+      ],
+    );
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            LucideIcons.info,
+            size: 16,
+            color: iconColor,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: selectable
+                ? SelectableText.rich(span)
+                : Text.rich(span),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _QuoteNode extends _MarkdownNode {
@@ -1470,6 +1577,46 @@ class _MarkdownParser {
         }
 
         nodes.add(_CalloutNode(kind: kind, text: quoteLines.join('\n')));
+        continue;
+      }
+
+      // ── Confidence Indicator Line: "Confidence: HIGH (...)" or "**Confidence: HIGH** (...)" ──
+      final cleanedLine = trimmed
+          .replaceAll(RegExp(r'^>\s*'), '')
+          .replaceAll('**', '')
+          .replaceAll('__', '')
+          .replaceAll('*', '')
+          .trim();
+      final confMatch = RegExp(
+        r'^Confidence\s*:\s*([A-Za-z]+)(.*)$',
+        caseSensitive: false,
+      ).firstMatch(cleanedLine);
+      if (confMatch != null && !trimmed.startsWith('#')) {
+        final level = confMatch.group(1)!.trim().toUpperCase();
+        var detail = (confMatch.group(2) ?? '').trim();
+        // If this came from a multi-line blockquote, collect following quote lines
+        if (trimmed.startsWith('>')) {
+          final extraLines = <String>[];
+          i++;
+          while (i < lines.length && lines[i].trim().startsWith('>')) {
+            final l = lines[i]
+                .trim()
+                .substring(1)
+                .replaceAll('**', '')
+                .replaceAll('*', '')
+                .trim();
+            if (l.isNotEmpty) extraLines.add(l);
+            i++;
+          }
+          if (extraLines.isNotEmpty) {
+            detail = detail.isEmpty
+                ? extraLines.join(' ')
+                : '$detail ${extraLines.join(' ')}';
+          }
+        } else {
+          i++;
+        }
+        nodes.add(_ConfidenceNode(level: level, detail: detail));
         continue;
       }
 

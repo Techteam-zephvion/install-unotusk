@@ -265,9 +265,8 @@ class _ChatInputBoxState extends State<ChatInputBox>
 
   Widget _buildModelMenuCard() {
     final isDark = widget.palette.isDark;
-    final menuBg = isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
-    final menuBorder =
-        isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+    final menuBg = isDark ? widget.palette.bgElevated : const Color(0xFFFFFFFF);
+    final menuBorder = widget.palette.div;
 
     return AnimatedBuilder(
       animation: _modelAnim,
@@ -405,9 +404,8 @@ class _ChatInputBoxState extends State<ChatInputBox>
 
   Widget _buildPlusMenuCard() {
     final isDark = widget.palette.isDark;
-    final menuBg = isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
-    final menuBorder =
-        isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+    final menuBg = isDark ? widget.palette.bgElevated : const Color(0xFFFFFFFF);
+    final menuBorder = widget.palette.div;
 
     return AnimatedBuilder(
       animation: _plusAnim,
@@ -538,9 +536,15 @@ class _ChatInputBoxState extends State<ChatInputBox>
 
     // Zero-alpha matched base color to prevent muddy grey lerp artifacts
     final accentBase = p.accent;
-    final sendIconColor = canSubmit
-        ? (isDark ? const Color(0xFF0A0F20) : Colors.white)
-        : p.textSec.withValues(alpha: 0.6);
+    final composerBg = isDark ? const Color(0xFF151D30) : const Color(0xFFFFFFFF);
+    final controlPillBg = isDark ? const Color(0xFF1C2438) : const Color(0xFFF4EFE7);
+    final sendBg = canSubmit
+        ? (_sendBtnHovered
+            ? Color.lerp(p.accent, isDark ? Colors.white : const Color(0xFF1E263D), 0.14)!
+            : p.accent)
+        : p.accent.withValues(alpha: isDark ? 0.55 : 0.45);
+    final sendIconColor =
+        isDark ? const Color(0xFF0B1020) : const Color(0xFFF4F1EC);
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -555,9 +559,9 @@ class _ChatInputBoxState extends State<ChatInputBox>
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: p.accent.withValues(alpha: 0.14),
+                color: p.accent.withValues(alpha: 0.12),
                 border: Border.all(
-                  color: p.accent.withValues(alpha: 0.4),
+                  color: p.accent.withValues(alpha: 0.34),
                   width: 1,
                 ),
                 borderRadius: BorderRadius.circular(20),
@@ -601,52 +605,37 @@ class _ChatInputBoxState extends State<ChatInputBox>
             ),
           ],
 
-          // Main Prompt Bar with Thin Focus Border & Tight Subtle Outer Fade
+          // Main Integrated Composer Surface
           MouseRegion(
             onEnter: (_) => setState(() => _isCardHovered = true),
             onExit: (_) => setState(() => _isCardHovered = false),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
-                gradient: p.elevatedCardGradient,
+                color: composerBg,
                 border: Border.all(
                   color: isFocused
-                      ? accentBase.withValues(alpha: isDark ? 0.52 : 0.44)
+                      ? accentBase.withValues(alpha: isDark ? 0.38 : 0.34)
                       : (_isCardHovered
-                          ? accentBase.withValues(alpha: isDark ? 0.28 : 0.24)
-                          : p.div),
-                  width: isFocused ? 0.75 : 0.9,
+                          ? accentBase.withValues(alpha: isDark ? 0.22 : 0.20)
+                          : p.div.withValues(alpha: 0.9)),
+                  width: 1.0,
                 ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: isFocused
-                    ? [
-                        // Subtle, tight halo fading gently from the border color
-                        BoxShadow(
-                          color: accentBase.withValues(
-                              alpha: isDark ? 0.14 : 0.09),
-                          blurRadius: 10,
-                          spreadRadius: 0.5,
-                          offset: Offset.zero,
-                        ),
-                        BoxShadow(
-                          color: accentBase.withValues(
-                              alpha: isDark ? 0.055 : 0.035),
-                          blurRadius: 18,
-                          spreadRadius: 0,
-                          offset: Offset.zero,
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black
-                              .withValues(alpha: isDark ? 0.20 : 0.04),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF050814).withValues(
+                      alpha: isDark
+                          ? (isFocused ? 0.34 : 0.24)
+                          : (isFocused ? 0.09 : 0.05),
+                    ),
+                    blurRadius: isFocused ? 18 : 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
+              padding: const EdgeInsets.fromLTRB(16, 13, 12, 11),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -678,15 +667,15 @@ class _ChatInputBoxState extends State<ChatInputBox>
                       textInputAction: TextInputAction.send,
                       style: UnoTypography.body(
                         color: p.text,
-                        fontSize: 15.5,
+                        fontSize: 15,
                         height: 1.5,
                       ),
                       decoration: InputDecoration(
                         hintText: widget.placeholder ??
                             'Ask about a merge, a ticket, or a decision on your project…',
                         hintStyle: UnoTypography.body(
-                          color: p.textSec.withValues(alpha: 0.8),
-                          fontSize: 15.5,
+                          color: p.textMuted,
+                          fontSize: 15,
                         ),
                         border: InputBorder.none,
                         isDense: true,
@@ -707,7 +696,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                     curve: Curves.easeOutCubic,
                     child: _attachedFileNames.isNotEmpty
                         ? Padding(
-                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            padding: const EdgeInsets.only(top: 8, bottom: 2),
                             child: Wrap(
                               spacing: 8,
                               runSpacing: 6,
@@ -717,10 +706,10 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: p.accent.withValues(alpha: 0.12),
+                                    color: p.accent.withValues(alpha: 0.10),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: p.accent.withValues(alpha: 0.35),
+                                      color: p.accent.withValues(alpha: 0.28),
                                     ),
                                   ),
                                   child: Row(
@@ -764,22 +753,16 @@ class _ChatInputBoxState extends State<ChatInputBox>
                         : const SizedBox.shrink(),
                   ),
 
-                  const SizedBox(height: 10),
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: p.div.withValues(alpha: 0.55),
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
 
-                  // Bottom toolbar inside card
+                  // Clean Bottom Toolbar (no inner divider line)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Left controls: Plus, Attach, Minimal Model Selector
+                      // Left controls: Plus, Attach, Thinking Toggle, Model Selector
                       Row(
                         children: [
-                          // Plus Button
+                          // Plus Button (quiet icon button, understated hover)
                           CompositedTransformTarget(
                             link: _plusButtonLink,
                             child: MouseRegion(
@@ -802,27 +785,20 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                       color: accentBase.withValues(
                                         alpha: (_plusMenuOverlay != null ||
                                                 _plusBtnHovered)
-                                            ? 0.10
+                                            ? 0.08
                                             : 0.0,
                                       ),
-                                      border: Border.all(
-                                        color: _plusMenuOverlay != null ||
-                                                _plusBtnHovered
-                                            ? accentBase.withValues(alpha: 0.35)
-                                            : p.div,
-                                        width: 1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(9),
                                     ),
                                     child: Center(
                                       child: RotationTransition(
                                         turns: _plusRotate,
                                         child: Icon(
                                           LucideIcons.plus,
-                                          size: 15,
+                                          size: 16,
                                           color: _plusMenuOverlay != null ||
                                                   _plusBtnHovered
-                                              ? p.text
+                                              ? p.accent
                                               : p.textSec,
                                         ),
                                       ),
@@ -832,9 +808,9 @@ class _ChatInputBoxState extends State<ChatInputBox>
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 4),
 
-                          // Paperclip attach button
+                          // Paperclip attach button (quiet icon button)
                           MouseRegion(
                             cursor: SystemMouseCursors.click,
                             onEnter: (_) =>
@@ -853,22 +829,16 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                   height: 32,
                                   decoration: BoxDecoration(
                                     color: accentBase.withValues(
-                                      alpha: _attachBtnHovered ? 0.10 : 0.0,
+                                      alpha: _attachBtnHovered ? 0.08 : 0.0,
                                     ),
-                                    border: Border.all(
-                                      color: _attachBtnHovered
-                                          ? accentBase.withValues(alpha: 0.35)
-                                          : p.div,
-                                      width: 1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(9),
                                   ),
                                   child: Center(
                                     child: Icon(
                                       LucideIcons.paperclip,
-                                      size: 14,
+                                      size: 15,
                                       color: _attachBtnHovered
-                                          ? p.text
+                                          ? p.accent
                                           : p.textSec,
                                     ),
                                   ),
@@ -878,7 +848,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                           ),
                           const SizedBox(width: 8),
 
-                          // Thinking Toggle Button (Live end-to-end reasoning control)
+                          // Thinking Toggle Pill
                           MouseRegion(
                             cursor: SystemMouseCursors.click,
                             onEnter: (_) =>
@@ -903,21 +873,17 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10),
                                   decoration: BoxDecoration(
-                                    color: _thinkingEnabled
-                                        ? accentBase.withValues(
-                                            alpha: isDark ? 0.12 : 0.08)
-                                        : accentBase.withValues(
-                                            alpha: _thinkingToggleHovered
-                                                ? 0.06
-                                                : 0.0),
+                                    color: _thinkingToggleHovered
+                                        ? p.bgInteractive
+                                        : controlPillBg,
                                     border: Border.all(
                                       color: _thinkingEnabled
                                           ? accentBase.withValues(
-                                              alpha: isDark ? 0.42 : 0.32)
+                                              alpha: isDark ? 0.30 : 0.28)
                                           : (_thinkingToggleHovered
                                               ? accentBase.withValues(
-                                                  alpha: 0.25)
-                                              : p.div),
+                                                  alpha: 0.22)
+                                              : p.div.withValues(alpha: 0.85)),
                                       width: 1,
                                     ),
                                     borderRadius: BorderRadius.circular(10),
@@ -949,7 +915,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                               : FontWeight.w400,
                                         ),
                                       ),
-                                      const SizedBox(width: 7),
+                                      const SizedBox(width: 8),
                                       AnimatedContainer(
                                         duration:
                                             const Duration(milliseconds: 180),
@@ -978,7 +944,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                               shape: BoxShape.circle,
                                               color: _thinkingEnabled
                                                   ? (isDark
-                                                      ? const Color(0xFF0A0F20)
+                                                      ? const Color(0xFF0B1020)
                                                       : Colors.white)
                                                   : p.bgElevated,
                                             ),
@@ -1017,13 +983,13 @@ class _ChatInputBoxState extends State<ChatInputBox>
                                     decoration: BoxDecoration(
                                       color: (_modelBtnHovered ||
                                               _modelMenuOverlay != null)
-                                          ? p.bgSurface
-                                          : p.bgSurface.withValues(alpha: 0.6),
+                                          ? p.bgInteractive
+                                          : controlPillBg,
                                       border: Border.all(
                                         color: (_modelBtnHovered ||
                                                 _modelMenuOverlay != null)
-                                            ? accentBase.withValues(alpha: 0.38)
-                                            : p.div,
+                                            ? accentBase.withValues(alpha: 0.30)
+                                            : p.div.withValues(alpha: 0.85),
                                         width: 1,
                                       ),
                                       borderRadius: BorderRadius.circular(10),
@@ -1067,7 +1033,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                         ],
                       ),
 
-                      // Right toolbar: Send button
+                      // Right toolbar: Warm Ivory Rounded-Square Primary Send Button
                       MouseRegion(
                         cursor: canSubmit
                             ? SystemMouseCursors.click
@@ -1075,10 +1041,8 @@ class _ChatInputBoxState extends State<ChatInputBox>
                         onEnter: (_) => setState(() => _sendBtnHovered = true),
                         onExit: (_) => setState(() => _sendBtnHovered = false),
                         child: AnimatedScale(
-                          scale: canSubmit && _sendBtnHovered
-                              ? 1.07
-                              : (canSubmit ? 1.0 : 0.94),
-                          duration: const Duration(milliseconds: 160),
+                          scale: canSubmit && _sendBtnHovered ? 1.05 : 1.0,
+                          duration: const Duration(milliseconds: 150),
                           curve: Curves.easeOutCubic,
                           child: GestureDetector(
                             onTap: canSubmit ? _handleSubmit : null,
@@ -1089,16 +1053,15 @@ class _ChatInputBoxState extends State<ChatInputBox>
                               width: 34,
                               height: 34,
                               decoration: BoxDecoration(
-                                color: canSubmit
-                                    ? p.accent
-                                    : p.div.withValues(alpha: 0.45),
-                                shape: BoxShape.circle,
+                                color: sendBg,
+                                borderRadius: BorderRadius.circular(10),
                                 boxShadow: canSubmit
                                     ? [
                                         BoxShadow(
-                                          color: p.accent
-                                              .withValues(alpha: 0.32),
-                                          blurRadius: 10,
+                                          color: const Color(0xFF050814)
+                                              .withValues(
+                                                  alpha: isDark ? 0.30 : 0.14),
+                                          blurRadius: 8,
                                           offset: const Offset(0, 2),
                                         ),
                                       ]
@@ -1107,7 +1070,7 @@ class _ChatInputBoxState extends State<ChatInputBox>
                               child: Center(
                                 child: Icon(
                                   LucideIcons.arrowUp,
-                                  size: 15,
+                                  size: 16,
                                   color: sendIconColor,
                                 ),
                               ),
