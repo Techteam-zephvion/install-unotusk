@@ -14,6 +14,8 @@ import '../widgets/constellation_loader.dart';
 import '../widgets/bdd_contract_card.dart';
 import '../widgets/reasoning_panel.dart';
 import '../widgets/file_detail_panel.dart';
+import '../../../../widgets/markdown_text.dart';
+import '../../../../theme/app_theme.dart';
 
 class ChatMessageItem {
   final String id;
@@ -1020,9 +1022,12 @@ class _AskTabState extends ConsumerState<AskTab> {
             if (msg.bdd == null)
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  answer.content,
-                  style: AppTextStyles.inter(
+                child: MarkdownText(
+                  text: answer.content,
+                  palette: UnoPalette.dark,
+                  selectable: true,
+                  onFileTap: _openFileCitation,
+                  baseStyle: AppTextStyles.inter(
                     fontSize: 15,
                     color: AppColors.textPrimary,
                     height: 1.65,

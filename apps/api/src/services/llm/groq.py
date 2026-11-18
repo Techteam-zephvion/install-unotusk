@@ -101,14 +101,18 @@ class GroqProvider(LLMProvider):
                 messages: list[dict[str, str]] = [
                     {"role": "system", "content": system_content}
                 ]
+                # Include recent conversation turns with bounded length to preserve TPM budget
                 if conversation_history:
-                    for msg in conversation_history[-6:]:  # Keep recent history
-                        messages.append({"role": msg["role"], "content": msg["content"]})
+                    for msg in conversation_history[-4:]:
+                        c_text = str(msg.get("content", ""))
+                        if len(c_text) > 500:
+                            c_text = c_text[:500] + "..."
+                        messages.append({"role": msg["role"], "content": c_text})
 
-                # Cap context characters to ensure request never exceeds model TPM limit (~14k chars / ~3.5k tokens)
+                # Cap context characters to ensure request never exceeds model TPM limit (~12k chars / ~3k tokens)
                 safe_context = project_context
-                if len(safe_context) > 14000:
-                    safe_context = safe_context[:14000] + "\n... [context truncated to stay within token budget]"
+                if len(safe_context) > 12000:
+                    safe_context = safe_context[:12000] + "\n... [context truncated to stay within token budget]"
 
                 user_prompt = (
                     f"## PROJECT CONTEXT EVIDENCE\n\n"
@@ -128,35 +132,49 @@ class GroqProvider(LLMProvider):
                     )
                 messages.append({"role": "user", "content": user_prompt})
 
+                # Determine if model supports DeepSeek R1 reasoning parameters
+                is_deepseek_r1 = "r1" in self.model.lower() or "deepseek" in self.model.lower()
+                create_kwargs: dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": 2500,
+                    "temperature": 0.1,
+                }
+                if is_deepseek_r1:
+                    create_kwargs["reasoning_effort"] = policy.groq_reasoning_effort
+                    create_kwargs["reasoning_format"] = policy.groq_reasoning_format
+
                 max_retries = 2
                 response = None
                 for attempt in range(max_retries + 1):
                     try:
-                        response = await self._client.chat.completions.create(
-                            model=self.model,
-                            messages=messages,
-                            max_tokens=750,
-                            temperature=0.1,
-                            reasoning_effort=policy.groq_reasoning_effort,
-                            reasoning_format=policy.groq_reasoning_format,
-                        )
+                        response = await self._client.chat.completions.create(**create_kwargs)
                         break
                     except Exception as err:
                         err_str = str(err)
-                        if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
-                            wait_sec = 3 * (attempt + 1)
+                        # If rate limit or TPM exceeded on 70B, failover immediately to high-capacity 8B
+                        if ("429" in err_str or "rate_limit" in err_str.lower() or "tokens per minute" in err_str.lower()) and create_kwargs["model"] != "llama-3.1-8b-instant":
                             logger.warning(
-                                f"Groq 429 rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{max_retries})..."
+                                f"Groq {create_kwargs['model']} rate limit hit; failing over to llama-3.1-8b-instant (30k TPM)..."
                             )
+                            create_kwargs["model"] = "llama-3.1-8b-instant"
+                            continue
+                        elif ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
+                            wait_sec = 2 * (attempt + 1)
+                            logger.warning(f"Groq rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{max_retries})...")
                             await asyncio.sleep(wait_sec)
                             continue
                         raise
 
-                content = (
-                    response.choices[0].message.content
-                    if response and response.choices and response.choices[0].message.content
-                    else "No response generated."
-                )
+                raw_msg = response.choices[0].message if (response and response.choices) else None
+                content = None
+                if raw_msg:
+                    content = raw_msg.content
+                    # If content is empty but model produced reasoning output, use it
+                    if not content and hasattr(raw_msg, "reasoning") and raw_msg.reasoning:
+                        content = raw_msg.reasoning
+                content = content or "No response generated."
+
                 prompt_tokens = (
                     response.usage.prompt_tokens if response and response.usage else len(project_context) // 4
                 )
@@ -170,10 +188,9 @@ class GroqProvider(LLMProvider):
                     related_entities=related_entities,
                     confidence=confidence,
                     debug_signals={
-                        "model": self.model,
+                        "model": create_kwargs.get("model", self.model),
                         "provider": "groq",
                         "thinking_tier": policy.tier.value,
-                        "reasoning_effort": policy.groq_reasoning_effort,
                         "evidence_count": len(evidence_items),
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
@@ -181,12 +198,31 @@ class GroqProvider(LLMProvider):
                 )
             except Exception as e:
                 logger.error(
-                    f"Groq API call failed: {e}. Falling back to deterministic synthesis.",
+                    f"Groq API call failed: {e}",
                     exc_info=True,
                 )
                 last_error_reason = str(e)
         else:
             last_error_reason = "No API key configured"
+
+        # If live API fails, return explicit notice instead of synthetic mock data
+        if last_error_reason and "No API key configured" not in last_error_reason:
+            error_notice = (
+                f"### Groq Service Notice\n\n"
+                f"The AI model request could not be completed: `{last_error_reason}`.\n\n"
+                f"Please wait a moment and try asking again."
+            )
+            return GroundedAnswer(
+                content=error_notice,
+                evidence=evidence_items,
+                related_entities=related_entities,
+                confidence="LOW",
+                debug_signals={
+                    "model": self.model,
+                    "provider": "groq",
+                    "error": last_error_reason,
+                },
+            )
 
         # Deterministic offline synthesis fallback (for tests, CI, or when API key is not configured)
         fallback_content = self._generate_offline_grounded_answer(
