@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 
 class OntologyGraphScreen extends StatefulWidget {
@@ -81,10 +82,9 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
               // Title
               Text(
                 'Knowledge Graph',
-                style: UnoTypography.brandSerif(
-                  palette: widget.palette,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
+                style: AppFonts.display(
+                  fontSize: 30,
+                  color: widget.palette.text,
                 ),
               ),
               const SizedBox(height: 6),
@@ -270,8 +270,7 @@ class _OntologyGraphPainter extends CustomPainter {
       // Monospace label below
       final textSpan = TextSpan(
         text: node.label,
-        style: TextStyle(
-          fontFamily: 'monospace',
+        style: AppFonts.mono(
           fontSize: 9.5,
           color: palette.textSec,
           letterSpacing: 0.2,
@@ -314,8 +313,7 @@ class _OntologyGraphPainter extends CustomPainter {
         // Pill badge background with monospace label
         final textSpan = TextSpan(
           text: activeNode.label,
-          style: TextStyle(
-            fontFamily: 'monospace',
+          style: AppFonts.mono(
             fontSize: 10.0,
             fontWeight: FontWeight.w600,
             color: palette.text,

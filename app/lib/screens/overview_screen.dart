@@ -167,7 +167,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                     children: [
                       Text(
                         repoInfo?.name.isNotEmpty == true ? repoInfo!.name : 'Project Overview',
-                        style: UnoTypography.body(color: p.text, fontSize: 20, fontWeight: FontWeight.w600),
+                        style: UnoTypography.displaySerif(palette: p, fontSize: 26),
                       ),
                       const SizedBox(width: 10),
                       Container(

@@ -1070,9 +1070,8 @@ class _ResponseCardState extends State<_ResponseCard> {
                         'BDD Intent Contract',
                         style: UnoTypography.displaySerif(
                           palette: widget.palette,
-                          fontSize: 16,
+                          fontSize: 16.5,
                           fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(width: 8),

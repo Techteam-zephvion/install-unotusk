@@ -27,7 +27,7 @@ class _DesktopWindowControlsState extends State<DesktopWindowControls>
   @override
   void initState() {
     super.initState();
-    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
       windowManager.addListener(this);
       _checkMaximized();
     }
@@ -42,7 +42,7 @@ class _DesktopWindowControlsState extends State<DesktopWindowControls>
 
   @override
   void dispose() {
-    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
       windowManager.removeListener(this);
     }
     super.dispose();
@@ -65,7 +65,7 @@ class _DesktopWindowControlsState extends State<DesktopWindowControls>
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb || (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS)) {
+    if (kIsWeb || (!Platform.isWindows && !Platform.isLinux)) {
       return const SizedBox.shrink();
     }
 

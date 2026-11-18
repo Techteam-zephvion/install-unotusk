@@ -46,12 +46,13 @@ class TopNavBar extends StatelessWidget {
     final displayBranch = branchName ?? 'main';
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final isWindowsOrLinux = !kIsWeb && (Platform.isWindows || Platform.isLinux);
 
     return Container(
       height: 52,
       padding: EdgeInsets.only(
         left: showSidebarToggle ? 10 : 20,
-        right: isDesktop ? 0 : 24,
+        right: isWindowsOrLinux ? 0 : 24,
       ),
       decoration: BoxDecoration(
         gradient: palette.headerGradient,
@@ -129,9 +130,9 @@ class TopNavBar extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         '$displayName · $displayBranch',
-                        style: UnoTypography.body(
+                        style: UnoTypography.mono(
                           color: palette.text,
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -242,8 +243,8 @@ class TopNavBar extends StatelessWidget {
                 ),
               ),
 
-              // Desktop Window Controls (Minimize, Maximize/Restore, Close)
-              if (isDesktop) ...[
+              // Desktop Window Controls (Minimize, Maximize/Restore, Close - Windows & Linux only)
+              if (isWindowsOrLinux) ...[
                 const SizedBox(width: 8),
                 DesktopWindowControls(palette: palette, height: 52),
               ],

@@ -72,9 +72,9 @@ class _SpecHistoryScreenState extends State<SpecHistoryScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'Project Intelligence Record',
-                    style: UnoTypography.brandSerif(
+                    style: UnoTypography.displaySerif(
                       palette: widget.palette,
-                      fontSize: 26,
+                      fontSize: 28,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -324,10 +324,9 @@ class _SpecHistoryScreenState extends State<SpecHistoryScreen> {
                                     const SizedBox(height: 6),
                                     Text(
                                       s.query,
-                                      style: UnoTypography.body(
-                                        color: widget.palette.text,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
+                                      style: UnoTypography.accentSerif(
+                                        palette: widget.palette,
+                                        fontSize: 15.5,
                                       ),
                                     ),
                                     const SizedBox(height: 6),

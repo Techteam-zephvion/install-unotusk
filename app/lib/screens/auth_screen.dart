@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
@@ -614,7 +614,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(width: 6),
                 Text(
                   isDark ? 'Dark' : 'Light',
-                  style: GoogleFonts.inter(
+                  style: AppFonts.body(
                     color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -645,7 +645,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(width: 9),
                 Text(
                   'Unotusk',
-                  style: GoogleFonts.youngSerif(
+                  style: AppFonts.youngSerif(
                     color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
                     fontSize: 16,
                   ),
@@ -660,7 +660,7 @@ class _AuthScreenState extends State<AuthScreen> {
         // ── Heading & Subtitle ──
         Text(
           _activeMode == 0 ? 'Sign in to Unotusk' : 'Sign up to Unotusk',
-          style: GoogleFonts.youngSerif(
+          style: AppFonts.accent(
             color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
             fontSize: 24,
           ),
@@ -670,7 +670,7 @@ class _AuthScreenState extends State<AuthScreen> {
           _activeMode == 0
               ? 'Enter your work email and password to access your workspace.'
               : 'Register a new project intelligence workspace.',
-          style: GoogleFonts.inter(
+          style: AppFonts.body(
             color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
             fontSize: 13,
             height: 1.4,
@@ -768,7 +768,7 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           child: Text(
             label,
-            style: GoogleFonts.inter(
+            style: AppFonts.body(
               color: isSelected
                   ? (isCardLight ? _AuthColors.pureWhite : _AuthColors.obsidianNavy)
                   : (isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate),
@@ -825,7 +825,7 @@ class _AuthScreenState extends State<AuthScreen> {
               controller: controller,
               obscureText: obscureText,
               textAlignVertical: TextAlignVertical.center,
-              style: GoogleFonts.inter(
+              style: AppFonts.body(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
                 color: textColor,
@@ -835,7 +835,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 hintText: hintText,
-                hintStyle: GoogleFonts.inter(
+                hintStyle: AppFonts.body(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w400,
                   color: hintColor,
@@ -869,7 +869,7 @@ class _AuthScreenState extends State<AuthScreen> {
         // Work Email Label
         Text(
           'Work Email',
-          style: GoogleFonts.inter(
+          style: AppFonts.body(
             color: labelColor,
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -888,7 +888,7 @@ class _AuthScreenState extends State<AuthScreen> {
         // Password Label with eye toggle
         Text(
           'Password',
-          style: GoogleFonts.inter(
+          style: AppFonts.body(
             color: labelColor,
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -944,7 +944,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   )
                 : Text(
                     'Sign In',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: btnFg,
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
@@ -979,7 +979,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 children: [
                   Text(
                     'Full Name',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: labelColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1002,7 +1002,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 children: [
                   Text(
                     'Organisation Name',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: labelColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1032,7 +1032,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 children: [
                   Text(
                     'Work Email',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: labelColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1055,7 +1055,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 children: [
                   Text(
                     'Password (min 8 chars)',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: labelColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1105,7 +1105,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 children: [
                   Text(
                     'Role',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: labelColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1134,7 +1134,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                         ),
                         isExpanded: true,
-                        style: GoogleFonts.inter(
+                        style: AppFonts.body(
                           color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
                           fontSize: 13,
                         ),
@@ -1183,7 +1183,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               setState(() => _termsAgreed = !_termsAgreed),
                           child: Text(
                             'I agree to terms of service',
-                            style: GoogleFonts.inter(
+                            style: AppFonts.body(
                               color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                               fontSize: 12,
                             ),
@@ -1226,7 +1226,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   )
                 : Text(
                     'Sign Up',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: btnFg,
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
@@ -1249,7 +1249,7 @@ class _AuthScreenState extends State<AuthScreen> {
       children: [
         Text(
           'Select project server',
-          style: GoogleFonts.youngSerif(
+          style: AppFonts.accent(
             color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
             fontSize: 24,
           ),
@@ -1257,7 +1257,7 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 6),
         Text(
           'Choose a running workspace instance to connect to.',
-          style: GoogleFonts.inter(
+          style: AppFonts.body(
             color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
             fontSize: 13,
           ),
@@ -1293,7 +1293,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 child: Text(
                   'Could not connect to registry: ${snapshot.error}',
-                  style: GoogleFonts.inter(color: Colors.red.shade300, fontSize: 13),
+                  style: AppFonts.body(color: Colors.red.shade300, fontSize: 13),
                 ),
               );
             }
@@ -1304,7 +1304,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'No running servers found.',
-                  style: GoogleFonts.inter(
+                  style: AppFonts.body(
                     color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                     fontSize: 13,
                   ),
@@ -1353,7 +1353,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     children: [
                                       Text(
                                         project.name,
-                                        style: GoogleFonts.inter(
+                                        style: AppFonts.body(
                                           color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
@@ -1361,7 +1361,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ),
                                       Text(
                                         'Port: $port',
-                                        style: GoogleFonts.ibmPlexMono(
+                                        style: AppFonts.mono(
                                           color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                                           fontSize: 11,
                                         ),
@@ -1392,7 +1392,7 @@ class _AuthScreenState extends State<AuthScreen> {
           onPressed: () => setState(() => _activeMode = 0),
           child: Text(
             'Back',
-            style: GoogleFonts.inter(
+            style: AppFonts.body(
               color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -1425,7 +1425,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               title: Text(
                 'Connect to Server',
-                style: GoogleFonts.youngSerif(
+                style: AppFonts.accent(
                   color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
                   fontSize: 19,
                 ),
@@ -1438,7 +1438,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   children: [
                     Text(
                       'Enter the Control Plane address (Port 28000):',
-                      style: GoogleFonts.inter(
+                      style: AppFonts.body(
                         color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                         fontSize: 13,
                       ),
@@ -1512,7 +1512,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 isScanningDialog ? 'Scanning Subnet...' : 'Auto-Detect',
-                                style: GoogleFonts.inter(
+                                style: AppFonts.body(
                                   color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -1551,7 +1551,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             Expanded(
                               child: Text(
                                 'Probing local endpoints & scanning subnet .1 to .254...',
-                                style: GoogleFonts.inter(
+                                style: AppFonts.body(
                                   color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                                   fontSize: 11,
                                 ),
@@ -1577,7 +1577,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               Expanded(
                                 child: Text(
                                   'Server discovered: ${dialogResult!.serverUrl}',
-                                  style: GoogleFonts.ibmPlexMono(color: const Color(0xFF6EC8B8), fontSize: 11),
+                                  style: AppFonts.mono(color: const Color(0xFF6EC8B8), fontSize: 11),
                                 ),
                               ),
                             ],
@@ -1598,7 +1598,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               Expanded(
                                 child: Text(
                                   'No servers found on the local network. Make sure your server is running or enter the address manually.',
-                                  style: GoogleFonts.inter(
+                                  style: AppFonts.body(
                                     color: const Color(0xFFE89885),
                                     fontSize: 12,
                                   ),
@@ -1616,7 +1616,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   onPressed: () => Navigator.of(ctx).pop(),
                   child: Text(
                     'Cancel',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.body(
                       color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                       fontSize: 13,
                     ),
@@ -1693,7 +1693,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Text(
                       'Server: ${ApiService.baseUrl}',
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.ibmPlexMono(
+                      style: AppFonts.mono(
                         color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
                         fontSize: 11,
                       ),

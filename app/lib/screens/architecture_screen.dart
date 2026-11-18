@@ -170,7 +170,7 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
                         children: [
                           Text(
                             'Architecture & Components',
-                            style: UnoTypography.body(color: p.text, fontSize: 18, fontWeight: FontWeight.w600),
+                            style: UnoTypography.displaySerif(palette: p, fontSize: 26),
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),

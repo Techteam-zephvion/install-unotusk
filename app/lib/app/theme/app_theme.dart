@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_fonts.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
@@ -8,6 +9,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      textTheme: AppFonts.textTheme(ThemeData.dark().textTheme),
       scaffoldBackgroundColor: AppColors.bgBase,
       canvasColor: AppColors.bgSurface,
       colorScheme: const ColorScheme.dark(
@@ -115,6 +117,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      textTheme: AppFonts.textTheme(ThemeData.light().textTheme),
       scaffoldBackgroundColor: AppColors.bgBaseLight,
       canvasColor: AppColors.bgSurfaceLight,
       colorScheme: const ColorScheme.light(

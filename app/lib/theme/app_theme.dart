@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'app_fonts.dart';
 
 class UnoPalette {
   final Color bgBase;
@@ -227,13 +227,14 @@ class UnoTypography {
     FontWeight fontWeight = FontWeight.w400,
     double lineHeight = 1.2,
     FontStyle fontStyle = FontStyle.normal,
+    double? letterSpacing,
   }) {
-    return GoogleFonts.instrumentSerif(
+    return AppFonts.display(
       fontSize: fontSize,
-      fontWeight: fontWeight,
       color: palette.text,
       fontStyle: fontStyle,
-      height: lineHeight,
+      lineHeight: lineHeight,
+      letterSpacing: letterSpacing,
     );
   }
 
@@ -241,12 +242,29 @@ class UnoTypography {
     required UnoPalette palette,
     double fontSize = 17,
     FontWeight fontWeight = FontWeight.w400,
+    double? letterSpacing = -0.2,
+    FontStyle fontStyle = FontStyle.normal,
   }) {
-    return GoogleFonts.youngSerif(
+    return AppFonts.youngSerif(
       fontSize: fontSize,
-      fontWeight: fontWeight,
       color: palette.text,
-      letterSpacing: -0.2,
+      fontStyle: fontStyle,
+      letterSpacing: letterSpacing,
+    );
+  }
+
+  static TextStyle accentSerif({
+    required UnoPalette palette,
+    double fontSize = 18,
+    FontWeight fontWeight = FontWeight.w400,
+    double? letterSpacing,
+    FontStyle fontStyle = FontStyle.normal,
+  }) {
+    return AppFonts.accent(
+      fontSize: fontSize,
+      color: palette.text,
+      fontStyle: fontStyle,
+      letterSpacing: letterSpacing,
     );
   }
 
@@ -257,7 +275,7 @@ class UnoTypography {
     double letterSpacing = 0.5,
     double? height,
   }) {
-    return GoogleFonts.ibmPlexMono(
+    return AppFonts.mono(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
@@ -271,12 +289,16 @@ class UnoTypography {
     double fontSize = 14,
     FontWeight fontWeight = FontWeight.normal,
     double height = 1.5,
+    double? letterSpacing,
+    FontStyle fontStyle = FontStyle.normal,
   }) {
-    return GoogleFonts.inter(
+    return AppFonts.body(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
       height: height,
+      letterSpacing: letterSpacing,
+      fontStyle: fontStyle,
     );
   }
 }

@@ -96,9 +96,9 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
               const SizedBox(height: 6),
               Text(
                 'Project Dashboard',
-                style: UnoTypography.brandSerif(
+                style: UnoTypography.displaySerif(
                   palette: widget.palette,
-                  fontSize: 26,
+                  fontSize: 28,
                 ),
               ),
               const SizedBox(height: 28),
