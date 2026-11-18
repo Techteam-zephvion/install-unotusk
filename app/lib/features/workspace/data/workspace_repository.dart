@@ -201,12 +201,16 @@ class WorkspaceRepository {
     String question, {
     String? conversationId,
     String thinkingTier = 'warm',
+    bool? enableStructureAwareStarRag,
   }) async {
     final payload = <String, dynamic>{
       'question': question,
       'thinking_tier': thinkingTier,
     };
     if (conversationId != null) payload['conversation_id'] = conversationId;
+    if (enableStructureAwareStarRag != null) {
+      payload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
+    }
 
     final response = await _apiClient.post(
       ApiEndpoints.projectAsk(projectId),

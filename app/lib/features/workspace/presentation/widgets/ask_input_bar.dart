@@ -5,13 +5,17 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 
 enum ThinkingTier { hot, warm, cold }
+enum RagEngineMode { auto, starRag, atom }
 
 class AskInputBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String>? onSubmitted;
   final void Function(String text, ThinkingTier tier)? onSubmittedWithTier;
+  final void Function(String text, ThinkingTier tier, bool? enableStarRag)? onSubmittedWithTierAndRag;
   final ValueChanged<ThinkingTier>? onTierChanged;
+  final ValueChanged<RagEngineMode>? onRagModeChanged;
   final ThinkingTier initialTier;
+  final RagEngineMode initialRagMode;
   final bool isGenerating;
   final String? placeholder;
   final ValueChanged<String>? onSuggestionSelect;
@@ -22,8 +26,11 @@ class AskInputBar extends StatefulWidget {
     required this.controller,
     this.onSubmitted,
     this.onSubmittedWithTier,
+    this.onSubmittedWithTierAndRag,
     this.onTierChanged,
+    this.onRagModeChanged,
     this.initialTier = ThinkingTier.warm,
+    this.initialRagMode = RagEngineMode.auto,
     this.isGenerating = false,
     this.placeholder,
     this.onSuggestionSelect,
@@ -39,6 +46,7 @@ class _AskInputBarState extends State<AskInputBar> {
   bool _thinkingOpen = false;
   bool _thinkingEnabled = true;
   late ThinkingTier _thinkingTier;
+  late RagEngineMode _ragMode;
   String? _activeSearchMode; // 'research' | 'web' | null
   bool _piEnabled = false;
   bool _showSuggestions = false;
@@ -67,6 +75,7 @@ class _AskInputBarState extends State<AskInputBar> {
   void initState() {
     super.initState();
     _thinkingTier = widget.initialTier;
+    _ragMode = widget.initialRagMode;
   }
 
   @override
@@ -74,6 +83,31 @@ class _AskInputBarState extends State<AskInputBar> {
     super.didUpdateWidget(oldWidget);
     if (widget.initialTier != oldWidget.initialTier) {
       _thinkingTier = widget.initialTier;
+    }
+    if (widget.initialRagMode != oldWidget.initialRagMode) {
+      _ragMode = widget.initialRagMode;
+    }
+  }
+
+  Color get _ragColor {
+    switch (_ragMode) {
+      case RagEngineMode.auto:
+        return AppColors.textSecondary;
+      case RagEngineMode.starRag:
+        return const Color(0xFFC678DD);
+      case RagEngineMode.atom:
+        return const Color(0xFF61AFEF);
+    }
+  }
+
+  String get _ragLabel {
+    switch (_ragMode) {
+      case RagEngineMode.auto:
+        return 'Auto (RAG)';
+      case RagEngineMode.starRag:
+        return 'STAR-RAG';
+      case RagEngineMode.atom:
+        return 'ATOM';
     }
   }
 
@@ -106,7 +140,13 @@ class _AskInputBarState extends State<AskInputBar> {
       _attachedFileNames.clear();
     });
     final effectiveTier = _thinkingEnabled ? _thinkingTier : ThinkingTier.warm;
-    if (widget.onSubmittedWithTier != null) {
+    final bool? starRagParam = _ragMode == RagEngineMode.auto
+        ? null
+        : (_ragMode == RagEngineMode.starRag);
+
+    if (widget.onSubmittedWithTierAndRag != null) {
+      widget.onSubmittedWithTierAndRag!(text, effectiveTier, starRagParam);
+    } else if (widget.onSubmittedWithTier != null) {
       widget.onSubmittedWithTier!(text, effectiveTier);
     } else if (widget.onSubmitted != null) {
       widget.onSubmitted!(text);
@@ -381,6 +421,59 @@ class _AskInputBarState extends State<AskInputBar> {
                                       Icons.keyboard_arrow_down,
                                       size: 13,
                                       color: _thinkingEnabled ? _thinkingColor : AppColors.textSecondary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 8),
+
+                            // RAG Engine Selector Pill
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  switch (_ragMode) {
+                                    case RagEngineMode.auto:
+                                      _ragMode = RagEngineMode.starRag;
+                                      break;
+                                    case RagEngineMode.starRag:
+                                      _ragMode = RagEngineMode.atom;
+                                      break;
+                                    case RagEngineMode.atom:
+                                      _ragMode = RagEngineMode.auto;
+                                      break;
+                                  }
+                                  widget.onRagModeChanged?.call(_ragMode);
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                height: 30,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: _ragColor.withValues(alpha: 0.10),
+                                  border: Border.all(
+                                    color: _ragColor.withValues(alpha: 0.45),
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.account_tree_outlined,
+                                      size: 13,
+                                      color: _ragColor,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      _ragLabel,
+                                      style: AppTextStyles.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: _ragColor,
+                                      ),
                                     ),
                                   ],
                                 ),

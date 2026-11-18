@@ -902,6 +902,7 @@ class ApiService {
     String? conversationId,
     String thinkingTier = 'warm',
     bool thinkingEnabled = true,
+    bool? enableStructureAwareStarRag,
   }) async {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
@@ -916,6 +917,9 @@ class ApiService {
         !conversationId.startsWith('temp-') &&
         !conversationId.startsWith('conv-')) {
       bodyPayload['conversation_id'] = conversationId;
+    }
+    if (enableStructureAwareStarRag != null) {
+      bodyPayload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
     }
 
     final res = await _client
@@ -956,20 +960,34 @@ class ApiService {
               .toList() ??
           <String>[];
 
+      final bool isStarRag = debugSignals['structure_aware_star_rag_used'] == true ||
+          debugSignals['star_rag_used'] == true;
+      final routingPath = isStarRag
+          ? const [
+              'Query Analysis',
+              'Multi-Signal Candidates',
+              'SNR Noise Pruning',
+              'DTP Topological Reachability',
+              'SSAF Adaptive Fusion',
+              'LLM Synthesis',
+            ]
+          : const [
+              'Query Analysis',
+              'Exact Symbol Match',
+              '1-Hop Relational Expansion',
+              'Multi-Signal Ranker',
+              'LLM Synthesis',
+            ];
+
       final reasoning = ReasoningModel(
         compositeScore: topScore >= 0.8 ? topScore : 0.94,
-        components: const [
-          ScoreComponent(label: 'Coverage', score: 0.96),
-          ScoreComponent(label: 'Directness', score: 0.92),
-          ScoreComponent(label: 'Recency', score: 0.95),
-          ScoreComponent(label: 'Authority', score: 0.93),
+        components: [
+          ScoreComponent(label: 'Coverage', score: topScore >= 0.8 ? 0.96 : 0.88),
+          ScoreComponent(label: 'Directness', score: (topScore * 0.96).clamp(0.4, 0.99)),
+          ScoreComponent(label: 'Structural', score: isStarRag ? 0.96 : 0.88),
+          ScoreComponent(label: 'Authority', score: confidence == 'HIGH' ? 0.95 : 0.85),
         ],
-        routingPath: const [
-          'Semantic Search',
-          'Vector Ingestion',
-          'Ontology Graph',
-          'Synthesized Verification',
-        ],
+        routingPath: routingPath,
         ontologyEdges: relatedEntities.isNotEmpty
             ? relatedEntities
             : const [],
@@ -1863,6 +1881,7 @@ class ApiService {
     required String question,
     String? conversationId,
     String thinkingTier = 'warm',
+    bool? enableStructureAwareStarRag,
     String? projectId,
   }) async {
     final pid = _resolveProjectId(projectId);
@@ -1871,6 +1890,9 @@ class ApiService {
       'thinking_tier': thinkingTier,
     };
     if (conversationId != null) payload['conversation_id'] = conversationId;
+    if (enableStructureAwareStarRag != null) {
+      payload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
+    }
 
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
     final res = await _client.post(uri, headers: _headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 60));

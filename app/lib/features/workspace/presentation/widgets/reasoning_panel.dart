@@ -14,6 +14,11 @@ class ReasoningData {
   final List<String> routingPath;
   final List<String> ontologyEdges;
   final List<String> citations;
+  final String? routingDecision;
+  final bool isStarRag;
+  final int? candidatesCount;
+  final int? expandedCount;
+  final Map<String, dynamic>? debugSignals;
 
   const ReasoningData({
     required this.compositeScore,
@@ -21,6 +26,11 @@ class ReasoningData {
     required this.routingPath,
     required this.ontologyEdges,
     required this.citations,
+    this.routingDecision,
+    this.isStarRag = false,
+    this.candidatesCount,
+    this.expandedCount,
+    this.debugSignals,
   });
 }
 
@@ -56,6 +66,28 @@ class _ReasoningPanelState extends State<ReasoningPanel> {
     return 'INSUFFICIENT';
   }
 
+  Widget _buildEngineBadge() {
+    final bool isStar = widget.reasoning.isStarRag;
+    final color = isStar ? const Color(0xFFC678DD) : const Color(0xFF61AFEF);
+    final label = isStar ? 'STAR-RAG' : 'ATOM';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.mono(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final thoughtSeconds = (widget.reasoning.compositeScore * 2.8).toStringAsFixed(1);
@@ -89,6 +121,8 @@ class _ReasoningPanelState extends State<ReasoningPanel> {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  _buildEngineBadge(),
                   const SizedBox(width: 6),
                   AnimatedRotation(
                     turns: _isOpen ? 0.5 : 0.0,
@@ -184,6 +218,73 @@ class _ReasoningPanelState extends State<ReasoningPanel> {
                           ],
                         ),
                       )),
+
+                  const SizedBox(height: 14),
+
+                  // RAG Pipeline Diagnostics
+                  Text('RAG PIPELINE EXECUTION', style: _sectionHeaderStyle),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgElevated,
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Engine: ',
+                              style: AppTextStyles.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              widget.reasoning.isStarRag ? 'Structure-Aware STAR-RAG' : 'Baseline ATOM',
+                              style: AppTextStyles.mono(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: widget.reasoning.isStarRag ? const Color(0xFFC678DD) : const Color(0xFF61AFEF),
+                              ),
+                            ),
+                            if (widget.reasoning.routingDecision != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.bgSurface,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AppColors.divider),
+                                ),
+                                child: Text(
+                                  widget.reasoning.routingDecision!,
+                                  style: AppTextStyles.mono(
+                                    fontSize: 10,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (widget.reasoning.candidatesCount != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Candidates: ${widget.reasoning.candidatesCount} retrieved · ${widget.reasoning.expandedCount ?? widget.reasoning.candidatesCount} expanded',
+                            style: AppTextStyles.mono(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
 
                   const SizedBox(height: 14),
 
