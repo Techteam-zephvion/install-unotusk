@@ -30,6 +30,41 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   bool _isDownloading = false;
   late final bool _isWebViewSupported;
 
+  static String sanitizeMermaid(String raw) {
+    var c = raw.trim();
+    if (c.startsWith('```mermaid')) {
+      c = c.substring(10).trim();
+    } else if (c.startsWith('```')) {
+      c = c.substring(3).trim();
+    }
+    if (c.endsWith('```')) {
+      c = c.substring(0, c.length - 3).trim();
+    }
+
+    final lines = c.split('\n');
+    final firstLine = lines.isNotEmpty ? lines.first.trim() : '';
+    final hasHeader = firstLine.startsWith('flowchart') ||
+        firstLine.startsWith('graph') ||
+        firstLine.startsWith('sequenceDiagram') ||
+        firstLine.startsWith('classDiagram') ||
+        firstLine.startsWith('stateDiagram') ||
+        firstLine.startsWith('erDiagram') ||
+        firstLine.startsWith('gantt') ||
+        firstLine.startsWith('pie');
+
+    if (!hasHeader) {
+      c = 'flowchart TD\n$c';
+    }
+
+    // Auto-quote unquoted labels containing parentheses, slashes, or hyphens e.g. A[Label (info)] -> A["Label (info)"]
+    c = c.replaceAllMapped(
+      RegExp(r'(\b[a-zA-Z0-9_]+)\[([^"\]\n]*[\(\)\/\s\-][^"\]\n]*)\]'),
+      (match) => '${match.group(1)}["${match.group(2)}"]',
+    );
+
+    return c;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,7 +80,7 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   }
 
   String _getMermaidImageUrl({String format = 'png'}) {
-    final cleanCode = widget.code.trim();
+    final cleanCode = sanitizeMermaid(widget.code);
     final payload = jsonEncode({
       'code': cleanCode,
       'mermaid': {
@@ -225,6 +260,298 @@ $cleanCode
     );
   }
 
+  Widget _buildNativeVisualFlowchart(UnoPalette p) {
+    final clean = sanitizeMermaid(widget.code);
+    final lines = clean.split('\n');
+
+    // Sequence diagram check
+    if (clean.toLowerCase().contains('sequencediagram')) {
+      final steps = <String>[];
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.contains('->>') || trimmed.contains('-->>')) {
+          steps.add(trimmed);
+        }
+      }
+      return Container(
+        padding: const EdgeInsets.all(16),
+        color: const Color(0xFF131311),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(LucideIcons.arrowRightLeft, size: 14, color: p.accent),
+                const SizedBox(width: 8),
+                Text(
+                  'Sequence Interaction Flow',
+                  style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text('NATIVE VIEWER', style: UnoTypography.mono(color: p.accent, fontSize: 9)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...steps.asMap().entries.map((entry) {
+              final idx = entry.key + 1;
+              final step = entry.value;
+              final isReturn = step.contains('-->>');
+              final arrow = isReturn ? '⇠' : '⇢';
+              final parts = step.split(isReturn ? '-->>' : '->>');
+              final from = parts.isNotEmpty ? parts[0].trim() : '';
+              final rest = parts.length > 1 ? parts[1].trim() : '';
+              final toAndMsg = rest.split(':');
+              final to = toAndMsg.isNotEmpty ? toAndMsg[0].trim() : '';
+              final msg = toAndMsg.length > 1 ? toAndMsg[1].replaceAll('"', '').trim() : '';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: p.bgSurface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: p.div, width: 0.8),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 10,
+                      backgroundColor: p.accent.withValues(alpha: 0.2),
+                      child: Text(
+                        '$idx',
+                        style: UnoTypography.mono(color: p.accent, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      from,
+                      style: UnoTypography.mono(color: const Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      arrow,
+                      style: TextStyle(color: p.textSec, fontSize: 14),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      to,
+                      style: UnoTypography.mono(color: const Color(0xFFC678DD), fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        msg,
+                        style: UnoTypography.body(color: p.text, fontSize: 11.5),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      );
+    }
+
+    // Flowchart / Graph parser
+    final subgraphs = <String, List<String>>{};
+    String? currentSubgraph;
+    final rootNodes = <String>[];
+    final edges = <String>[];
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith('subgraph')) {
+        final match = RegExp(r'subgraph\s+([a-zA-Z0-9_]+)\s*(?:\["?([^"\]]+)"?\])?').firstMatch(trimmed);
+        currentSubgraph = match?.group(2) ?? match?.group(1) ?? 'Components';
+        subgraphs[currentSubgraph] = [];
+      } else if (trimmed == 'end') {
+        currentSubgraph = null;
+      } else if (trimmed.contains('-->') || trimmed.contains('-.->') || trimmed.contains('==>')) {
+        edges.add(trimmed);
+      } else if (trimmed.contains('[') && trimmed.contains(']')) {
+        final nodeMatch = RegExp(r'([a-zA-Z0-9_]+)\["?([^"\]]+)"?\]').firstMatch(trimmed);
+        if (nodeMatch != null) {
+          final label = nodeMatch.group(2) ?? nodeMatch.group(1)!;
+          if (currentSubgraph != null) {
+            subgraphs[currentSubgraph]!.add(label);
+          } else {
+            rootNodes.add(label);
+          }
+        }
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: const Color(0xFF131311),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(LucideIcons.boxes, size: 14, color: p.accent),
+              const SizedBox(width: 8),
+              Text(
+                'Architecture Spec Topology',
+                style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('NATIVE RENDER', style: UnoTypography.mono(color: p.accent, fontSize: 9)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Subgraphs list
+          ...subgraphs.entries.map((entry) {
+            final title = entry.key;
+            final nodes = entry.value;
+            final isPres = title.toLowerCase().contains('presentation') || title.toLowerCase().contains('client');
+            final isApi = title.toLowerCase().contains('api') || title.toLowerCase().contains('gateway') || title.toLowerCase().contains('control');
+            final isDomain = title.toLowerCase().contains('domain') || title.toLowerCase().contains('service') || title.toLowerCase().contains('routing') || title.toLowerCase().contains('synthesis');
+            final isData = title.toLowerCase().contains('data') || title.toLowerCase().contains('storage') || title.toLowerCase().contains('database');
+
+            final color = isPres
+                ? const Color(0xFF38BDF8)
+                : (isApi
+                    ? const Color(0xFFA855F7)
+                    : (isDomain
+                        ? const Color(0xFF10B981)
+                        : (isData ? const Color(0xFFF59E0B) : p.accent)));
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: p.bgSurface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: color.withValues(alpha: 0.4), width: 1.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        title,
+                        style: UnoTypography.mono(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  if (nodes.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: nodes.map((n) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF181816),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(color: p.div),
+                          ),
+                          child: Text(
+                            n,
+                            style: UnoTypography.body(color: p.text, fontSize: 11),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+
+          // Root components if any
+          if (rootNodes.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: p.bgSurface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: p.accent.withValues(alpha: 0.35), width: 1.0),
+              ),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: rootNodes.map((n) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF181816),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: p.div),
+                    ),
+                    child: Text(
+                      n,
+                      style: UnoTypography.body(color: p.text, fontSize: 11),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+
+          // Flow connections
+          if (edges.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF181816),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: p.div, width: 0.7),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Direct Execution & Control Flows',
+                    style: UnoTypography.mono(color: p.textSec, fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: edges.take(8).map((edge) {
+                      return Text(
+                        edge.replaceAll('"', ''),
+                        style: UnoTypography.mono(color: p.textSec, fontSize: 10),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildDiagramView(UnoPalette p) {
     if (_isWebViewSupported) {
       return SizedBox(
@@ -247,23 +574,7 @@ $cleanCode
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            color: p.warn.withValues(alpha: 0.1),
-            child: Row(
-              children: [
-                Icon(LucideIcons.info, size: 13, color: p.warn),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Remote render unavailable offline. Showing Mermaid source.',
-                    style: UnoTypography.mono(color: p.warn, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildCodeView(p),
+          _buildNativeVisualFlowchart(p),
         ],
       );
     }

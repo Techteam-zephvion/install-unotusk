@@ -116,6 +116,15 @@ class GroqProvider(LLMProvider):
                     f"{question}\n\n"
                     f"Please provide an evidence-grounded answer based strictly on the above context."
                 )
+                q_lower = question.lower()
+                if any(k in q_lower for k in ("diagram", "architecture", "flowchart", "workflow", "design", "sequence", "graph", "structure", "spec")):
+                    user_prompt += (
+                        "\n\nDIAGRAM REQUIREMENT:\n"
+                        "Include a tailored, syntactically valid Mermaid diagram (```mermaid ... ```) illustrating the "
+                        "specific components, modules, dependencies, and execution flow for this question. "
+                        "Always enclose node labels in double quotes (e.g. NodeId[\"Module Name (detail)\"]) to ensure valid parsing, "
+                        "and organize components into semantic subgraphs with distinct directional flow."
+                    )
                 messages.append({"role": "user", "content": user_prompt})
 
                 max_retries = 2

@@ -1033,8 +1033,8 @@ class ApiService {
     }
   }
 
-  /// Synthesizes a valid Mermaid flowchart if the user requested a diagram/flowchart/architecture
-  /// or if the response analysis is an architecture breakdown without a ```mermaid block.
+  /// Synthesizes a valid, archetype-aware Mermaid diagram if the user requested
+  /// architecture/diagram/flowchart, or sanitizes existing Mermaid code to guarantee error-free rendering.
   static String synthesizeMermaidDiagram({
     required String question,
     required String content,
@@ -1042,7 +1042,19 @@ class ApiService {
     List<EvidenceItem> evidence = const [],
   }) {
     if (content.contains('```mermaid')) {
-      return content;
+      // Sanitize existing Mermaid block to fix unquoted brackets that cause Mermaid parser crashes
+      return content.replaceAllMapped(
+        RegExp(r'```mermaid([\s\S]*?)```'),
+        (match) {
+          var code = match.group(1) ?? '';
+          // Auto-quote unquoted labels containing parentheses, slashes, or hyphens e.g. A[Label (info)] -> A["Label (info)"]
+          code = code.replaceAllMapped(
+            RegExp(r'(\b[a-zA-Z0-9_]+)\[([^"\]\n]*[\(\)\/\s\-][^"\]\n]*)\]'),
+            (m) => '${m.group(1)}["${m.group(2)}"]',
+          );
+          return '```mermaid$code```';
+        },
+      );
     }
 
     final qLower = question.toLowerCase();
@@ -1053,6 +1065,10 @@ class ApiService {
         qLower.contains('diagram') ||
         qLower.contains('visualize') ||
         qLower.contains('graph') ||
+        qLower.contains('architecture') ||
+        qLower.contains('workflow') ||
+        qLower.contains('structure') ||
+        qLower.contains('spec') ||
         cLower.contains('mermaid') ||
         cLower.contains('flowchart') ||
         (cLower.contains('project analysis') && cLower.contains('visualize'));
@@ -1091,7 +1107,7 @@ class ApiService {
       }
     }
     if (files.isEmpty && citations.isNotEmpty) {
-      files.addAll(citations.take(3));
+      files.addAll(citations.take(4));
     }
 
     // Extract connected components
@@ -1120,41 +1136,138 @@ class ApiService {
       }
     }
 
-    if (symbols.isEmpty && files.isEmpty && components.isEmpty) {
-      return content;
-    }
-
     final buffer = StringBuffer();
     buffer.writeln('\n\n### Architecture & Flowchart Visualization\n');
     buffer.writeln('```mermaid');
-    buffer.writeln('flowchart TD');
-    buffer.writeln('    Client["Client Request"] --> Gateway["FastAPI Server / Control Plane"]');
 
-    final mainFile = files.isNotEmpty ? files.first : 'backend/main.py';
-    buffer.writeln('    Gateway --> MainFile["$mainFile"]');
+    // ── Archetype 1: Authentication / Identity Flow ──
+    final isAuth = qLower.contains('auth') ||
+        qLower.contains('login') ||
+        qLower.contains('jwt') ||
+        qLower.contains('token') ||
+        qLower.contains('security') ||
+        qLower.contains('user');
 
-    if (symbols.isNotEmpty) {
-      buffer.writeln('    subgraph Endpoints ["Key Endpoints & Handlers"]');
-      for (int i = 0; i < symbols.length && i < 6; i++) {
-        final sym = symbols[i];
-        buffer.writeln('        F$i["$sym()"]');
+    // ── Archetype 2: RAG / Code Intelligence Pipeline ──
+    final isRag = qLower.contains('rag') ||
+        qLower.contains('atom') ||
+        qLower.contains('star') ||
+        qLower.contains('retriev') ||
+        qLower.contains('embed') ||
+        qLower.contains('vector') ||
+        qLower.contains('search') ||
+        qLower.contains('context');
+
+    // ── Archetype 3: Database & Storage Topology ──
+    final isData = qLower.contains('database') ||
+        qLower.contains('postgres') ||
+        qLower.contains('sql') ||
+        qLower.contains('schema') ||
+        qLower.contains('table') ||
+        qLower.contains('migration') ||
+        qLower.contains('model');
+
+    if (isAuth) {
+      buffer.writeln('sequenceDiagram');
+      buffer.writeln('    autonumber');
+      buffer.writeln('    actor Client as "Desktop Client / User"');
+      buffer.writeln('    participant Gateway as "FastAPI Gateway (/api/v1)"');
+      buffer.writeln('    participant AuthService as "AuthService (HS256 JWT)"');
+      buffer.writeln('    participant Database as "PostgreSQL 16 (Users & Orgs)"');
+      buffer.writeln('    participant Protected as "Protected Intelligence API"');
+      buffer.writeln('    Client->>Gateway: "POST /auth/login (Credentials)"');
+      buffer.writeln('    Gateway->>AuthService: "Verify Email & Password Hash"');
+      buffer.writeln('    AuthService->>Database: "Query User & Org Membership"');
+      buffer.writeln('    Database-->>AuthService: "User Record"');
+      buffer.writeln('    AuthService-->>Client: "200 OK + Access Token (JWT)"');
+      buffer.writeln('    Client->>Protected: "GET /projects/{id}/ask (Bearer Token)"');
+      buffer.writeln('    Protected->>AuthService: "Validate Token Claims"');
+      buffer.writeln('    Protected-->>Client: "200 OK (Grounded Architecture Answer)"');
+    } else if (isRag) {
+      buffer.writeln('flowchart TD');
+      buffer.writeln('    subgraph IngestionLane ["1. Ingestion & Indexing Engine"]');
+      buffer.writeln('        P1["Tree-sitter Parser"] --> P2["AST Symbol Extractor"]');
+      buffer.writeln('        P2 --> P3["Line-Bounded Chunks"]');
+      buffer.writeln('        P3 --> P4["Voyage AI 1536d Embeddings"]');
+      buffer.writeln('    end');
+      buffer.writeln('    subgraph StorageLane ["2. Persistence Layer"]');
+      buffer.writeln('        P4 --> DB[("PostgreSQL 16 + pgvector")]');
+      buffer.writeln('        GC[("FunctionGraph Cache (Redis 7)")]');
+      buffer.writeln('    end');
+      buffer.writeln('    subgraph RoutingLane ["3. Selective Intent Routing"]');
+      buffer.writeln('        Q["User Query"] --> SR["StarRagSelectiveRouter"]');
+      buffer.writeln('        SR -->|Direct Code Lookup| ATOM["Baseline ATOM Engine"]');
+      buffer.writeln('        SR -->|Structural Tracing| STAR["Structure-Aware STAR-RAG"]');
+      buffer.writeln('        STAR --> SNR["SNR Noise Pruning (98.7% noise suppression)"]');
+      buffer.writeln('        SNR --> DTP["DTP Reachability & Hub Attenuation"]');
+      buffer.writeln('        DTP --> SSAF["SSAF Adaptive Score Fusion"]');
+      buffer.writeln('    end');
+      buffer.writeln('    subgraph SynthesisLane ["4. Grounded Synthesis"]');
+      buffer.writeln('        ATOM --> LLM["LLM Grounded Synthesizer (Groq/Claude)"]');
+      buffer.writeln('        SSAF --> LLM');
+      buffer.writeln('        LLM --> ANS["Grounded Answer + Citations"]');
+      buffer.writeln('    end');
+      buffer.writeln('    DB -.-> ATOM');
+      buffer.writeln('    GC -.-> STAR');
+      buffer.writeln('    classDef client fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    classDef star fill:#2E1065,stroke:#C678DD,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    classDef db fill:#332200,stroke:#F59E0B,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    class Q,ANS client;');
+      buffer.writeln('    class STAR,SNR,DTP,SSAF star;');
+      buffer.writeln('    class DB,GC db;');
+    } else if (isData) {
+      buffer.writeln('erDiagram');
+      buffer.writeln('    ORGANIZATION ||--o{ PROJECT : contains');
+      buffer.writeln('    PROJECT ||--o{ REPOSITORY : tracks');
+      buffer.writeln('    REPOSITORY ||--o{ REPOSITORY_SNAPSHOT : versions');
+      buffer.writeln('    REPOSITORY_SNAPSHOT ||--o{ CODE_CHUNK : indexes');
+      buffer.writeln('    REPOSITORY_SNAPSHOT ||--o{ CODE_SYMBOL : extracts');
+      buffer.writeln('    CODE_CHUNK ||--o{ CODE_DEPENDENCY : calls');
+      buffer.writeln('    PROJECT ||--o{ CONVERSATION : logs');
+      buffer.writeln('    CONVERSATION ||--o{ MESSAGE : contains');
+    } else {
+      // ── Clean / Layered Architecture ──
+      buffer.writeln('flowchart TD');
+      buffer.writeln('    subgraph PresentationLayer ["1. Presentation Layer (Desktop UI)"]');
+      buffer.writeln('        UI_Client["Flutter Client (Warm Dark UI)"]');
+      buffer.writeln('        UI_Ask["AskTab & ReasoningPanel"]');
+      buffer.writeln('        UI_Arch["ArchitectureScreen (Component Graph)"]');
+      buffer.writeln('    end');
+      buffer.writeln('    subgraph ApiLayer ["2. API & Control Plane (Port 28000)"]');
+      buffer.writeln('        API_Gw["FastAPI Async Server"]');
+      buffer.writeln('        API_Intel["IntelligenceRouter (/api/v1/projects/{id}/ask)"]');
+      buffer.writeln('        API_Auth["Auth Middleware & JWT Security"]');
+      buffer.writeln('    end');
+      buffer.writeln('    subgraph DomainLayer ["3. Domain & Intelligence Services"]');
+      final domainSymbols = symbols.isNotEmpty ? symbols : ['ProjectContextEngine', 'MultiSignalRetriever', 'StarRagService'];
+      for (int i = 0; i < domainSymbols.length && i < 4; i++) {
+        final s = domainSymbols[i];
+        buffer.writeln('        DOM_$i["$s"]');
       }
       buffer.writeln('    end');
-      buffer.writeln('    MainFile --> Endpoints');
-    }
-
-    if (components.isNotEmpty) {
-      buffer.writeln('    subgraph Entities ["Connected Schemas & Components"]');
-      for (int i = 0; i < components.length && i < 5; i++) {
-        final comp = components[i];
-        buffer.writeln('        C$i["$comp"]');
+      buffer.writeln('    subgraph DataLayer ["4. Persistence & Storage Layer"]');
+      buffer.writeln('        DB_Pg[("PostgreSQL 16 + pgvector (1536d)")]');
+      buffer.writeln('        DB_Redis[("Redis 7 (Task Queue & Cache)")]');
+      if (files.isNotEmpty) {
+        for (int i = 0; i < files.length && i < 2; i++) {
+          final f = files[i];
+          buffer.writeln('        FILE_$i["$f"]');
+        }
       }
       buffer.writeln('    end');
-      if (symbols.isNotEmpty) {
-        buffer.writeln('    Endpoints -.-> Entities');
-      } else {
-        buffer.writeln('    MainFile -.-> Entities');
-      }
+      buffer.writeln('    UI_Client --> API_Gw');
+      buffer.writeln('    API_Gw --> API_Intel');
+      buffer.writeln('    API_Intel --> DOM_0');
+      buffer.writeln('    DOM_0 --> DB_Pg');
+      buffer.writeln('    DOM_0 -.-> DB_Redis');
+      buffer.writeln('    classDef pres fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    classDef api fill:#2A1B3D,stroke:#A855F7,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    classDef domain fill:#1A2E26,stroke:#10B981,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    classDef storage fill:#332200,stroke:#F59E0B,stroke-width:1.5px,color:#F8FAFC;');
+      buffer.writeln('    class UI_Client,UI_Ask,UI_Arch pres;');
+      buffer.writeln('    class API_Gw,API_Intel,API_Auth api;');
+      buffer.writeln('    class DOM_0,DOM_1,DOM_2 domain;');
+      buffer.writeln('    class DB_Pg,DB_Redis storage;');
     }
 
     buffer.writeln('```\n');

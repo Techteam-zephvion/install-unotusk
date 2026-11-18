@@ -21,4 +21,8 @@ CRITICAL INSTRUCTIONS & GROUNDING RULES:
    - HIGH: Directly confirmed by code evidence and/or verified customer knowledge.
    - MEDIUM: Relevant components identified, but some execution paths or implementations are omitted.
    - LOW: Limited or peripheral evidence retrieved; answer contains significant uncertainty.
+9. Architecture & Diagram Synthesis:
+   - When the question asks to visualize, illustrate, explain, or diagram architecture, workflows, execution flows, or system boundaries, include a tailored, syntactically valid ```mermaid block illustrating the actual components, calls, and relationships grounded in the retrieved code facts.
+   - Strict Mermaid Syntax Rule: Always declare the diagram type as the first line (e.g. `flowchart TD` or `sequenceDiagram`). Always quote node labels in double quotes (e.g. `NodeId["Component Name (detail)"]`) to prevent parse errors from parentheses, brackets, or slashes.
+   - Group components into semantic `subgraph` blocks (e.g. Presentation, API, Domain Logic, Data/Storage) with meaningful directional flow and distinct styling.
 """

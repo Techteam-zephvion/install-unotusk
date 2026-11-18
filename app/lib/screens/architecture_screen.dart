@@ -76,6 +76,22 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
     }
   }
 
+  Color _layerColor(String layer) {
+    switch (layer.toUpperCase()) {
+      case 'PRESENTATION':
+        return const Color(0xFF38BDF8); // Electric Sky Blue
+      case 'DOMAIN':
+        return const Color(0xFFC678DD); // Vivid Purple / Logic
+      case 'DATA':
+        return const Color(0xFF10B981); // Emerald Green / Storage
+      case 'CORE':
+        return const Color(0xFFF59E0B); // Warm Amber / Framework
+      case 'ALL':
+      default:
+        return p.accent; // Terracotta Accent
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -218,27 +234,55 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
                     const SizedBox(width: 10),
                     ..._layers.map((layer) {
                       final isSel = _selectedLayer == layer;
+                      final layerCol = _layerColor(layer);
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: InkWell(
                           onTap: () => setState(() => _selectedLayer = layer),
                           borderRadius: BorderRadius.circular(6),
-                          child: Container(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: isSel ? p.accent.withValues(alpha: 0.15) : Colors.transparent,
+                              color: isSel ? layerCol.withValues(alpha: 0.18) : Colors.transparent,
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: isSel ? p.accent : p.div,
+                                color: isSel ? layerCol : p.div,
+                                width: isSel ? 1.2 : 1.0,
                               ),
+                              boxShadow: isSel
+                                  ? [
+                                      BoxShadow(
+                                        color: layerCol.withValues(alpha: 0.15),
+                                        blurRadius: 8,
+                                        spreadRadius: 0.5,
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                            child: Text(
-                              layer,
-                              style: UnoTypography.mono(
-                                color: isSel ? p.accent : p.textSec,
-                                fontSize: 10,
-                                fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSel && layer != 'ALL') ...[
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: layerCol,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                ],
+                                Text(
+                                  layer,
+                                  style: UnoTypography.mono(
+                                    color: isSel ? layerCol : p.textSec,
+                                    fontSize: 10.5,
+                                    fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -276,6 +320,7 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
                         itemBuilder: (context, index) {
                           final comp = filtered[index];
                           final isSelected = _selectedComponent?.id == comp.id;
+                          final compColor = _layerColor(comp.layer);
 
                           return InkWell(
                             onTap: () => setState(() => _selectedComponent = comp),
@@ -284,12 +329,13 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? p.accent.withValues(alpha: 0.10)
+                                    ? compColor.withValues(alpha: 0.12)
                                     : null,
                                 gradient: isSelected ? null : p.sectionGradient,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: isSelected ? p.accent : p.div,
+                                  color: isSelected ? compColor : p.div,
+                                  width: isSelected ? 1.3 : 1.0,
                                 ),
                               ),
                               child: Column(
@@ -499,40 +545,19 @@ class _ArchitectureScreenState extends State<ArchitectureScreen> {
   }
 
   Widget _layerBadge(String layer) {
-    Color bg;
-    Color fg;
-    switch (layer.toUpperCase()) {
-      case 'PRESENTATION':
-        bg = const Color(0xFF3B82F6).withValues(alpha: 0.15);
-        fg = const Color(0xFF3B82F6);
-        break;
-      case 'DOMAIN':
-        bg = const Color(0xFF10B981).withValues(alpha: 0.15);
-        fg = const Color(0xFF10B981);
-        break;
-      case 'DATA':
-        bg = const Color(0xFFF59E0B).withValues(alpha: 0.15);
-        fg = const Color(0xFFF59E0B);
-        break;
-      case 'CORE':
-        bg = const Color(0xFF8B5CF6).withValues(alpha: 0.15);
-        fg = const Color(0xFF8B5CF6);
-        break;
-      default:
-        bg = p.bgElevated;
-        fg = p.textSec;
-        break;
-    }
+    final fg = _layerColor(layer);
+    final bg = fg.withValues(alpha: 0.15);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: fg.withValues(alpha: 0.35), width: 0.8),
       ),
       child: Text(
         layer.toUpperCase(),
-        style: UnoTypography.mono(color: fg, fontSize: 9, letterSpacing: 0.5),
+        style: UnoTypography.mono(color: fg, fontSize: 9.5, fontWeight: FontWeight.w600),
       ),
     );
   }
