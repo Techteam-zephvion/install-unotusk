@@ -23,6 +23,8 @@ class ProjectsScreen extends StatefulWidget {
   final UserModel? user;
   final void Function(ProjectItem project) onOpenProject;
   final VoidCallback onLogOut;
+  final List<ProjectItem>? initialConnectedProjects;
+  final ValueChanged<List<ProjectItem>>? onConnectedProjectsChanged;
 
   const ProjectsScreen({
     super.key,
@@ -33,6 +35,8 @@ class ProjectsScreen extends StatefulWidget {
     this.user,
     required this.onOpenProject,
     required this.onLogOut,
+    this.initialConnectedProjects,
+    this.onConnectedProjectsChanged,
   });
 
   @override
@@ -113,15 +117,28 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     if (ApiService.connectedProjectIds.isEmpty) {
       ApiService.loadPersistedConnectedProjects();
     }
-    if (ApiService.cachedProjects.isNotEmpty) {
+    if (ApiService.isControlPlane && ApiService.cachedProjects.isNotEmpty) {
       final validIds = ApiService.cachedProjects.map((p) => p.id.toLowerCase()).toSet();
       final validNames = ApiService.cachedProjects.map((p) => p.name.toLowerCase()).toSet();
       ApiService.connectedProjectIds.removeWhere((id) =>
           !validIds.contains(id.toLowerCase()) &&
           !validNames.contains(id.toLowerCase()));
     }
-    if (ApiService.connectedWorkspaceProjects.isNotEmpty) {
+    if (widget.initialConnectedProjects != null && widget.initialConnectedProjects!.isNotEmpty) {
+      _projects.addAll(widget.initialConnectedProjects!);
+      for (final p in widget.initialConnectedProjects!) {
+        ApiService.connectedProjectIds.add(p.id);
+        ApiService.connectedProjectIds.add(p.name);
+      }
+      ApiService.connectedWorkspaceProjects
+        ..clear()
+        ..addAll(_projects);
+    } else if (ApiService.connectedWorkspaceProjects.isNotEmpty) {
       _projects.addAll(ApiService.connectedWorkspaceProjects);
+      for (final p in ApiService.connectedWorkspaceProjects) {
+        ApiService.connectedProjectIds.add(p.id);
+        ApiService.connectedProjectIds.add(p.name);
+      }
     } else {
       for (final p in ApiService.cachedProjects) {
         if (ApiService.connectedProjectIds.contains(p.id) ||
@@ -173,11 +190,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _isRefreshingProjects = false;
         _availableBackendProjects = List<ProjectItem>.from(serverProjects);
         
-        final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
-        final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
-        ApiService.connectedProjectIds.removeWhere((id) =>
-            !validIds.contains(id.toLowerCase()) &&
-            !validNames.contains(id.toLowerCase()));
+        if (ApiService.isControlPlane) {
+          final validIds = serverProjects.map((p) => p.id.toLowerCase()).toSet();
+          final validNames = serverProjects.map((p) => p.name.toLowerCase()).toSet();
+          ApiService.connectedProjectIds.removeWhere((id) =>
+              !validIds.contains(id.toLowerCase()) &&
+              !validNames.contains(id.toLowerCase()));
+        }
 
         _projects.clear();
         for (final p in serverProjects) {
@@ -195,6 +214,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ApiService.connectedWorkspaceProjects
           ..clear()
           ..addAll(_projects);
+        widget.onConnectedProjectsChanged?.call(_projects);
       });
     } catch (e) {
       if (!mounted) return;
@@ -375,6 +395,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ..clear()
         ..addAll(_projects);
     });
+    widget.onConnectedProjectsChanged?.call(_projects);
     ApiService.savePersistedConnectedProjects();
   }
 
@@ -398,6 +419,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ..clear()
         ..addAll(_projects);
     });
+    widget.onConnectedProjectsChanged?.call(_projects);
     ApiService.savePersistedConnectedProjects();
   }
 

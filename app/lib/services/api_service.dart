@@ -205,6 +205,13 @@ class ApiService {
   static final Set<String> connectedProjectIds = {};
   static final List<ProjectItem> connectedWorkspaceProjects = [];
 
+  /// Returns true if the current baseUrl targets the Control Plane (port 28000).
+  /// Data plane instances run on ports 28100-28999.
+  static bool get isControlPlane {
+    final uri = Uri.tryParse(baseUrl);
+    return uri == null || uri.port == 28000;
+  }
+
   static File? get _connectedProjectsFile {
     if (kIsWeb) return null;
     final email = activeUser?.email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_') ?? 'default';
@@ -229,6 +236,8 @@ class ApiService {
   static void savePersistedConnectedProjects() {
     try {
       if (kIsWeb) return;
+      // Safety guard: Never overwrite persisted file if connectedProjectIds was emptied during a non-control-plane shift
+      if (!isControlPlane && connectedProjectIds.isEmpty) return;
       final file = _connectedProjectsFile;
       if (file != null) {
         file.writeAsStringSync(jsonEncode(connectedProjectIds.toList()));
@@ -758,19 +767,23 @@ class ApiService {
           loadPersistedConnectedProjects();
         }
 
-        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects
-        final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
-        final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
-        connectedProjectIds.removeWhere(
-          (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
-        );
-        savePersistedConnectedProjects();
+        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects.
+        // CRITICAL: Only prune when communicating with Control Plane (port 28000).
+        // Isolated data-plane containers (ports 28100+) must NOT prune control-plane connected projects!
+        if (isControlPlane) {
+          final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
+          final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
+          connectedProjectIds.removeWhere(
+            (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
+          );
+          savePersistedConnectedProjects();
 
-        connectedWorkspaceProjects.clear();
-        for (final p in projects) {
-          if (connectedProjectIds.contains(p.id) ||
-              connectedProjectIds.contains(p.name)) {
-            connectedWorkspaceProjects.add(p);
+          connectedWorkspaceProjects.clear();
+          for (final p in projects) {
+            if (connectedProjectIds.contains(p.id) ||
+                connectedProjectIds.contains(p.name)) {
+              connectedWorkspaceProjects.add(p);
+            }
           }
         }
         if (activeProject == null && projects.isNotEmpty) {
@@ -1102,29 +1115,44 @@ class ApiService {
       return content;
     }
 
+    // Sanitize a label for use inside Mermaid ["..."] — escape quotes and
+    // strip characters that break Mermaid parsing.
+    String sanitize(String raw) {
+      return raw
+          .replaceAll('"', "'")        // double-quote → single-quote
+          .replaceAll('<', '')          // strip angle brackets
+          .replaceAll('>', '')
+          .replaceAll('&', 'and')      // ampersand → word
+          .replaceAll('#', '')         // strip hash
+          .replaceAll(';', '')         // strip semicolons
+          .replaceAll('{', '(')        // curly braces → parens
+          .replaceAll('}', ')')
+          .trim();
+    }
+
     final buffer = StringBuffer();
-    buffer.writeln('\n\n### Architecture & Flowchart Visualization\n');
+    buffer.writeln('\n\n### Architecture and Flowchart Visualization\n');
     buffer.writeln('```mermaid');
     buffer.writeln('flowchart TD');
     buffer.writeln('    Client["Client Request"] --> Gateway["FastAPI Server / Control Plane"]');
 
-    final mainFile = files.isNotEmpty ? files.first : 'backend/main.py';
+    final mainFile = files.isNotEmpty ? sanitize(files.first) : 'backend/main.py';
     buffer.writeln('    Gateway --> MainFile["$mainFile"]');
 
     if (symbols.isNotEmpty) {
-      buffer.writeln('    subgraph Endpoints ["Key Endpoints & Handlers"]');
+      buffer.writeln('    subgraph Endpoints ["Key Endpoints and Handlers"]');
       for (int i = 0; i < symbols.length && i < 6; i++) {
-        final sym = symbols[i];
-        buffer.writeln('        F$i["$sym()"]');
+        final sym = sanitize(symbols[i]);
+        buffer.writeln('        F$i["$sym"]');
       }
       buffer.writeln('    end');
       buffer.writeln('    MainFile --> Endpoints');
     }
 
     if (components.isNotEmpty) {
-      buffer.writeln('    subgraph Entities ["Connected Schemas & Components"]');
+      buffer.writeln('    subgraph Entities ["Connected Schemas and Components"]');
       for (int i = 0; i < components.length && i < 5; i++) {
-        final comp = components[i];
+        final comp = sanitize(components[i]);
         buffer.writeln('        C$i["$comp"]');
       }
       buffer.writeln('    end');

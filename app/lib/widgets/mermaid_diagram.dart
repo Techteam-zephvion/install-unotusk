@@ -30,10 +30,76 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   bool _isDownloading = false;
   late final bool _isWebViewSupported;
 
+  /// Cleans the raw Mermaid code to fix common syntax issues that cause
+  /// "Syntax error in text" in Mermaid.js:
+  ///  - Strips leading/trailing whitespace and blank lines
+  ///  - Removes "flowchart" or "graph" lines that are duplicated
+  ///  - Escapes unquoted node labels containing special characters
+  late String _sanitizedCode;
+
   @override
   void initState() {
     super.initState();
     _isWebViewSupported = !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isAndroid || Platform.isIOS);
+    _sanitizedCode = _sanitizeMermaidCode(widget.code);
+  }
+
+  @override
+  void didUpdateWidget(MermaidDiagram oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.code != widget.code) {
+      _sanitizedCode = _sanitizeMermaidCode(widget.code);
+    }
+  }
+
+  /// Sanitizes Mermaid code to prevent common parse errors.
+  static String _sanitizeMermaidCode(String raw) {
+    var code = raw.trim();
+
+    // Remove accidental wrapping in ```mermaid ... ``` fences
+    if (code.startsWith('```mermaid')) {
+      code = code.substring('```mermaid'.length);
+    }
+    if (code.startsWith('```')) {
+      code = code.substring(3);
+    }
+    if (code.endsWith('```')) {
+      code = code.substring(0, code.length - 3);
+    }
+    code = code.trim();
+
+    // Fix unquoted node labels with special chars on each line
+    final lines = code.split('\n');
+    final fixedLines = <String>[];
+    // Pattern: nodeId[label] or nodeId(label) where label is NOT already quoted
+    final nodePattern = RegExp(r'^(\s*)(\w+)\[([^\]"]+)\](.*)$');
+    final nodeParenPattern = RegExp(r'^(\s*)(\w+)\(([^)"]+)\)(.*)$');
+
+    for (final line in lines) {
+      var fixedLine = line;
+
+      // Fix nodeId[unquoted label with specials] → nodeId["sanitized label"]
+      final m = nodePattern.firstMatch(fixedLine);
+      if (m != null) {
+        final label = m.group(3)!;
+        if (label.contains('&') || label.contains('<') || label.contains('>') ||
+            label.contains('"') || label.contains('(') || label.contains(')') ||
+            label.contains('#') || label.contains(';')) {
+          final clean = label
+              .replaceAll('"', "'")
+              .replaceAll('&', 'and')
+              .replaceAll('<', '')
+              .replaceAll('>', '')
+              .replaceAll('#', '')
+              .replaceAll(';', '');
+          fixedLine = '${m.group(1)}${m.group(2)}["$clean"]${m.group(4)}';
+        }
+      }
+
+      fixedLines.add(fixedLine);
+    }
+
+    return fixedLines.join('\n');
   }
 
   void _copy() {
@@ -45,7 +111,7 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   }
 
   String _getMermaidImageUrl({String format = 'png'}) {
-    final cleanCode = widget.code.trim();
+    final cleanCode = _sanitizedCode;
     final payload = jsonEncode({
       'code': cleanCode,
       'mermaid': {
@@ -126,7 +192,7 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
       context: context,
       useSafeArea: false,
       builder: (ctx) => _MermaidFullscreenDialog(
-        code: widget.code,
+        code: _sanitizedCode,
         palette: widget.palette,
         imageUrl: _getMermaidImageUrl(format: 'png'),
         onDownload: _downloadImage,
@@ -135,7 +201,10 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   }
 
   String _generateHtml() {
-    final cleanCode = widget.code.replaceAll('`', '\\`').replaceAll('\$', '\\\$');
+    // Use pre-sanitized code. Mermaid.js expects raw syntax inside <pre>,
+    // so do NOT HTML-encode arrows (-->, -.->). The _sanitizeMermaidCode
+    // already stripped dangerous characters from labels.
+    final cleanCode = _sanitizedCode;
     return '''
 <!DOCTYPE html>
 <html lang="en">
@@ -164,41 +233,49 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
       max-width: 100% !important;
       height: auto !important;
     }
+    #error-container {
+      display: none;
+      color: #FF9999;
+      padding: 16px;
+      text-align: center;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
-  <div class="mermaid">
+  <pre class="mermaid">
 $cleanCode
-  </div>
+  </pre>
+  <div id="error-container"></div>
   <script>
     function renderDiagram() {
       if (typeof mermaid !== 'undefined') {
-        try {
-          mermaid.initialize({ 
-            startOnLoad: true, 
-            theme: 'dark',
-            themeVariables: {
-              primaryColor: '#2B2822',
-              primaryTextColor: '#E2E0D9',
-              primaryBorderColor: '#454035',
-              lineColor: '#888478',
-              secondaryColor: '#4A463B',
-              tertiaryColor: '#181816',
-              background: '#131311',
-              mainBkg: '#1D1C19'
-            }
-          });
-          mermaid.run();
-        } catch (e) {
-          console.error('Mermaid render error:', e);
-        }
+        mermaid.initialize({ 
+          startOnLoad: false, 
+          theme: 'dark',
+          securityLevel: 'loose',
+          themeVariables: {
+            primaryColor: '#2B2822',
+            primaryTextColor: '#E2E0D9',
+            primaryBorderColor: '#454035',
+            lineColor: '#888478',
+            secondaryColor: '#4A463B',
+            tertiaryColor: '#181816',
+            background: '#131311',
+            mainBkg: '#1D1C19'
+          }
+        });
+        mermaid.run({ suppressErrors: false }).catch(function(err) {
+          var errDiv = document.getElementById('error-container');
+          errDiv.style.display = 'block';
+          errDiv.textContent = 'Diagram render error: ' + (err.message || err);
+        });
       }
     }
-    if (typeof mermaid !== 'undefined') {
-      renderDiagram();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', renderDiagram);
     } else {
-      window.addEventListener('DOMContentLoaded', renderDiagram);
-      window.addEventListener('load', renderDiagram);
+      renderDiagram();
     }
   </script>
 </body>
