@@ -1,17 +1,22 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:app/models/models.dart';
 import 'package:app/theme/app_theme.dart';
 import 'package:app/widgets/sidebar.dart';
+import 'package:app/widgets/unotusk_logo.dart';
 
 void main() {
-  testWidgets('UnoSidebar collapsed layout is centered and not shifted left',
+  testWidgets(
+      'UnoSidebar collapsed layout is centered, logo morphs to open button on hover, and tooltips render to the right',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+
+    bool toggled = false;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -20,9 +25,9 @@ void main() {
             children: [
               UnoSidebar(
                 open: false,
-                onToggle: () {},
+                onToggle: () => toggled = true,
                 onNewQuery: () {},
-                palette: UnoPalette.light,
+                palette: UnoPalette.dark,
                 activeView: 'chat',
                 onViewChange: (_) {},
                 onLoadRecentChat: (_) {},
@@ -43,41 +48,66 @@ void main() {
     // Verify sidebar width is 72.0
     final sidebarFinder = find.byType(UnoSidebar);
     expect(sidebarFinder, findsOneWidget);
-    final sidebarSize = tester.getSize(sidebarFinder);
-    expect(sidebarSize.width, 72.0);
+    expect(tester.getSize(sidebarFinder).width, 72.0);
 
-    // Verify Expand Chevron button is horizontally centered (width: 36, offset dx: 18.0)
-    final chevronFinder = find.byIcon(LucideIcons.chevronRight);
-    expect(chevronFinder, findsOneWidget);
-    final chevronTopLeft = tester.getTopLeft(chevronFinder);
-    // The icon is centered inside the 36px button, so its x position should be near (72 - iconSize)/2 = (72 - 14)/2 = 29.0
-    expect(chevronTopLeft.dx, greaterThan(20.0));
-    expect(chevronTopLeft.dx, lessThan(40.0));
+    // No separate expand chevron button — logo handles expand on hover
+    expect(find.byIcon(LucideIcons.chevronRight), findsNothing);
 
-    // Verify New Query Plus button icon is centered
+    // Verify Logo, New Query Plus, Projects folder, and Archive icons are all centered at x = 36.0
+    final logoFinder = find.byType(UnotuskLogo);
     final plusFinder = find.byIcon(LucideIcons.plus);
-    expect(plusFinder, findsOneWidget);
-    final plusTopLeft = tester.getTopLeft(plusFinder);
-    expect(plusTopLeft.dx, greaterThan(20.0));
-    expect(plusTopLeft.dx, lessThan(40.0));
-
-    // Verify Ask (zap) is removed and first nav item (folder) is centered
-    expect(find.byIcon(LucideIcons.zap), findsNothing);
-    final clipFinder = find.byIcon(LucideIcons.folder);
-    expect(clipFinder, findsOneWidget);
-    final clipTopLeft = tester.getTopLeft(clipFinder);
-    expect(clipTopLeft.dx, greaterThan(20.0));
-    expect(clipTopLeft.dx, lessThan(40.0));
-
-    // Verify archive button icon is centered
+    final folderFinder = find.byIcon(LucideIcons.folder);
     final archiveFinder = find.byIcon(LucideIcons.archive);
+
+    expect(logoFinder, findsOneWidget);
+    expect(plusFinder, findsOneWidget);
+    expect(folderFinder, findsOneWidget);
     expect(archiveFinder, findsOneWidget);
-    final archiveTopLeft = tester.getTopLeft(archiveFinder);
-    expect(archiveTopLeft.dx, greaterThan(20.0));
-    expect(archiveTopLeft.dx, lessThan(40.0));
+
+    expect(tester.getCenter(logoFinder).dx, closeTo(36.0, 1.0));
+    expect(tester.getCenter(plusFinder).dx, closeTo(36.0, 1.0));
+    expect(tester.getCenter(folderFinder).dx, closeTo(36.0, 1.0));
+    expect(tester.getCenter(archiveFinder).dx, closeTo(36.0, 1.0));
+
+    // Hover over the collapsed Unotusk logo -> morphs into panelLeftOpen & shows right-side "Open sidebar" pill
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+
+    await gesture.moveTo(tester.getCenter(logoFinder));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(LucideIcons.panelLeftOpen), findsOneWidget);
+    final openTooltip = find.text('Open sidebar');
+    expect(openTooltip, findsOneWidget);
+    expect(tester.getTopLeft(openTooltip).dx, greaterThan(70.0));
+
+    // Clicking the hovered logo triggers onToggle
+    await tester.tap(find.byIcon(LucideIcons.panelLeftOpen));
+    await tester.pumpAndSettle();
+    expect(toggled, isTrue);
+
+    // Hover over the collapsed Projects icon -> tooltip floats to the RIGHT (not covering "+" above)
+    final folderCenter = tester.getCenter(folderFinder);
+    await gesture.moveTo(folderCenter);
+    await tester.pumpAndSettle();
+
+    // Find the visible right-side overlay label (positioned right of the 72px sidebar)
+    final projectsTexts = find.text('Projects').evaluate().toList();
+    final rightSideTooltip = projectsTexts.where((el) {
+      final box = el.renderObject as RenderBox;
+      return box.localToGlobal(Offset.zero).dx > 72.0;
+    }).toList();
+    expect(rightSideTooltip.length, 1);
+
+    final tooltipBox = rightSideTooltip.first.renderObject as RenderBox;
+    final tooltipCenterY =
+        tooltipBox.localToGlobal(Offset(0, tooltipBox.size.height / 2)).dy;
+    // Vertically aligned with the Projects icon, never covering the Plus icon above it
+    expect(tooltipCenterY, closeTo(folderCenter.dy, 6.0));
   });
 
-  testWidgets('UnoSidebar toggling collapse does not throw RenderFlex overflow',
+  testWidgets('UnoSidebar toggling collapse smoothly does not throw RenderFlex overflow',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -119,12 +149,13 @@ void main() {
 
     // Tap collapse button
     await tester.tap(find.byIcon(LucideIcons.panelLeftClose));
-    // Pump frames during collapse animation
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.pump(const Duration(milliseconds: 50));
+    // Pump intermediate frames across the 260ms collapse animation
+    for (int i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     await tester.pumpAndSettle();
 
+    expect(tester.getSize(find.byType(UnoSidebar)).width, 72.0);
     expect(tester.takeException(), isNull);
   });
 
@@ -167,15 +198,16 @@ void main() {
     expect(find.text('Discoveries'), findsNothing);
     expect(find.text('Knowledge'), findsNothing);
     expect(find.text('Spec History'), findsNothing);
+    expect(find.text('Ontology Graph'), findsNothing);
+    expect(find.byIcon(LucideIcons.boxes), findsNothing);
 
-    // Remaining nav items are displayed
+    // Remaining nav items are displayed (Ontology Graph renamed to Architecture)
     for (final label in [
       'Projects',
       'Overview',
       'Ask AI',
       'Files',
       'Architecture',
-      'Ontology Graph',
       'Ingestion Feed',
       'Archived chats',
     ]) {
@@ -183,7 +215,7 @@ void main() {
     }
 
     // Active ('Ask AI') and inactive ('Projects', 'Overview', 'Files', 'Archived chats')
-    // icons all align to the exact same X coordinate
+    // icons all align to the exact same X coordinate (36.0)
     final projectsX = tester.getCenter(find.byIcon(LucideIcons.folder)).dx;
     final overviewX =
         tester.getCenter(find.byIcon(LucideIcons.layoutDashboard)).dx;

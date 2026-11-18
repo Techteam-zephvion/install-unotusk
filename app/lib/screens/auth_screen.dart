@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,14 +51,22 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen>
+    with SingleTickerProviderStateMixin {
   // Mode: 0 = Sign In, 1 = Create Workspace, 2 = Select Project Server
   int _activeMode = 0;
+  // Sign Up sub-section step: 0 = Profile & Workspace, 1 = Credentials, 2 = Role & Confirm
+  int _signUpStep = 0;
   bool _isServerConnected = false;
   bool _isScanning = false;
   ServerDiscoveryResult? _discoveryResult;
   Timer? _healthTimer;
   late bool _localIsDark;
+
+  late final AnimationController _entranceController;
+  late final Animation<double> _entranceFade;
+  late final Animation<Offset> _heroSlide;
+  late final Animation<Offset> _cardSlide;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -74,6 +83,30 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _localIsDark = widget.isDark ?? widget.palette.isDark;
+
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
+    );
+    _entranceFade = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    );
+    _heroSlide = Tween<Offset>(
+      begin: const Offset(-0.02, 0.02),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    ));
+    _cardSlide = Tween<Offset>(
+      begin: const Offset(0.0, 0.03),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    ));
+    _entranceController.forward();
 
     if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
       _isServerConnected = true;
@@ -161,6 +194,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void dispose() {
     _healthTimer?.cancel();
+    _entranceController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
@@ -471,98 +505,493 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final isDark = _localIsDark;
     // Opposite Shade Rule:
-    // When screen is dark (isDark == true), middle card is LIGHT (_isCardLight == true).
-    // When screen is light (isDark == false), middle card is DARK (_isCardLight == false).
+    // When screen is dark (isDark == true), auth card is LIGHT (isCardLight == true).
+    // When screen is light (isDark == false), auth card is DARK (isCardLight == false).
     final isCardLight = isDark;
     final palette = _getEffectivePalette(isDark);
 
     return Scaffold(
       backgroundColor: isDark ? _AuthColors.obsidianNavy : _AuthColors.sandBg,
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        color: isDark ? _AuthColors.obsidianNavy : _AuthColors.sandBg,
-        child: Column(
-          children: [
-            // ── Window Title Bar ──
-            WindowTitleBar(
-              palette: isDark
-                  ? const UnoPalette(
-                      bgBase: _AuthColors.obsidianNavy,
-                      bgSurface: _AuthColors.slateNavy,
-                      bgElevated: _AuthColors.obsidianNavy,
-                      div: _AuthColors.darkBorderHover,
-                      accent: _AuthColors.warmSand,
-                      output: _AuthColors.warmSand,
-                      live: Color(0xFF22C55E),
-                      confirmed: _AuthColors.warmSand,
-                      inferred: _AuthColors.warmSand,
-                      neutral: _AuthColors.coolSlate,
-                      text: _AuthColors.pureWhite,
-                      textSec: _AuthColors.coolSlate,
-                    )
-                  : const UnoPalette(
-                      bgBase: _AuthColors.sandBg,
-                      bgSurface: _AuthColors.pureWhite,
-                      bgElevated: _AuthColors.sandLight,
-                      div: _AuthColors.sandTint,
-                      accent: _AuthColors.obsidianNavy,
-                      output: _AuthColors.obsidianNavy,
-                      live: Color(0xFF22C55E),
-                      confirmed: _AuthColors.obsidianNavy,
-                      inferred: _AuthColors.obsidianNavy,
-                      neutral: _AuthColors.coolSlate,
-                      text: _AuthColors.obsidianNavy,
-                      textSec: _AuthColors.mutedDark,
-                    ),
-            ),
+      body: TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: isDark ? 1.0 : 0.0),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeInOutCubic,
+        builder: (context, t, _) {
+          // Smoothly interpolated palette values for Dark (t=1) <-> Light (t=0)
+          final baseTopLeft = Color.lerp(
+            const Color(0xFFFAF8F4),
+            const Color(0xFF060A16),
+            t,
+          )!;
+          final baseMid = Color.lerp(
+            _AuthColors.sandBg,
+            _AuthColors.obsidianNavy,
+            t,
+          )!;
+          final baseBottomRight = Color.lerp(
+            const Color(0xFFE7E0D4),
+            const Color(0xFF0F162C),
+            t,
+          )!;
 
-            // ── Center Card (Opposite shade from the outer screen) ──
-            Expanded(
-              child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    constraints: BoxConstraints(
-                      maxWidth: _activeMode == 1 ? 580 : (_activeMode == 2 ? 460 : 440),
-                    ),
-                    margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
-                    decoration: BoxDecoration(
-                      color: isCardLight ? _AuthColors.sandCream : _AuthColors.obsidianNavy,
-                      border: Border.all(
-                        color: isCardLight ? _AuthColors.warmSand : _AuthColors.darkBorderHover,
-                        width: 1.5,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.65)
-                              : _AuthColors.obsidianNavy.withValues(alpha: 0.12),
-                          blurRadius: isDark ? 48 : 36,
-                          offset: const Offset(0, 16),
-                        ),
-                        if (!isCardLight)
-                          BoxShadow(
-                            color: _AuthColors.warmSand.withValues(alpha: 0.05),
-                            blurRadius: 1,
-                            offset: const Offset(0, 1),
-                          ),
-                      ],
-                    ),
-                    child: _activeMode == 2
-                        ? _buildServerList(isCardLight, palette)
-                        : _buildAuthCard(isCardLight, palette),
+          final reliefTint = Color.lerp(
+            const Color(0xFFE9E2D6),
+            const Color(0xFF1A2442),
+            t,
+          )!;
+          final reliefOpacity = lerpDouble(0.36, 0.24, t)!;
+
+          final featherColor = Color.lerp(
+            _AuthColors.sandBg,
+            _AuthColors.obsidianNavy,
+            t,
+          )!;
+          final vignetteEdge = Color.lerp(
+            const Color(0xFFEBE4D8),
+            const Color(0xFF050814),
+            t,
+          )!;
+          final spotlightColor = Color.lerp(
+            const Color(0xFFFFFFFF),
+            _AuthColors.warmSand,
+            t,
+          )!;
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // ── Layer 1: Multi-stop Tonal Base Canvas ──
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    stops: const [0.0, 0.5, 1.0],
+                    colors: [baseTopLeft, baseMid, baseBottomRight],
                   ),
                 ),
               ),
+
+              // ── Layer 2: Full-Bleed Sculptural Bas-Relief Artwork ──
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: reliefOpacity,
+                    child: ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        reliefTint,
+                        BlendMode.color,
+                      ),
+                      child: Image.asset(
+                        'assets/auth_relief_bg.jpg',
+                        fit: BoxFit.cover,
+                        alignment: const Alignment(-0.28, 0.0),
+                        filterQuality: FilterQuality.medium,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Layer 3: Horizontal Editorial Feather Veil ──
+              // Keeps the bas-relief sculptural on the left and dissolves smoothly
+              // into clean solid obsidian / warm sand behind the right auth card.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        stops: const [0.0, 0.36, 0.62, 1.0],
+                        colors: [
+                          featherColor.withValues(
+                              alpha: lerpDouble(0.24, 0.44, t)!),
+                          featherColor.withValues(
+                              alpha: lerpDouble(0.42, 0.62, t)!),
+                          featherColor.withValues(
+                              alpha: lerpDouble(0.88, 0.94, t)!),
+                          featherColor.withValues(
+                              alpha: lerpDouble(0.97, 0.99, t)!),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Layer 4: Top & Bottom Cinematic Framing Vignette ──
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.22, 0.78, 1.0],
+                        colors: [
+                          vignetteEdge.withValues(
+                              alpha: lerpDouble(0.55, 0.72, t)!),
+                          vignetteEdge.withValues(alpha: 0.0),
+                          vignetteEdge.withValues(alpha: 0.0),
+                          vignetteEdge.withValues(
+                              alpha: lerpDouble(0.58, 0.80, t)!),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Layer 5: Subtle Ambient Gallery Spotlight Behind Hero Lockup ──
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.46, 0.0),
+                        radius: 0.72,
+                        stops: const [0.0, 0.52, 1.0],
+                        colors: [
+                          spotlightColor.withValues(
+                              alpha: lerpDouble(0.45, 0.07, t)!),
+                          spotlightColor.withValues(
+                              alpha: lerpDouble(0.14, 0.02, t)!),
+                          spotlightColor.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Layer 6: Foreground Window Chrome & Split Layout ──
+              Column(
+                children: [
+                  WindowTitleBar(
+                    transparent: true,
+                    palette: isDark
+                        ? const UnoPalette(
+                            bgBase: _AuthColors.obsidianNavy,
+                            bgSurface: _AuthColors.slateNavy,
+                            bgElevated: _AuthColors.obsidianNavy,
+                            div: _AuthColors.darkBorderHover,
+                            accent: _AuthColors.warmSand,
+                            output: _AuthColors.warmSand,
+                            live: Color(0xFF22C55E),
+                            confirmed: _AuthColors.warmSand,
+                            inferred: _AuthColors.warmSand,
+                            neutral: _AuthColors.coolSlate,
+                            text: _AuthColors.pureWhite,
+                            textSec: _AuthColors.coolSlate,
+                          )
+                        : const UnoPalette(
+                            bgBase: _AuthColors.sandBg,
+                            bgSurface: _AuthColors.pureWhite,
+                            bgElevated: _AuthColors.sandLight,
+                            div: _AuthColors.sandTint,
+                            accent: _AuthColors.obsidianNavy,
+                            output: _AuthColors.obsidianNavy,
+                            live: Color(0xFF22C55E),
+                            confirmed: _AuthColors.obsidianNavy,
+                            inferred: _AuthColors.obsidianNavy,
+                            neutral: _AuthColors.coolSlate,
+                            text: _AuthColors.obsidianNavy,
+                            textSec: _AuthColors.mutedDark,
+                          ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 920;
+                        if (!isWide) {
+                          return Center(
+                            child: _buildAuthCardShell(
+                              isDark: isDark,
+                              isCardLight: isCardLight,
+                              palette: palette,
+                              t: t,
+                            ),
+                          );
+                        }
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Left Editorial Brand Showcase over Bas-Relief
+                            Expanded(
+                              flex: 11,
+                              child: FadeTransition(
+                                opacity: _entranceFade,
+                                child: SlideTransition(
+                                  position: _heroSlide,
+                                  child: _buildLeftHeroShowcase(
+                                    isDark: isDark,
+                                    t: t,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Right Opposite-Shade Auth Card Panel
+                            Expanded(
+                              flex: 10,
+                              child: Center(
+                                child: FadeTransition(
+                                  opacity: _entranceFade,
+                                  child: SlideTransition(
+                                    position: _cardSlide,
+                                    child: _buildAuthCardShell(
+                                      isDark: isDark,
+                                      isCardLight: isCardLight,
+                                      palette: palette,
+                                      t: t,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLeftHeroShowcase({
+    required bool isDark,
+    required double t,
+  }) {
+    // Unified opposite-shade / exact logo brand tone:
+    // Dark mode (#0A0F20 bg) -> Warm Sand (#CBC1B4) matching the light elephant logo
+    // Light mode (#F2EFE9 bg) -> Obsidian Navy (#0A0F20) matching the dark elephant logo
+    final brandColor = Color.lerp(
+      _AuthColors.obsidianNavy,
+      _AuthColors.warmSand,
+      t,
+    )!;
+    final subColor = Color.lerp(
+      const Color(0xFF3A393D),
+      _AuthColors.warmSand.withValues(alpha: 0.76),
+      t,
+    )!;
+    final mutedColor = Color.lerp(
+      _AuthColors.mutedDark,
+      _AuthColors.warmSand.withValues(alpha: 0.62),
+      t,
+    )!;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isLarge = constraints.maxWidth >= 600;
+        // Account for transparent padding inside logo PNG so the visible mark
+        // stands clearly larger than the wordmark and frames the full lockup.
+        final logoMarkSize = isLarge ? 136.0 : 114.0;
+        final wordmarkSize = isLarge ? 72.0 : 60.0;
+        final taglineSize = isLarge ? 20.5 : 17.5;
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            isLarge ? 60 : 44,
+            34,
+            32,
+            42,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // ── Top Spacer (keeps brand lockup vertically centered) ──
+              const SizedBox(height: 1),
+
+              // ── Centerpiece Free-Standing Logo & Aligned Wordmark Lockup ──
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    UnotuskLogo(size: logoMarkSize, onDark: isDark),
+                    const SizedBox(width: 6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Unotusk',
+                          style: GoogleFonts.youngSerif(
+                            color: brandColor,
+                            fontSize: wordmarkSize,
+                            letterSpacing: -1.3,
+                            height: 0.98,
+                            shadows: [
+                              Shadow(
+                                color: (isDark
+                                        ? const Color(0xFF040712)
+                                        : _AuthColors.sandBg)
+                                    .withValues(alpha: 0.55),
+                                blurRadius: 18,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 3),
+                          child: Text(
+                            'Project Intelligence Layer',
+                            maxLines: 1,
+                            style: GoogleFonts.cormorantGaramond(
+                              color: subColor,
+                              fontSize: taglineSize,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.8,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Bottom Studio Capability Strip ──
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 0,
+                runSpacing: 8,
+                children: [
+                  _buildHeroPillar(
+                    LucideIcons.gitBranch,
+                    'AST-Grounded',
+                    mutedColor,
+                  ),
+                  _buildHeroPillarDivider(brandColor),
+                  _buildHeroPillar(
+                    LucideIcons.shieldCheck,
+                    'Zero Hallucination',
+                    mutedColor,
+                  ),
+                  _buildHeroPillarDivider(brandColor),
+                  _buildHeroPillar(
+                    LucideIcons.cpu,
+                    'Local-First',
+                    mutedColor,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeroPillar(IconData icon, String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroPillarDivider(Color color) {
+    return Container(
+      width: 1,
+      height: 12,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: color.withValues(alpha: 0.24),
+    );
+  }
+
+  Widget _buildAuthCardShell({
+    required bool isDark,
+    required bool isCardLight,
+    required UnoPalette palette,
+    required double t,
+  }) {
+    final cardTop = Color.lerp(
+      const Color(0xFF13192F),
+      const Color(0xFFFAF8F3),
+      t,
+    )!;
+    final cardMid = Color.lerp(
+      _AuthColors.obsidianNavy,
+      _AuthColors.sandCream,
+      t,
+    )!;
+    final cardBottom = Color.lerp(
+      const Color(0xFF070B18),
+      const Color(0xFFEDE7DC),
+      t,
+    )!;
+    final cardBorder = Color.lerp(
+      _AuthColors.darkBorderHover,
+      _AuthColors.warmSand,
+      t,
+    )!;
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.center,
+      child: Container(
+        key: const ValueKey('auth-card-shell'),
+        width: 440,
+        margin: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.55, 1.0],
+            colors: [cardTop, cardMid, cardBottom],
+          ),
+          border: Border.all(
+            color: cardBorder,
+            width: 1.25,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: lerpDouble(0.24, 0.62, t)!),
+              blurRadius: lerpDouble(36, 52, t)!,
+              offset: const Offset(0, 18),
+            ),
+            BoxShadow(
+              color: _AuthColors.warmSand.withValues(
+                alpha: lerpDouble(0.06, 0.08, t)!,
+              ),
+              blurRadius: 1,
+              spreadRadius: 0,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
+        child: _activeMode == 2
+            ? _buildServerList(isCardLight, palette)
+            : _buildAuthCard(isCardLight, palette),
       ),
     );
   }
@@ -657,7 +1086,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         const SizedBox(height: 18),
 
-        // ── Heading & Subtitle ──
+        // ── Heading & Subtitle (Fixed height prevents any vertical jump between tabs) ──
         Text(
           _activeMode == 0 ? 'Sign in to Unotusk' : 'Sign up to Unotusk',
           style: GoogleFonts.youngSerif(
@@ -666,17 +1095,23 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
         const SizedBox(height: 5),
-        Text(
-          _activeMode == 0
-              ? 'Enter your work email and password to access your workspace.'
-              : 'Register a new project intelligence workspace.',
-          style: GoogleFonts.inter(
-            color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
-            fontSize: 13,
-            height: 1.4,
+        SizedBox(
+          height: 38,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Text(
+              _activeMode == 0
+                  ? 'Enter your work email and password to access your workspace.'
+                  : 'Create your account to join your project intelligence workspace.',
+              style: GoogleFonts.inter(
+                color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
         // ── Segmented Mode Switcher (Sign In vs Sign Up) ──
         AnimatedContainer(
@@ -699,6 +1134,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   isCardLight,
                   () => setState(() {
                     _activeMode = 0;
+                    _signUpStep = 0;
                     _errorMessage = null;
                   }),
                 ),
@@ -710,6 +1146,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   isCardLight,
                   () => setState(() {
                     _activeMode = 1;
+                    _signUpStep = 0;
                     _errorMessage = null;
                   }),
                 ),
@@ -723,11 +1160,36 @@ class _AuthScreenState extends State<AuthScreen> {
 
         _buildServerDiscoveryStatusCard(isCardLight, palette),
 
-        // ── Mode-specific form ──
-        if (_activeMode == 0)
-          _buildSignInForm(isCardLight, palette)
-        else
-          _buildCreateWorkspaceForm(isCardLight, palette),
+        // ── Mode-specific form locked to identical height across Sign In & Sign Up ──
+        SizedBox(
+          height: 244,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.03, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: _activeMode == 0
+                ? KeyedSubtree(
+                    key: const ValueKey('mode-signin'),
+                    child: _buildSignInForm(isCardLight, palette),
+                  )
+                : KeyedSubtree(
+                    key: ValueKey('mode-signup-$_signUpStep'),
+                    child: _buildCreateWorkspaceForm(isCardLight, palette),
+                  ),
+          ),
+        ),
 
         _buildServerFooter(isCardLight, palette),
       ],
@@ -864,7 +1326,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
       children: [
         // Work Email Label
         Text(
@@ -883,7 +1344,7 @@ class _AuthScreenState extends State<AuthScreen> {
           isCardLight: isCardLight,
           onSubmitted: _handleSignIn,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
         // Password Label with eye toggle
         Text(
@@ -917,7 +1378,7 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const Spacer(),
 
         // Submit Button (ElevatedButton)
         SizedBox(
@@ -957,255 +1418,322 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  void _advanceSignUpStep() {
+    if (_signUpStep == 0) {
+      if (_nameController.text.trim().isEmpty) {
+        setState(() => _errorMessage = 'Please enter your full name.');
+        return;
+      }
+      if (_orgController.text.trim().isEmpty) {
+        setState(() => _errorMessage = 'Please enter your organisation name.');
+        return;
+      }
+      setState(() {
+        _errorMessage = null;
+        _signUpStep = 1;
+      });
+    } else if (_signUpStep == 1) {
+      final email = _emailController.text.trim().toLowerCase();
+      if (!_validateAcmeEmail(email)) return;
+      if (_passwordController.text.length < 8) {
+        setState(() =>
+            _errorMessage = 'Password must be at least 8 characters long.');
+        return;
+      }
+      setState(() {
+        _errorMessage = null;
+        _signUpStep = 2;
+      });
+    } else {
+      _handleCreateWorkspace();
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
-  //  Create Workspace / Sign Up Form (Horizontal 2-Column Layout)
+  //  Create Workspace / Sign Up Form (Clean 3-Section Flow, Exact Sign-In Size)
   // ─────────────────────────────────────────────────────────────
   Widget _buildCreateWorkspaceForm(bool isCardLight, UnoPalette palette) {
-    final labelColor = isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand;
+    final labelColor =
+        isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand;
+    final mutedColor =
+        isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate;
     final btnBg = isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand;
     final btnFg = isCardLight ? _AuthColors.pureWhite : _AuthColors.obsidianNavy;
 
+    const stepTitles = ['Workspace', 'Credentials', 'Role'];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
       children: [
-        // Row 1: Full Name & Organisation Name
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Full Name',
-                    style: GoogleFonts.inter(
-                      color: labelColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
+        // ── Minimal Section Progress Header ──
+        SizedBox(
+          height: 20,
+          child: Row(
+            children: [
+              if (_signUpStep > 0) ...[
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _errorMessage = null;
+                      _signUpStep--;
+                    }),
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          LucideIcons.arrowLeft,
+                          size: 13,
+                          color: labelColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Back',
+                          style: GoogleFonts.inter(
+                            color: labelColor,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  _buildCenteredInputBox(
-                    controller: _nameController,
-                    hintText: 'Alex Morgan',
-                    isCardLight: isCardLight,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Organisation Name',
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    '·',
                     style: GoogleFonts.inter(
-                      color: labelColor,
+                      color: mutedColor.withValues(alpha: 0.6),
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  _buildCenteredInputBox(
-                    controller: _orgController,
-                    hintText: 'Your organization',
-                    isCardLight: isCardLight,
+                ),
+              ],
+              Expanded(
+                child: Text(
+                  'Step ${_signUpStep + 1} of 3 · ${stepTitles[_signUpStep]}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: mutedColor,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              // Interactive clickable progress dashes
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(3, (i) {
+                  final active = i == _signUpStep;
+                  final completed = i < _signUpStep;
+                  return MouseRegion(
+                    cursor: completed
+                        ? SystemMouseCursors.click
+                        : SystemMouseCursors.basic,
+                    child: GestureDetector(
+                      onTap: completed
+                          ? () => setState(() {
+                                _errorMessage = null;
+                                _signUpStep = i;
+                              })
+                          : null,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        margin: EdgeInsets.only(left: i == 0 ? 0 : 5),
+                        width: active ? 22 : 12,
+                        height: 3.5,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(2),
+                          color: (active || completed)
+                              ? btnBg
+                              : (isCardLight
+                                  ? _AuthColors.warmSand.withValues(alpha: 0.55)
+                                  : _AuthColors.darkBorderHover),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 
-        // Row 2: Work Email & Password
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Work Email',
-                    style: GoogleFonts.inter(
-                      color: labelColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  _buildCenteredInputBox(
-                    controller: _emailController,
-                    hintText: 'alex@acme.com',
-                    isCardLight: isCardLight,
-                  ),
-                ],
-              ),
+        // ── Section Content ──
+        if (_signUpStep == 0) ...[
+          Text(
+            'Full Name',
+            style: GoogleFonts.inter(
+              color: labelColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Password (min 8 chars)',
-                    style: GoogleFonts.inter(
-                      color: labelColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  _buildCenteredInputBox(
-                    controller: _passwordController,
-                    hintText: '••••••••',
-                    isCardLight: isCardLight,
-                    obscureText: _obscurePassword,
-                    suffix: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () => setState(
-                            () => _obscurePassword = !_obscurePassword),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Icon(
-                            _obscurePassword
-                                ? LucideIcons.eye
-                                : LucideIcons.eyeOff,
-                            size: 16.5,
-                            color: isCardLight
-                                ? _AuthColors.mutedDark
-                                : _AuthColors.coolSlate,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 5),
+          _buildCenteredInputBox(
+            controller: _nameController,
+            hintText: 'Alex Morgan',
+            isCardLight: isCardLight,
+            onSubmitted: _advanceSignUpStep,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Organisation Name',
+            style: GoogleFonts.inter(
+              color: labelColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Row 3: Role Dropdown & Terms Checkbox
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Role',
-                    style: GoogleFonts.inter(
-                      color: labelColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isCardLight ? _AuthColors.pureWhite : _AuthColors.slateNavy,
-                      border: Border.all(
-                        color: isCardLight ? _AuthColors.warmSand : _AuthColors.darkBorderHover,
-                        width: 1.2,
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedRole,
-                        dropdownColor: isCardLight ? _AuthColors.pureWhite : _AuthColors.slateNavy,
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
-                        ),
-                        isExpanded: true,
-                        style: GoogleFonts.inter(
-                          color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
-                          fontSize: 13,
-                        ),
-                        items: ['Member (Dev)', 'Manager']
-                            .map((r) =>
-                                DropdownMenuItem(value: r, child: Text(r)))
-                            .toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedRole = val ?? 'Member (Dev)'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 5),
+          _buildCenteredInputBox(
+            controller: _orgController,
+            hintText: 'Your organization',
+            isCardLight: isCardLight,
+            onSubmitted: _advanceSignUpStep,
+          ),
+        ] else if (_signUpStep == 1) ...[
+          Text(
+            'Work Email',
+            style: GoogleFonts.inter(
+              color: labelColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Container(
-                height: 44,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Checkbox(
-                        value: _termsAgreed,
-                        activeColor: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand,
-                        checkColor: isCardLight ? _AuthColors.pureWhite : _AuthColors.obsidianNavy,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        side: BorderSide(
-                          color: isCardLight ? _AuthColors.sandTint : _AuthColors.coolSlate,
-                        ),
-                        onChanged: (val) =>
-                            setState(() => _termsAgreed = val ?? false),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _termsAgreed = !_termsAgreed),
-                          child: Text(
-                            'I agree to terms of service',
-                            style: GoogleFonts.inter(
-                              color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+          ),
+          const SizedBox(height: 5),
+          _buildCenteredInputBox(
+            controller: _emailController,
+            hintText: 'alex@acme.com',
+            isCardLight: isCardLight,
+            onSubmitted: _advanceSignUpStep,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Password (min 8 chars)',
+            style: GoogleFonts.inter(
+              color: labelColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 5),
+          _buildCenteredInputBox(
+            controller: _passwordController,
+            hintText: '••••••••',
+            isCardLight: isCardLight,
+            obscureText: _obscurePassword,
+            onSubmitted: _advanceSignUpStep,
+            suffix: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                    size: 16.5,
+                    color: mutedColor,
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 20),
+          ),
+        ] else ...[
+          Text(
+            'Select Role',
+            style: GoogleFonts.inter(
+              color: labelColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildRoleOptionCard(
+                  value: 'Member (Dev)',
+                  title: 'Member',
+                  subtitle: 'Developer access',
+                  icon: LucideIcons.code,
+                  isCardLight: isCardLight,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildRoleOptionCard(
+                  value: 'Manager',
+                  title: 'Manager',
+                  subtitle: 'Workspace lead',
+                  icon: LucideIcons.shieldCheck,
+                  isCardLight: isCardLight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: Checkbox(
+                  value: _termsAgreed,
+                  activeColor: btnBg,
+                  checkColor: btnFg,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  side: BorderSide(
+                    color: isCardLight
+                        ? _AuthColors.sandTint
+                        : _AuthColors.coolSlate,
+                  ),
+                  onChanged: (val) =>
+                      setState(() => _termsAgreed = val ?? false),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _termsAgreed = !_termsAgreed),
+                    child: Text(
+                      'I agree to the terms of service',
+                      style: GoogleFonts.inter(
+                        color: mutedColor,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
 
-        // Submit Button (Sign Up)
+        const Spacer(),
+
+        // ── Primary Section Action / Submit Button ──
         SizedBox(
           height: 44,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _handleCreateWorkspace,
+            onPressed: _isLoading ? null : _advanceSignUpStep,
             style: ElevatedButton.styleFrom(
               backgroundColor: btnBg,
               foregroundColor: btnFg,
@@ -1224,18 +1752,106 @@ class _AuthScreenState extends State<AuthScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(btnFg),
                     ),
                   )
-                : Text(
-                    'Sign Up',
-                    style: GoogleFonts.inter(
-                      color: btnFg,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
-                    ),
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _signUpStep < 2 ? 'Continue' : 'Sign Up',
+                        style: GoogleFonts.inter(
+                          color: btnFg,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                      if (_signUpStep < 2) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          LucideIcons.arrowRight,
+                          size: 15,
+                          color: btnFg,
+                        ),
+                      ],
+                    ],
                   ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRoleOptionCard({
+    required String value,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isCardLight,
+  }) {
+    final isSelected = _selectedRole == value;
+    final bg = isSelected
+        ? (isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand)
+        : (isCardLight ? _AuthColors.pureWhite : _AuthColors.slateNavy);
+    final border = isSelected
+        ? (isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand)
+        : (isCardLight ? _AuthColors.warmSand : _AuthColors.darkBorderHover);
+    final fg = isSelected
+        ? (isCardLight ? _AuthColors.pureWhite : _AuthColors.obsidianNavy)
+        : (isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite);
+    final subFg = isSelected
+        ? fg.withValues(alpha: 0.72)
+        : (isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedRole = value),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 170),
+          curve: Curves.easeOutCubic,
+          height: 66,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: border, width: 1.2),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: fg,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: subFg,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

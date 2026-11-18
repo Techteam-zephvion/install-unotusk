@@ -9,7 +9,6 @@ import 'dialogs/notifications_panel.dart';
 import 'dialogs/settings_modal.dart';
 import 'models/models.dart';
 import 'screens/admin_screen.dart';
-import 'screens/architecture_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/discoveries_screen.dart';
@@ -592,7 +591,7 @@ class _AppShellState extends State<AppShell> {
                                     );
                                   },
                                   child: KeyedSubtree(
-                                    key: ValueKey<String>('$_activeView-${widget.isDark}'),
+                                    key: ValueKey<String>(_activeView),
                                     child: _buildCurrentScreen(palette),
                                   ),
                                 ),
@@ -635,7 +634,7 @@ class _AppShellState extends State<AppShell> {
                                   );
                                 },
                                 child: KeyedSubtree(
-                                  key: ValueKey<String>('$_activeView-${widget.isDark}'),
+                                  key: ValueKey<String>(_activeView),
                                   child: _buildCurrentScreen(palette),
                                 ),
                               ),
@@ -759,11 +758,6 @@ class _AppShellState extends State<AppShell> {
         );
       case 'files':
         return FilesScreen(palette: palette);
-      case 'architecture':
-        return ArchitectureScreen(
-          palette: palette,
-          onNavigateToFile: (path) => setState(() => _activeView = 'files'),
-        );
       case 'discoveries':
         return DiscoveriesScreen(
           palette: palette,

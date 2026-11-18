@@ -378,13 +378,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
         // ── Filter & Search Strip ──
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          decoration: BoxDecoration(
-            color: p.bgSurface,
-            border: Border(
-              top: BorderSide(color: p.div),
-              bottom: BorderSide(color: p.div),
-            ),
-          ),
+          color: Colors.transparent,
           child: Row(
             children: [
               Text('Category:', style: UnoTypography.mono(color: p.textSec, fontSize: 11)),

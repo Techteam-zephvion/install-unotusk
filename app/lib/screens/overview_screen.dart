@@ -166,7 +166,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
                   Row(
                     children: [
                       Text(
-                        repoInfo?.name.isNotEmpty == true ? repoInfo!.name : 'Project Overview',
+                        repoInfo?.name.isNotEmpty == true
+                            ? formatDisplayTitle(repoInfo!.name)
+                            : 'Project Overview',
                         style: UnoTypography.body(color: p.text, fontSize: 20, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(width: 10),
@@ -606,7 +608,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                             : (snapshot?.commitHash ?? 'HEAD'),
                       ),
                       _detailRow('Status', snapshot?.status ?? 'READY'),
-                      Divider(height: 28, color: p.div),
+                      const SizedBox(height: 20),
                       Text(
                         'Quick Navigate',
                         style: UnoTypography.body(color: p.textSec, fontSize: 12, fontWeight: FontWeight.w600),
@@ -624,7 +626,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                           _navChip(
                             icon: LucideIcons.boxes,
                             label: 'Architecture',
-                            onTap: () => widget.onNavigateView?.call('architecture'),
+                            onTap: () => widget.onNavigateView?.call('graph'),
                           ),
                           _navChip(
                             icon: LucideIcons.searchCode,
@@ -816,9 +818,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Divider(color: p.div),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 18),
 
                     Text(
                       'CURRENT PROJECT MEMBERS',
@@ -1027,13 +1027,33 @@ class _OverviewScreenState extends State<OverviewScreen> {
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: p.accent,
-                          foregroundColor: Colors.white,
+                          foregroundColor: p.isDark
+                              ? const Color(0xFF0B1020)
+                              : const Color(0xFFF4F1EC),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         child: isAdding
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : Text('Add Member', style: UnoTypography.body(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                            ? SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: p.isDark
+                                      ? const Color(0xFF0B1020)
+                                      : const Color(0xFFF4F1EC),
+                                ),
+                              )
+                            : Text(
+                                'Add Member',
+                                style: UnoTypography.body(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.isDark
+                                      ? const Color(0xFF0B1020)
+                                      : const Color(0xFFF4F1EC),
+                                ),
+                              ),
                       ),
                     ),
                   ],

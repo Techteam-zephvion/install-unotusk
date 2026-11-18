@@ -202,7 +202,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        Divider(color: widget.palette.div),
+        const SizedBox(height: 6),
         const SizedBox(height: 18),
 
         Text('COLOR THEME',
@@ -329,7 +329,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        Divider(color: widget.palette.div),
+        const SizedBox(height: 6),
         const SizedBox(height: 18),
         Row(
           children: [
@@ -441,7 +441,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Divider(color: widget.palette.div),
+              const SizedBox(height: 6),
               const SizedBox(height: 16),
 
               // Security Guardrails Card
@@ -707,11 +707,22 @@ class _AdminScreenState extends State<AdminScreen> {
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: widget.palette.accent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: widget.palette.isDark
+                          ? const Color(0xFF0B1020)
+                          : const Color(0xFFF4F1EC),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: Text('Assign Role', style: UnoTypography.body(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white)),
+                    child: Text(
+                      'Assign Role',
+                      style: UnoTypography.body(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: widget.palette.isDark
+                            ? const Color(0xFF0B1020)
+                            : const Color(0xFFF4F1EC),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -736,7 +747,7 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          Divider(color: widget.palette.div),
+          const SizedBox(height: 6),
           const SizedBox(height: 16),
 
           // Backend Server URL Configuration
@@ -784,11 +795,22 @@ class _AdminScreenState extends State<AdminScreen> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: widget.palette.accent,
-                        foregroundColor: Colors.white,
+                        foregroundColor: widget.palette.isDark
+                            ? const Color(0xFF0B1020)
+                            : const Color(0xFFF4F1EC),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: Text('Save & Connect', style: UnoTypography.body(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white)),
+                      child: Text(
+                        'Save & Connect',
+                        style: UnoTypography.body(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: widget.palette.isDark
+                              ? const Color(0xFF0B1020)
+                              : const Color(0xFFF4F1EC),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -870,7 +892,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        Divider(color: widget.palette.div),
+        const SizedBox(height: 6),
         const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.all(18),

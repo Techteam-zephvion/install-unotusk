@@ -1,14 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:window_manager/window_manager.dart';
 import '../models/models.dart';
 import '../models/workspace_models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import 'dart:io';
-import 'package:window_manager/window_manager.dart';
 import '../widgets/desktop_window_controls.dart';
 import '../widgets/unotusk_logo.dart';
 
@@ -39,11 +41,22 @@ class ProjectsScreen extends StatefulWidget {
   State<ProjectsScreen> createState() => _ProjectsScreenState();
 }
 
-class _ProjectsScreenState extends State<ProjectsScreen> {
+class _ProjectsScreenState extends State<ProjectsScreen>
+    with SingleTickerProviderStateMixin {
   String _activeTab = 'projects'; // 'projects' or 'settings'
   String _filterText = '';
   bool _connectDialogOpen = false;
   Timer? _serverTimer;
+
+  final _mainScrollController = ScrollController();
+  final _filterController = TextEditingController();
+  final _filterFocusNode = FocusNode();
+  bool _filterFocused = false;
+  bool _filterHovered = false;
+
+  late final AnimationController _entranceController;
+  late final Animation<double> _entranceFade;
+  late final Animation<Offset> _entranceSlide;
 
   bool get _isManager {
     if (widget.user != null) return widget.user!.isManager;
@@ -110,6 +123,27 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   @override
   void initState() {
     super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _entranceFade = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    );
+    _entranceSlide = Tween<Offset>(
+      begin: const Offset(0, 0.025),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    ));
+    _entranceController.forward();
+
+    _filterFocusNode.addListener(() {
+      if (mounted) setState(() => _filterFocused = _filterFocusNode.hasFocus);
+    });
+
     // Restore any previously connected projects so they remain in workspace
     if (ApiService.connectedProjectIds.isEmpty) {
       ApiService.loadPersistedConnectedProjects();
@@ -217,63 +251,102 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   Widget build(BuildContext context) {
     final palette = widget.palette;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isNarrow = screenWidth < 600;
+    final isNarrow = screenWidth < 720;
 
     return Scaffold(
       backgroundColor: palette.bgBase,
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(gradient: palette.pageGradient),
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                // ─── Top Navigation Bar ───
-                _buildTopBar(palette, isNarrow),
+      body: TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: widget.isDark ? 1.0 : 0.0),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeInOutCubic,
+        builder: (context, t, _) {
+          final baseTopLeft = Color.lerp(
+            const Color(0xFFF3EFE8),
+            const Color(0xFF0A0F1D),
+            t,
+          )!;
+          final baseMid = Color.lerp(
+            const Color(0xFFF0EBE2),
+            const Color(0xFF0C1121),
+            t,
+          )!;
+          final baseBottomRight = Color.lerp(
+            const Color(0xFFECE6DC),
+            const Color(0xFF0E1426),
+            t,
+          )!;
 
-                // ─── Content Area ───
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-                      return Stack(
-                        alignment: Alignment.topCenter,
-                        children: <Widget>[
-                          ...previousChildren,
-                          ?currentChild,
-                        ],
-                      );
-                    },
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    transitionBuilder: (child, animation) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
-                    child: KeyedSubtree(
-                      key: ValueKey<String>('$_activeTab-${widget.isDark}'),
-                      child: _activeTab == 'projects'
-                          ? _buildProjectsContent(palette, isNarrow)
-                          : _buildSettingsContent(palette),
-                    ),
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // ── Layer 1: Velvety Matte Tonal Base (zero glossy glare) ──
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    stops: const [0.0, 0.5, 1.0],
+                    colors: [baseTopLeft, baseMid, baseBottomRight],
                   ),
                 ),
-              ],
-            ),
+              ),
 
-            // Connect Codebase Dialog Overlay
-            if (_connectDialogOpen)
-              _buildConnectCodebaseDialog(palette),
+              // ── Layer 2: Foreground Chrome & Workspace ──
+              Column(
+                children: [
+                  // ─── Transparent Floating Top Navigation Bar ───
+                  _buildTopBar(palette, isNarrow, t),
 
-            // Connect Workspace Dialog Overlay (Manager RBAC)
-            if (_connectWorkspaceDialogOpen)
-              _buildConnectWorkspaceDialog(palette),
+                  // ─── Content Area ───
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      layoutBuilder: (Widget? currentChild,
+                          List<Widget> previousChildren) {
+                        return Stack(
+                          alignment: Alignment.topCenter,
+                          children: <Widget>[
+                            ...previousChildren,
+                            ?currentChild,
+                          ],
+                        );
+                      },
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                      child: KeyedSubtree(
+                        key: ValueKey<String>(_activeTab),
+                        child: _activeTab == 'projects'
+                            ? FadeTransition(
+                                opacity: _entranceFade,
+                                child: SlideTransition(
+                                  position: _entranceSlide,
+                                  child: _buildProjectsContent(
+                                      palette, isNarrow, t),
+                                ),
+                              )
+                            : _buildSettingsContent(palette),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
 
-            // Manage Workspace Dialog Overlay (Manager RBAC)
-            if (_managingWorkspaceProject != null)
-              _buildManageWorkspaceModal(palette),
-          ],
-        ),
+              // Connect Codebase Dialog Overlay
+              if (_connectDialogOpen) _buildConnectCodebaseDialog(palette),
+
+              // Connect Workspace Dialog Overlay (Manager RBAC)
+              if (_connectWorkspaceDialogOpen)
+                _buildConnectWorkspaceDialog(palette),
+
+              // Manage Workspace Dialog Overlay (Manager RBAC)
+              if (_managingWorkspaceProject != null)
+                _buildManageWorkspaceModal(palette),
+            ],
+          );
+        },
       ),
     );
   }
@@ -281,6 +354,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   @override
   void dispose() {
     _serverTimer?.cancel();
+    _entranceController.dispose();
+    _mainScrollController.dispose();
+    _filterController.dispose();
+    _filterFocusNode.dispose();
     _serverUrlController.dispose();
     _workspaceScrollController.dispose();
     _searchMemberController.dispose();
@@ -1456,7 +1533,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Manage employees and permissions for ${project.name}',
+                              'Manage employees and permissions for ${formatDisplayTitle(project.name)}',
                               style: UnoTypography.body(
                                 color: palette.textSec,
                                 fontSize: 12.5,
@@ -1480,55 +1557,99 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Project Summary Pill Strip ──
+                  // ── Matte Project Summary Card ──
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                        horizontal: 14, vertical: 11),
                     decoration: BoxDecoration(
-                      color: palette.bgElevated,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: palette.div),
+                      color: palette.isDark
+                          ? const Color(0xFF141C2F)
+                          : const Color(0xFFFAF7F2),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                        color: palette.isDark
+                            ? const Color(0xFF232D44)
+                            : const Color(0xFFDFD8CC),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.code,
-                          size: 15,
-                          color: palette.textSec,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          project.name,
-                          style: UnoTypography.body(
-                            color: palette.text,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: palette.isDark
+                                ? const Color(0xFF1B243A)
+                                : const Color(0xFFEFEAE0),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: palette.isDark
+                                  ? const Color(0xFF28334D)
+                                  : const Color(0xFFDDD5C9),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            LucideIcons.folderGit2,
+                            size: 16,
+                            color: palette.accent,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        // Ready Green Button / Status badge
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            formatDisplayTitle(project.name),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: UnoTypography.body(
+                              color: palette.text,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Restrained status pill
                         Builder(
                           builder: (context) {
-                            final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
+                            final isStopped = project.upsStatus.toUpperCase() ==
+                                    'STOPPED' ||
                                 project.upsStatus.toUpperCase() == 'DELETED' ||
                                 project.upsStatus.toUpperCase() == 'OFFLINE';
 
                             if (isStopped) {
                               return Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+                                    horizontal: 8, vertical: 2.5),
                                 decoration: BoxDecoration(
-                                  color: Colors.redAccent.withValues(alpha: 0.12),
-                                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.10),
+                                  border: Border.all(
+                                      color: Colors.redAccent
+                                          .withValues(alpha: 0.30)),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Text(
-                                  'STOPPED',
-                                  style: UnoTypography.mono(
-                                    color: Colors.redAccent,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 5.5,
+                                      height: 5.5,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Stopped',
+                                      style: UnoTypography.body(
+                                        color: Colors.redAccent,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             }
@@ -1539,44 +1660,50 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                 project.ingestionStatus.toLowerCase() == 'live';
 
                             if (isReady) {
-                              return Tooltip(
-                                message: 'Ready',
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: palette.live.withValues(alpha: 0.15),
-                                    border: Border.all(
-                                        color: palette.live.withValues(alpha: 0.45)),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: palette.live,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: palette.live.withValues(alpha: 0.7),
-                                          blurRadius: 4,
-                                          spreadRadius: 0.5,
-                                        ),
-                                      ],
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: palette.live.withValues(alpha: 0.10),
+                                  border: Border.all(
+                                      color:
+                                          palette.live.withValues(alpha: 0.26)),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 5.5,
+                                      height: 5.5,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: palette.live,
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Active',
+                                      style: UnoTypography.body(
+                                        color: palette.isDark
+                                            ? const Color(0xFF6EE7B7)
+                                            : const Color(0xFF15803D),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             }
 
                             return Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2),
+                                  horizontal: 8, vertical: 2.5),
                               decoration: BoxDecoration(
                                 color: palette.bgBase,
                                 border: Border.all(color: palette.div),
-                                borderRadius: BorderRadius.circular(5),
+                                borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 project.upsStatus.toUpperCase(),
@@ -1592,18 +1719,32 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         const Spacer(),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
+                              horizontal: 9, vertical: 4),
                           decoration: BoxDecoration(
-                            color: palette.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            '${_projectMembers.length} Members',
-                            style: UnoTypography.mono(
-                              color: palette.accent,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                            color: palette.accent.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: palette.accent.withValues(alpha: 0.22),
                             ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.users,
+                                size: 11.5,
+                                color: palette.accent,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${_projectMembers.length} ${_projectMembers.length == 1 ? 'Member' : 'Members'}',
+                                style: UnoTypography.body(
+                                  color: palette.accent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -1999,26 +2140,45 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                           ),
                                           child: Center(
                                             child: isAssigning
-                                                ? const SizedBox(
+                                                ? SizedBox(
                                                     width: 12,
                                                     height: 12,
-                                                    child: CircularProgressIndicator(
+                                                    child:
+                                                        CircularProgressIndicator(
                                                       strokeWidth: 2,
-                                                      color: Colors.white,
+                                                      color: palette.isDark
+                                                          ? const Color(
+                                                              0xFF0B1020)
+                                                          : const Color(
+                                                              0xFFF4F1EC),
                                                     ),
                                                   )
                                                 : Row(
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: [
-                                                      const Icon(Icons.add,
-                                                          size: 13, color: Colors.white),
+                                                      Icon(
+                                                        Icons.add,
+                                                        size: 13,
+                                                        color: palette.isDark
+                                                            ? const Color(
+                                                                0xFF0B1020)
+                                                            : const Color(
+                                                                0xFFF4F1EC),
+                                                      ),
                                                       const SizedBox(width: 3),
                                                       Text(
                                                         'Assign',
-                                                        style: UnoTypography.body(
-                                                          color: Colors.white,
+                                                        style:
+                                                            UnoTypography.body(
+                                                          color: palette.isDark
+                                                              ? const Color(
+                                                                  0xFF0B1020)
+                                                              : const Color(
+                                                                  0xFFF4F1EC),
                                                           fontSize: 11.5,
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                         ),
                                                       ),
                                                     ],
@@ -2338,39 +2498,57 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
 
   // ─────────────────────────────────────────────────
-  //  Top Navigation Bar
+  //  Floating Transparent Top Navigation Bar
   // ─────────────────────────────────────────────────
-  Widget _buildTopBar(UnoPalette palette, bool isNarrow) {
+  Widget _buildTopBar(UnoPalette palette, bool isNarrow, double t) {
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final brandColor = Color.lerp(
+      const Color(0xFF0A0F20),
+      const Color(0xFFCBC1B4),
+      t,
+    )!;
 
     return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        gradient: palette.headerGradient,
-        border: Border(
-          bottom: BorderSide(color: palette.div.withValues(alpha: 0.45)),
-        ),
-      ),
+      height: 54,
+      color: Colors.transparent,
       padding: EdgeInsets.only(
-        left: isNarrow ? 12 : 20,
-        right: isDesktop ? 0 : (isNarrow ? 12 : 20),
+        left: isNarrow ? 14 : 24,
+        right: isDesktop ? 0 : (isNarrow ? 14 : 24),
       ),
       child: Row(
         children: [
-          // ── Left: Unotusk Logo & Name (Consistent with Workspace view) ──
+          // ── Left: Unotusk Logo, Wordmark & Quiet Workspace Tag ──
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              UnotuskLogo(size: 18, onDark: widget.isDark),
-              const SizedBox(width: 9),
+              UnotuskLogo(size: 22, onDark: widget.isDark),
+              const SizedBox(width: 8),
               Text(
                 'Unotusk',
-                style: UnoTypography.brandSerif(
-                  palette: palette,
-                  fontSize: 14.5,
+                style: GoogleFonts.youngSerif(
+                  color: brandColor,
+                  fontSize: 15.5,
+                  letterSpacing: -0.2,
                 ),
               ),
+              if (!isNarrow) ...[
+                Container(
+                  width: 1,
+                  height: 14,
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  color: brandColor.withValues(alpha: 0.20),
+                ),
+                Text(
+                  'WORKSPACE',
+                  style: GoogleFonts.inter(
+                    color: brandColor.withValues(alpha: 0.62),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
             ],
           ),
 
@@ -2379,44 +2557,24 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             child: isDesktop
                 ? const DragToMoveArea(
                     child: SizedBox(
-                      height: 52,
+                      height: 54,
                       width: double.infinity,
                     ),
                   )
-                : const SizedBox(height: 52),
+                : const SizedBox(height: 54),
           ),
-          // ── Theme Toggle (Consistent with Workspace view) ──
-          InkWell(
+
+          // ── Smooth Tactile Theme Toggle Pill (Matching Auth Screen) ──
+          _TactileThemePill(
+            isDark: widget.isDark,
+            t: t,
             onTap: widget.onToggleTheme,
-            borderRadius: BorderRadius.circular(6),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                border: Border.all(color: palette.div),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: AnimatedRotation(
-                turns: widget.isDark ? 0.0 : 0.5,
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  widget.isDark ? LucideIcons.moon : LucideIcons.sun,
-                  size: 14,
-                  color: palette.textSec,
-                ),
-              ),
-            ),
           ),
 
           // Desktop Window Controls (Minimize, Maximize/Restore, Close)
           if (isDesktop) ...[
-            const SizedBox(width: 8),
-            DesktopWindowControls(palette: palette, height: 52),
+            const SizedBox(width: 10),
+            DesktopWindowControls(palette: palette, height: 54),
           ],
         ],
       ),
@@ -2426,221 +2584,388 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   // ─────────────────────────────────────────────────
   //  Projects Content
   // ─────────────────────────────────────────────────
-  Widget _buildProjectsContent(UnoPalette palette, bool isNarrow) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1400),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isNarrow ? 20 : 40,
-            vertical: 24,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header Row ──
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Projects',
-                          style: UnoTypography.body(
-                            color: palette.text,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Software projects available in your workspace',
-                          style: UnoTypography.body(
-                            color: palette.textSec,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // ── Action Buttons ──
-                  Row(
-                    children: [
-                      _buildUserLoginButton(palette),
-                      const SizedBox(width: 10),
-                      _buildActionButton(
-                        icon: Icons.refresh,
-                        label: 'Refresh',
-                        palette: palette,
-                        filled: false,
-                        isLoading: _isRefreshingProjects,
-                        onTap: () => _fetchServerProjects(isSilent: false),
-                      ),
-                      if (_isManager) ...[
-                        const SizedBox(width: 10),
-                        _buildActionButton(
-                          icon: Icons.hub_outlined,
-                          label: 'Connect Workspace',
-                          palette: palette,
-                          filled: true,
-                          onTap: _openConnectWorkspaceDialog,
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
+  Widget _buildProjectsContent(UnoPalette palette, bool isNarrow, double t) {
+    final brandColor = Color.lerp(
+      const Color(0xFF0A0F20),
+      const Color(0xFFCBC1B4),
+      t,
+    )!;
+    final subColor = Color.lerp(
+      const Color(0xFF5A575B),
+      const Color(0xFF84878F),
+      t,
+    )!;
+    final activeCount = _projects.where((p) {
+      final st = p.upsStatus.toUpperCase();
+      return st != 'STOPPED' && st != 'DELETED' && st != 'OFFLINE';
+    }).length;
 
-              const SizedBox(height: 24),
-
-              // ── Filter Input ──
-              SizedBox(
-                width: 280,
-                height: 40,
-                child: TextField(
-                  onChanged: (v) => setState(() => _filterText = v),
-                  style: UnoTypography.body(
-                    color: palette.text,
-                    fontSize: 13,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Filter projects...',
-                    hintStyle: UnoTypography.body(
-                      color: palette.textSec.withValues(alpha: 0.6),
-                      fontSize: 13,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      size: 18,
-                      color: palette.textSec,
-                    ),
-                    filled: true,
-                    fillColor: palette.bgElevated,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.div),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.div),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.accent, width: 1.5),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── Project Cards ──
-              if (_isLoadingProjects)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Loading workspace...',
-                          style: UnoTypography.body(
-                            color: palette.textSec,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else if (_filteredProjects.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-                  decoration: BoxDecoration(
-                    gradient: palette.sectionGradient,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: palette.div),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _filterText.isNotEmpty
-                            ? Icons.search_off_rounded
-                            : Icons.folder_open_rounded,
-                        size: 36,
-                        color: palette.textSec,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _filterText.isNotEmpty
-                            ? 'No matching projects found'
-                            : 'No projects in workspace',
-                        style: UnoTypography.body(
-                          color: palette.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _filterText.isNotEmpty
-                            ? 'Try adjusting your search filter.'
-                            : (_isManager
-                                ? 'Connect backend projects to display them in your workspace.'
-                                : 'No projects have been connected to this workspace yet.'),
-                        textAlign: TextAlign.center,
-                        style: UnoTypography.body(
-                          color: palette.textSec,
-                          fontSize: 13,
-                        ),
-                      ),
-                      if (_isManager && _filterText.isEmpty) ...[
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _openConnectWorkspaceDialog,
-                          icon: Icon(
-                            Icons.hub_outlined,
-                            size: 16,
-                            color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
-                          ),
-                          label: Text(
-                            'Connect Workspace',
-                            style: TextStyle(
-                              color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: palette.accent,
-                            foregroundColor: widget.isDark ? const Color(0xFF0A0F20) : Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 18, vertical: 11),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                )
-              else
-                ..._filteredProjects
-                    .map((project) => _buildProjectCard(project, palette)),
-            ],
+    final headerTitle = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Projects',
+          style: GoogleFonts.youngSerif(
+            color: brandColor,
+            fontSize: isNarrow ? 30 : 38,
+            letterSpacing: -0.7,
+            height: 1.05,
           ),
         ),
+        const SizedBox(height: 6),
+        Text(
+          'Software projects available in your workspace',
+          style: GoogleFonts.inter(
+            color: subColor,
+            fontSize: 14.5,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+
+    final headerActions = Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildUserLoginButton(palette, t),
+        _buildActionButton(
+          icon: LucideIcons.refreshCw,
+          label: 'Refresh',
+          palette: palette,
+          filled: false,
+          isLoading: _isRefreshingProjects,
+          onTap: () => _fetchServerProjects(isSilent: false),
+        ),
+        if (_isManager)
+          _buildActionButton(
+            icon: Icons.hub_outlined,
+            label: 'Connect Workspace',
+            palette: palette,
+            filled: true,
+            onTap: _openConnectWorkspaceDialog,
+          ),
+      ],
+    );
+
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: RawScrollbar(
+        controller: _mainScrollController,
+        thumbVisibility: false,
+        trackVisibility: false,
+        thickness: 2.0,
+        radius: const Radius.circular(2),
+        thumbColor: palette.textSec.withValues(alpha: 0.25),
+        fadeDuration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.only(right: 4, top: 8, bottom: 8),
+        child: SingleChildScrollView(
+          controller: _mainScrollController,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1260),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 20 : 48,
+                  vertical: isNarrow ? 24 : 36,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Editorial Header Row (Left Title + Right-Aligned Actions) ──
+                    if (isNarrow) ...[
+                      headerTitle,
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: headerActions,
+                        ),
+                      ),
+                    ] else
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(child: headerTitle),
+                          const SizedBox(width: 24),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: headerActions,
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Matte Recessed Filter Bar + Quiet Workspace Counter ──
+                    Row(
+                      children: [
+                        MouseRegion(
+                          onEnter: (_) => setState(() => _filterHovered = true),
+                          onExit: (_) => setState(() => _filterHovered = false),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOutCubic,
+                            width: isNarrow ? 240 : 340,
+                            height: 40,
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 13),
+                            decoration: BoxDecoration(
+                              color: Color.lerp(
+                                const Color(0xFFFAF7F2),
+                                const Color(0xFF12192B),
+                                t,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _filterFocused
+                                    ? brandColor.withValues(
+                                        alpha: widget.isDark ? 0.45 : 0.42)
+                                    : (_filterHovered
+                                        ? brandColor.withValues(alpha: 0.24)
+                                        : palette.div),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  LucideIcons.search,
+                                  size: 15,
+                                  color: _filterFocused
+                                      ? brandColor
+                                      : palette.textSec,
+                                ),
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _filterController,
+                                    focusNode: _filterFocusNode,
+                                    onChanged: (v) =>
+                                        setState(() => _filterText = v),
+                                    textAlignVertical: TextAlignVertical.center,
+                                    style: UnoTypography.body(
+                                      color: palette.text,
+                                      fontSize: 13.5,
+                                    ),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 10),
+                                      hintText: 'Filter projects...',
+                                      hintStyle: UnoTypography.body(
+                                        color: palette.textSec
+                                            .withValues(alpha: 0.65),
+                                        fontSize: 13.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 140),
+                                  child: _filterText.isNotEmpty
+                                      ? MouseRegion(
+                                          key: const ValueKey('clear-filter'),
+                                          cursor: SystemMouseCursors.click,
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              _filterController.clear();
+                                              setState(() => _filterText = '');
+                                            },
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(
+                                                  left: 6),
+                                              child: Icon(
+                                                LucideIcons.x,
+                                                size: 14,
+                                                color: palette.textSec,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(
+                                          key: ValueKey('empty-filter'),
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (_projects.isNotEmpty && !isNarrow)
+                          Text(
+                            '${_projects.length} ${_projects.length == 1 ? 'project' : 'projects'} · $activeCount active',
+                            style: GoogleFonts.inter(
+                              color: subColor.withValues(alpha: 0.85),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    // ── Project Cards / Elevated Empty State ──
+                    if (_isLoadingProjects)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 56),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      brandColor),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Loading workspace...',
+                                style: UnoTypography.body(
+                                  color: palette.textSec,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_filteredProjects.isEmpty)
+                      _buildElevatedEmptyState(palette, t)
+                    else
+                      ..._filteredProjects.map(
+                          (project) => _buildProjectCard(project, palette)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildElevatedEmptyState(UnoPalette palette, double t) {
+    final brandColor = Color.lerp(
+      const Color(0xFF0B1020),
+      const Color(0xFFE9DFD0),
+      t,
+    )!;
+    final cardTop = Color.lerp(
+      const Color(0xFFFAF7F2),
+      const Color(0xFF141C2F),
+      t,
+    )!;
+    final cardBottom = Color.lerp(
+      const Color(0xFFF3EDE3),
+      const Color(0xFF101728),
+      t,
+    )!;
+    final iconBg = Color.lerp(
+      const Color(0xFFEFEAE0),
+      const Color(0xFF1A2338),
+      t,
+    )!;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 28),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [cardTop, cardBottom],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Color.lerp(
+            const Color(0xFFDFD8CC),
+            const Color(0xFF232C42),
+            t,
+          )!,
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Color.lerp(
+                  const Color(0xFFDDD5C9),
+                  const Color(0xFF28334C),
+                  t,
+                )!,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              _filterText.isNotEmpty
+                  ? LucideIcons.searchX
+                  : LucideIcons.folderKanban,
+              size: 22,
+              color: brandColor,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            _filterText.isNotEmpty
+                ? 'No matching projects found'
+                : 'No projects in workspace',
+            style: GoogleFonts.youngSerif(
+              color: palette.text,
+              fontSize: 22,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Text(
+              _filterText.isNotEmpty
+                  ? 'Try adjusting your search filter to find a connected project.'
+                  : (_isManager
+                      ? 'Connect backend project servers to begin exploring architecture and intelligence.'
+                      : 'No projects have been connected to this workspace yet.'),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: palette.textSec,
+                fontSize: 13.5,
+                height: 1.5,
+              ),
+            ),
+          ),
+          if (_isManager && _filterText.isEmpty) ...[
+            const SizedBox(height: 22),
+            _TactileHomeButton(
+              icon: Icons.hub_outlined,
+              label: 'Connect Workspace',
+              palette: palette,
+              isDark: widget.isDark,
+              filled: true,
+              onTap: _openConnectWorkspaceDialog,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2653,60 +2978,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     required VoidCallback onTap,
     bool isLoading = false,
   }) {
-    final Color buttonFg = filled
-        ? (widget.isDark ? const Color(0xFF0A0F20) : Colors.white)
-        : palette.text;
-    final Color iconColor = filled
-        ? (widget.isDark ? const Color(0xFF0A0F20) : Colors.white)
-        : palette.textSec;
-
-    return InkWell(
-      onTap: isLoading ? () {} : onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: filled ? palette.accent : Colors.transparent,
-          border: filled
-              ? null
-              : Border.all(color: palette.div),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 15,
-              height: 15,
-              child: isLoading
-                  ? Center(
-                      child: SizedBox(
-                        width: 13,
-                        height: 13,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(buttonFg),
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      icon,
-                      size: 15,
-                      color: iconColor,
-                    ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: UnoTypography.body(
-                color: buttonFg,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return _TactileHomeButton(
+      icon: icon,
+      label: label,
+      palette: palette,
+      isDark: widget.isDark,
+      filled: filled,
+      isLoading: isLoading,
+      onTap: onTap,
     );
   }
 
@@ -2721,22 +3000,49 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   // ─────────────────────────────────────────────────
-  //  User Login / Menu Button (Beside Refresh Button)
+  //  Sleek User Profile Pill (Matching Sidebar Monogram Aesthetic)
   // ─────────────────────────────────────────────────
-  Widget _buildUserLoginButton(UnoPalette palette) {
-    final displayName = widget.userName.isNotEmpty ? widget.userName : 'Lead Admin';
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'L';
+  Widget _buildUserLoginButton(UnoPalette palette, double t) {
+    final displayName =
+        widget.userName.isNotEmpty ? widget.userName : 'Lead Admin';
+    final nameParts = displayName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final initials = nameParts.isEmpty
+        ? 'U'
+        : (nameParts.length == 1
+            ? nameParts[0]
+                .substring(0, nameParts[0].length >= 2 ? 2 : 1)
+                .toUpperCase()
+            : '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase());
     final email = widget.user?.email ?? 'lead@acme.com';
+
+    final avatarBg =
+        widget.isDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
+    final avatarFg =
+        widget.isDark ? const Color(0xFF0A0F20) : const Color(0xFFCBC1B4);
+    final pillBg = Color.lerp(
+      const Color(0xFFFFFFFF).withValues(alpha: 0.85),
+      const Color(0xFF161C31).withValues(alpha: 0.85),
+      t,
+    )!;
+    final pillBorder = Color.lerp(
+      const Color(0xFFE4DFD6),
+      const Color(0xFF2E313C),
+      t,
+    )!;
 
     return PopupMenuButton<String>(
       tooltip: '',
       position: PopupMenuPosition.under,
-      offset: const Offset(0, 6),
-      color: palette.bgSurface,
-      elevation: 8,
+      offset: const Offset(0, 8),
+      color: widget.isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF),
+      elevation: 14,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: palette.div),
+        borderRadius: BorderRadius.circular(13),
+        side: BorderSide(color: pillBorder),
       ),
       onSelected: (val) {
         if (val == 'settings') {
@@ -2748,44 +3054,48 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       itemBuilder: (context) => [
         PopupMenuItem<String>(
           enabled: false,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
             children: [
-              Text(
-                displayName,
-                style: UnoTypography.body(
-                  color: palette.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                email,
-                style: UnoTypography.mono(
-                  color: palette.textSec,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: palette.bgElevated,
-                  border: Border.all(color: palette.div),
-                  borderRadius: BorderRadius.circular(4),
+                  color: avatarBg,
+                  borderRadius: BorderRadius.circular(9),
                 ),
+                alignment: Alignment.center,
                 child: Text(
-                  _isManager ? 'MANAGER' : 'MEMBER',
-                  style: UnoTypography.mono(
-                    color: palette.textSec,
-                    fontSize: 9,
-                    letterSpacing: 0.8,
-                    fontWeight: FontWeight.w600,
+                  initials,
+                  style: UnoTypography.body(
+                    color: avatarFg,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    displayName,
+                    style: UnoTypography.body(
+                      color: palette.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 1.5),
+                  Text(
+                    email,
+                    style: UnoTypography.body(
+                      color: palette.textSec,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -2796,7 +3106,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           height: 38,
           child: Row(
             children: [
-              Icon(Icons.settings_outlined, size: 15, color: palette.textSec),
+              Icon(LucideIcons.settings, size: 14.5, color: palette.textSec),
               const SizedBox(width: 10),
               Text(
                 'Settings',
@@ -2811,7 +3121,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           height: 38,
           child: Row(
             children: [
-              const Icon(Icons.logout, size: 15, color: Color(0xFFE05A5A)),
+              const Icon(LucideIcons.logOut,
+                  size: 14.5, color: Color(0xFFE05A5A)),
               const SizedBox(width: 10),
               Text(
                 'Sign Out',
@@ -2825,51 +3136,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           ),
         ),
       ],
-      child: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          border: Border.all(color: palette.div),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                initial,
-                style: UnoTypography.body(
-                  color: palette.accent,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              displayName,
-              style: UnoTypography.body(
-                color: palette.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.keyboard_arrow_down,
-              size: 15,
-              color: palette.textSec,
-            ),
-          ],
-        ),
+      child: _TactileProfileTrigger(
+        initials: initials,
+        displayName: displayName,
+        avatarBg: avatarBg,
+        avatarFg: avatarFg,
+        pillBg: pillBg,
+        pillBorder: pillBorder,
+        palette: palette,
       ),
     );
   }
@@ -3217,14 +3491,16 @@ class _OppositeProjectCard extends StatefulWidget {
 
 class _OppositeProjectCardState extends State<_OppositeProjectCard> {
   bool _isHovered = false;
+  bool _isPressed = false;
   bool _isManageHovered = false;
+  bool _isManagePressed = false;
   bool _isOpenHovered = false;
+  bool _isOpenPressed = false;
 
   @override
   Widget build(BuildContext context) {
     final project = widget.project;
-    // Opposite shade to the page background
-    final isCardDark = !widget.isDark;
+    final isDark = widget.isDark;
 
     final isStopped = project.upsStatus.toUpperCase() == 'STOPPED' ||
         project.upsStatus.toUpperCase() == 'DELETED' ||
@@ -3237,306 +3513,386 @@ class _OppositeProjectCardState extends State<_OppositeProjectCard> {
             project.upsStatus.toUpperCase() == 'ACTIVE' ||
             project.ingestionStatus.toLowerCase() == 'live');
 
-    // Exact palette tokens for opposite shade
-    final cardBg = isCardDark
-        ? (_isHovered ? const Color(0xFF12172A) : const Color(0xFF0A0F20))
-        : (_isHovered ? const Color(0xFFFFFFFF) : const Color(0xFFF5F2EB));
+    // Velvety matte same-shade tonal gradient (zero glossy sheen)
+    final cardGradientColors = isDark
+        ? (_isHovered
+            ? const [
+                Color(0xFF1A2237),
+                Color(0xFF161E32),
+                Color(0xFF131B2D),
+              ]
+            : const [
+                Color(0xFF151C2F),
+                Color(0xFF12192B),
+                Color(0xFF101627),
+              ])
+        : (_isHovered
+            ? const [
+                Color(0xFFFCF9F4),
+                Color(0xFFF8F4EC),
+                Color(0xFFF4EFE6),
+              ]
+            : const [
+                Color(0xFFFAF7F2),
+                Color(0xFFF6F1E9),
+                Color(0xFFF2ECE2),
+              ]);
 
-    final cardBorder = isCardDark
-        ? (_isHovered ? const Color(0xFF3A3F52) : const Color(0xFF222533))
-        : (_isHovered ? const Color(0xFFD2C9BA) : const Color(0xFFE4DFD6));
+    final cardBorder = isDark
+        ? (_isHovered
+            ? const Color(0xFFE9DFD0).withValues(alpha: 0.28)
+            : const Color(0xFF222B42))
+        : (_isHovered
+            ? const Color(0xFF0B1020).withValues(alpha: 0.24)
+            : const Color(0xFFDFD8CC));
 
-    final iconBoxBg =
-        isCardDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
-    final iconBoxBorder =
-        isCardDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+    final iconBg = isDark
+        ? (_isHovered ? const Color(0xFF1F2840) : const Color(0xFF1A2237))
+        : (_isHovered ? const Color(0xFFF2ECE2) : const Color(0xFFEFEAE0));
+    final iconBoxBorder = isDark
+        ? (_isHovered
+            ? const Color(0xFFE9DFD0).withValues(alpha: 0.20)
+            : const Color(0xFF26304A))
+        : const Color(0xFFDDD5C9);
     final iconColor =
-        isCardDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFE5DAC9) : const Color(0xFF111728);
 
     final titleColor =
-        isCardDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFF0ECE4) : const Color(0xFF111728);
     final subtitleColor =
-        isCardDark ? const Color(0xFF84878F) : const Color(0xFF6B686A);
+        isDark ? const Color(0xFF8C92A2) : const Color(0xFF666368);
     final portColor =
-        isCardDark ? const Color(0xFFCBC1B4) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFC5B9A6) : const Color(0xFF3E465E);
 
-    final manageBg = isCardDark
-        ? (_isManageHovered ? const Color(0xFF1E2336) : const Color(0xFF161A29))
-        : (_isManageHovered ? const Color(0xFFF0ECE4) : const Color(0xFFFFFFFF));
-    final manageBorder =
-        isCardDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+    final manageBg = isDark
+        ? (_isManageHovered ? const Color(0xFF212A42) : const Color(0xFF1A2236))
+        : (_isManageHovered ? const Color(0xFFEAE3D7) : const Color(0xFFF2ECE2));
+    final manageBorder = isDark
+        ? (_isManageHovered
+            ? const Color(0xFFE9DFD0).withValues(alpha: 0.26)
+            : const Color(0xFF27314A))
+        : (_isManageHovered
+            ? const Color(0xFF0B1020).withValues(alpha: 0.24)
+            : const Color(0xFFDDD5C9));
     final manageFg =
-        isCardDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
+        isDark ? const Color(0xFFF0ECE4) : const Color(0xFF111728);
+    final manageIconColor =
+        isDark ? const Color(0xFFC5B9A6) : const Color(0xFF5A585E);
 
-    final openBg = isCardDark
-        ? (_isOpenHovered ? const Color(0xFFD8CFBF) : const Color(0xFFCBC1B4))
-        : (_isOpenHovered ? const Color(0xFF161A29) : const Color(0xFF0A0F20));
+    final openBg = isDark
+        ? (_isOpenHovered ? const Color(0xFFEEE4D5) : const Color(0xFFE5DAC9))
+        : (_isOpenHovered ? const Color(0xFF1C243B) : const Color(0xFF111728));
     final openFg =
-        isCardDark ? const Color(0xFF0A0F20) : const Color(0xFFFFFFFF);
+        isDark ? const Color(0xFF0B1020) : const Color(0xFFF4F1EC);
 
     const liveGreen = Color(0xFF22C55E);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onExit: (_) => setState(() {
+        _isHovered = false;
+        _isPressed = false;
+      }),
       cursor: isStopped ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: isStopped ? null : widget.onOpen,
+        onTapDown: isStopped ? null : (_) => setState(() => _isPressed = true),
+        onTapUp: isStopped ? null : (_) => setState(() => _isPressed = false),
+        onTapCancel: isStopped ? null : () => setState(() => _isPressed = false),
         behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+        child: AnimatedScale(
+          scale: _isPressed ? 0.994 : 1.0,
+          duration: const Duration(milliseconds: 95),
           curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
-            color: cardBg,
-            border: Border.all(color: cardBorder, width: 1.1),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: (isCardDark ? const Color(0xFF0A0F20) : Colors.black)
-                    .withValues(
-                  alpha: isCardDark
-                      ? (_isHovered ? 0.28 : 0.16)
-                      : (_isHovered ? 0.34 : 0.22),
-                ),
-                blurRadius: _isHovered ? 22 : 14,
-                offset: Offset(0, _isHovered ? 6 : 3),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                stops: const [0.0, 0.50, 1.0],
+                colors: cardGradientColors,
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Repository / Project icon
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconBoxBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: iconBoxBorder),
+              border: Border.all(color: cardBorder, width: 1.0),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                // Matte recessed project icon tile
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: iconBoxBorder, width: 1),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    LucideIcons.folderGit2,
+                    size: 17.5,
+                    color: iconColor,
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: Icon(
-                  LucideIcons.folderGit2,
-                  size: 18,
-                  color: iconColor,
-                ),
-              ),
 
-              const SizedBox(width: 15),
+                const SizedBox(width: 15),
 
-              // Project name, status & metadata
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            project.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: UnoTypography.body(
-                              color: titleColor,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        if (isStopped)
-                          Tooltip(
-                            message: 'Server Stopped on Backend',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2.5),
-                              decoration: BoxDecoration(
-                                color: Colors.redAccent.withValues(alpha: 0.14),
-                                border: Border.all(
-                                    color: Colors.redAccent
-                                        .withValues(alpha: 0.4)),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.redAccent,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'STOPPED',
-                                    style: UnoTypography.mono(
-                                      color: Colors.redAccent,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        else if (isReady)
-                          Tooltip(
-                            message: 'Active & Ready',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2.5),
-                              decoration: BoxDecoration(
-                                color: liveGreen.withValues(
-                                    alpha: isCardDark ? 0.12 : 0.14),
-                                border: Border.all(
-                                    color: liveGreen.withValues(alpha: 0.35)),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6.5,
-                                    height: 6.5,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: liveGreen,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: liveGreen.withValues(
-                                              alpha: 0.65),
-                                          blurRadius: 4,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    'Active',
-                                    style: UnoTypography.body(
-                                      color: isCardDark
-                                          ? const Color(0xFF4ADE80)
-                                          : const Color(0xFF15803D),
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: iconBoxBg,
-                              border: Border.all(color: iconBoxBorder),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                // Project name, status & metadata
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
                             child: Text(
-                              project.upsStatus.toUpperCase(),
-                              style: UnoTypography.mono(
-                                color: subtitleColor,
-                                fontSize: 10,
+                              formatDisplayTitle(project.name),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: UnoTypography.body(
+                                color: titleColor,
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    if ((project.description != null &&
-                            project.description!.isNotEmpty) ||
-                        project.port != null) ...[
-                      const SizedBox(height: 3.5),
-                      Row(
-                        children: [
-                          if (project.description != null &&
-                              project.description!.isNotEmpty)
-                            Flexible(
+                          const SizedBox(width: 10),
+                          if (isStopped)
+                            Tooltip(
+                              message: 'Server Stopped on Backend',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.10),
+                                  border: Border.all(
+                                      color: Colors.redAccent
+                                          .withValues(alpha: 0.30)),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 5.5,
+                                      height: 5.5,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Stopped',
+                                      style: UnoTypography.body(
+                                        color: Colors.redAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else if (isReady)
+                            Tooltip(
+                              message: 'Active & Ready',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: liveGreen.withValues(
+                                      alpha: isDark ? 0.09 : 0.10),
+                                  border: Border.all(
+                                      color: liveGreen.withValues(
+                                          alpha: isDark ? 0.24 : 0.28)),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 5.5,
+                                      height: 5.5,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: liveGreen,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Active',
+                                      style: UnoTypography.body(
+                                        color: isDark
+                                            ? const Color(0xFF6EE7B7)
+                                            : const Color(0xFF15803D),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: manageBg,
+                                border: Border.all(color: iconBoxBorder),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                               child: Text(
-                                project.description!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                project.upsStatus.toUpperCase(),
                                 style: UnoTypography.mono(
                                   color: subtitleColor,
-                                  fontSize: 11.5,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
-                          if (project.port != null) ...[
+                        ],
+                      ),
+                      if ((project.description != null &&
+                              project.description!.isNotEmpty) ||
+                          project.port != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
                             if (project.description != null &&
                                 project.description!.isNotEmpty)
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 6),
+                              Flexible(
                                 child: Text(
-                                  '·',
-                                  style: UnoTypography.mono(
-                                    color:
-                                        subtitleColor.withValues(alpha: 0.65),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                                  project.description!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: UnoTypography.body(
+                                    color: subtitleColor,
+                                    fontSize: 12.5,
+                                    height: 1.35,
                                   ),
                                 ),
                               ),
-                            Text(
-                              'Port ${project.port}',
-                              style: UnoTypography.mono(
-                                color: portColor,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w500,
+                            if (project.port != null) ...[
+                              if (project.description != null &&
+                                  project.description!.isNotEmpty)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 7),
+                                  child: Text(
+                                    '·',
+                                    style: UnoTypography.body(
+                                      color:
+                                          subtitleColor.withValues(alpha: 0.55),
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              Text(
+                                'Port ${project.port}',
+                                style: UnoTypography.mono(
+                                  color: portColor,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(width: 16),
+                const SizedBox(width: 16),
 
-              // Manage Workspace button (Manager Role Only)
-              if (widget.isManager) ...[
-                MouseRegion(
-                  onEnter: (_) => setState(() => _isManageHovered = true),
-                  onExit: (_) => setState(() => _isManageHovered = false),
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: widget.onManageWorkspace,
-                    behavior: HitTestBehavior.opaque,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7.5),
+                // Manage Workspace button (Manager Role Only)
+                if (widget.isManager) ...[
+                  MouseRegion(
+                    onEnter: (_) => setState(() => _isManageHovered = true),
+                    onExit: (_) => setState(() {
+                      _isManageHovered = false;
+                      _isManagePressed = false;
+                    }),
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: widget.onManageWorkspace,
+                      onTapDown: (_) => setState(() => _isManagePressed = true),
+                      onTapUp: (_) => setState(() => _isManagePressed = false),
+                      onTapCancel: () =>
+                          setState(() => _isManagePressed = false),
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedScale(
+                        scale: _isManagePressed ? 0.96 : 1.0,
+                        duration: const Duration(milliseconds: 95),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 13),
+                          decoration: BoxDecoration(
+                            color: manageBg,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: manageBorder, width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.users,
+                                size: 13.5,
+                                color: manageIconColor,
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                'Manage Workspace',
+                                style: UnoTypography.body(
+                                  color: manageFg,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+
+                // Primary Open CTA / Server Stopped indicator
+                if (isStopped)
+                  Tooltip(
+                    message:
+                        'Cannot open: Project server is stopped on backend',
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 13),
                       decoration: BoxDecoration(
                         color: manageBg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: manageBorder),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: iconBoxBorder),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            LucideIcons.users,
-                            size: 13.5,
-                            color: subtitleColor,
-                          ),
+                          Icon(Icons.power_off, size: 13, color: subtitleColor),
                           const SizedBox(width: 6),
                           Text(
-                            'Manage Workspace',
+                            'Server Stopped',
                             style: UnoTypography.body(
-                              color: manageFg,
+                              color: subtitleColor,
                               fontSize: 12.5,
                               fontWeight: FontWeight.w500,
                             ),
@@ -3544,95 +3900,450 @@ class _OppositeProjectCardState extends State<_OppositeProjectCard> {
                         ],
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-              ],
-
-              // Primary Open CTA / Server Stopped indicator
-              if (isStopped)
-                Tooltip(
-                  message: 'Cannot open: Project server is stopped on backend',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 7.5),
-                    decoration: BoxDecoration(
-                      color: iconBoxBg,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: iconBoxBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.power_off, size: 13, color: subtitleColor),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Server Stopped',
-                          style: UnoTypography.body(
-                            color: subtitleColor,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
+                  )
+                else
+                  MouseRegion(
+                    onEnter: (_) => setState(() => _isOpenHovered = true),
+                    onExit: (_) => setState(() {
+                      _isOpenHovered = false;
+                      _isOpenPressed = false;
+                    }),
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: widget.onOpen,
+                      onTapDown: (_) => setState(() => _isOpenPressed = true),
+                      onTapUp: (_) => setState(() => _isOpenPressed = false),
+                      onTapCancel: () => setState(() => _isOpenPressed = false),
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedScale(
+                        scale: _isOpenPressed ? 0.96 : 1.0,
+                        duration: const Duration(milliseconds: 95),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
+                          decoration: BoxDecoration(
+                            color: openBg,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Open',
+                                style: UnoTypography.body(
+                                  color: openFg,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              AnimatedSlide(
+                                duration: const Duration(milliseconds: 160),
+                                curve: Curves.easeOutCubic,
+                                offset: _isOpenHovered
+                                    ? const Offset(0.18, 0)
+                                    : Offset.zero,
+                                child: Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 14.5,
+                                  color: openFg,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                )
-              else
-                MouseRegion(
-                  onEnter: (_) => setState(() => _isOpenHovered = true),
-                  onExit: (_) => setState(() => _isOpenHovered = false),
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: widget.onOpen,
-                    behavior: HitTestBehavior.opaque,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7.5),
-                      decoration: BoxDecoration(
-                        color: openBg,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: openBg.withValues(
-                                alpha: _isOpenHovered ? 0.30 : 0.12),
-                            blurRadius: _isOpenHovered ? 10 : 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Open',
-                            style: UnoTypography.body(
-                              color: openFg,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          AnimatedSlide(
-                            duration: const Duration(milliseconds: 160),
-                            curve: Curves.easeOutCubic,
-                            offset: _isOpenHovered
-                                ? const Offset(0.18, 0)
-                                : Offset.zero,
-                            child: Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 14.5,
-                              color: openFg,
-                            ),
-                          ),
-                        ],
-                      ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tactile Light / Dark pill toggle matching the redesigned AuthScreen.
+class _TactileThemePill extends StatefulWidget {
+  final bool isDark;
+  final double t;
+  final VoidCallback onTap;
+
+  const _TactileThemePill({
+    required this.isDark,
+    required this.t,
+    required this.onTap,
+  });
+
+  @override
+  State<_TactileThemePill> createState() => _TactileThemePillState();
+}
+
+class _TactileThemePillState extends State<_TactileThemePill> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final fg = Color.lerp(
+      const Color(0xFF111728),
+      const Color(0xFFE5DAC9),
+      t,
+    )!;
+    final bgBase = Color.lerp(
+      const Color(0xFFFAF7F2),
+      const Color(0xFF141C2F),
+      t,
+    )!;
+    final bgHover = Color.lerp(
+      const Color(0xFFF2ECE2),
+      const Color(0xFF1B243B),
+      t,
+    )!;
+    final borderRest = Color.lerp(
+      const Color(0xFFDFD8CC),
+      const Color(0xFF232C42),
+      t,
+    )!;
+    final borderHover = fg.withValues(alpha: lerpDouble(0.28, 0.34, t)!);
+
+    return Tooltip(
+      message: widget.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() {
+          _hovered = false;
+          _pressed = false;
+        }),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedScale(
+            scale: _pressed ? 0.96 : 1.0,
+            duration: const Duration(milliseconds: 95),
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 11),
+              decoration: BoxDecoration(
+                color: _hovered ? bgHover : bgBase,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _hovered ? borderHover : borderRest,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 240),
+                    transitionBuilder: (child, anim) => RotationTransition(
+                      turns: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
+                      child: FadeTransition(opacity: anim, child: child),
                     ),
+                    child: Icon(
+                      widget.isDark ? LucideIcons.moon : LucideIcons.sun,
+                      key: ValueKey<bool>(widget.isDark),
+                      size: 13,
+                      color: fg,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    widget.isDark ? 'Dark' : 'Light',
+                    style: GoogleFonts.inter(
+                      color: fg,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tactile primary / secondary workspace action button with physical press-down
+/// physics and tonal elevation.
+class _TactileHomeButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final UnoPalette palette;
+  final bool isDark;
+  final bool filled;
+  final VoidCallback onTap;
+  final bool isLoading;
+
+  const _TactileHomeButton({
+    required this.icon,
+    required this.label,
+    required this.palette,
+    required this.isDark,
+    required this.filled,
+    required this.onTap,
+    this.isLoading = false,
+  });
+
+  @override
+  State<_TactileHomeButton> createState() => _TactileHomeButtonState();
+}
+
+class _TactileHomeButtonState extends State<_TactileHomeButton> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final filled = widget.filled;
+
+    final Color bgColor;
+    final Color fg;
+    final Color borderColor;
+
+    if (filled) {
+      if (isDark) {
+        bgColor = _hovered ? const Color(0xFFEEE4D5) : const Color(0xFFE5DAC9);
+        fg = const Color(0xFF0B1020);
+        borderColor = const Color(0xFFE5DAC9).withValues(alpha: 0.0);
+      } else {
+        bgColor = _hovered ? const Color(0xFF1C243B) : const Color(0xFF111728);
+        fg = const Color(0xFFF4F1EC);
+        borderColor = const Color(0xFF111728).withValues(alpha: 0.0);
+      }
+    } else {
+      if (isDark) {
+        bgColor = _hovered ? const Color(0xFF1B243B) : const Color(0xFF141C2F);
+        fg = const Color(0xFFF0ECE4);
+        borderColor = _hovered
+            ? const Color(0xFFE5DAC9).withValues(alpha: 0.28)
+            : const Color(0xFF232C42);
+      } else {
+        bgColor = _hovered ? const Color(0xFFF2ECE2) : const Color(0xFFFAF7F2);
+        fg = const Color(0xFF111728);
+        borderColor = _hovered
+            ? const Color(0xFF0B1020).withValues(alpha: 0.24)
+            : const Color(0xFFDFD8CC);
+      }
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() {
+        _hovered = false;
+        _pressed = false;
+      }),
+      cursor: widget.isLoading
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.isLoading ? null : widget.onTap,
+        onTapDown:
+            widget.isLoading ? null : (_) => setState(() => _pressed = true),
+        onTapUp:
+            widget.isLoading ? null : (_) => setState(() => _pressed = false),
+        onTapCancel:
+            widget.isLoading ? null : () => setState(() => _pressed = false),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedScale(
+          scale: _pressed ? 0.965 : 1.0,
+          duration: const Duration(milliseconds: 95),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderColor, width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.isLoading)
+                  SizedBox(
+                    width: 13.5,
+                    height: 13.5,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      valueColor: AlwaysStoppedAnimation<Color>(fg),
+                    ),
+                  )
+                else
+                  Icon(widget.icon, size: 15, color: fg),
+                const SizedBox(width: 8),
+                Text(
+                  widget.label,
+                  style: GoogleFonts.inter(
+                    color: fg,
+                    fontSize: 13,
+                    fontWeight: filled ? FontWeight.w600 : FontWeight.w500,
+                    letterSpacing: -0.1,
                   ),
                 ),
-            ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tactile profile trigger pill rendered inside PopupMenuButton.
+/// Uses Listener (not GestureDetector) so press physics animate without
+/// consuming the PopupMenuButton tap.
+class _TactileProfileTrigger extends StatefulWidget {
+  final String initials;
+  final String displayName;
+  final Color avatarBg;
+  final Color avatarFg;
+  final Color pillBg;
+  final Color pillBorder;
+  final UnoPalette palette;
+
+  const _TactileProfileTrigger({
+    required this.initials,
+    required this.displayName,
+    required this.avatarBg,
+    required this.avatarFg,
+    required this.pillBg,
+    required this.pillBorder,
+    required this.palette,
+  });
+
+  @override
+  State<_TactileProfileTrigger> createState() => _TactileProfileTriggerState();
+}
+
+class _TactileProfileTriggerState extends State<_TactileProfileTrigger> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.palette.bgBase.computeLuminance() < 0.2;
+    final hoverBorder = isDark
+        ? const Color(0xFFE5DAC9).withValues(alpha: 0.28)
+        : const Color(0xFF0B1020).withValues(alpha: 0.24);
+    final restBorder = isDark
+        ? const Color(0xFF232C42)
+        : const Color(0xFFDFD8CC);
+    final pillColor = isDark
+        ? (_hovered ? const Color(0xFF1B243B) : const Color(0xFF141C2F))
+        : (_hovered ? const Color(0xFFF2ECE2) : const Color(0xFFFAF7F2));
+    final cutoutColor = pillColor;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() {
+        _hovered = false;
+        _pressed = false;
+      }),
+      cursor: SystemMouseCursors.click,
+      child: Listener(
+        onPointerDown: (_) => setState(() => _pressed = true),
+        onPointerUp: (_) => setState(() => _pressed = false),
+        onPointerCancel: (_) => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.965 : 1.0,
+          duration: const Duration(milliseconds: 95),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            height: 38,
+            padding: const EdgeInsets.only(left: 7, right: 13),
+            decoration: BoxDecoration(
+              color: pillColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _hovered ? hoverBorder : restBorder,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  scale: _hovered ? 1.05 : 1.0,
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFFE5DAC9)
+                              : const Color(0xFF111728),
+                          borderRadius: BorderRadius.circular(6.5),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          widget.initials,
+                          style: GoogleFonts.inter(
+                            color: isDark
+                                ? const Color(0xFF0B1020)
+                                : const Color(0xFFF4F1EC),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: -1.5,
+                        bottom: -1.5,
+                        child: Container(
+                          width: 7.5,
+                          height: 7.5,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: cutoutColor,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Text(
+                  widget.displayName,
+                  style: GoogleFonts.inter(
+                    color: widget.palette.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
