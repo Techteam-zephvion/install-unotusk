@@ -32,14 +32,16 @@ void main() async {
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     await windowManager.ensureInitialized();
 
-    const windowOptions = WindowOptions(
-      size: Size(1280, 720),
-      minimumSize: Size(800, 500),
+    final isMacOS = Platform.isMacOS;
+
+    final windowOptions = WindowOptions(
+      size: const Size(1280, 720),
+      minimumSize: const Size(800, 500),
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.hidden,
-      windowButtonVisibility: false,
+      windowButtonVisibility: isMacOS ? true : false,
     );
 
     windowManager.waitUntilReadyToShow(windowOptions, () async {

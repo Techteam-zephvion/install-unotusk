@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
@@ -166,6 +168,8 @@ class _UnoSidebarState extends State<UnoSidebar> {
   //  EXPANDED — 264px width, crisp Swiss-grid alignment
   // ═══════════════════════════════════════════════════════
   Widget _buildExpanded(bool isDark) {
+    final isMacOS = !kIsWeb && Platform.isMacOS;
+
     return SizedBox(
       width: 264.0,
       height: double.infinity,
@@ -174,7 +178,7 @@ class _UnoSidebarState extends State<UnoSidebar> {
         children: [
           // 1. Header (Logo + Title + Collapse Button)
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            padding: EdgeInsets.fromLTRB(12, isMacOS ? 36 : 12, 12, 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -271,13 +275,15 @@ class _UnoSidebarState extends State<UnoSidebar> {
   //  COLLAPSED — 72px width, centered icons & smooth micro-interactions
   // ═══════════════════════════════════════════════════════
   Widget _buildNarrow(bool isDark) {
+    final isMacOS = !kIsWeb && Platform.isMacOS;
+
     return SizedBox(
       width: 72.0,
       height: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 12),
+          SizedBox(height: isMacOS ? 36 : 12),
           // Logo
           DragToMoveArea(
             child: MouseRegion(

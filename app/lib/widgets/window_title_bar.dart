@@ -30,11 +30,12 @@ class WindowTitleBar extends StatelessWidget {
     }
 
     final isDark = palette.isDark;
+    final isMacOS = !kIsWeb && Platform.isMacOS;
 
     return Container(
       height: height,
       color: palette.bgBase,
-      padding: const EdgeInsets.only(left: 14),
+      padding: EdgeInsets.only(left: isMacOS ? 78.0 : 14.0),
       child: Row(
         children: [
           // ── Logo + Brand Name ──
@@ -64,8 +65,9 @@ class WindowTitleBar extends StatelessWidget {
             ),
           ),
 
-          // ── Window Controls ──
-          DesktopWindowControls(palette: palette, height: height),
+          // ── Window Controls (Windows / Linux only) ──
+          if (!isMacOS)
+            DesktopWindowControls(palette: palette, height: height),
         ],
       ),
     );

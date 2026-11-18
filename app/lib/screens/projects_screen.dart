@@ -2365,6 +2365,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   Widget _buildTopBar(UnoPalette palette, bool isNarrow) {
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final isMacOS = !kIsWeb && Platform.isMacOS;
+    final isWindowsOrLinux = !kIsWeb && (Platform.isWindows || Platform.isLinux);
 
     return Container(
       height: 52,
@@ -2375,8 +2377,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ),
       ),
       padding: EdgeInsets.only(
-        left: isNarrow ? 12 : 20,
-        right: isDesktop ? 0 : (isNarrow ? 12 : 20),
+        left: isMacOS ? 78 : (isNarrow ? 12 : 20),
+        right: isWindowsOrLinux ? 0 : (isNarrow ? 12 : 20),
       ),
       child: Row(
         children: [
@@ -2435,8 +2437,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             ),
           ),
 
-          // Desktop Window Controls (Minimize, Maximize/Restore, Close)
-          if (isDesktop) ...[
+          // Desktop Window Controls (Minimize, Maximize/Restore, Close - Windows & Linux only)
+          if (isWindowsOrLinux) ...[
             const SizedBox(width: 8),
             DesktopWindowControls(palette: palette, height: 52),
           ],
