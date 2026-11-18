@@ -7,6 +7,7 @@ from apps.api.src.services.llm.base import (
     LLMProvider,
     extract_customer_notes,
     format_insufficient_evidence_response,
+    generate_grounded_mermaid_diagram,
     should_abstain_due_to_insufficient_evidence,
 )
 from apps.api.src.services.llm.system_prompt import PROJECT_INTELLIGENCE_SYSTEM_PROMPT
@@ -326,6 +327,17 @@ class ClaudeProvider(LLMProvider):
             lines.append("\n**Deep Architectural Reasoning & Verification:**")
             lines.append("- Multi-hop structural dependency verification completed across indexed modules.")
             lines.append("- Analyzed cross-module relationships, contracts, and failure boundary constraints.")
+
+        # Grounded Mermaid diagram synthesis if query requests architectural/workflow visual design
+        diagram = generate_grounded_mermaid_diagram(
+            question=question,
+            evidence_items=top_evidence,
+            symbols=symbols,
+            files=files,
+        )
+        if diagram:
+            lines.append("\n### Architecture and Flowchart Visualization\n")
+            lines.append(diagram)
 
         return "\n".join(lines)
 

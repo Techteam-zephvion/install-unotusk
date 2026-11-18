@@ -19,6 +19,9 @@ class MermaidDiagram extends StatefulWidget {
     required this.palette,
   });
 
+  /// Sanitizes Mermaid code to prevent common parse errors.
+  static String sanitizeMermaid(String raw) => _MermaidDiagramState.sanitizeMermaid(raw);
+
   @override
   State<MermaidDiagram> createState() => _MermaidDiagramState();
 }

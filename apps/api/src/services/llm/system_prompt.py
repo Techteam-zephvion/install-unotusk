@@ -21,8 +21,28 @@ CRITICAL INSTRUCTIONS & GROUNDING RULES:
    - HIGH: Directly confirmed by code evidence and/or verified customer knowledge.
    - MEDIUM: Relevant components identified, but some execution paths or implementations are omitted.
    - LOW: Limited or peripheral evidence retrieved; answer contains significant uncertainty.
-9. Architecture & Diagram Synthesis:
-   - When the question asks to visualize, illustrate, explain, or diagram architecture, workflows, execution flows, or system boundaries, include a tailored, syntactically valid ```mermaid block illustrating the actual components, calls, and relationships grounded in the retrieved code facts.
-   - Strict Mermaid Syntax Rule: Always declare the diagram type as the first line (e.g. `flowchart TD` or `sequenceDiagram`). Always quote node labels in double quotes (e.g. `NodeId["Component Name (detail)"]`) to prevent parse errors from parentheses, brackets, or slashes.
-   - Group components into semantic `subgraph` blocks (e.g. Presentation, API, Domain Logic, Data/Storage) with meaningful directional flow and distinct styling.
+9. Dynamic Architecture & Diagram Synthesis (10/10 Visual Engineering):
+   - When the question asks to visualize, illustrate, explain, or diagram architecture, workflows, execution flows, system boundaries, component designs, or pipelines:
+     YOU MUST GENERATE A COMPLETE, ORIGINAL, DEEPLY TAILORED ```mermaid ... ``` DIAGRAM REFLECTING THE USER'S SPECIFIC CODEBASE AND EXACT REQUEST.
+   - Anti-Boilerplate Rule: NEVER output a generic or predefined template (e.g., NEVER inject 'Flutter Client', 'FastAPI Server', or 'PostgreSQL' unless the user's repository actually uses those exact technologies!). Every node must represent an ACTUAL file, class, component, function, endpoint, or data store observed in the retrieved evidence.
+   - Framework & Stack Sensitivity:
+     * Frontend Apps (React, Next.js, Vue, Svelte, Tailwind): Diagram UI Pages, Layouts, Components, Hooks, State Stores, and Assets.
+     * Backend Services (FastAPI, Express, Django, Go, Spring): Diagram Routes, Controllers, Middleware, Services, Repositories, and DB Models.
+     * Data Pipelines & Workers: Diagram Ingestion, Parsers, Queues, Workers, and Storage Nodes.
+   - Archetype Selection Based on Request:
+     * System Architecture / Component Topology: `flowchart TD` or `flowchart LR` with semantic `subgraph` groupings (e.g. `subgraph UI ["User Interface"]`, `subgraph Services ["Application Services"]`).
+     * Request Lifecycle / Auth / Communication Protocol: `sequenceDiagram` with `autonumber`, distinct actors/participants, and realistic request/response payloads.
+     * State Transitions / Lifecycle: `stateDiagram-v2` with state transitions and guards.
+     * Data Models & Relationships: `erDiagram` or `classDiagram` with field types and cardinality.
+   - Strict Syntax & Chat Integrity Rules (Zero Parse Failures):
+     1. The diagram declaration must be on the very first line inside ```mermaid (e.g., `flowchart TD`).
+     2. Every node label MUST be enclosed in double quotes: `NodeId["Component Label (details)"]`. Never leave raw unquoted parentheses, brackets, or slashes inside labels.
+     3. Use alphanumeric node IDs without special characters (e.g., `UI_Section`, `SVC_Auth`, `DB_Store`).
+     4. Always close the code block cleanly with ``` on its own line so chat text formatting is never broken.
+   - Dark-Theme Visual Spec Styling:
+     Include dark-mode `classDef` rules and assign classes to nodes for high-contrast, beautiful visualization:
+     classDef ui fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;
+     classDef logic fill:#2A1B3D,stroke:#C084FC,stroke-width:1.5px,color:#F8FAFC;
+     classDef data fill:#1A2E26,stroke:#10B981,stroke-width:1.5px,color:#F8FAFC;
+     classDef storage fill:#332200,stroke:#F59E0B,stroke-width:1.5px,color:#F8FAFC;
 """

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../models/workspace_models.dart';
+import '../widgets/mermaid_diagram.dart';
 import '../features/connection/data/local_registry_service.dart';
 import 'server_discovery_service.dart';
 
@@ -1055,17 +1056,20 @@ class ApiService {
     List<EvidenceItem> evidence = const [],
   }) {
     if (content.contains('```mermaid')) {
-      // Sanitize existing Mermaid block to fix unquoted brackets that cause Mermaid parser crashes
-      return content.replaceAllMapped(
+      // Ensure mermaid block is cleanly closed so chat text never breaks
+      var fixed = content;
+      final openFences = RegExp(r'```mermaid').allMatches(fixed).length;
+      final allFences = RegExp(r'```').allMatches(fixed).length;
+      // Each ```mermaid counts as 1 open fence; closing fences are general ```
+      if (allFences < openFences * 2) {
+        fixed = '$fixed\n```\n';
+      }
+      return fixed.replaceAllMapped(
         RegExp(r'```mermaid([\s\S]*?)```'),
         (match) {
           var code = match.group(1) ?? '';
-          // Auto-quote unquoted labels containing parentheses, slashes, or hyphens e.g. A[Label (info)] -> A["Label (info)"]
-          code = code.replaceAllMapped(
-            RegExp(r'(\b[a-zA-Z0-9_]+)\[([^"\]\n]*[\(\)\/\s\-][^"\]\n]*)\]'),
-            (m) => '${m.group(1)}["${m.group(2)}"]',
-          );
-          return '```mermaid$code```';
+          code = MermaidDiagram.sanitizeMermaid(code);
+          return '```mermaid\n$code\n```';
         },
       );
     }
@@ -1082,6 +1086,8 @@ class ApiService {
         qLower.contains('workflow') ||
         qLower.contains('structure') ||
         qLower.contains('spec') ||
+        qLower.contains('component') ||
+        qLower.contains('design') ||
         cLower.contains('mermaid') ||
         cLower.contains('flowchart') ||
         (cLower.contains('project analysis') && cLower.contains('visualize'));
@@ -1149,17 +1155,16 @@ class ApiService {
       }
     }
 
-    // Sanitize a label for use inside Mermaid ["..."] — escape quotes and
-    // strip characters that break Mermaid parsing.
+    // Sanitize a label for use inside Mermaid ["..."] — escape quotes and strip characters
     String sanitize(String raw) {
       return raw
-          .replaceAll('"', "'")        // double-quote → single-quote
-          .replaceAll('<', '')          // strip angle brackets
+          .replaceAll('"', "'")
+          .replaceAll('<', '')
           .replaceAll('>', '')
-          .replaceAll('&', 'and')      // ampersand → word
-          .replaceAll('#', '')         // strip hash
-          .replaceAll(';', '')         // strip semicolons
-          .replaceAll('{', '(')        // curly braces → parens
+          .replaceAll('&', 'and')
+          .replaceAll('#', '')
+          .replaceAll(';', '')
+          .replaceAll('{', '(')
           .replaceAll('}', ')')
           .trim();
     }
@@ -1168,136 +1173,215 @@ class ApiService {
     buffer.writeln('\n\n### Architecture and Flowchart Visualization\n');
     buffer.writeln('```mermaid');
 
-    // ── Archetype 1: Authentication / Identity Flow ──
-    final isAuth = qLower.contains('auth') ||
-        qLower.contains('login') ||
-        qLower.contains('jwt') ||
-        qLower.contains('token') ||
-        qLower.contains('security') ||
-        qLower.contains('user');
+    // ── Archetype 1: Authentication / Identity Sequence (when query is explicitly auth) ──
+    final isExplicitAuth = (qLower.contains('auth') ||
+            qLower.contains('login') ||
+            qLower.contains('jwt') ||
+            qLower.contains('token')) &&
+        symbols.isNotEmpty;
 
-    // ── Archetype 2: RAG / Code Intelligence Pipeline ──
-    final isRag = qLower.contains('rag') ||
-        qLower.contains('atom') ||
-        qLower.contains('star') ||
-        qLower.contains('retriev') ||
-        qLower.contains('embed') ||
-        qLower.contains('vector') ||
-        qLower.contains('search') ||
-        qLower.contains('context');
-
-    // ── Archetype 3: Database & Storage Topology ──
-    final isData = qLower.contains('database') ||
-        qLower.contains('postgres') ||
-        qLower.contains('sql') ||
-        qLower.contains('schema') ||
-        qLower.contains('table') ||
-        qLower.contains('migration') ||
-        qLower.contains('model');
-
-    if (isAuth) {
+    if (isExplicitAuth) {
       buffer.writeln('sequenceDiagram');
       buffer.writeln('    autonumber');
-      buffer.writeln('    actor Client as "Desktop Client / User"');
-      buffer.writeln('    participant Gateway as "FastAPI Gateway (/api/v1)"');
-      buffer.writeln('    participant AuthService as "AuthService (HS256 JWT)"');
-      buffer.writeln('    participant Database as "PostgreSQL 16 (Users & Orgs)"');
-      buffer.writeln('    participant Protected as "Protected Intelligence API"');
-      buffer.writeln('    Client->>Gateway: "POST /auth/login (Credentials)"');
-      buffer.writeln('    Gateway->>AuthService: "Verify Email & Password Hash"');
-      buffer.writeln('    AuthService->>Database: "Query User & Org Membership"');
-      buffer.writeln('    Database-->>AuthService: "User Record"');
-      buffer.writeln('    AuthService-->>Client: "200 OK + Access Token (JWT)"');
-      buffer.writeln('    Client->>Protected: "GET /projects/{id}/ask (Bearer Token)"');
-      buffer.writeln('    Protected->>AuthService: "Validate Token Claims"');
-      buffer.writeln('    Protected-->>Client: "200 OK (Grounded Architecture Answer)"');
-    } else if (isRag) {
-      buffer.writeln('flowchart TD');
-      buffer.writeln('    subgraph IngestionLane ["1. Ingestion & Indexing Engine"]');
-      buffer.writeln('        P1["Tree-sitter Parser"] --> P2["AST Symbol Extractor"]');
-      buffer.writeln('        P2 --> P3["Line-Bounded Chunks"]');
-      buffer.writeln('        P3 --> P4["Voyage AI 1536d Embeddings"]');
-      buffer.writeln('    end');
-      buffer.writeln('    subgraph StorageLane ["2. Persistence Layer"]');
-      buffer.writeln('        P4 --> DB[("PostgreSQL 16 + pgvector")]');
-      buffer.writeln('        GC[("FunctionGraph Cache (Redis 7)")]');
-      buffer.writeln('    end');
-      buffer.writeln('    subgraph RoutingLane ["3. Selective Intent Routing"]');
-      buffer.writeln('        Q["User Query"] --> SR["StarRagSelectiveRouter"]');
-      buffer.writeln('        SR -->|Direct Code Lookup| ATOM["Baseline ATOM Engine"]');
-      buffer.writeln('        SR -->|Structural Tracing| STAR["Structure-Aware STAR-RAG"]');
-      buffer.writeln('        STAR --> SNR["SNR Noise Pruning (98.7% noise suppression)"]');
-      buffer.writeln('        SNR --> DTP["DTP Reachability & Hub Attenuation"]');
-      buffer.writeln('        DTP --> SSAF["SSAF Adaptive Score Fusion"]');
-      buffer.writeln('    end');
-      buffer.writeln('    subgraph SynthesisLane ["4. Grounded Synthesis"]');
-      buffer.writeln('        ATOM --> LLM["LLM Grounded Synthesizer (Groq/Claude)"]');
-      buffer.writeln('        SSAF --> LLM');
-      buffer.writeln('        LLM --> ANS["Grounded Answer + Citations"]');
-      buffer.writeln('    end');
-      buffer.writeln('    DB -.-> ATOM');
-      buffer.writeln('    GC -.-> STAR');
-      buffer.writeln('    classDef client fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;');
-      buffer.writeln('    classDef star fill:#2E1065,stroke:#C678DD,stroke-width:1.5px,color:#F8FAFC;');
-      buffer.writeln('    classDef db fill:#332200,stroke:#F59E0B,stroke-width:1.5px,color:#F8FAFC;');
-      buffer.writeln('    class Q,ANS client;');
-      buffer.writeln('    class STAR,SNR,DTP,SSAF star;');
-      buffer.writeln('    class DB,GC db;');
-    } else if (isData) {
-      buffer.writeln('erDiagram');
-      buffer.writeln('    ORGANIZATION ||--o{ PROJECT : contains');
-      buffer.writeln('    PROJECT ||--o{ REPOSITORY : tracks');
-      buffer.writeln('    REPOSITORY ||--o{ REPOSITORY_SNAPSHOT : versions');
-      buffer.writeln('    REPOSITORY_SNAPSHOT ||--o{ CODE_CHUNK : indexes');
-      buffer.writeln('    REPOSITORY_SNAPSHOT ||--o{ CODE_SYMBOL : extracts');
-      buffer.writeln('    CODE_CHUNK ||--o{ CODE_DEPENDENCY : calls');
-      buffer.writeln('    PROJECT ||--o{ CONVERSATION : logs');
-      buffer.writeln('    CONVERSATION ||--o{ MESSAGE : contains');
-    } else {
-      // ── Clean / Layered Architecture ──
-      buffer.writeln('flowchart TD');
-      buffer.writeln('    subgraph PresentationLayer ["1. Presentation Layer (Desktop UI)"]');
-      buffer.writeln('        UI_Client["Flutter Client (Warm Dark UI)"]');
-      buffer.writeln('        UI_Ask["AskTab & ReasoningPanel"]');
-      buffer.writeln('        UI_Arch["ArchitectureScreen (Component Graph)"]');
-      buffer.writeln('    end');
-      buffer.writeln('    subgraph ApiLayer ["2. API & Control Plane (Port 28000)"]');
-      buffer.writeln('        API_Gw["FastAPI Async Server"]');
-      buffer.writeln('        API_Intel["IntelligenceRouter (/api/v1/projects/{id}/ask)"]');
-      buffer.writeln('        API_Auth["Auth Middleware & JWT Security"]');
-      buffer.writeln('    end');
-      buffer.writeln('    subgraph DomainLayer ["3. Domain & Intelligence Services"]');
-      final domainSymbols = symbols.isNotEmpty
-          ? symbols.map(sanitize).toList()
-          : ['ProjectContextEngine', 'MultiSignalRetriever', 'StarRagService'];
-      for (int i = 0; i < domainSymbols.length && i < 4; i++) {
-        final s = domainSymbols[i];
-        buffer.writeln('        DOM_$i["$s"]');
+      buffer.writeln('    actor Client as "Client / User"');
+      final pList = <String>[];
+      for (int i = 0; i < symbols.length && i < 3; i++) {
+        final pId = 'Auth_$i';
+        buffer.writeln('    participant $pId as "${sanitize(symbols[i])}"');
+        pList.add(pId);
       }
-      buffer.writeln('    end');
-      buffer.writeln('    subgraph DataLayer ["4. Persistence & Storage Layer"]');
-      buffer.writeln('        DB_Pg[("PostgreSQL 16 + pgvector (1536d)")]');
-      buffer.writeln('        DB_Redis[("Redis 7 (Task Queue & Cache)")]');
       if (files.isNotEmpty) {
-        for (int i = 0; i < files.length && i < 2; i++) {
-          final f = sanitize(files[i]);
-          buffer.writeln('        FILE_$i["$f"]');
+        buffer.writeln('    participant Storage as "${sanitize(files.first)}"');
+        pList.add('Storage');
+      }
+      buffer.writeln('    Client->>${pList.first}: "Trigger Action / Request"');
+      for (int i = 0; i < pList.length - 1; i++) {
+        buffer.writeln('    ${pList[i]}->>${pList[i + 1]}: "Validate / Process"');
+        buffer.writeln('    ${pList[i + 1]}-->>${pList[i]}: "Status OK"');
+      }
+      buffer.writeln('    ${pList.first}-->>Client: "200 Authorized / Verified"');
+    } else {
+      // ── Archetype 2: Dynamic Project-Aware Architecture & Component Graph ──
+      // Categorize the user's actual files and symbols into real architectural tiers
+      final uiNodes = <MapEntry<String, String>>[];
+      final apiNodes = <MapEntry<String, String>>[];
+      final domainNodes = <MapEntry<String, String>>[];
+      final dataNodes = <MapEntry<String, String>>[];
+      final assetNodes = <MapEntry<String, String>>[];
+
+      // Categorize files
+      for (int i = 0; i < files.length; i++) {
+        final f = files[i];
+        final fLow = f.toLowerCase();
+        final id = 'F_$i';
+        final lbl = sanitize(f);
+
+        if (fLow.endsWith('.webp') ||
+            fLow.endsWith('.png') ||
+            fLow.endsWith('.jpg') ||
+            fLow.endsWith('.svg') ||
+            fLow.endsWith('.ico') ||
+            fLow.endsWith('.css') ||
+            fLow.contains('public/') ||
+            fLow.contains('assets/')) {
+          assetNodes.add(MapEntry(id, lbl));
+        } else if (fLow.endsWith('.tsx') ||
+            fLow.endsWith('.jsx') ||
+            fLow.endsWith('.vue') ||
+            fLow.endsWith('.svelte') ||
+            fLow.endsWith('.html') ||
+            fLow.contains('/ui/') ||
+            fLow.contains('/components/') ||
+            fLow.contains('/pages/') ||
+            fLow.contains('/screens/') ||
+            fLow.contains('/views/')) {
+          uiNodes.add(MapEntry(id, lbl));
+        } else if (fLow.contains('/api/') ||
+            fLow.contains('/routes/') ||
+            fLow.contains('/endpoints/') ||
+            fLow.contains('/controllers/') ||
+            fLow.contains('/gateway')) {
+          apiNodes.add(MapEntry(id, lbl));
+        } else if (fLow.contains('/models/') ||
+            fLow.contains('/schemas/') ||
+            fLow.contains('/db/') ||
+            fLow.contains('/entities/') ||
+            fLow.contains('/repository/') ||
+            fLow.contains('/store/')) {
+          dataNodes.add(MapEntry(id, lbl));
+        } else {
+          domainNodes.add(MapEntry(id, lbl));
         }
       }
-      buffer.writeln('    end');
-      buffer.writeln('    UI_Client --> API_Gw');
-      buffer.writeln('    API_Gw --> API_Intel');
-      buffer.writeln('    API_Intel --> DOM_0');
-      buffer.writeln('    DOM_0 --> DB_Pg');
-      buffer.writeln('    DOM_0 -.-> DB_Redis');
-      buffer.writeln('    classDef pres fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;');
+
+      // Categorize symbols
+      for (int i = 0; i < symbols.length; i++) {
+        final s = symbols[i];
+        final sLow = s.toLowerCase();
+        final id = 'S_$i';
+        final lbl = sanitize(s);
+
+        if (sLow.contains('ui') ||
+            sLow.contains('screen') ||
+            sLow.contains('view') ||
+            sLow.contains('component') ||
+            sLow.contains('button') ||
+            sLow.contains('section') ||
+            sLow.contains('modal') ||
+            sLow.contains('page')) {
+          uiNodes.add(MapEntry(id, lbl));
+        } else if (sLow.contains('route') ||
+            sLow.contains('api') ||
+            sLow.contains('endpoint') ||
+            sLow.contains('controller') ||
+            sLow.contains('handler') ||
+            sLow.contains('post') ||
+            sLow.contains('get')) {
+          apiNodes.add(MapEntry(id, lbl));
+        } else if (sLow.contains('model') ||
+            sLow.contains('schema') ||
+            sLow.contains('table') ||
+            sLow.contains('entity') ||
+            sLow.contains('repo') ||
+            sLow.contains('db')) {
+          dataNodes.add(MapEntry(id, lbl));
+        } else {
+          domainNodes.add(MapEntry(id, lbl));
+        }
+      }
+
+      // If all nodes are empty, populate from components or generic
+      if (uiNodes.isEmpty && apiNodes.isEmpty && domainNodes.isEmpty && dataNodes.isEmpty && assetNodes.isEmpty) {
+        for (int i = 0; i < components.length && i < 4; i++) {
+          domainNodes.add(MapEntry('C_$i', sanitize(components[i])));
+        }
+        if (domainNodes.isEmpty) {
+          domainNodes.add(const MapEntry('Core_0', 'ProjectCore'));
+        }
+      }
+
+      buffer.writeln('flowchart TD');
+
+      final allUi = <String>[];
+      final allApi = <String>[];
+      final allDomain = <String>[];
+      final allData = <String>[];
+      final allAssets = <String>[];
+
+      if (uiNodes.isNotEmpty) {
+        buffer.writeln('    subgraph UI ["User Interface & Presentation Layer"]');
+        for (final entry in uiNodes.take(4)) {
+          buffer.writeln('        ${entry.key}["${entry.value}"]');
+          allUi.add(entry.key);
+        }
+        buffer.writeln('    end');
+      }
+
+      if (apiNodes.isNotEmpty) {
+        buffer.writeln('    subgraph API ["Routing & API Services"]');
+        for (final entry in apiNodes.take(4)) {
+          buffer.writeln('        ${entry.key}["${entry.value}"]');
+          allApi.add(entry.key);
+        }
+        buffer.writeln('    end');
+      }
+
+      if (domainNodes.isNotEmpty) {
+        buffer.writeln('    subgraph Domain ["Domain Logic & Functions"]');
+        for (final entry in domainNodes.take(5)) {
+          buffer.writeln('        ${entry.key}["${entry.value}"]');
+          allDomain.add(entry.key);
+        }
+        buffer.writeln('    end');
+      }
+
+      if (dataNodes.isNotEmpty) {
+        buffer.writeln('    subgraph Data ["Data & Persistence Layer"]');
+        for (final entry in dataNodes.take(4)) {
+          buffer.writeln('        ${entry.key}[("${entry.value}")]');
+          allData.add(entry.key);
+        }
+        buffer.writeln('    end');
+      }
+
+      if (assetNodes.isNotEmpty) {
+        buffer.writeln('    subgraph Assets ["Static Assets & Media"]');
+        for (final entry in assetNodes.take(3)) {
+          buffer.writeln('        ${entry.key}["${entry.value}"]');
+          allAssets.add(entry.key);
+        }
+        buffer.writeln('    end');
+      }
+
+      // Draw real directional relationships between discovered tiers
+      if (allUi.isNotEmpty && allDomain.isNotEmpty) {
+        buffer.writeln('    ${allUi.first} -->|renders/executes| ${allDomain.first}');
+      }
+      if (allApi.isNotEmpty && allDomain.isNotEmpty) {
+        buffer.writeln('    ${allApi.first} -->|invokes| ${allDomain.first}');
+      }
+      if (allDomain.isNotEmpty && allData.isNotEmpty) {
+        buffer.writeln('    ${allDomain.first} -->|persists/queries| ${allData.first}');
+      }
+      if (allUi.isNotEmpty && allAssets.isNotEmpty) {
+        buffer.writeln('    ${allUi.first} -.->|loads asset| ${allAssets.first}');
+      }
+      if (allDomain.length > 1) {
+        buffer.writeln('    ${allDomain[0]} -->|calls| ${allDomain[1]}');
+      }
+
+      // Spec dark-mode styling with distinct layer colors
+      buffer.writeln('    classDef ui fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;');
       buffer.writeln('    classDef api fill:#2A1B3D,stroke:#A855F7,stroke-width:1.5px,color:#F8FAFC;');
       buffer.writeln('    classDef domain fill:#1A2E26,stroke:#10B981,stroke-width:1.5px,color:#F8FAFC;');
       buffer.writeln('    classDef storage fill:#332200,stroke:#F59E0B,stroke-width:1.5px,color:#F8FAFC;');
-      buffer.writeln('    class UI_Client,UI_Ask,UI_Arch pres;');
-      buffer.writeln('    class API_Gw,API_Intel,API_Auth api;');
-      buffer.writeln('    class DOM_0,DOM_1,DOM_2 domain;');
-      buffer.writeln('    class DB_Pg,DB_Redis storage;');
+      buffer.writeln('    classDef asset fill:#262338,stroke:#EC4899,stroke-width:1.5px,color:#F8FAFC;');
+
+      if (allUi.isNotEmpty) buffer.writeln('    class ${allUi.join(',')} ui;');
+      if (allApi.isNotEmpty) buffer.writeln('    class ${allApi.join(',')} api;');
+      if (allDomain.isNotEmpty) buffer.writeln('    class ${allDomain.join(',')} domain;');
+      if (allData.isNotEmpty) buffer.writeln('    class ${allData.join(',')} storage;');
+      if (allAssets.isNotEmpty) buffer.writeln('    class ${allAssets.join(',')} asset;');
     }
 
     buffer.writeln('```\n');
