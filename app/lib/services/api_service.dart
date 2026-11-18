@@ -205,6 +205,13 @@ class ApiService {
   static final Set<String> connectedProjectIds = {};
   static final List<ProjectItem> connectedWorkspaceProjects = [];
 
+  /// Returns true if the current baseUrl targets the Control Plane (port 28000).
+  /// Data plane instances run on ports 28100-28999.
+  static bool get isControlPlane {
+    final uri = Uri.tryParse(baseUrl);
+    return uri == null || uri.port == 28000;
+  }
+
   static File? get _connectedProjectsFile {
     if (kIsWeb) return null;
     final email = activeUser?.email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_') ?? 'default';
@@ -229,6 +236,8 @@ class ApiService {
   static void savePersistedConnectedProjects() {
     try {
       if (kIsWeb) return;
+      // Safety guard: Never overwrite persisted file if connectedProjectIds was emptied during a non-control-plane shift
+      if (!isControlPlane && connectedProjectIds.isEmpty) return;
       final file = _connectedProjectsFile;
       if (file != null) {
         file.writeAsStringSync(jsonEncode(connectedProjectIds.toList()));
@@ -758,19 +767,23 @@ class ApiService {
           loadPersistedConnectedProjects();
         }
 
-        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects
-        final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
-        final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
-        connectedProjectIds.removeWhere(
-          (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
-        );
-        savePersistedConnectedProjects();
+        // Strictly prune connectedProjectIds to only retain valid project IDs/names that exist in live projects.
+        // CRITICAL: Only prune when communicating with Control Plane (port 28000).
+        // Isolated data-plane containers (ports 28100+) must NOT prune control-plane connected projects!
+        if (isControlPlane) {
+          final validProjectIds = projects.map((p) => p.id.toLowerCase()).toSet();
+          final validProjectNames = projects.map((p) => p.name.toLowerCase()).toSet();
+          connectedProjectIds.removeWhere(
+            (id) => !validProjectIds.contains(id.toLowerCase()) && !validProjectNames.contains(id.toLowerCase()),
+          );
+          savePersistedConnectedProjects();
 
-        connectedWorkspaceProjects.clear();
-        for (final p in projects) {
-          if (connectedProjectIds.contains(p.id) ||
-              connectedProjectIds.contains(p.name)) {
-            connectedWorkspaceProjects.add(p);
+          connectedWorkspaceProjects.clear();
+          for (final p in projects) {
+            if (connectedProjectIds.contains(p.id) ||
+                connectedProjectIds.contains(p.name)) {
+              connectedWorkspaceProjects.add(p);
+            }
           }
         }
         if (activeProject == null && projects.isNotEmpty) {
@@ -1136,8 +1149,23 @@ class ApiService {
       }
     }
 
+    // Sanitize a label for use inside Mermaid ["..."] — escape quotes and
+    // strip characters that break Mermaid parsing.
+    String sanitize(String raw) {
+      return raw
+          .replaceAll('"', "'")        // double-quote → single-quote
+          .replaceAll('<', '')          // strip angle brackets
+          .replaceAll('>', '')
+          .replaceAll('&', 'and')      // ampersand → word
+          .replaceAll('#', '')         // strip hash
+          .replaceAll(';', '')         // strip semicolons
+          .replaceAll('{', '(')        // curly braces → parens
+          .replaceAll('}', ')')
+          .trim();
+    }
+
     final buffer = StringBuffer();
-    buffer.writeln('\n\n### Architecture & Flowchart Visualization\n');
+    buffer.writeln('\n\n### Architecture and Flowchart Visualization\n');
     buffer.writeln('```mermaid');
 
     // ── Archetype 1: Authentication / Identity Flow ──
@@ -1239,7 +1267,9 @@ class ApiService {
       buffer.writeln('        API_Auth["Auth Middleware & JWT Security"]');
       buffer.writeln('    end');
       buffer.writeln('    subgraph DomainLayer ["3. Domain & Intelligence Services"]');
-      final domainSymbols = symbols.isNotEmpty ? symbols : ['ProjectContextEngine', 'MultiSignalRetriever', 'StarRagService'];
+      final domainSymbols = symbols.isNotEmpty
+          ? symbols.map(sanitize).toList()
+          : ['ProjectContextEngine', 'MultiSignalRetriever', 'StarRagService'];
       for (int i = 0; i < domainSymbols.length && i < 4; i++) {
         final s = domainSymbols[i];
         buffer.writeln('        DOM_$i["$s"]');
@@ -1250,7 +1280,7 @@ class ApiService {
       buffer.writeln('        DB_Redis[("Redis 7 (Task Queue & Cache)")]');
       if (files.isNotEmpty) {
         for (int i = 0; i < files.length && i < 2; i++) {
-          final f = files[i];
+          final f = sanitize(files[i]);
           buffer.writeln('        FILE_$i["$f"]');
         }
       }

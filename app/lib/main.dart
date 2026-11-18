@@ -122,6 +122,7 @@ class _AppShellState extends State<AppShell> {
   );
   ProjectItem? _openedProject;
   String _openedProjectName = '';
+  final List<ProjectItem> _workspaceConnectedProjects = [];
 
   bool _sidebarOpen = true;
   String _activeView = 'chat'; // chat, spec-history, graph, feed, admin
@@ -304,6 +305,7 @@ class _AppShellState extends State<AppShell> {
 
   void _handleLogOut() {
     _clearTimers();
+    _workspaceConnectedProjects.clear();
     ApiService.logout();
     final currentHost = Uri.parse(ApiService.baseUrl).host;
     ApiService.setBaseUrl('http://$currentHost:28000'); // Reset port to control plane on logout
@@ -508,6 +510,14 @@ class _AppShellState extends State<AppShell> {
         userName: _user.name,
         onOpenProject: _handleOpenProject,
         onLogOut: _handleLogOut,
+        initialConnectedProjects: _workspaceConnectedProjects,
+        onConnectedProjectsChanged: (projects) {
+          setState(() {
+            _workspaceConnectedProjects
+              ..clear()
+              ..addAll(projects);
+          });
+        },
       );
     }
 

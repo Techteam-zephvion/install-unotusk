@@ -20,6 +20,7 @@ class _RecordingWorkspaceRepository extends Fake implements WorkspaceRepository 
     String question, {
     String? conversationId,
     String thinkingTier = 'warm',
+    bool? enableStructureAwareStarRag,
   }) async {
     callCount++;
     lastProjectId = projectId;
