@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Any
 
@@ -364,19 +365,132 @@ class ProjectContextEngine:
                 session=session,
                 project_id=project_id,
                 analyzed_query=analyzed,
+                query_embedding=query_embedding,
             )
+
+        # Convert retrieved knowledge and integration records into evidence items
+        knowledge_evidence_items: list[dict[str, Any]] = []
+        for rec in knowledge_records:
+            source_type = rec.get("source_type") or "CUSTOMER"
+            is_integration = source_type.upper() in ("GITHUB", "INTEGRATION") or bool(
+                rec.get("source_reference_type")
+            )
+            ev_type = "integration" if is_integration else "knowledge"
+            ref_type = rec.get("source_reference_type")
+            ref_id = rec.get("source_reference_id")
+
+            rec_score = float(rec.get("score", 1.0))
+            norm_rel = min(1.0, max(0.2, round(rec_score / 15.0, 2)))
+
+            file_identifier = (
+                rec.get("related_file_path")
+                or f"{source_type.lower()}/{ref_id or rec.get('title', 'note')}"
+            )
+            symbol_identifier = rec.get("related_symbol") or rec.get("title")
+
+            item_dict: dict[str, Any] = {
+                "type": ev_type,
+                "file": file_identifier,
+                "symbol": symbol_identifier,
+                "lines": None,
+                "relevance": norm_rel,
+                "snippet": rec.get("content"),
+                "source_type": source_type,
+                "source_reference_type": ref_type,
+                "source_reference_id": ref_id,
+                "category": rec.get("category"),
+                "title": rec.get("title"),
+                "retrieval_reason": f"Project {ev_type} retrieval (score {rec_score})",
+                "provenance": {
+                    "id": rec.get("id"),
+                    "source_type": source_type,
+                    "source_reference_type": ref_type,
+                    "source_reference_id": ref_id,
+                    "title": rec.get("title"),
+                    "category": rec.get("category"),
+                    "knowledge_metadata": rec.get("knowledge_metadata", {}),
+                },
+            }
+            knowledge_evidence_items.append(item_dict)
+            if symbol_identifier and symbol_identifier not in assembled.related_entities:
+                assembled.related_entities.append(symbol_identifier)
+
+        # Check for explicit issue/PR requests that have no matching records
+        query_explicit_issue_refs = set(
+            re.findall(r"(?:#|issue\s*#?|pr\s*#?|pull\s*#?|ticket\s*#?)\s*(\d+)", question, re.IGNORECASE)
+        )
+        if query_explicit_issue_refs:
+            matched_issue_refs = {
+                str(rec.get("source_reference_id", "")).lstrip("#").strip()
+                for rec in knowledge_records
+                if rec.get("source_reference_id")
+            }
+            unmatched_requested_refs = query_explicit_issue_refs - matched_issue_refs
+            if unmatched_requested_refs:
+                GENERIC_TOKENS = {
+                    "issue", "pr", "pull", "request", "ticket", "task", "say", "about",
+                    "what", "how", "why", "when", "does", "the", "for", "and", "or", "to", "in"
+                }
+                meaningful_kws = [
+                    k.lower() for k in analyzed.keywords
+                    if k.lower() not in GENERIC_TOKENS and k not in query_explicit_issue_refs and len(k) > 1
+                ]
+                has_code_grounding = any(
+                    any(kw in c.name.lower() or kw in c.path.lower() or (c.content and kw in c.content.lower()) for kw in meaningful_kws)
+                    for c in raw_candidates
+                )
+                if not has_code_grounding:
+                    missing_str = ", ".join([f"#{r}" for r in sorted(unmatched_requested_refs)])
+                    abstention_content = (
+                        f"### Insufficient Evidence\n\n"
+                        f"I searched the project context and connected integrations for **{missing_str}** "
+                        f"('{question}'), but did not find matching issues, pull requests, or specifications.\n\n"
+                        f"No matching integration records or implementation code were found in the project."
+                    )
+                    return GroundedAnswer(
+                        content=abstention_content,
+                        evidence=[],
+                        related_entities=[],
+                        confidence="LOW",
+                        debug_signals={
+                            "is_abstention": True,
+                            "missing_integration_reference": list(unmatched_requested_refs),
+                            "synthesis_gated": True,
+                            "model": getattr(self.llm_provider, "model_name", "grounded-engine"),
+                            "provider": getattr(self.llm_provider, "provider_name", "offline"),
+                        },
+                    )
+
+        # Merge evidence items: prioritize integration/knowledge if relevant, or combine with code
+        if knowledge_evidence_items:
+            has_strong_knowledge = any(k.get("score", 0.0) >= 5.0 for k in knowledge_records)
+            has_explicit_ref = any(
+                k.get("source_reference_id") and k["source_reference_id"].lower() in question.lower()
+                for k in knowledge_records
+            )
+            if has_strong_knowledge or has_explicit_ref or not assembled.evidence_items:
+                all_evidence_items = knowledge_evidence_items + assembled.evidence_items
+            else:
+                all_evidence_items = assembled.evidence_items + knowledge_evidence_items
+        else:
+            all_evidence_items = assembled.evidence_items
+
+        assembled.evidence_items = all_evidence_items
 
         full_prompt_context = assembled.prompt_context
         if knowledge_context:
-            full_prompt_context = (
-                f"{knowledge_context}\n\n## REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}"
-            )
+            if assembled.prompt_context:
+                full_prompt_context = (
+                    f"{knowledge_context}\n\n## REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}"
+                )
+            else:
+                full_prompt_context = knowledge_context
 
         # 6. LLM Grounded Synthesis (Claude, Groq, or deterministic offline)
         answer = await self.llm_provider.generate_grounded_answer(
             question=question,
             project_context=full_prompt_context,
-            evidence_items=assembled.evidence_items,
+            evidence_items=all_evidence_items,
             related_entities=assembled.related_entities,
             conversation_history=conversation_history,
             thinking_tier=thinking_tier,

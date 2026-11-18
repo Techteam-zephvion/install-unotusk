@@ -11,6 +11,7 @@ class KnowledgeCreateRequest(BaseModel):
     category: KnowledgeCategory
     title: str = Field(..., min_length=1, max_length=255)
     content: str = Field(..., min_length=1, max_length=10000)
+    source_type: str = Field(default="CUSTOMER", description="Originating source type e.g. CUSTOMER, GITHUB")
     source_reference_type: str | None = None
     source_reference_id: str | None = None
     related_file_path: str | None = None
@@ -26,6 +27,9 @@ class KnowledgeUpdateRequest(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=255)
     content: str | None = Field(None, min_length=1, max_length=10000)
     status: KnowledgeStatus | None = None
+    source_type: str | None = None
+    source_reference_type: str | None = None
+    source_reference_id: str | None = None
     related_file_path: str | None = None
     related_symbol: str | None = None
     related_finding_id: uuid.UUID | None = None

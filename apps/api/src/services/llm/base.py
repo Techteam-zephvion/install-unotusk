@@ -69,9 +69,46 @@ def extract_customer_notes(project_context: str) -> list[str]:
     return customer_notes
 
 
+def extract_integration_notes(project_context: str) -> list[str]:
+    """
+    Extracts structured integration context blocks from prompt context.
+    Integration context represents synchronized issues, requirements, PRs, and external specs.
+    """
+    integration_notes: list[str] = []
+    if "<integration_project_context>" in project_context:
+        try:
+            start_tag = "<integration_project_context>"
+            end_tag = "</integration_project_context>"
+            start_idx = project_context.find(start_tag) + len(start_tag)
+            end_idx = project_context.find(end_tag)
+            if start_idx != -1 and end_idx != -1:
+                raw_integration = project_context[start_idx:end_idx].strip()
+                for block in raw_integration.split("### [INTEGRATION:"):
+                    block = block.strip()
+                    if block and not block.startswith("This block contains"):
+                        lines_b = block.splitlines()
+                        header = lines_b[0].strip()
+                        content_lines = [
+                            line_text
+                            for line_text in lines_b[1:]
+                            if line_text.strip().startswith("Content:")
+                        ]
+                        content_txt = (
+                            content_lines[0].replace("Content:", "").strip()
+                            if content_lines
+                            else ""
+                        )
+                        integration_notes.append(f"- **[INTEGRATION: {header}]**: {content_txt}")
+        except Exception:
+            pass
+
+    return integration_notes
+
+
 def should_abstain_due_to_insufficient_evidence(
     evidence_items: list[dict[str, Any]],
     customer_notes: list[str],
+    integration_notes: list[str] | None = None,
     threshold: float = MIN_GROUNDED_SYNTHESIS_THRESHOLD,
 ) -> tuple[bool, float]:
     """
@@ -79,12 +116,12 @@ def should_abstain_due_to_insufficient_evidence(
     Returns (should_abstain, max_relevance).
 
     Abstention triggers to prevent hallucination when:
-    1. No customer project knowledge is available, AND
+    1. No customer or integration project knowledge is available, AND
     2. Either evidence_items is empty OR the maximum candidate relevance is below threshold (< 0.20).
     """
     max_rel = max((float(e.get("relevance", 0.0)) for e in evidence_items), default=0.0)
-    if customer_notes:
-        return False, max_rel
+    if customer_notes or (integration_notes and len(integration_notes) > 0):
+        return False, max(max_rel, 0.8)
     if not evidence_items or max_rel < threshold:
         return True, max_rel
     return False, max_rel
