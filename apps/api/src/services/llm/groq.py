@@ -109,10 +109,14 @@ class GroqProvider(LLMProvider):
                             c_text = c_text[:500] + "..."
                         messages.append({"role": msg["role"], "content": c_text})
 
-                # Cap context characters to ensure request never exceeds model TPM limit (~12k chars / ~3k tokens)
+                # Cap context characters based on model capacity:
+                # 70B has a tight 6,000 TPM limit; cap context to 6,000 chars (~1.5k tokens) to prevent 429s.
+                # 8B has a 30,000 TPM limit; allow up to 14,000 chars (~3.5k tokens).
+                model_name = self.model or "llama-3.1-8b-instant"
+                max_ctx_chars = 6000 if "70b" in model_name.lower() else 14000
                 safe_context = project_context
-                if len(safe_context) > 12000:
-                    safe_context = safe_context[:12000] + "\n... [context truncated to stay within token budget]"
+                if len(safe_context) > max_ctx_chars:
+                    safe_context = safe_context[:max_ctx_chars] + "\n... [context trimmed to stay within rate limit]"
 
                 user_prompt = (
                     f"## PROJECT CONTEXT EVIDENCE\n\n"
@@ -133,37 +137,49 @@ class GroqProvider(LLMProvider):
                 messages.append({"role": "user", "content": user_prompt})
 
                 # Determine if model supports DeepSeek R1 reasoning parameters
-                is_deepseek_r1 = "r1" in self.model.lower() or "deepseek" in self.model.lower()
+                is_deepseek_r1 = "r1" in model_name.lower() or "deepseek" in model_name.lower()
                 create_kwargs: dict[str, Any] = {
-                    "model": self.model,
+                    "model": model_name,
                     "messages": messages,
-                    "max_tokens": 2500,
+                    "max_tokens": 2000,
                     "temperature": 0.1,
                 }
                 if is_deepseek_r1:
                     create_kwargs["reasoning_effort"] = policy.groq_reasoning_effort
                     create_kwargs["reasoning_format"] = policy.groq_reasoning_format
 
-                max_retries = 2
+                max_retries = 3
                 response = None
-                for attempt in range(max_retries + 1):
+                # Multi-tier fallback models with high independent TPM quotas:
+                fallback_models = ["llama-3.1-8b-instant", "gemma2-9b-it"]
+                for attempt in range(max_retries):
                     try:
                         response = await self._client.chat.completions.create(**create_kwargs)
                         break
                     except Exception as err:
                         err_str = str(err)
-                        # If rate limit or TPM exceeded on 70B, failover immediately to high-capacity 8B
-                        if ("429" in err_str or "rate_limit" in err_str.lower() or "tokens per minute" in err_str.lower()) and create_kwargs["model"] != "llama-3.1-8b-instant":
-                            logger.warning(
-                                f"Groq {create_kwargs['model']} rate limit hit; failing over to llama-3.1-8b-instant (30k TPM)..."
-                            )
-                            create_kwargs["model"] = "llama-3.1-8b-instant"
-                            continue
-                        elif ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
-                            wait_sec = 2 * (attempt + 1)
-                            logger.warning(f"Groq rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{max_retries})...")
-                            await asyncio.sleep(wait_sec)
-                            continue
+                        is_rate_limit = "429" in err_str or "rate_limit" in err_str.lower() or "tokens per minute" in err_str.lower()
+                        if is_rate_limit:
+                            # Immediately failover across model tiers to bypass exhausted quota
+                            current_m = create_kwargs["model"]
+                            next_model = None
+                            for fb in fallback_models:
+                                if fb != current_m:
+                                    next_model = fb
+                                    break
+                            if next_model:
+                                logger.warning(
+                                    f"Groq {current_m} rate limit hit; failing over to {next_model} (high quota)..."
+                                )
+                                create_kwargs["model"] = next_model
+                                create_kwargs.pop("reasoning_effort", None)
+                                create_kwargs.pop("reasoning_format", None)
+                                continue
+                            else:
+                                wait_sec = 2 * (attempt + 1)
+                                logger.warning(f"Groq rate limit hit, retrying in {wait_sec}s...")
+                                await asyncio.sleep(wait_sec)
+                                continue
                         raise
 
                 raw_msg = response.choices[0].message if (response and response.choices) else None
@@ -401,26 +417,25 @@ class GroqProvider(LLMProvider):
             return {}
         import json
         max_retries = 2
+        # Use high-throughput 8B model for lightweight metadata extraction to preserve 70B quota
+        json_model = "llama-3.1-8b-instant"
         for attempt in range(max_retries + 1):
             try:
                 response = await self._client.chat.completions.create(
-                    model=self.model,
+                    model=json_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     response_format={"type": "json_object"},
-                    max_tokens=500,
+                    max_tokens=400,
                 )
                 content = response.choices[0].message.content
                 return json.loads(content)
             except Exception as e:
                 err_str = str(e)
                 if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
-                    wait_sec = 3 * (attempt + 1)
-                    logger.warning(
-                        f"Groq generate_json 429 rate limit hit, retrying in {wait_sec}s..."
-                    )
+                    wait_sec = 2 * (attempt + 1)
                     await asyncio.sleep(wait_sec)
                     continue
                 logger.error(f"Groq generate_json error: {e}")
