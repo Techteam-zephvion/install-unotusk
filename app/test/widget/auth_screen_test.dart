@@ -155,4 +155,29 @@ void main() {
     expect(find.text('Member'), findsOneWidget);
     expect(find.text('Manager'), findsOneWidget);
   });
+
+  testWidgets('AuthScreen renders studio-grade server pill and does not show in-card search banner', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthScreen(
+          palette: UnoPalette.dark,
+          onAuthenticated: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify in-card search banner is NOT rendered
+    expect(find.text('Searching network for active Unotusk server...'), findsNothing);
+    expect(find.text('No servers are available'), findsNothing);
+
+    // Verify studio-grade server connection pill
+    expect(find.text('Control Plane'), findsOneWidget);
+    // Old unstyled monospace string should not be found
+    expect(find.textContaining('Server: http://'), findsNothing);
+  });
 }

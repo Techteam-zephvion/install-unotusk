@@ -61,6 +61,8 @@ class _AuthScreenState extends State<AuthScreen>
   bool _isScanning = false;
   ServerDiscoveryResult? _discoveryResult;
   Timer? _healthTimer;
+  String? _serverNotificationToast;
+  Timer? _serverNotificationTimer;
   late bool _localIsDark;
 
   late final AnimationController _entranceController;
@@ -168,6 +170,21 @@ class _AuthScreenState extends State<AuthScreen>
           );
   }
 
+  void _showServerErrorToast(String message) {
+    _serverNotificationTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _serverNotificationToast = message;
+    });
+    _serverNotificationTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _serverNotificationToast = null;
+        });
+      }
+    });
+  }
+
   void _initServer({bool forceRescan = false}) async {
     setState(() {
       _isScanning = true;
@@ -179,21 +196,29 @@ class _AuthScreenState extends State<AuthScreen>
         _isServerConnected = ApiService.isConnected;
         _discoveryResult = result;
       });
+      if (!_isServerConnected && !result.isSuccess) {
+        _showServerErrorToast('No Unotusk servers found on local network.');
+      }
     }
   }
 
   void _checkServer() async {
     final ok = await ApiService.checkHealth();
     if (mounted) {
+      final wasConnected = _isServerConnected;
       setState(() {
         _isServerConnected = ok;
       });
+      if (wasConnected && !ok) {
+        _showServerErrorToast('Lost connection to Unotusk Control Plane.');
+      }
     }
   }
 
   @override
   void dispose() {
     _healthTimer?.cancel();
+    _serverNotificationTimer?.cancel();
     _entranceController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -253,10 +278,24 @@ class _AuthScreenState extends State<AuthScreen>
       widget.onAuthenticated(user);
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
+      final lower = msg.toLowerCase();
+      if (!_isServerConnected ||
+          lower.contains('failed to connect') ||
+          lower.contains('connection refused') ||
+          lower.contains('network is unreachable') ||
+          lower.contains('timed out')) {
+        _showServerErrorToast(
+          'Server unreachable at ${_formatEndpoint(ApiService.baseUrl)}',
+        );
+      } else {
+        setState(() {
+          _errorMessage = msg;
+        });
+      }
     }
   }
 
@@ -309,10 +348,24 @@ class _AuthScreenState extends State<AuthScreen>
       widget.onAuthenticated(user);
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
+      final lower = msg.toLowerCase();
+      if (!_isServerConnected ||
+          lower.contains('failed to connect') ||
+          lower.contains('connection refused') ||
+          lower.contains('network is unreachable') ||
+          lower.contains('timed out')) {
+        _showServerErrorToast(
+          'Server unreachable at ${_formatEndpoint(ApiService.baseUrl)}',
+        );
+      } else {
+        setState(() {
+          _errorMessage = msg;
+        });
+      }
     }
   }
 
@@ -356,148 +409,52 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  Widget _buildServerDiscoveryStatusCard(bool isCardLight, UnoPalette palette) {
-    if (_isScanning) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isCardLight ? _AuthColors.sandCreamBorder : _AuthColors.slateNavy,
-          border: Border.all(color: palette.div),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isCardLight ? _AuthColors.obsidianNavy : _AuthColors.warmSand,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Searching network for active Unotusk server...',
-                style: UnoTypography.body(
-                  color: palette.textSec,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+  static String _formatEndpoint(String url) {
+    final clean = url
+        .trim()
+        .replaceFirst(RegExp(r'^https?:\/\/'), '')
+        .replaceFirst(RegExp(r'\/+$'), '');
+    return clean.isEmpty ? '127.0.0.1:28000' : clean;
+  }
 
-    if (_isServerConnected) {
-      return const SizedBox.shrink();
-    }
-
-    final result = _discoveryResult ?? ApiService.lastDiscoveryResult;
-    if (result == null || result.isSuccess) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD4725A).withValues(alpha: isCardLight ? 0.08 : 0.12),
-        border: Border.all(
-          color: const Color(0xFFD4725A).withValues(alpha: isCardLight ? 0.35 : 0.40),
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                LucideIcons.serverOff,
-                size: 16,
-                color: Color(0xFFD4725A),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'No servers are available',
-                  style: UnoTypography.body(
-                    color: isCardLight ? const Color(0xFFB94A32) : const Color(0xFFE89885),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+  Widget _buildFloatingServerToast(bool isDark, UnoPalette palette) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.0, -0.45),
+            end: Offset.zero,
+          ).animate(animation),
+          child: FadeTransition(
+            opacity: animation,
+            child: child,
           ),
-          const SizedBox(height: 6),
-          Text(
-            'No running Unotusk Control Plane was found on the local network. Make sure your server is running or configure the server address manually.',
-            style: UnoTypography.body(
-              color: palette.textSec,
-              fontSize: 12,
+        );
+      },
+      child: _serverNotificationToast == null
+          ? const SizedBox.shrink(key: ValueKey('empty-server-toast'))
+          : _ServerToastHUD(
+              key: ValueKey('server-toast-$_serverNotificationToast'),
+              message: _serverNotificationToast!,
+              isDark: isDark,
+              onDismiss: () {
+                _serverNotificationTimer?.cancel();
+                setState(() => _serverNotificationToast = null);
+              },
+              onConfigure: () {
+                _serverNotificationTimer?.cancel();
+                setState(() => _serverNotificationToast = null);
+                _showServerSwitchDialog();
+              },
+              onRescan: () {
+                _serverNotificationTimer?.cancel();
+                setState(() => _serverNotificationToast = null);
+                _initServer(forceRescan: true);
+              },
             ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              InkWell(
-                onTap: _showServerSwitchDialog,
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Text(
-                    'Manual IP',
-                    style: UnoTypography.body(
-                      color: palette.textSec,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => _initServer(forceRescan: true),
-                borderRadius: BorderRadius.circular(4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isCardLight ? _AuthColors.pureWhite : _AuthColors.slateNavy,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: palette.div),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        LucideIcons.refreshCw,
-                        size: 11,
-                        color: palette.text,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Re-scan Subnet',
-                        style: UnoTypography.body(
-                          color: palette.text,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -758,6 +715,16 @@ class _AuthScreenState extends State<AuthScreen>
                     ),
                   ),
                 ],
+              ),
+
+              // ── Layer 7: Floating Auto-Vanishing Server Notification / Toast HUD ──
+              Positioned(
+                top: 44,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: _buildFloatingServerToast(isDark, palette),
+                ),
               ),
             ],
           );
@@ -1157,8 +1124,6 @@ class _AuthScreenState extends State<AuthScreen>
         const SizedBox(height: 18),
 
         _buildErrorBanner(isCardLight),
-
-        _buildServerDiscoveryStatusCard(isCardLight, palette),
 
         // ── Mode-specific form locked to identical height across Sign In & Sign Up ──
         SizedBox(
@@ -2266,69 +2231,403 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  Server Status Footer
+  //  Server Status Footer (Studio-Grade Tactile Connection Pill)
   // ─────────────────────────────────────────────────────────────
   Widget _buildServerFooter(bool isCardLight, UnoPalette palette) {
-    final isOnline = _isServerConnected || ApiService.isConnected;
-    final dotColor = isOnline
-        ? const Color(0xFF22C55E) // Green when online
-        : const Color(0xFFE05A5A); // Red when offline
-
     return Column(
       children: [
-        const SizedBox(height: 16),
-        MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: InkWell(
-            onTap: _showServerSwitchDialog,
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        const SizedBox(height: 18),
+        _TactileServerPill(
+          isOnline: _isServerConnected || ApiService.isConnected,
+          isScanning: _isScanning,
+          serverUrl: ApiService.baseUrl,
+          isCardLight: isCardLight,
+          onTap: _showServerSwitchDialog,
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Tactile Server Connection Pill Widget
+// ─────────────────────────────────────────────────────────────
+class _TactileServerPill extends StatefulWidget {
+  final bool isOnline;
+  final bool isScanning;
+  final String serverUrl;
+  final bool isCardLight;
+  final VoidCallback onTap;
+
+  const _TactileServerPill({
+    required this.isOnline,
+    required this.isScanning,
+    required this.serverUrl,
+    required this.isCardLight,
+    required this.onTap,
+  });
+
+  @override
+  State<_TactileServerPill> createState() => _TactileServerPillState();
+}
+
+class _TactileServerPillState extends State<_TactileServerPill> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  String get _cleanEndpoint {
+    final raw = widget.serverUrl.trim();
+    final stripped = raw
+        .replaceFirst(RegExp(r'^https?:\/\/'), '')
+        .replaceFirst(RegExp(r'\/+$'), '');
+    return stripped.isEmpty ? '127.0.0.1:28000' : stripped;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOnline = widget.isOnline;
+    final isScanning = widget.isScanning;
+    final isCardLight = widget.isCardLight;
+
+    final dotColor = isScanning
+        ? const Color(0xFFF59E0B)
+        : (isOnline ? const Color(0xFF22C55E) : const Color(0xFFEF4444));
+
+    final textPrimary =
+        isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite;
+    final textMuted =
+        isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate;
+
+    final bg = isCardLight
+        ? (_isHovered
+            ? _AuthColors.pureWhite
+            : _AuthColors.sandCreamBorder.withValues(alpha: 0.65))
+        : (_isHovered
+            ? _AuthColors.slateNavy
+            : _AuthColors.obsidianNavy.withValues(alpha: 0.75));
+
+    final borderColor = isCardLight
+        ? (_isHovered
+            ? _AuthColors.sandTint
+            : _AuthColors.warmSand.withValues(alpha: 0.65))
+        : (_isHovered
+            ? _AuthColors.warmSand.withValues(alpha: 0.35)
+            : _AuthColors.darkBorderHover);
+
+    final tooltipMsg = isScanning
+        ? 'Scanning local network for active servers...'
+        : (isOnline
+            ? 'Connected to Control Plane • Click to configure IP or switch server'
+            : 'Control Plane offline • Click to configure IP or re-scan');
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Tooltip(
+        message: tooltipMsg,
+        preferBelow: true,
+        verticalOffset: 16,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: widget.onTap,
+          child: AnimatedScale(
+            scale: _isPressed ? 0.98 : 1.0,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              height: 30,
+              constraints: const BoxConstraints(maxWidth: 320),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: borderColor, width: 0.85),
+                boxShadow: [
+                  BoxShadow(
+                    color: isCardLight
+                        ? _AuthColors.obsidianNavy
+                            .withValues(alpha: _isHovered ? 0.08 : 0.03)
+                        : Colors.black
+                            .withValues(alpha: _isHovered ? 0.35 : 0.18),
+                    blurRadius: _isHovered ? 8 : 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: 6.5,
-                    height: 6.5,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: dotColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: dotColor.withValues(alpha: 0.5),
-                          blurRadius: 5,
-                          spreadRadius: 1,
+                  if (isScanning)
+                    SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.75,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isCardLight
+                              ? _AuthColors.obsidianNavy
+                              : _AuthColors.warmSand,
                         ),
-                      ],
+                      ),
+                    )
+                  else
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 6.5,
+                      height: 6.5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: dotColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: dotColor.withValues(alpha: 0.45),
+                            blurRadius: 4,
+                            spreadRadius: 0.5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(width: 7.5),
+                  Text(
+                    isScanning
+                        ? 'Scanning...'
+                        : (isOnline ? 'Control Plane' : 'Offline'),
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.15,
+                      color: isScanning
+                          ? textMuted
+                          : (isOnline
+                              ? textPrimary
+                              : const Color(0xFFE05A5A)),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
                     child: Text(
-                      'Server: ${ApiService.baseUrl}',
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.ibmPlexMono(
-                        color: isCardLight ? _AuthColors.mutedDark : _AuthColors.coolSlate,
+                      '·',
+                      style: GoogleFonts.inter(
                         fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: textMuted.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      _cleanEndpoint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.ibmPlexMono(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
                   Icon(
-                    LucideIcons.arrowLeftRight,
+                    LucideIcons.slidersHorizontal,
                     size: 11,
-                    color: isCardLight
-                        ? _AuthColors.mutedDark.withValues(alpha: 0.8)
-                        : _AuthColors.coolSlate.withValues(alpha: 0.8),
+                    color: _isHovered
+                        ? textPrimary
+                        : textMuted.withValues(alpha: 0.75),
                   ),
                 ],
               ),
             ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Floating Auto-Vanishing Server Notification Toast HUD
+// ─────────────────────────────────────────────────────────────
+class _ServerToastHUD extends StatelessWidget {
+  final String message;
+  final bool isDark;
+  final VoidCallback onDismiss;
+  final VoidCallback onConfigure;
+  final VoidCallback onRescan;
+
+  const _ServerToastHUD({
+    super.key,
+    required this.message,
+    required this.isDark,
+    required this.onDismiss,
+    required this.onConfigure,
+    required this.onRescan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColors = isDark
+        ? [const Color(0xFF181F33), const Color(0xFF101524)]
+        : [const Color(0xFFFFFDF9), const Color(0xFFF7F2E9)];
+    final borderColor = isDark
+        ? const Color(0xFFE05A5A).withValues(alpha: 0.40)
+        : const Color(0xFFE05A5A).withValues(alpha: 0.50);
+    final textPrimary =
+        isDark ? _AuthColors.pureWhite : _AuthColors.obsidianNavy;
+    final textMuted = isDark ? _AuthColors.coolSlate : _AuthColors.mutedDark;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
+        constraints: const BoxConstraints(maxWidth: 500),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: bgColors,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: const Color(0xFFE05A5A).withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE05A5A).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                LucideIcons.serverOff,
+                size: 14,
+                color: Color(0xFFE05A5A),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                message,
+                style: GoogleFonts.inter(
+                  color: textPrimary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onConfigure,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF222838)
+                        : _AuthColors.sandCreamBorder,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isDark
+                          ? _AuthColors.darkBorderHover
+                          : _AuthColors.warmSand,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.slidersHorizontal,
+                        size: 11,
+                        color: textPrimary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Manual IP',
+                        style: GoogleFonts.inter(
+                          color: textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Tooltip(
+                message: 'Re-scan Subnet',
+                child: GestureDetector(
+                  onTap: onRescan,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF222838)
+                          : _AuthColors.sandCreamBorder,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      LucideIcons.refreshCw,
+                      size: 12,
+                      color: textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Tooltip(
+                message: 'Dismiss',
+                child: GestureDetector(
+                  onTap: onDismiss,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      LucideIcons.x,
+                      size: 13,
+                      color: textMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
