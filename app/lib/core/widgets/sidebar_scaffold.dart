@@ -488,7 +488,7 @@ class _SidebarScaffoldState extends State<SidebarScaffold> {
                                     itemBuilder: (context) => widget.availableServers!.map((p) {
                                       return PopupMenuItem(
                                         value: p.id,
-                                        child: Text('${p.name} (Port: ${p.port})', style: AppTextStyles.inter(fontSize: 13)),
+                                        child: Text(p.name, style: AppTextStyles.inter(fontSize: 13)),
                                       );
                                     }).toList(),
                                     child: Container(

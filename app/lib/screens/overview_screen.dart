@@ -263,8 +263,8 @@ class _OverviewScreenState extends State<OverviewScreen> {
                         children: [
                           Text(
                             _dataPlaneStatus?.port != null
-                                ? 'Control Plane (Port 28000) · Data Plane Isolation (Port ${_dataPlaneStatus!.port})'
-                                : 'Unified Control & Intelligence Engine (Port 28000)',
+                                ? 'Control Plane · Data Plane Isolation'
+                                : 'Unified Control & Intelligence Engine',
                             style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(width: 8),
@@ -805,7 +805,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                                   style: UnoTypography.body(color: p.text, fontSize: 16, fontWeight: FontWeight.w600),
                                 ),
                                 Text(
-                                  'Control Plane Port 28000 · Project Container Isolation',
+                                  'Control Plane · Project Container Isolation',
                                   style: UnoTypography.mono(color: p.textSec, fontSize: 10.5),
                                 ),
                               ],

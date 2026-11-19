@@ -62,7 +62,7 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Repository reindex initiated on ${ApiService.baseUrl}'),
+            content: const Text('Repository reindex initiated'),
             backgroundColor: const Color(0xFF15803D),
           ),
         );

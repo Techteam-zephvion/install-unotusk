@@ -24,7 +24,7 @@ class ChatScreen extends StatefulWidget {
     'What are the primary components in this repository?',
     'Explain the database migration flow and schema',
     'How does authentication and OIDC discovery work?',
-    'What services are exposed over the LAN on port 28000?',
+    'What services are exposed over the local network?',
   ];
 
   static const List<HeroCardItem> heroCards = [
@@ -44,7 +44,7 @@ class ChatScreen extends StatefulWidget {
       icon: LucideIcons.cpu,
     ),
     HeroCardItem(
-      title: 'Audit LAN network connectivity and ports',
+      title: 'Audit LAN network connectivity and services',
       tag: 'TELEMETRY',
       icon: LucideIcons.network,
     ),

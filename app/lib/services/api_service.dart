@@ -328,7 +328,7 @@ class ApiService {
     final healthOk = await checkHealth();
     if (!healthOk) {
       throw Exception(
-          lastError ?? 'Cannot reach backend server at http://10.0.0.59:28000');
+          lastError ?? 'Cannot reach backend server. Please verify network connection.');
     }
 
     try {
@@ -400,7 +400,7 @@ class ApiService {
       return user;
     } else if (res.statusCode == 401) {
       throw Exception(
-          'Invalid email or password on http://10.0.0.59:28000. Please verify credentials.');
+          'Invalid email or password. Please verify credentials.');
     } else {
       throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
     }

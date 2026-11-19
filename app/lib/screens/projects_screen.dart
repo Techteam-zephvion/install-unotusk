@@ -613,7 +613,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                   const SizedBox(height: 6),
                   _buildInputField(
                     controller: _serverUrlController,
-                    hint: 'http://10.0.0.59:28000',
+                    hint: 'http://10.0.0.59',
                     icon: Icons.dns_outlined,
                     palette: palette,
                   ),
@@ -992,7 +992,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                                           size: 26, color: palette.textSec),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'No servers found on http://${ApiService.serverHost}',
+                                        'No servers found on http://${ApiService.serverHost.split(":").first}',
                                         textAlign: TextAlign.center,
                                         style: UnoTypography.body(
                                           color: palette.text,
@@ -1002,7 +1002,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Ensure project servers are running on port 28000+.',
+                                        'Ensure project servers are running and connected.',
                                         textAlign: TextAlign.center,
                                         style: UnoTypography.body(
                                           color: palette.textSec,
@@ -3278,7 +3278,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _buildSettingsRow('Primary Server URL', ApiService.baseUrl, palette),
+                    _buildSettingsRow('Primary Server URL', ApiService.baseUrl.replaceAll(RegExp(r':\d+'), ''), palette),
                     _buildSettingsRow('LAN Interface', 'wlo1 (Private Subnet 10.0.0.0/24)', palette),
                     _buildSettingsRow('Health Endpoints', '/health (200 OK) · /health/ready (200 OK)', palette),
                     _buildSettingsRow('Average Response Time', '28ms across 6 employee nodes', palette),
@@ -3314,13 +3314,13 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _buildServiceItem('unotusk-api', 'FastAPI · Bound to 0.0.0.0:28000 · JWT & CORS active', 'Healthy', palette),
+                    _buildServiceItem('unotusk-api', 'FastAPI · REST Control Plane · JWT & CORS active', 'Healthy', palette),
                     const SizedBox(height: 8),
                     _buildServiceItem('unotusk-worker', 'Async Ingestion · AST parsing & pgvector indexing', 'Up', palette),
                     const SizedBox(height: 8),
-                    _buildServiceItem('unotusk-postgres', 'PostgreSQL with pgvector · Internal 5432 (isolated)', 'Healthy', palette),
+                    _buildServiceItem('unotusk-postgres', 'PostgreSQL with pgvector · Relational & Vector Storage', 'Healthy', palette),
                     const SizedBox(height: 8),
-                    _buildServiceItem('unotusk-redis', 'Task Queue & Cache · Internal 6379 (isolated)', 'Healthy', palette),
+                    _buildServiceItem('unotusk-redis', 'Task Queue & Cache · Asynchronous Pipeline Broker', 'Healthy', palette),
                   ],
                 ),
               ),
@@ -3595,8 +3595,6 @@ class _OppositeProjectCardState extends State<_OppositeProjectCard> {
         isDark ? const Color(0xFFF0ECE4) : const Color(0xFF111728);
     final subtitleColor =
         isDark ? const Color(0xFF8C92A2) : const Color(0xFF666368);
-    final portColor =
-        isDark ? const Color(0xFFC5B9A6) : const Color(0xFF3E465E);
 
     final manageBg = isDark
         ? (_isManageHovered ? const Color(0xFF212A42) : const Color(0xFF1A2236))
@@ -3795,52 +3793,19 @@ class _OppositeProjectCardState extends State<_OppositeProjectCard> {
                             ),
                         ],
                       ),
-                      if ((project.description != null &&
-                              project.description!.isNotEmpty) ||
-                          project.port != null) ...[
+                      if (project.description != null &&
+                          project.description!.trim().isNotEmpty &&
+                          !project.description!.trim().toLowerCase().startsWith('server instance for')) ...[
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (project.description != null &&
-                                project.description!.isNotEmpty)
-                              Flexible(
-                                child: Text(
-                                  project.description!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: UnoTypography.body(
-                                    color: subtitleColor,
-                                    fontSize: 12.5,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ),
-                            if (project.port != null) ...[
-                              if (project.description != null &&
-                                  project.description!.isNotEmpty)
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 7),
-                                  child: Text(
-                                    '·',
-                                    style: UnoTypography.body(
-                                      color:
-                                          subtitleColor.withValues(alpha: 0.55),
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              Text(
-                                'Port ${project.port}',
-                                style: UnoTypography.mono(
-                                  color: portColor,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ],
+                        Text(
+                          project.description!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: UnoTypography.body(
+                            color: subtitleColor,
+                            fontSize: 12.5,
+                            height: 1.35,
+                          ),
                         ),
                       ],
                     ],

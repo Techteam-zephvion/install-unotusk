@@ -7,7 +7,6 @@ import '../../domain/grounded_answer.dart';
 import '../../domain/feature_specification.dart';
 import '../../domain/project_file.dart';
 import '../../data/workspace_repository.dart';
-import '../../../../services/api_service.dart';
 import '../workspace_controller.dart';
 import '../widgets/ask_input_bar.dart';
 import '../widgets/constellation_loader.dart';
@@ -372,7 +371,7 @@ class _AskTabState extends ConsumerState<AskTab> {
         conversationId: 'err-conv',
         messageId: 'err-msg-${DateTime.now().millisecondsSinceEpoch}',
         role: 'assistant',
-        content: 'Failed to retrieve answer from backend: $e\n\nPlease ensure backend is reachable at ${ApiService.baseUrl}.',
+        content: 'Failed to retrieve answer from backend: $e\n\nPlease ensure the backend server is reachable.',
         evidence: const [],
         relatedEntities: const [],
         confidence: 'INFERRED',

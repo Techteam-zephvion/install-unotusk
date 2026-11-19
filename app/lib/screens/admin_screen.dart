@@ -379,7 +379,7 @@ class _AdminScreenState extends State<AdminScreen> {
         const SizedBox(height: 14),
         _buildInfoField('ORGANIZATION / TEAM', widget.user.org.isNotEmpty ? widget.user.org : 'Pilot Workspace (34b9ce85)'),
         const SizedBox(height: 14),
-        _buildInfoField('ACTIVE BACKEND', ApiService.baseUrl),
+        _buildInfoField('ACTIVE BACKEND', ApiService.baseUrl.replaceAll(RegExp(r':\d+'), '')),
       ],
     );
   }
@@ -411,7 +411,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Phase 1 Role-Based Access Control · Dynamic Data Plane Isolation (28100-28999 Pool)',
+                        'Phase 1 Role-Based Access Control · Dynamic Data Plane Isolation',
                         style: UnoTypography.mono(
                           color: widget.palette.textSec,
                           fontSize: 11,
@@ -468,7 +468,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Control Plane (Port 28000) · Data Plane Isolation Guardrails Active',
+                            'Control Plane · Data Plane Isolation Guardrails Active',
                             style: UnoTypography.body(color: widget.palette.text, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                           Text(
@@ -752,7 +752,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
           // Backend Server URL Configuration
           Text(
-            'PRIMARY BACKEND CONNECTION (PORT 28000 SERIES)',
+            'PRIMARY BACKEND CONNECTION',
             style: UnoTypography.mono(color: widget.palette.textSec, fontSize: 10.5, letterSpacing: 0.8),
           ),
           const SizedBox(height: 10),
@@ -824,7 +824,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         ApiService.setBaseUrl('http://10.0.0.59:28000');
                         setState(() {});
                       },
-                      child: Text('LAN (10.0.0.59:28000)', style: UnoTypography.mono(color: widget.palette.accent, fontSize: 11)),
+                      child: Text('LAN (10.0.0.59)', style: UnoTypography.mono(color: widget.palette.accent, fontSize: 11)),
                     ),
                     const SizedBox(width: 14),
                     InkWell(
@@ -833,7 +833,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         ApiService.setBaseUrl('http://localhost:28000');
                         setState(() {});
                       },
-                      child: Text('Localhost (28000)', style: UnoTypography.mono(color: widget.palette.accent, fontSize: 11)),
+                      child: Text('Localhost', style: UnoTypography.mono(color: widget.palette.accent, fontSize: 11)),
                     ),
                   ],
                 ),
