@@ -741,6 +741,7 @@ class _AppShellState extends State<AppShell> {
               onClose: () => setState(() => _settingsModalOpen = false),
               defaultTab: _defaultSettingsTab,
               user: _user,
+              projectId: _openedProject?.id,
             ),
 
           // Archived Modal Overlay

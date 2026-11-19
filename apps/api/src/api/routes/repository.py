@@ -40,6 +40,16 @@ async def connect_github(
     )
 
 
+@router.get("/integrations", response_model=list[dict])
+async def list_project_integrations(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await RepositoryService.list_project_integrations(db, current_user.id, resolved_id)
+
+
 @router.get("/repositories")
 async def list_available_repositories(
     project_id: str,
