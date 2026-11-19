@@ -862,15 +862,35 @@ class _UnifiedNavItemState extends State<_UnifiedNavItem> {
     final hoverBase =
         isDark ? const Color(0xFFE9DFD0) : const Color(0xFF0B1020);
 
+    final Gradient? bgGradient = active
+        ? (isDark
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1E2840),
+                  Color(0xFF141C30),
+                ],
+              )
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFFFFF),
+                  Color(0xFFF6F3EC),
+                ],
+              ))
+        : null;
+
     final bgColor = active
-        ? p.bgElevated
+        ? null
         : hoverBase.withValues(alpha: _hovered ? 0.055 : 0.0);
 
     final borderColor = active
-        ? (isDark ? p.accent.withValues(alpha: 0.18) : p.div)
-        : (isDark
-            ? p.accent.withValues(alpha: 0.0)
-            : p.div.withValues(alpha: 0.0));
+        ? (isDark ? p.accent.withValues(alpha: 0.26) : const Color(0xFFDCD4C6))
+        : (_hovered
+            ? (isDark ? p.div.withValues(alpha: 0.8) : const Color(0xFFE2DDD2))
+            : Colors.transparent);
 
     final iconColor = active
         ? p.accent
@@ -879,6 +899,22 @@ class _UnifiedNavItemState extends State<_UnifiedNavItem> {
             : (isDark ? p.accentMuted.withValues(alpha: 0.78) : p.textSec));
 
     final textColor = active ? p.text : (_hovered ? p.text : p.textSec);
+
+    final shadows = active
+        ? [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+            if (isDark)
+              BoxShadow(
+                color: p.accent.withValues(alpha: 0.05),
+                blurRadius: 1,
+                offset: const Offset(0, 1),
+              ),
+          ]
+        : <BoxShadow>[];
 
     return _SidebarRightTooltip(
       label: widget.label,
@@ -907,93 +943,101 @@ class _UnifiedNavItemState extends State<_UnifiedNavItem> {
               width: widget.innerWidth,
               height: 40,
               decoration: BoxDecoration(
+                gradient: bgGradient,
                 color: bgColor,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: borderColor, width: 1),
+                boxShadow: shadows,
               ),
-              child: Stack(
-                alignment: Alignment.centerLeft,
-                children: [
-                  // Left-edge active accent indicator (smoothly fades out in collapsed tile mode)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: Opacity(
-                        opacity: widget.expandT,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          width: active ? 2.5 : 0.0,
-                          height: active ? 18.0 : 0.0,
-                          decoration: BoxDecoration(
-                            color: p.accent,
-                            borderRadius: const BorderRadius.horizontal(
-                              right: Radius.circular(3),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Unified Icon + Smoothly Fading Label (Icon center locked at x = 36.0)
-                  ClipRect(
-                    child: OverflowBox(
-                      alignment: Alignment.centerLeft,
-                      minWidth: widget.expandedInnerWidth,
-                      maxWidth: widget.expandedInnerWidth,
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: Center(
-                              child: AnimatedScale(
-                                scale: (widget.isCollapsed && _hovered)
-                                    ? 1.08
-                                    : 1.0,
-                                duration: const Duration(milliseconds: 160),
-                                curve: Curves.easeOutCubic,
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: widget.expandedInnerWidth,
+                  maxWidth: widget.expandedInnerWidth,
+                  child: Row(
+                    children: [
+                      // Leading 40×40 slot with centered 28×28 icon badge (axis locked at x = 36.0)
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Center(
+                          child: AnimatedScale(
+                            scale: (widget.isCollapsed && _hovered)
+                                ? 1.08
+                                : 1.0,
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOutCubic,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(7),
+                                color: active
+                                    ? (isDark
+                                        ? p.accent.withValues(alpha: 0.12)
+                                        : p.accent.withValues(alpha: 0.08))
+                                    : Colors.transparent,
+                              ),
+                              child: Center(
                                 child: Icon(
                                   widget.icon,
-                                  size: 16.5,
+                                  size: 16.0,
                                   color: iconColor,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Opacity(
-                              opacity: widget.labelOpacity,
-                              child: AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 160),
-                                curve: Curves.easeOutCubic,
-                                style: UnoTypography.body(
-                                  color: textColor,
-                                  fontSize: 13.5,
-                                  fontWeight: active
-                                      ? FontWeight.w600
-                                      : (_hovered
-                                          ? FontWeight.w500
-                                          : FontWeight.w400),
-                                ),
-                                child: Text(
-                                  widget.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Opacity(
+                          opacity: widget.labelOpacity,
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOutCubic,
+                            style: UnoTypography.body(
+                              color: textColor,
+                              fontSize: 13.5,
+                              fontWeight: active
+                                  ? FontWeight.w600
+                                  : (_hovered
+                                      ? FontWeight.w500
+                                      : FontWeight.w400),
+                            ),
+                            child: Text(
+                              widget.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                        ],
+                        ),
                       ),
-                    ),
+                      // Modern luminous right-side active indicator
+                      if (active)
+                        Opacity(
+                          opacity: widget.labelOpacity,
+                          child: Container(
+                            width: 3.5,
+                            height: 14.0,
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              color: p.accent,
+                              borderRadius: BorderRadius.circular(2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: p.accent.withValues(alpha: 0.5),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 10),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
