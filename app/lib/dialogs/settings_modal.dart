@@ -28,7 +28,6 @@ class SettingsModal extends StatefulWidget {
 class _SettingsModalState extends State<SettingsModal> {
   late String _activeTab;
   String _selectedReasoningTier = 'warm';
-  String _selectedSpecFormat = 'bdd';
   final ScrollController _scrollController = ScrollController();
 
   static const List<Map<String, dynamic>> _tabs = [
@@ -69,6 +68,25 @@ class _SettingsModalState extends State<SettingsModal> {
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
+
+    final displayName = widget.user.name.trim().isNotEmpty
+        ? widget.user.name.trim()
+        : (widget.user.email.isNotEmpty
+            ? widget.user.email.split('@').first
+            : 'Developer Lead');
+
+    final displayRole = widget.user.role.isNotEmpty
+        ? widget.user.role
+        : 'Workspace Administrator';
+
+    final initials = displayName.contains(' ')
+        ? displayName
+            .split(' ')
+            .where((s) => s.isNotEmpty)
+            .take(2)
+            .map((s) => s[0].toUpperCase())
+            .join()
+        : (displayName.isNotEmpty ? displayName[0].toUpperCase() : 'DL');
 
     return Material(
       color: Colors.black.withValues(alpha: widget.isDark ? 0.65 : 0.40),
@@ -151,7 +169,7 @@ class _SettingsModalState extends State<SettingsModal> {
                   children: [
                     // Left Tab Sidebar
                     Container(
-                      width: 190,
+                      width: 200,
                       decoration: BoxDecoration(
                         color: palette.bgSurface,
                         border: Border(
@@ -159,56 +177,163 @@ class _SettingsModalState extends State<SettingsModal> {
                         ),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-                      child: ListView(
-                        padding: EdgeInsets.zero,
-                        children: _tabs.map((t) {
-                          final active = _activeTab == t['id'];
-                          return InkWell(
-                            onTap: () => _switchTab(t['id']),
-                            borderRadius: BorderRadius.circular(10),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              margin: const EdgeInsets.only(bottom: 4),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 9.5),
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? palette.accent.withValues(
-                                        alpha: widget.isDark ? 0.12 : 0.14)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                border: active
-                                    ? Border.all(
-                                        color: palette.accent.withValues(alpha: 0.35))
-                                    : Border.all(color: Colors.transparent),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    t['icon'] as IconData,
-                                    size: 15.5,
-                                    color: active
-                                        ? palette.accent
-                                        : palette.textSec,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    t['label'] as String,
-                                    style: UnoTypography.body(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ..._tabs.map((t) {
+                            final active = _activeTab == t['id'];
+                            return InkWell(
+                              onTap: () => _switchTab(t['id']),
+                              borderRadius: BorderRadius.circular(10),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                margin: const EdgeInsets.only(bottom: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 9.5),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? palette.accent.withValues(
+                                          alpha: widget.isDark ? 0.12 : 0.14)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: active
+                                      ? Border.all(
+                                          color: palette.accent.withValues(alpha: 0.35))
+                                      : Border.all(color: Colors.transparent),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      t['icon'] as IconData,
+                                      size: 15.5,
                                       color: active
-                                          ? palette.text
+                                          ? palette.accent
                                           : palette.textSec,
-                                      fontSize: 13,
-                                      fontWeight: active
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      t['label'] as String,
+                                      style: UnoTypography.body(
+                                        color: active
+                                            ? palette.text
+                                            : palette.textSec,
+                                        fontSize: 13,
+                                        fontWeight: active
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                            );
+                          }),
+
+                          const Spacer(),
+
+                          // ── Left Bottom: Studio-Grade Anchor & Identity Footer ──
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: palette.bgElevated.withValues(alpha: widget.isDark ? 0.45 : 0.65),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: palette.div.withValues(alpha: 0.5)),
                             ),
-                          );
-                        }).toList(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: palette.accent.withValues(alpha: widget.isDark ? 0.20 : 0.14),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          initials,
+                                          style: UnoTypography.body(
+                                            color: palette.accent,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            displayName,
+                                            style: UnoTypography.body(
+                                              color: palette.text,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            displayRole,
+                                            style: UnoTypography.body(
+                                              color: palette.textSec,
+                                              fontSize: 10,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Divider(
+                                  height: 1,
+                                  thickness: 1,
+                                  color: palette.div.withValues(alpha: 0.4),
+                                ),
+                                const SizedBox(height: 7),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: palette.live,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          'Local-First',
+                                          style: UnoTypography.mono(
+                                            color: palette.textSec,
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      'v0.1.0',
+                                      style: UnoTypography.mono(
+                                        color: palette.textSec,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -880,10 +1005,10 @@ class _SettingsModalState extends State<SettingsModal> {
           palette: palette,
         ),
 
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
 
         Text(
-          'SPECIFICATION OUTPUT FORMAT',
+          'EVIDENCE GROUNDING SAFEGUARDS',
           style: UnoTypography.mono(
             color: palette.textSec,
             fontSize: 10.5,
@@ -893,15 +1018,132 @@ class _SettingsModalState extends State<SettingsModal> {
         ),
         const SizedBox(height: 10),
 
-        // Wrap guarantees zero overflow on any window or font scaling!
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildSpecFormatChip('bdd', 'Gherkin BDD Contracts', palette),
-            _buildSpecFormatChip('adr', 'Markdown ADR Records', palette),
-            _buildSpecFormatChip('ts', 'TypeScript Interfaces', palette),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: palette.bgElevated,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.div),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: palette.live.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(LucideIcons.shieldCheck, size: 15, color: palette.live),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Zero-Hallucination Synthesis Gate',
+                      style: UnoTypography.body(
+                        color: palette.text,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Enforces strict factual citations. Automatically abstains with evidence audit when retrieval confidence is low.',
+                      style: UnoTypography.body(
+                        color: palette.textSec,
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: palette.live.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: palette.live.withValues(alpha: 0.35)),
+                ),
+                child: Text(
+                  'ENFORCED',
+                  style: UnoTypography.mono(
+                    color: palette.live,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: palette.bgElevated,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.div),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(LucideIcons.gitFork, size: 15, color: palette.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Structure-Aware STAR-RAG Traversal',
+                      style: UnoTypography.body(
+                        color: palette.text,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '2-Hop BFS graph expansion over AST symbols, call hierarchies, and internal module dependency edges.',
+                      style: UnoTypography.body(
+                        color: palette.textSec,
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: widget.isDark ? 0.14 : 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
+                ),
+                child: Text(
+                  'ACTIVE',
+                  style: UnoTypography.mono(
+                    color: palette.accent,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -985,37 +1227,6 @@ class _SettingsModalState extends State<SettingsModal> {
                   : null,
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSpecFormatChip(String id, String label, UnoPalette palette) {
-    final isSelected = _selectedSpecFormat == id;
-
-    return InkWell(
-      onTap: () => setState(() => _selectedSpecFormat = id),
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? palette.accent.withValues(alpha: widget.isDark ? 0.16 : 0.14)
-              : palette.bgElevated,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? palette.accent : palette.div,
-            width: isSelected ? 1.4 : 1.0,
-          ),
-        ),
-        child: Text(
-          label,
-          style: UnoTypography.body(
-            color: isSelected ? palette.text : palette.textSec,
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-          ),
         ),
       ),
     );
