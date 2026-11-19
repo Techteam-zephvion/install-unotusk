@@ -12,7 +12,6 @@ import '../models/workspace_models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/desktop_window_controls.dart';
-import '../widgets/unotusk_workspace_brand.dart';
 
 /// Projects dashboard screen with top nav bar and project list.
 /// Matches the reference design: Unotusk logo, Projects/Settings tabs,
@@ -2537,11 +2536,6 @@ class _ProjectsScreenState extends State<ProjectsScreen>
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
     final isMacOS = !kIsWeb && Platform.isMacOS;
     final isWindowsOrLinux = !kIsWeb && (Platform.isWindows || Platform.isLinux);
-    final brandColor = Color.lerp(
-      const Color(0xFF0A0F20),
-      const Color(0xFFCBC1B4),
-      t,
-    )!;
 
     return Container(
       height: 54,
@@ -2552,13 +2546,6 @@ class _ProjectsScreenState extends State<ProjectsScreen>
       ),
       child: Row(
         children: [
-          // ── Left: Unotusk Logo, Wordmark & Quiet Workspace Tag ──
-          UnotuskWorkspaceBrand(
-            palette: palette,
-            isDark: widget.isDark,
-            color: brandColor,
-          ),
-
           // ── Draggable window area ──
           Expanded(
             child: isDesktop
