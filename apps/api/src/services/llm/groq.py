@@ -235,6 +235,7 @@ class GroqProvider(LLMProvider):
                         "model": create_kwargs.get("model", self.model),
                         "provider": "groq",
                         "thinking_tier": policy.tier.value,
+                        "reasoning_effort": policy.groq_reasoning_effort,
                         "evidence_count": len(evidence_items),
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
