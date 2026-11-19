@@ -85,11 +85,38 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  String _getGreeting() {
+  String _getGreetingHeadline(String name) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    final List<String> phrases;
+
+    if (hour >= 5 && hour < 12) {
+      phrases = [
+        'Morning, $name. What are we tracing?',
+        'Coffee’s ready. What’s the merge?',
+        'Let’s make sense of the code, $name.',
+      ];
+    } else if (hour >= 12 && hour < 17) {
+      phrases = [
+        'Afternoon, $name. Got a merge to untangle?',
+        'Let’s trace it, $name.',
+        'Which decision are we unpacking?',
+      ];
+    } else if (hour >= 17 && hour < 22) {
+      phrases = [
+        'Evening, $name. Any last merge?',
+        'Let’s review today’s changes.',
+        'One more trace before you sign off?',
+      ];
+    } else {
+      phrases = [
+        'Late night, $name. Let’s trace it.',
+        'Night shift. What’s breaking?',
+        'Quiet hours. What are we digging into?',
+      ];
+    }
+
+    final slot = (DateTime.now().minute ~/ 15) % phrases.length;
+    return phrases[slot];
   }
 
   void _handleSubmit() {
@@ -124,7 +151,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildHero() {
     final name = widget.userName != null && widget.userName!.isNotEmpty
         ? widget.userName!
-        : 'Developer';
+        : 'Dev Lead';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -148,11 +175,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        '${_getGreeting()}, $name',
+                        _getGreetingHeadline(name),
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: UnoTypography.displaySerif(
                           palette: widget.palette,
-                          fontSize: 33,
+                          fontSize: 27,
+                          lineHeight: 1.15,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -162,9 +192,11 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? 'Investigate ${formatDisplayTitle(widget.projectName!)}, architecture, or code decisions'
                             : 'Investigate your project, architecture, or code decisions',
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: UnoTypography.body(
                           color: widget.palette.textSec,
-                          fontSize: 15,
+                          fontSize: 14.5,
                         ),
                       ),
                       const SizedBox(height: 26),
