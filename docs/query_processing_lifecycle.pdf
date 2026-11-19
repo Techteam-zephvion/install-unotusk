@@ -1,0 +1,1262 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R] /Count 4 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 4 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R /F3 13 0 R /F4 14 0 R /F5 15 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 5756 >>
+stream
+0.100 0.100 0.100 RG
+0.100 0.100 0.100 rg
+0.094 0.094 0.086 rg
+0.00 785.00 595.28 56.89 re f
+0.850 0.450 0.150 rg
+0.00 783.00 595.28 2.50 re f
+1.000 1.000 1.000 rg
+BT
+/F2 15 Tf
+40.00 810.00 Td
+(UNOTUSK) Tj
+ET
+0.800 0.800 0.780 rg
+BT
+/F1 10 Tf
+118.00 810.00 Td
+(|  PROJECT INTELLIGENCE) Tj
+ET
+0.220 0.220 0.200 rg
+440.00 804.00 115.00 18.00 re f
+0.950 0.700 0.350 rg
+BT
+/F2 7.5 Tf
+447.00 809.00 Td
+(QUERY DATA PIPELINE) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 16 Tf
+40.00 755.00 Td
+(1. Executive Lifecycle & End-to-End Pipeline) Tj
+ET
+0.450 0.450 0.450 rg
+BT
+/F3 9.5 Tf
+40.00 740.00 Td
+(Chronological flow of an architectural user query from Desktop UI to Grounded LLM Response) Tj
+ET
+0.880 0.880 0.860 RG
+0.75 w
+40.00 732.00 m 555.28 732.00 l S
+0.900 0.900 0.880 RG
+0.50 w
+40.00 42.00 m 555.28 42.00 l S
+0.550 0.550 0.550 rg
+BT
+/F1 8 Tf
+40.00 30.00 Td
+(Unotusk Architecture Specification -- Confidential & Single-Tenant Local Deployment) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F2 8 Tf
+500.00 30.00 Td
+(Page 1 of 4) Tj
+ET
+0.200 0.200 0.200 rg
+BT
+/F1 9.5 Tf
+40.00 715.00 Td
+(When an engineer asks a question in the Unotusk Desktop Client \(e.g. 'How does authentication middleware) Tj
+ET
+0.200 0.200 0.200 rg
+BT
+/F1 9.5 Tf
+40.00 701.50 Td
+(handle expired tokens on the features branch?'\), the system does NOT pass raw files or rely on shallow) Tj
+ET
+0.200 0.200 0.200 rg
+BT
+/F1 9.5 Tf
+40.00 688.00 Td
+(README keyword lookups. Instead, it executes an evidence-grounded, 6-stage semantic processing pipeline) Tj
+ET
+0.200 0.200 0.200 rg
+BT
+/F1 9.5 Tf
+40.00 674.50 Td
+(with sub-second retrieval, AST symbol graph expansion, branch isolation, and multi-signal ranking.) Tj
+ET
+0.960 0.960 0.970 rg
+40.00 595.00 515.00 48.00 re f
+0.820 0.840 0.860 RG
+0.70 w
+40.00 595.00 515.00 48.00 re S
+0.200 0.250 0.320 rg
+50.00 613.00 60.00 16.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 7.5 Tf
+56.00 618.00 Td
+(STAGE 1) Tj
+ET
+0.120 0.140 0.180 rg
+BT
+/F2 10 Tf
+120.00 618.00 Td
+(Query Decomposition & Branch Resolution) Tj
+ET
+0.350 0.380 0.420 rg
+BT
+/F1 8.5 Tf
+120.00 604.00 Td
+(Extracts keywords, symbols, paths, and filters active branch snapshot.) Tj
+ET
+0.650 0.680 0.720 RG
+1.20 w
+297.00 595.00 m 297.00 587.00 l S
+0.940 0.960 0.980 rg
+40.00 538.00 515.00 48.00 re f
+0.820 0.840 0.860 RG
+0.70 w
+40.00 538.00 515.00 48.00 re S
+0.200 0.250 0.320 rg
+50.00 556.00 60.00 16.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 7.5 Tf
+56.00 561.00 Td
+(STAGE 2) Tj
+ET
+0.120 0.140 0.180 rg
+BT
+/F2 10 Tf
+120.00 561.00 Td
+(Multi-Signal Candidate Retrieval) Tj
+ET
+0.350 0.380 0.420 rg
+BT
+/F1 8.5 Tf
+120.00 547.00 Td
+(Queries PostgreSQL with pgvector cosine similarity + AST symbol SQL.) Tj
+ET
+0.650 0.680 0.720 RG
+1.20 w
+297.00 538.00 m 297.00 530.00 l S
+0.940 0.970 0.950 rg
+40.00 481.00 515.00 48.00 re f
+0.820 0.840 0.860 RG
+0.70 w
+40.00 481.00 515.00 48.00 re S
+0.200 0.250 0.320 rg
+50.00 499.00 60.00 16.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 7.5 Tf
+56.00 504.00 Td
+(STAGE 3) Tj
+ET
+0.120 0.140 0.180 rg
+BT
+/F2 10 Tf
+120.00 504.00 Td
+(Structural AST Graph Expansion) Tj
+ET
+0.350 0.380 0.420 rg
+BT
+/F1 8.5 Tf
+120.00 490.00 Td
+(Traverses 1-hop and 2-hop caller/callee relations via CodeDependency.) Tj
+ET
+0.650 0.680 0.720 RG
+1.20 w
+297.00 481.00 m 297.00 473.00 l S
+0.980 0.950 0.930 rg
+40.00 424.00 515.00 48.00 re f
+0.820 0.840 0.860 RG
+0.70 w
+40.00 424.00 515.00 48.00 re S
+0.200 0.250 0.320 rg
+50.00 442.00 60.00 16.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 7.5 Tf
+56.00 447.00 Td
+(STAGE 4) Tj
+ET
+0.120 0.140 0.180 rg
+BT
+/F2 10 Tf
+120.00 447.00 Td
+(Multi-Signal Ranking & Code Boost) Tj
+ET
+0.350 0.380 0.420 rg
+BT
+/F1 8.5 Tf
+120.00 433.00 Td
+(Demotes READMEs \(0.4x\) and boosts AST classes/functions \(1.8x\).) Tj
+ET
+0.650 0.680 0.720 RG
+1.20 w
+297.00 424.00 m 297.00 416.00 l S
+0.970 0.940 0.970 rg
+40.00 367.00 515.00 48.00 re f
+0.820 0.840 0.860 RG
+0.70 w
+40.00 367.00 515.00 48.00 re S
+0.200 0.250 0.320 rg
+50.00 385.00 60.00 16.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 7.5 Tf
+56.00 390.00 Td
+(STAGE 5) Tj
+ET
+0.120 0.140 0.180 rg
+BT
+/F2 10 Tf
+120.00 390.00 Td
+(Context Assembly & Token Budgeting) Tj
+ET
+0.350 0.380 0.420 rg
+BT
+/F1 8.5 Tf
+120.00 376.00 Td
+(Builds macro-skeleton, ranked chunks, customer ADRs under 6,000 tokens.) Tj
+ET
+0.650 0.680 0.720 RG
+1.20 w
+297.00 367.00 m 297.00 359.00 l S
+0.930 0.970 0.980 rg
+40.00 310.00 515.00 48.00 re f
+0.820 0.840 0.860 RG
+0.70 w
+40.00 310.00 515.00 48.00 re S
+0.200 0.250 0.320 rg
+50.00 328.00 60.00 16.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 7.5 Tf
+56.00 333.00 Td
+(STAGE 6) Tj
+ET
+0.120 0.140 0.180 rg
+BT
+/F2 10 Tf
+120.00 333.00 Td
+(Grounded LLM Synthesis & Verification) Tj
+ET
+0.350 0.380 0.420 rg
+BT
+/F1 8.5 Tf
+120.00 319.00 Td
+(Synthesizes answer with exact file/line citations and verification checks.) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 11 Tf
+40.00 296.00 Td
+(Core Tenets of Query Intelligence:) Tj
+ET
+0.180 0.180 0.180 rg
+BT
+/F2 8.5 Tf
+45.00 282.00 Td
+(* Zero Hallucination Policy: ) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8.5 Tf
+173.18 282.00 Td
+(The LLM synthesizes answers strictly grounded on retrieved evidence items with exact line numbers.) Tj
+ET
+0.180 0.180 0.180 rg
+BT
+/F2 8.5 Tf
+45.00 269.00 Td
+(* AST Code Superiority: ) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8.5 Tf
+151.08 269.00 Td
+(Actual source code chunks outrank Markdown documentation to prevent superficial answers.) Tj
+ET
+0.180 0.180 0.180 rg
+BT
+/F2 8.5 Tf
+45.00 256.00 Td
+(* Branch Isolation: ) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8.5 Tf
+133.40 256.00 Td
+(Developer feature branches \(e.g. 'features', 'checkout'\) are isolated from 'main' snapshot data.) Tj
+ET
+0.180 0.180 0.180 rg
+BT
+/F2 8.5 Tf
+45.00 243.00 Td
+(* Multi-Tenant Data Plane: ) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8.5 Tf
+164.34 243.00 Td
+(Every query is strictly constrained to the user's organization, project, and current conversation thread.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 6 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R /F3 13 0 R /F4 14 0 R /F5 15 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 5528 >>
+stream
+0.100 0.100 0.100 RG
+0.100 0.100 0.100 rg
+0.094 0.094 0.086 rg
+0.00 785.00 595.28 56.89 re f
+0.850 0.450 0.150 rg
+0.00 783.00 595.28 2.50 re f
+1.000 1.000 1.000 rg
+BT
+/F2 15 Tf
+40.00 810.00 Td
+(UNOTUSK) Tj
+ET
+0.800 0.800 0.780 rg
+BT
+/F1 10 Tf
+118.00 810.00 Td
+(|  PROJECT INTELLIGENCE) Tj
+ET
+0.220 0.220 0.200 rg
+440.00 804.00 115.00 18.00 re f
+0.950 0.700 0.350 rg
+BT
+/F2 7.5 Tf
+447.00 809.00 Td
+(QUERY DATA PIPELINE) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 16 Tf
+40.00 755.00 Td
+(2. Query Decomposition & Tri-Signal Retrieval) Tj
+ET
+0.450 0.450 0.450 rg
+BT
+/F3 9.5 Tf
+40.00 740.00 Td
+(How user natural language is parsed and matched against pgvector, AST symbols, and file paths) Tj
+ET
+0.880 0.880 0.860 RG
+0.75 w
+40.00 732.00 m 555.28 732.00 l S
+0.900 0.900 0.880 RG
+0.50 w
+40.00 42.00 m 555.28 42.00 l S
+0.550 0.550 0.550 rg
+BT
+/F1 8 Tf
+40.00 30.00 Td
+(Unotusk Architecture Specification -- Confidential & Single-Tenant Local Deployment) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F2 8 Tf
+500.00 30.00 Td
+(Page 2 of 4) Tj
+ET
+0.850 0.450 0.150 rg
+BT
+/F2 12 Tf
+40.00 715.00 Td
+(Stage 1: Query Analysis & Branch Resolution) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 699.00 Td
+(When a request arrives at POST /api/v1/projects/{project_id}/ask with a GroundedAskRequest payload, the system) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 686.00 Td
+(first invokes analyze_query_async\(\). The query is analyzed across five orthogonal dimensions:) Tj
+ET
+0.970 0.970 0.970 rg
+40.00 590.00 515.00 75.00 re f
+0.850 0.850 0.850 RG
+40.00 590.00 515.00 75.00 re S
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+45.00 649.00 Td
+(1. Target Symbols: Extracts classes, functions \(e.g. 'AuthMiddleware'\)) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+45.00 633.00 Td
+(2. File Path Clues: Identifies paths or extensions \('src/auth', '.py'\)) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+45.00 617.00 Td
+(3. Concept Synonyms: Expands domain keywords \('jwt' -> 'token', 'auth'\)) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+45.00 601.00 Td
+(4. Temporal Intent: Detects commit queries \('recent changes', 'git diff'\)) Tj
+ET
+0.850 0.350 0.100 rg
+BT
+/F2 8.5 Tf
+290.00 649.00 Td
+(Branch Snapshot Scoping:) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+290.00 635.00 Td
+(If payload.branch is specified \(e.g. 'features'\):) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+290.00 621.00 Td
+(SELECT * FROM repository_snapshots WHERE branch = :branch) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F1 7.5 Tf
+290.00 607.00 Td
+(If branch is omitted, it defaults to the latest completed 'main' snapshot.) Tj
+ET
+0.850 0.450 0.150 rg
+BT
+/F2 12 Tf
+40.00 570.00 Td
+(Stage 2: Tri-Signal Parallel Database Retrieval) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 554.00 Td
+(Rather than issuing a single embedding search, Unotusk dispatches three complementary signals in parallel) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 541.00 Td
+(against PostgreSQL 16 to guarantee both semantic depth and exact symbol precision:) Tj
+ET
+0.200 0.220 0.260 rg
+40.00 500.00 515.00 18.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+46.00 505.00 Td
+(Signal) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+136.00 505.00 Td
+(Mechanism) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+276.00 505.00 Td
+(Database Query Target) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+461.00 505.00 Td
+(Target Match) Tj
+ET
+0.970 0.970 0.980 rg
+40.00 478.00 515.00 22.00 re f
+0.880 0.880 0.900 RG
+40.00 478.00 m 555.00 478.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+46.00 485.00 Td
+(Signal A: Vector RAG) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+136.00 485.00 Td
+(Dense semantic similarity) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+276.00 485.00 Td
+(code_chunks.embedding <=> query_vec) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+461.00 485.00 Td
+(High-level concept intent) Tj
+ET
+1.000 1.000 1.000 rg
+40.00 456.00 515.00 22.00 re f
+0.880 0.880 0.900 RG
+40.00 456.00 m 555.00 456.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+46.00 463.00 Td
+(Signal B: AST Symbols) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+136.00 463.00 Td
+(Exact & prefix symbol match) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+276.00 463.00 Td
+(code_symbols.name ILIKE :sym) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+461.00 463.00 Td
+(Classes, functions, methods) Tj
+ET
+0.970 0.970 0.980 rg
+40.00 434.00 515.00 22.00 re f
+0.880 0.880 0.900 RG
+40.00 434.00 m 555.00 434.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 8 Tf
+46.00 441.00 Td
+(Signal C: Path Index) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+136.00 441.00 Td
+(File hierarchy prefix match) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+276.00 441.00 Td
+(repository_files.path ILIKE :path) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+461.00 441.00 Td
+(Modules, packages, routes) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 10 Tf
+40.00 416.00 Td
+(Exact Vector Cosine Retrieval Query \(PostgreSQL + pgvector\):) Tj
+ET
+0.960 0.960 0.970 rg
+40.00 322.00 515.00 82.00 re f
+0.800 0.830 0.880 RG
+40.00 322.00 515.00 82.00 re S
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 390.00 Td
+(SELECT c.id, c.file_path, c.start_line, c.end_line, c.content, c.symbol_type,) Tj
+ET
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 379.00 Td
+(       1 - \(c.embedding <=> :query_vector\) AS cosine_similarity) Tj
+ET
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 368.00 Td
+(FROM code_chunks c) Tj
+ET
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 357.00 Td
+(JOIN repository_files f ON f.id = c.file_id) Tj
+ET
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 346.00 Td
+(WHERE f.snapshot_id = :active_snapshot_id) Tj
+ET
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 335.00 Td
+(ORDER BY c.embedding <=> :query_vector ASC) Tj
+ET
+0.100 0.250 0.450 rg
+BT
+/F4 8 Tf
+50.00 324.00 Td
+(LIMIT 40;) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 8 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R /F3 13 0 R /F4 14 0 R /F5 15 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 4869 >>
+stream
+0.100 0.100 0.100 RG
+0.100 0.100 0.100 rg
+0.094 0.094 0.086 rg
+0.00 785.00 595.28 56.89 re f
+0.850 0.450 0.150 rg
+0.00 783.00 595.28 2.50 re f
+1.000 1.000 1.000 rg
+BT
+/F2 15 Tf
+40.00 810.00 Td
+(UNOTUSK) Tj
+ET
+0.800 0.800 0.780 rg
+BT
+/F1 10 Tf
+118.00 810.00 Td
+(|  PROJECT INTELLIGENCE) Tj
+ET
+0.220 0.220 0.200 rg
+440.00 804.00 115.00 18.00 re f
+0.950 0.700 0.350 rg
+BT
+/F2 7.5 Tf
+447.00 809.00 Td
+(QUERY DATA PIPELINE) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 16 Tf
+40.00 755.00 Td
+(3. AST Graph Expansion & Multi-Signal Ranking) Tj
+ET
+0.450 0.450 0.450 rg
+BT
+/F3 9.5 Tf
+40.00 740.00 Td
+(Elevating raw search into code intelligence: symbol call graphs and deep code prioritization) Tj
+ET
+0.880 0.880 0.860 RG
+0.75 w
+40.00 732.00 m 555.28 732.00 l S
+0.900 0.900 0.880 RG
+0.50 w
+40.00 42.00 m 555.28 42.00 l S
+0.550 0.550 0.550 rg
+BT
+/F1 8 Tf
+40.00 30.00 Td
+(Unotusk Architecture Specification -- Confidential & Single-Tenant Local Deployment) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F2 8 Tf
+500.00 30.00 Td
+(Page 3 of 4) Tj
+ET
+0.850 0.450 0.150 rg
+BT
+/F2 12 Tf
+40.00 715.00 Td
+(Stage 3: Structural Graph Expansion \(RelationshipExpander\)) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 699.00 Td
+(Isolated code snippets lack context. A controller calling an un-imported service is useless without knowing) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 686.00 Td
+(how that service is implemented. Unotusk executes a Breadth-First Search \(BFS\) over the code_dependencies) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 673.00 Td
+(table to gather related modules:) Tj
+ET
+0.970 0.980 0.960 rg
+40.00 580.00 515.00 72.00 re f
+0.820 0.880 0.820 RG
+40.00 580.00 515.00 72.00 re S
+0.150 0.350 0.150 rg
+BT
+/F2 8.5 Tf
+50.00 636.00 Td
+(1-Hop Inbound \(Callers\):) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+190.00 636.00 Td
+(Discovers who calls this symbol \(e.g. routes/checkout.py calls PaymentGateway\)) Tj
+ET
+0.150 0.350 0.150 rg
+BT
+/F2 8.5 Tf
+50.00 620.00 Td
+(1-Hop Outbound \(Callees\):) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+190.00 620.00 Td
+(Discovers what this symbol depends on \(e.g. PaymentGateway calls StripeSDK\)) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 8.5 Tf
+50.00 604.00 Td
+(Type Definitions:) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 8 Tf
+190.00 604.00 Td
+(Pulls parameter types and return schemas \(e.g. PaymentIntent, ChargeResult\)) Tj
+ET
+0.150 0.350 0.150 rg
+BT
+/F2 8.5 Tf
+50.00 588.00 Td
+(Hop Attenuation Factor:) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F3 8 Tf
+190.00 588.00 Td
+(1-Hop relevance = 0.85x; 2-Hop relevance = 0.60x to prevent graph explosion.) Tj
+ET
+0.850 0.450 0.150 rg
+BT
+/F2 12 Tf
+40.00 562.00 Td
+(Stage 4: MultiSignalRanker & Anti-README Bias Engine) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 546.00 Td
+(Standard RAG models frequently fail developers by returning generic README.md files because documentation has) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 533.00 Td
+(high lexical overlap with user questions. Unotusk solves this with an explicit MultiSignalRanker scoring) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 520.00 Td
+(formula:) Tj
+ET
+0.960 0.940 0.920 rg
+40.00 451.00 515.00 44.00 re f
+0.900 0.750 0.650 RG
+40.00 451.00 515.00 44.00 re S
+0.600 0.250 0.050 rg
+BT
+/F5 8.5 Tf
+55.00 477.00 Td
+(Final Score = \( S_lexical * W_lex + S_vector * W_vec + S_symbol * W_sym \) * M_boost * M_demote) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F3 7.5 Tf
+55.00 461.00 Td
+(Where weights are dynamically calibrated per query intent \(e.g. symbol queries weight W_sym = 0.50\).) Tj
+ET
+0.150 0.150 0.150 rg
+BT
+/F2 10 Tf
+40.00 437.00 Td
+(The Four Precision Multipliers:) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 8.5 Tf
+45.00 423.00 Td
+(AST Code Definition Boost \(1.8x\):) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 412.00 Td
+(Chunks containing actual class, function, method, interface, or struct definitions receive an immediate 1.8x boost,) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 400.50 Td
+(prioritizing implementation code over comments.) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 8.5 Tf
+45.00 385.00 Td
+(Markdown / README Demotion \(0.4x\):) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 374.00 Td
+(Any .md, .rst, README, or docs/ chunk is penalized by 0.4x for implementation queries, eliminating superficial) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 362.50 Td
+(documentation matches.) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 8.5 Tf
+45.00 347.00 Td
+(Exact Symbol Match Boost \(2.0x\):) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 336.00 Td
+(When a chunk contains the exact queried symbol name \(e.g. class PaymentService\), its relevance score is doubled.) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 8.5 Tf
+45.00 320.50 Td
+(Test / Mock Demotion \(0.7x\):) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 309.50 Td
+(Files in tests/, test/, or mock directories receive a 0.7x dampener unless the user explicitly requested test) Tj
+ET
+0.320 0.320 0.320 rg
+BT
+/F1 8 Tf
+60.00 298.00 Td
+(coverage information.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 10 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R /F3 13 0 R /F4 14 0 R /F5 15 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 5959 >>
+stream
+0.100 0.100 0.100 RG
+0.100 0.100 0.100 rg
+0.094 0.094 0.086 rg
+0.00 785.00 595.28 56.89 re f
+0.850 0.450 0.150 rg
+0.00 783.00 595.28 2.50 re f
+1.000 1.000 1.000 rg
+BT
+/F2 15 Tf
+40.00 810.00 Td
+(UNOTUSK) Tj
+ET
+0.800 0.800 0.780 rg
+BT
+/F1 10 Tf
+118.00 810.00 Td
+(|  PROJECT INTELLIGENCE) Tj
+ET
+0.220 0.220 0.200 rg
+440.00 804.00 115.00 18.00 re f
+0.950 0.700 0.350 rg
+BT
+/F2 7.5 Tf
+447.00 809.00 Td
+(QUERY DATA PIPELINE) Tj
+ET
+0.120 0.120 0.120 rg
+BT
+/F2 16 Tf
+40.00 755.00 Td
+(4. Context Assembly, Synthesis & Concrete Trace) Tj
+ET
+0.450 0.450 0.450 rg
+BT
+/F3 9.5 Tf
+40.00 740.00 Td
+(Token budgeting, grounded LLM synthesis, citation verification, and a live end-to-end trace) Tj
+ET
+0.880 0.880 0.860 RG
+0.75 w
+40.00 732.00 m 555.28 732.00 l S
+0.900 0.900 0.880 RG
+0.50 w
+40.00 42.00 m 555.28 42.00 l S
+0.550 0.550 0.550 rg
+BT
+/F1 8 Tf
+40.00 30.00 Td
+(Unotusk Architecture Specification -- Confidential & Single-Tenant Local Deployment) Tj
+ET
+0.400 0.400 0.400 rg
+BT
+/F2 8 Tf
+500.00 30.00 Td
+(Page 4 of 4) Tj
+ET
+0.850 0.450 0.150 rg
+BT
+/F2 12 Tf
+40.00 715.00 Td
+(Stage 5 & 6: Context Assembly, Budgeting & LLM Grounding) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 699.00 Td
+(The ContextAssembler merges ranked code chunks, architectural skeletons, and team knowledge under a strict) Tj
+ET
+0.250 0.250 0.250 rg
+BT
+/F1 9 Tf
+40.00 686.00 Td
+(6,000 token ceiling before passing the payload to the LLM Synthesizer \(Groq Qwen/Llama or Claude 3.5 Sonnet\).) Tj
+ET
+0.200 0.220 0.260 rg
+40.00 645.00 515.00 18.00 re f
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+48.00 650.00 Td
+(Context Layer) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+160.00 650.00 Td
+(Source Provider) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+290.00 650.00 Td
+(Token Budget) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F2 8 Tf
+390.00 650.00 Td
+(Role in Answer Synthesis) Tj
+ET
+0.970 0.970 0.980 rg
+40.00 627.00 515.00 18.00 re f
+0.880 0.880 0.900 RG
+40.00 627.00 m 555.00 627.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 7.5 Tf
+48.00 632.00 Td
+(Repository Skeleton) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 7.5 Tf
+160.00 632.00 Td
+(RepositorySkeletonBuilder) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+290.00 632.00 Td
+(~800 tokens) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+390.00 632.00 Td
+(Macro topology, directory tree, major subsystems) Tj
+ET
+1.000 1.000 1.000 rg
+40.00 609.00 515.00 18.00 re f
+0.880 0.880 0.900 RG
+40.00 609.00 m 555.00 609.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 7.5 Tf
+48.00 614.00 Td
+(Ranked Code Evidence) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 7.5 Tf
+160.00 614.00 Td
+(MultiSignalRanker \(Top 5-10\)) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+290.00 614.00 Td
+(~3,800 tokens) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+390.00 614.00 Td
+(Exact function implementations & AST symbols) Tj
+ET
+0.970 0.970 0.980 rg
+40.00 591.00 515.00 18.00 re f
+0.880 0.880 0.900 RG
+40.00 591.00 m 555.00 591.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 7.5 Tf
+48.00 596.00 Td
+(Team ADRs & Rules) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 7.5 Tf
+160.00 596.00 Td
+(KnowledgeRetriever) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+290.00 596.00 Td
+(~600 tokens) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+390.00 596.00 Td
+(Architectural constraints & team conventions) Tj
+ET
+1.000 1.000 1.000 rg
+40.00 573.00 515.00 18.00 re f
+0.880 0.880 0.900 RG
+40.00 573.00 m 555.00 573.00 l S
+0.150 0.150 0.150 rg
+BT
+/F2 7.5 Tf
+48.00 578.00 Td
+(Conversation History) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F1 7.5 Tf
+160.00 578.00 Td
+(Message Repository) Tj
+ET
+0.100 0.300 0.600 rg
+BT
+/F4 7.5 Tf
+290.00 578.00 Td
+(~800 tokens) Tj
+ET
+0.350 0.350 0.350 rg
+BT
+/F3 7.5 Tf
+390.00 578.00 Td
+(Previous user questions and assistant answers) Tj
+ET
+0.850 0.450 0.150 rg
+BT
+/F2 12 Tf
+40.00 553.00 Td
+(End-to-End Concrete Trace: Real Query Execution) Tj
+ET
+0.950 0.960 0.970 rg
+40.00 392.00 515.00 145.00 re f
+0.780 0.820 0.880 RG
+40.00 392.00 515.00 145.00 re S
+0.700 0.250 0.050 rg
+BT
+/F5 8 Tf
+50.00 523.00 Td
+(USER QUERY: 'How does the payment webhook handle duplicate event delivery on branch features?') Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F4 7.5 Tf
+50.00 510.50 Td
+() Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 498.00 Td
+([1. ROUTING]      ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 498.00 Td
+( POST /api/v1/projects/proj-101/ask | branch='features' | user_id=usr-dev) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 485.50 Td
+([2. DECOMPOSE]    ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 485.50 Td
+( Target symbols: ['WebhookHandler', 'handle_event'] | Keywords: ['payment', 'duplicate']) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 473.00 Td
+([3. SNAPSHOT]     ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 473.00 Td
+( Resolved snapshot: snap-features-v4 \(Branch: 'features', Commit: 7a8f9c2\)) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 460.50 Td
+([4. DB RETRIEVAL] ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 460.50 Td
+( Found 38 candidates in code_chunks \(pgvector\) + 4 AST symbol matches in code_symbols) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 448.00 Td
+([5. EXPANSION]    ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 448.00 Td
+( RelationshipExpander pulled 1-hop callee: IdempotencyKeyStore \(src/billing/keys.py\)) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 435.50 Td
+([6. RANKER]       ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 435.50 Td
+( src/billing/webhook.py::handle_event: Score 4.82 \(Boosted: AST Method 1.8x, Exact Sym 2.0x\)) Tj
+ET
+0.300 0.300 0.300 rg
+BT
+/F4 7.5 Tf
+50.00 423.00 Td
+(                   docs/README.md: Score 0.41 \(Demoted: Markdown 0.4x penalty applied\)) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 410.50 Td
+([7. SYNTHESIS]    ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 410.50 Td
+( Groq Qwen3.8-27b synthesizes grounded answer citing src/billing/webhook.py#L45-L78) Tj
+ET
+0.100 0.350 0.650 rg
+BT
+/F5 7.5 Tf
+50.00 398.00 Td
+([8. VERIFICATION] ) Tj
+ET
+0.200 0.220 0.250 rg
+BT
+/F4 7.5 Tf
+160.00 398.00 Td
+( Citation gate validates lines 45-78 exist in snap-features-v4. Verified: 100% Grounded.) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+12 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+13 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>
+endobj
+14 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+15 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>
+endobj
+xref
+0 16
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000133 00000 n 
+0000000310 00000 n 
+0000006117 00000 n 
+0000006294 00000 n 
+0000011873 00000 n 
+0000012050 00000 n 
+0000016970 00000 n 
+0000017148 00000 n 
+0000023159 00000 n 
+0000023230 00000 n 
+0000023306 00000 n 
+0000023385 00000 n 
+0000023454 00000 n 
+trailer
+<< /Size 16 /Root 1 0 R >>
+startxref
+23528
+%%EOF
