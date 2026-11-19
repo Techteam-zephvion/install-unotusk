@@ -127,7 +127,10 @@ class KnowledgeRetriever:
                     continue
 
             # Exact symbol match
-            if item.related_symbol and item.related_symbol.lower() in symbols_set:
+            if item.related_symbol and (
+                item.related_symbol.lower() in symbols_set
+                or item.related_symbol.lower() in raw_query
+            ):
                 score += 10.0
             elif item.related_symbol and item.related_symbol.lower() in ranked_symbols:
                 score += 6.0
@@ -172,8 +175,8 @@ class KnowledgeRetriever:
                     except Exception:
                         pass
 
-            # Only retain items that have genuine relevance to the query (score >= 1.5)
-            if score >= 1.5:
+            # Only retain items that have genuine relevance to the query (score >= 1.0)
+            if score >= 1.0:
                 scored_items.append((score, item))
 
         if not scored_items:

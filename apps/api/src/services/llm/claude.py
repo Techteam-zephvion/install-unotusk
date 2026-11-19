@@ -308,6 +308,13 @@ class ClaudeProvider(LLMProvider):
                         f"{i}. **{ref_str}**: {title_str}\n"
                         f"   Content: {ev.get('snippet', '')}"
                     )
+                elif ev_type in ("evidence_path", "star_rag_path"):
+                    path_str = ev.get("relationship_path") or ev.get("snippet") or ev.get("symbol") or ""
+                    first_file = ev.get("file") or "codebase"
+                    lines.append(
+                        f"{i}. **Structural Call Path**: `{path_str}`\n"
+                        f"   Traces call hierarchy and execution flow through: `{first_file}`."
+                    )
                 else:
                     sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
                     ev_file = ev.get("file") or ev.get("file_path") or "Unknown"

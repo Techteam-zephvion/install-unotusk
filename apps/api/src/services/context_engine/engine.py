@@ -220,6 +220,7 @@ class ProjectContextEngine:
             "routing_decision": route_reason,
             "selective_routing_applied": True,
         }
+        struct_evidence_paths: list[Any] = []
 
         if should_route_star:
             try:
@@ -246,6 +247,8 @@ class ProjectContextEngine:
                         **star_struct_res.diagnostics,
                     }
                 )
+                if not star_struct_res.is_fallback and star_struct_res.evidence_paths:
+                    struct_evidence_paths = star_struct_res.evidence_paths
             except Exception as exc:
                 struct_star_rag_applied = False
                 struct_star_rag_diagnostics.update(
@@ -344,6 +347,7 @@ class ProjectContextEngine:
         assembled = ContextAssembler.assemble_context(
             ranked_candidates=ranked,
             proof_chains=proof_chains,
+            evidence_paths=struct_evidence_paths,
         )
 
         # 5b. Retrieve Customer Project Knowledge
@@ -536,6 +540,7 @@ class ProjectContextEngine:
                     struct_star_rag_applied if should_route_star else False
                 ),
                 "structure_aware_star_rag_diagnostics": struct_star_rag_diagnostics,
+                "star_rag_evidence_paths_count": len(struct_evidence_paths),
                 "star_rag_routing_decision": route_reason,
                 "evoreasoner_used": evoreasoner_applied if use_evoreasoner else False,
                 "evoreasoner_diagnostics": evoreasoner_diagnostics,
