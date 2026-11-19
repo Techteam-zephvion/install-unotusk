@@ -55,4 +55,10 @@ class ApiEndpoints {
   static String projectServices(String projectId) => '/projects/$projectId/services';
   static String projectServiceDetail(String projectId, String serviceId) => '/projects/$projectId/services/$serviceId';
 
+  // Git Operations & Live Branches
+  static String projectGitBranches(String projectId) => '/projects/$projectId/git/branches';
+  static String projectGitDiff(String projectId, {String base = 'HEAD~1', String head = 'HEAD'}) =>
+      '/projects/$projectId/git/diff?base=$base&head=$head';
+  static String projectGitLog(String projectId, {int count = 20, String branch = 'HEAD'}) =>
+      '/projects/$projectId/git/log?count=$count&branch=$branch';
 }

@@ -930,6 +930,7 @@ class ApiService {
     String thinkingTier = 'warm',
     bool thinkingEnabled = true,
     bool? enableStructureAwareStarRag,
+    String? branch,
   }) async {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
@@ -947,6 +948,9 @@ class ApiService {
     }
     if (enableStructureAwareStarRag != null) {
       bodyPayload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
+    }
+    if (branch != null && branch.isNotEmpty) {
+      bodyPayload['branch'] = branch;
     }
 
     final res = await _client
@@ -2129,6 +2133,7 @@ class ApiService {
     String? conversationId,
     String thinkingTier = 'warm',
     bool? enableStructureAwareStarRag,
+    String? branch,
     String? projectId,
   }) async {
     final pid = _resolveProjectId(projectId);
@@ -2140,6 +2145,9 @@ class ApiService {
     if (enableStructureAwareStarRag != null) {
       payload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
     }
+    if (branch != null && branch.isNotEmpty) {
+      payload['branch'] = branch;
+    }
 
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
     final res = await _client.post(uri, headers: _headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 60));
@@ -2147,6 +2155,50 @@ class ApiService {
       return GroundedAnswer.fromJson(jsonDecode(res.body));
     }
     throw Exception('Failed to get grounded answer: HTTP ${res.statusCode}');
+  }
+
+  /// Fetches Git branches for the active project
+  static Future<Map<String, dynamic>> fetchGitBranches([String? projectId]) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/git/branches');
+    final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 15));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    return {'branches': ['main'], 'current': 'main'};
+  }
+
+  /// Fetches Git diff between two refs
+  static Future<Map<String, dynamic>> fetchGitDiff({
+    String? projectId,
+    String base = 'HEAD~1',
+    String head = 'HEAD',
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/git/diff?base=$base&head=$head');
+    final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 20));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    return {'success': false, 'diff': '', 'files_changed': []};
+  }
+
+  /// Fetches Git commit log
+  static Future<List<Map<String, dynamic>>> fetchGitLog({
+    String? projectId,
+    int count = 20,
+    String branch = 'HEAD',
+  }) async {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/git/log?count=$count&branch=$branch');
+    final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 15));
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body);
+      if (decoded is List) {
+        return List<Map<String, dynamic>>.from(decoded);
+      }
+    }
+    return [];
   }
 
   /// Fetches conversation threads for a project

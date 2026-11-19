@@ -202,6 +202,7 @@ class WorkspaceRepository {
     String? conversationId,
     String thinkingTier = 'warm',
     bool? enableStructureAwareStarRag,
+    String? branch,
   }) async {
     final payload = <String, dynamic>{
       'question': question,
@@ -211,12 +212,47 @@ class WorkspaceRepository {
     if (enableStructureAwareStarRag != null) {
       payload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
     }
+    if (branch != null && branch.isNotEmpty) {
+      payload['branch'] = branch;
+    }
 
     final response = await _apiClient.post(
       ApiEndpoints.projectAsk(projectId),
       data: payload,
     );
     return GroundedAnswer.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  // Live Git Operations
+  Future<Map<String, dynamic>> getGitBranches(String projectId) async {
+    final response = await _apiClient.get(ApiEndpoints.projectGitBranches(projectId));
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  Future<Map<String, dynamic>> getGitDiff(
+    String projectId, {
+    String base = 'HEAD~1',
+    String head = 'HEAD',
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.projectGitDiff(projectId, base: base, head: head),
+    );
+    return Map<String, dynamic>.from(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getGitLog(
+    String projectId, {
+    int count = 20,
+    String branch = 'HEAD',
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.projectGitLog(projectId, count: count, branch: branch),
+    );
+    final data = response.data;
+    if (data is List) {
+      return data.map((item) => Map<String, dynamic>.from(item)).toList();
+    }
+    return [];
   }
 
   Future<List<ConversationThread>> getConversations(String projectId) async {
