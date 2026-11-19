@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
-import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 
 class OntologyGraphScreen extends StatefulWidget {
@@ -58,105 +57,201 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
     }
   }
 
+  /// Computes transform (scale, offsetX, offsetY) from the actual bounding box
+  /// of all nodes so every node and label fits cleanly inside the frame with
+  /// zero scrolling and zero clipping at any window size.
+  ({double scale, double offsetX, double offsetY}) _computeViewportTransform(
+      Size size) {
+    if (_nodes.isEmpty) {
+      return (scale: 1.0, offsetX: 0.0, offsetY: 0.0);
+    }
+
+    double minX = _nodes.first.cx;
+    double maxX = _nodes.first.cx;
+    double minY = _nodes.first.cy;
+    double maxY = _nodes.first.cy;
+
+    for (final n in _nodes) {
+      if (n.cx < minX) minX = n.cx;
+      if (n.cx > maxX) maxX = n.cx;
+      if (n.cy < minY) minY = n.cy;
+      if (n.cy > maxY) maxY = n.cy;
+    }
+
+    final spanX = math.max(maxX - minX, 120.0);
+    final spanY = math.max(maxY - minY, 120.0);
+
+    const padX = 64.0;
+    const padTop = 34.0;
+    const padBottom = 48.0;
+
+    final availW = math.max(size.width - padX * 2, 80.0);
+    final availH = math.max(size.height - padTop - padBottom, 80.0);
+
+    final scale = math.min(availW / spanX, availH / spanY);
+    final drawnW = spanX * scale;
+    final drawnH = spanY * scale;
+
+    final offsetX = padX + (availW - drawnW) / 2 - minX * scale;
+    final offsetY = padTop + (availH - drawnH) / 2 - minY * scale;
+
+    return (scale: scale, offsetX: offsetX, offsetY: offsetY);
+  }
+
+  int? _hitTestNode(Offset localPos, double scale, double offsetX, double offsetY) {
+    int? hitId;
+    double bestDistSq = 1200.0;
+    for (final node in _nodes) {
+      final nx = node.cx * scale + offsetX;
+      final ny = node.cy * scale + offsetY;
+      final dx = localPos.dx - nx;
+      final dy = localPos.dy - ny;
+      final distSq = dx * dx + dy * dy;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        hitId = node.id;
+      }
+    }
+    return hitId;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+    final p = widget.palette;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 22),
       child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 1040),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Category Tag
-              Text(
-                'ONTOLOGY GRAPH',
-                style: UnoTypography.mono(
-                  color: widget.palette.textSec,
-                  fontSize: 11,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 6),
-
-              // Title
-              Text(
-                'Knowledge Graph',
-                style: AppFonts.display(
-                  fontSize: 30,
-                  color: widget.palette.text,
-                ),
-              ),
-              const SizedBox(height: 6),
-
-              // Subtitle
-              Text(
-                'Entity relationships indexed across commits, tickets, threads, and decisions.',
-                style: UnoTypography.body(
-                  color: widget.palette.textSec,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Main Graph Container Card
-              Container(
-                height: 560,
-                decoration: BoxDecoration(
-                  gradient: widget.palette.sectionGradient,
-                  border: Border.all(color: widget.palette.div),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final scaleX = constraints.maxWidth / 1000.0;
-                    final scaleY = constraints.maxHeight / 560.0;
-                    final scale = math.min(scaleX, scaleY);
-                    final offsetX = (constraints.maxWidth - 1000.0 * scale) / 2;
-                    final offsetY = (constraints.maxHeight - 560.0 * scale) / 2;
-
-                    return MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTapUp: (details) {
-                          int? tappedId;
-                          for (final node in _nodes) {
-                            final nx = node.cx * scale + offsetX;
-                            final ny = node.cy * scale + offsetY;
-                            final distSq = (details.localPosition.dx - nx) *
-                                    (details.localPosition.dx - nx) +
-                                (details.localPosition.dy - ny) *
-                                    (details.localPosition.dy - ny);
-                            if (distSq < 1400) {
-                              tappedId = node.id;
-                              break;
-                            }
-                          }
-                          setState(() {
-                            if (tappedId != null) {
-                              _hoveredNodeId =
-                                  _hoveredNodeId == tappedId ? 0 : tappedId;
-                            }
-                          });
-                        },
-                        child: CustomPaint(
-                          size: Size(constraints.maxWidth, constraints.maxHeight),
-                          painter: _OntologyGraphPainter(
-                            nodes: _nodes,
-                            edges: _edges,
-                            hoveredNodeId: _hoveredNodeId,
-                            palette: widget.palette,
-                            scale: scale,
-                            offsetX: offsetX,
-                            offsetY: offsetY,
-                            getNodeColor: _getNodeColor,
+              // Compact Editorial Header Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'ARCHITECTURE',
+                          style: UnoTypography.mono(
+                            color: p.textMuted,
+                            fontSize: 10.5,
+                            letterSpacing: 1.0,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Architecture',
+                          style: UnoTypography.headingSerif(
+                            color: p.text,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w600,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Entity relationships indexed across commits, tickets, threads, and decisions.',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: UnoTypography.body(
+                            color: p.textSec,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_nodes.isNotEmpty) ...[
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 11, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: p.bgElevated.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: p.div),
                       ),
-                    );
-                  },
+                      child: Text(
+                        '${_nodes.length} entities  ·  ${_edges.length} links',
+                        style: UnoTypography.mono(
+                          color: p.accentMuted,
+                          fontSize: 11,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Main Graph Container — Fills remaining viewport height cleanly (no scroll)
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: p.sectionGradient,
+                    border: Border.all(color: p.div),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final size =
+                          Size(constraints.maxWidth, constraints.maxHeight);
+                      final vp = _computeViewportTransform(size);
+
+                      return MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        onHover: (event) {
+                          final hit = _hitTestNode(
+                            event.localPosition,
+                            vp.scale,
+                            vp.offsetX,
+                            vp.offsetY,
+                          );
+                          if (hit != null && hit != _hoveredNodeId) {
+                            setState(() => _hoveredNodeId = hit);
+                          }
+                        },
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp: (details) {
+                            final tappedId = _hitTestNode(
+                              details.localPosition,
+                              vp.scale,
+                              vp.offsetX,
+                              vp.offsetY,
+                            );
+                            if (tappedId != null) {
+                              setState(() {
+                                _hoveredNodeId =
+                                    _hoveredNodeId == tappedId ? 0 : tappedId;
+                              });
+                            }
+                          },
+                          child: CustomPaint(
+                            size: size,
+                            painter: _OntologyGraphPainter(
+                              nodes: _nodes,
+                              edges: _edges,
+                              hoveredNodeId: _hoveredNodeId,
+                              palette: p,
+                              scale: vp.scale,
+                              offsetX: vp.offsetX,
+                              offsetY: vp.offsetY,
+                              getNodeColor: _getNodeColor,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
@@ -270,7 +365,8 @@ class _OntologyGraphPainter extends CustomPainter {
       // Monospace label below
       final textSpan = TextSpan(
         text: node.label,
-        style: AppFonts.mono(
+        style: TextStyle(
+          fontFamily: 'monospace',
           fontSize: 9.5,
           color: palette.textSec,
           letterSpacing: 0.2,
@@ -313,7 +409,8 @@ class _OntologyGraphPainter extends CustomPainter {
         // Pill badge background with monospace label
         final textSpan = TextSpan(
           text: activeNode.label,
-          style: AppFonts.mono(
+          style: TextStyle(
+            fontFamily: 'monospace',
             fontSize: 10.0,
             fontWeight: FontWeight.w600,
             color: palette.text,

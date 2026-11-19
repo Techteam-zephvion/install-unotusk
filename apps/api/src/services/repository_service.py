@@ -1,5 +1,7 @@
 import os
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,12 +16,15 @@ from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
     IntegrationProvider,
     IntegrationStatus,
+    KnowledgeCategory,
+    KnowledgeStatus,
     ProjectStatus,
     SnapshotStatus,
 )
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.finding import Finding
 from apps.api.src.models.integration import Integration
+from apps.api.src.models.knowledge import ProjectKnowledge
 from apps.api.src.models.membership import OrganizationMembership
 from apps.api.src.models.project import Project
 from apps.api.src.models.repository import Repository
@@ -585,3 +590,119 @@ class RepositoryService:
             chunks=chunks,
             full_content=full_content,
         )
+
+    @staticmethod
+    async def sync_github_issues(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        repository_id: uuid.UUID,
+        issues_data: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+        repo_q = select(Repository).where(
+            Repository.id == repository_id,
+            Repository.project_id == project.id,
+        )
+        repo_res = await session.execute(repo_q)
+        repo = repo_res.scalar_one_or_none()
+        if not repo:
+            raise NotFoundException(code="REPOSITORY_NOT_FOUND", message="Repository not found")
+
+        # Retrieve integration token if available
+        raw_issues = issues_data
+        if raw_issues is None:
+            token = os.getenv("GITHUB_TOKEN")
+            int_query = select(Integration).where(
+                Integration.project_id == project.id,
+                Integration.provider == IntegrationProvider.GITHUB,
+            )
+            int_res = await session.execute(int_query)
+            integration = int_res.scalar_one_or_none()
+            if integration and integration.integration_metadata:
+                encrypted_token = integration.integration_metadata.get("github_token")
+                token = decrypt_secret(encrypted_token) if encrypted_token else token
+
+            client = GitHubClient(token=token)
+            try:
+                raw_issues = await client.list_issues(owner=repo.owner, repo=repo.name)
+            except Exception:
+                raw_issues = []
+
+        synced_records = []
+        for issue in (raw_issues or []):
+            num = issue.get("number")
+            title = issue.get("title", "")
+            content = issue.get("body") or f"Issue #{num}: {title}"
+            is_pr = issue.get("is_pull_request", False)
+            ref_type = "GITHUB_PR" if is_pr else "GITHUB_ISSUE"
+            ref_id = f"#{num}"
+
+            # Check if already exists for this project
+            existing_q = select(ProjectKnowledge).where(
+                ProjectKnowledge.project_id == project.id,
+                ProjectKnowledge.source_type == "GITHUB",
+                ProjectKnowledge.source_reference_type == ref_type,
+                ProjectKnowledge.source_reference_id == ref_id,
+            )
+            existing = (await session.execute(existing_q)).scalar_one_or_none()
+
+            meta = {
+                "issue_number": num,
+                "external_id": issue.get("id"),
+                "url": issue.get("html_url"),
+                "labels": issue.get("labels", []),
+                "author": issue.get("author"),
+                "is_pull_request": is_pr,
+            }
+
+            # Generate embedding
+            try:
+                from apps.api.src.services.code_atom.embedding import generate_code_embedding
+
+                emb = generate_code_embedding(f"{title}\n{content}", input_type="document")
+                if emb:
+                    meta["embedding"] = emb
+            except Exception:
+                pass
+
+            now = datetime.now(UTC)
+            full_title = f"Issue #{num}: {title}" if not title.startswith(f"Issue #{num}") else title
+
+            category = (
+                KnowledgeCategory.CONSTRAINT
+                if any(w in title.lower() for w in ("security", "auth", "limit", "rate", "constraint"))
+                else KnowledgeCategory.BUSINESS_RULE
+            )
+
+            if existing is None:
+                new_item = ProjectKnowledge(
+                    id=uuid.uuid4(),
+                    project_id=project.id,
+                    created_by=user_id,
+                    category=category,
+                    title=full_title,
+                    content=content,
+                    status=KnowledgeStatus.ACTIVE,
+                    source_type="GITHUB",
+                    source_reference_type=ref_type,
+                    source_reference_id=ref_id,
+                    knowledge_metadata=meta,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(new_item)
+                synced_records.append(
+                    {"id": str(new_item.id), "number": num, "status": "created", "title": full_title}
+                )
+            else:
+                existing.title = full_title
+                existing.content = content
+                existing.knowledge_metadata = meta
+                existing.updated_at = now
+                synced_records.append(
+                    {"id": str(existing.id), "number": num, "status": "updated", "title": full_title}
+                )
+
+        await session.commit()
+        return synced_records

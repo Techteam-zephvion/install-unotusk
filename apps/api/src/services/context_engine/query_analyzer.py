@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -16,6 +18,7 @@ class AnalyzedQuery:
     has_negation: bool = False
     negation_keywords: list[str] = field(default_factory=list)
     structured_temporal_intent: Any | None = None
+    is_architectural_query: bool = False
 
 
 # Conjunctions that don't flip polarity or provide semantic code discrimination
@@ -188,6 +191,30 @@ def analyze_query(query: str) -> AnalyzedQuery:
 
     structured_intent = MemoTimeService.parse_temporal_intent(cleaned, target_symbols=dedup_symbols)
 
+    # Classify architectural / macro queries
+    q_low = cleaned.lower()
+    arch_terms = {
+        "architecture",
+        "architectural",
+        "diagram",
+        "flowchart",
+        "overview",
+        "components",
+        "structure",
+        "system",
+        "pipeline",
+        "workflow",
+        "topology",
+        "design",
+        "stack",
+        "modules",
+        "services",
+        "how does the project work",
+        "how does this repository work",
+        "how does it work",
+    }
+    is_arch = any(term in q_low for term in arch_terms)
+
     return AnalyzedQuery(
         raw_query=cleaned,
         keywords=dedup_keywords,
@@ -200,6 +227,7 @@ def analyze_query(query: str) -> AnalyzedQuery:
         has_negation=len(dedup_negations) > 0,
         negation_keywords=dedup_negations,
         structured_temporal_intent=structured_intent,
+        is_architectural_query=is_arch,
     )
 
 

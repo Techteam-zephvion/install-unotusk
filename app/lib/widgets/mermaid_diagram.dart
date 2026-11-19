@@ -421,30 +421,57 @@ $cleanCode
       );
     }
 
-    // Flowchart / Graph parser
-    final subgraphs = <String, List<String>>{};
+    // Flowchart / Graph parser with deep node-edge resolution
+    final subgraphs = <String, List<MapEntry<String, String>>>{};
     String? currentSubgraph;
-    final rootNodes = <String>[];
-    final edges = <String>[];
+    final rootNodes = <MapEntry<String, String>>[];
+    final nodeLabels = <String, String>{};
+    final parsedEdges = <Map<String, String>>[];
+
+    final nodePattern = RegExp(
+      r'([a-zA-Z0-9_]+)(?:\[\(?"?([^"\]\)]+)"?\)?\]|\(\["?([^"\]]+)"?\]\))',
+    );
+    final edgePattern = RegExp(
+      r'([a-zA-Z0-9_]+)\s*(?:-->|-\.->|==>)\s*(?:\|([^|]+)\|)?\s*([a-zA-Z0-9_]+)',
+    );
 
     for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.startsWith('subgraph')) {
         final match = RegExp(r'subgraph\s+([a-zA-Z0-9_]+)\s*(?:\["?([^"\]]+)"?\])?').firstMatch(trimmed);
         currentSubgraph = match?.group(2) ?? match?.group(1) ?? 'Components';
-        subgraphs[currentSubgraph] = [];
+        subgraphs[currentSubgraph] ??= [];
       } else if (trimmed == 'end') {
         currentSubgraph = null;
-      } else if (trimmed.contains('-->') || trimmed.contains('-.->') || trimmed.contains('==>')) {
-        edges.add(trimmed);
-      } else if (trimmed.contains('[') && trimmed.contains(']')) {
-        final nodeMatch = RegExp(r'([a-zA-Z0-9_]+)\["?([^"\]]+)"?\]').firstMatch(trimmed);
-        if (nodeMatch != null) {
-          final label = nodeMatch.group(2) ?? nodeMatch.group(1)!;
+      } else {
+        // Match edge first
+        final em = edgePattern.firstMatch(trimmed);
+        if (em != null) {
+          final fromId = em.group(1)!;
+          final action = em.group(2)?.trim() ?? 'connects to';
+          final toId = em.group(3)!;
+          parsedEdges.add({
+            'from': fromId,
+            'action': action,
+            'to': toId,
+          });
+        }
+
+        // Match node definition
+        final nm = nodePattern.firstMatch(trimmed);
+        if (nm != null) {
+          final id = nm.group(1)!;
+          final lbl = nm.group(2) ?? nm.group(3) ?? id;
+          nodeLabels[id] = lbl;
+          final entry = MapEntry(id, lbl);
           if (currentSubgraph != null) {
-            subgraphs[currentSubgraph]!.add(label);
+            if (!subgraphs[currentSubgraph]!.any((e) => e.key == id)) {
+              subgraphs[currentSubgraph]!.add(entry);
+            }
           } else {
-            rootNodes.add(label);
+            if (!rootNodes.any((e) => e.key == id)) {
+              rootNodes.add(entry);
+            }
           }
         }
       }
@@ -461,29 +488,31 @@ $cleanCode
               Icon(LucideIcons.boxes, size: 14, color: p.accent),
               const SizedBox(width: 8),
               Text(
-                'Architecture Spec Topology',
+                'Architecture Spec & System Topology',
                 style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text('NATIVE RENDER', style: UnoTypography.mono(color: p.accent, fontSize: 9)),
+                child: Text('INTERACTIVE TOPOLOGY', style: UnoTypography.mono(color: p.accent, fontSize: 9.5, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Subgraphs list
+          const SizedBox(height: 14),
+
+          // Subgraphs list (Architectural Tiers)
           ...subgraphs.entries.map((entry) {
             final title = entry.key;
             final nodes = entry.value;
-            final isPres = title.toLowerCase().contains('presentation') || title.toLowerCase().contains('client');
-            final isApi = title.toLowerCase().contains('api') || title.toLowerCase().contains('gateway') || title.toLowerCase().contains('control');
-            final isDomain = title.toLowerCase().contains('domain') || title.toLowerCase().contains('service') || title.toLowerCase().contains('routing') || title.toLowerCase().contains('synthesis');
-            final isData = title.toLowerCase().contains('data') || title.toLowerCase().contains('storage') || title.toLowerCase().contains('database');
+            final isPres = title.toLowerCase().contains('presentation') || title.toLowerCase().contains('ui') || title.toLowerCase().contains('client');
+            final isApi = title.toLowerCase().contains('api') || title.toLowerCase().contains('gateway') || title.toLowerCase().contains('route') || title.toLowerCase().contains('control');
+            final isDomain = title.toLowerCase().contains('domain') || title.toLowerCase().contains('service') || title.toLowerCase().contains('logic') || title.toLowerCase().contains('function');
+            final isData = title.toLowerCase().contains('data') || title.toLowerCase().contains('storage') || title.toLowerCase().contains('persistence') || title.toLowerCase().contains('database');
+            final isAsset = title.toLowerCase().contains('asset') || title.toLowerCase().contains('media') || title.toLowerCase().contains('static');
 
             final color = isPres
                 ? const Color(0xFF38BDF8)
@@ -491,49 +520,75 @@ $cleanCode
                     ? const Color(0xFFA855F7)
                     : (isDomain
                         ? const Color(0xFF10B981)
-                        : (isData ? const Color(0xFFF59E0B) : p.accent)));
+                        : (isData ? const Color(0xFFF59E0B) : (isAsset ? const Color(0xFFEC4899) : p.accent))));
+
+            final tierIcon = isPres
+                ? LucideIcons.layout
+                : (isApi
+                    ? LucideIcons.network
+                    : (isDomain
+                        ? LucideIcons.cpu
+                        : (isData ? LucideIcons.database : (isAsset ? LucideIcons.image : LucideIcons.box))));
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: p.bgSurface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color.withValues(alpha: 0.4), width: 1.0),
+                border: Border.all(color: color.withValues(alpha: 0.35), width: 1.0),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 6),
+                      Icon(tierIcon, size: 13, color: color),
+                      const SizedBox(width: 7),
                       Text(
                         title,
                         style: UnoTypography.mono(color: color, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
+                      const Spacer(),
+                      Text(
+                        '${nodes.length} component${nodes.length == 1 ? '' : 's'}',
+                        style: UnoTypography.mono(color: p.textSec.withValues(alpha: 0.6), fontSize: 9.5),
+                      ),
                     ],
                   ),
                   if (nodes.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: nodes.map((n) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: const Color(0xFF181816),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(color: p.div),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: p.div, width: 0.8),
                           ),
-                          child: Text(
-                            n,
-                            style: UnoTypography.body(color: p.text, fontSize: 11),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  n.key,
+                                  style: UnoTypography.mono(color: color, fontSize: 9.5, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                n.value,
+                                style: UnoTypography.body(color: p.text, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ],
                           ),
                         );
                       }).toList(),
@@ -547,7 +602,7 @@ $cleanCode
           // Root components if any
           if (rootNodes.isNotEmpty) ...[
             Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: p.bgSurface,
@@ -555,19 +610,19 @@ $cleanCode
                 border: Border.all(color: p.accent.withValues(alpha: 0.35), width: 1.0),
               ),
               child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: 8,
+                runSpacing: 8,
                 children: rootNodes.map((n) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF181816),
-                      borderRadius: BorderRadius.circular(5),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: p.div),
                     ),
                     child: Text(
-                      n,
-                      style: UnoTypography.body(color: p.text, fontSize: 11),
+                      n.value,
+                      style: UnoTypography.body(color: p.text, fontSize: 12),
                     ),
                   );
                 }).toList(),
@@ -575,34 +630,87 @@ $cleanCode
             ),
           ],
 
-          // Flow connections
-          if (edges.isNotEmpty) ...[
+          // Visual Execution & Data Flow
+          if (parsedEdges.isNotEmpty) ...[
             const SizedBox(height: 4),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFF181816),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: p.div, width: 0.7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: p.div, width: 0.8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Direct Execution & Control Flows',
-                    style: UnoTypography.mono(color: p.textSec, fontSize: 10, fontWeight: FontWeight.w600),
+                  Row(
+                    children: [
+                      Icon(LucideIcons.gitFork, size: 13, color: p.accent),
+                      const SizedBox(width: 7),
+                      Text(
+                        'Direct Execution & Control Flows',
+                        style: UnoTypography.mono(color: p.textSec, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: edges.take(8).map((edge) {
-                      return Text(
-                        edge.replaceAll('"', ''),
-                        style: UnoTypography.mono(color: p.textSec, fontSize: 10),
-                      );
-                    }).toList(),
-                  ),
+                  const SizedBox(height: 10),
+                  ...parsedEdges.take(12).map((edge) {
+                    final fromId = edge['from']!;
+                    final action = edge['action']!;
+                    final toId = edge['to']!;
+                    final fromName = nodeLabels[fromId] ?? fromId;
+                    final toName = nodeLabels[toId] ?? toId;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: p.bgSurface.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: p.div.withValues(alpha: 0.5), width: 0.7),
+                      ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            flex: 3,
+                            child: Text(
+                              fromName,
+                              style: UnoTypography.mono(color: const Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  action,
+                                  style: UnoTypography.mono(color: p.textSec, fontSize: 9.5),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(LucideIcons.arrowRight, size: 10, color: p.accent),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 3,
+                            child: Text(
+                              toName,
+                              style: UnoTypography.mono(color: const Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),

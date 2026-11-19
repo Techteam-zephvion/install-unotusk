@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from typing import Any
 
 from apps.api.src.config.settings import settings
@@ -7,6 +8,7 @@ from apps.api.src.services.llm.base import (
     GroundedAnswer,
     LLMProvider,
     extract_customer_notes,
+    extract_integration_notes,
     format_insufficient_evidence_response,
     generate_grounded_mermaid_diagram,
     should_abstain_due_to_insufficient_evidence,
@@ -48,11 +50,13 @@ class GroqProvider(LLMProvider):
 
         policy = get_thinking_policy(thinking_tier)
         customer_notes = extract_customer_notes(project_context)
+        integration_notes = extract_integration_notes(project_context)
 
         # Architecture V1 Section 9 Low-Confidence Synthesis Gate
         should_abstain, max_rel = should_abstain_due_to_insufficient_evidence(
             evidence_items=evidence_items,
             customer_notes=customer_notes,
+            integration_notes=integration_notes,
         )
 
         if should_abstain:
@@ -101,14 +105,30 @@ class GroqProvider(LLMProvider):
                 messages: list[dict[str, str]] = [
                     {"role": "system", "content": system_content}
                 ]
+                # Include recent conversation turns with bounded length to preserve TPM budget
                 if conversation_history:
-                    for msg in conversation_history[-6:]:  # Keep recent history
-                        messages.append({"role": msg["role"], "content": msg["content"]})
+                    for msg in conversation_history[-4:]:
+                        c_text = str(msg.get("content", ""))
+                        # Sanitize previous turns to prevent TPM exhaustion:
+                        # 1. Strip bulky previous mermaid blocks from history
+                        c_text = re.sub(r"```mermaid[\s\S]*?```", "[Diagram shown previously]", c_text)
+                        # 2. Strip large code blocks from history
+                        c_text = re.sub(r"```[\s\S]*?```", "[Code snippet shown previously]", c_text)
+                        # 3. Omit previous error notices or unhelpful status banners
+                        if any(err_token in c_text for err_token in ("Groq Service Notice", "No response generated", "Server Response:")):
+                            continue
+                        if len(c_text) > 400:
+                            c_text = c_text[:400] + "..."
+                        messages.append({"role": msg["role"], "content": c_text})
 
-                # Cap context characters to ensure request never exceeds model TPM limit (~14k chars / ~3.5k tokens)
+                # Cap context characters based on model capacity:
+                # 70B has a tight 6,000 TPM limit; cap context to 7,500 chars to prevent 429s.
+                # 8B / 9B has a 30,000 TPM limit; allow up to 28,000 chars (~7k tokens).
+                model_name = self.model or "llama-3.1-8b-instant"
+                max_ctx_chars = 7500 if "70b" in model_name.lower() else 28000
                 safe_context = project_context
-                if len(safe_context) > 14000:
-                    safe_context = safe_context[:14000] + "\n... [context truncated to stay within token budget]"
+                if len(safe_context) > max_ctx_chars:
+                    safe_context = safe_context[:max_ctx_chars] + "\n... [context trimmed to stay within rate limit]"
 
                 user_prompt = (
                     f"## PROJECT CONTEXT EVIDENCE\n\n"
@@ -118,45 +138,87 @@ class GroqProvider(LLMProvider):
                     f"Please provide an evidence-grounded answer based strictly on the above context."
                 )
                 q_lower = question.lower()
-                if any(k in q_lower for k in ("diagram", "architecture", "flowchart", "workflow", "design", "sequence", "graph", "structure", "spec")):
+                if any(k in q_lower for k in ("diagram", "architecture", "flowchart", "workflow", "design", "sequence", "graph", "structure", "spec", "overview", "components")):
                     user_prompt += (
                         "\n\nDIAGRAM REQUIREMENT:\n"
-                        "Include a tailored, syntactically valid Mermaid diagram (```mermaid ... ```) illustrating the "
-                        "specific components, modules, dependencies, and execution flow for this question. "
+                        "You MUST generate a comprehensive, deeply tailored Mermaid diagram (```mermaid ... ```) "
+                        "illustrating the REAL components, modules, dependencies, and execution flow found in the context above. "
+                        "Include 8 to 15 distinct nodes grouped into semantic subgraphs (e.g. UI, API / Controllers, Domain Services, Data Models, Infrastructure). "
                         "Always enclose node labels in double quotes (e.g. NodeId[\"Module Name (detail)\"]) to ensure valid parsing, "
-                        "and organize components into semantic subgraphs with distinct directional flow."
+                        "and declare the diagram type on the very first line inside the code fence (e.g. flowchart TD)."
                     )
                 messages.append({"role": "user", "content": user_prompt})
 
-                max_retries = 2
+                # Determine if model supports DeepSeek R1 / Qwen reasoning parameters
+                is_reasoning_model = any(k in model_name.lower() for k in ("r1", "deepseek", "qwen"))
+                create_kwargs: dict[str, Any] = {
+                    "model": model_name,
+                    "messages": messages,
+                    "max_tokens": 2500,
+                    "temperature": 0.1,
+                }
+                if is_reasoning_model:
+                    create_kwargs["reasoning_effort"] = policy.groq_reasoning_effort
+                    create_kwargs["reasoning_format"] = policy.groq_reasoning_format
+
+                max_retries = 3
                 response = None
-                for attempt in range(max_retries + 1):
+                # Multi-tier fallback models with high independent TPM quotas:
+                fallback_models = ["llama-3.1-8b-instant", "gemma2-9b-it"]
+                for attempt in range(max_retries):
                     try:
-                        response = await self._client.chat.completions.create(
-                            model=self.model,
-                            messages=messages,
-                            max_tokens=750,
-                            temperature=0.1,
-                            reasoning_effort=policy.groq_reasoning_effort,
-                            reasoning_format=policy.groq_reasoning_format,
-                        )
+                        response = await self._client.chat.completions.create(**create_kwargs)
                         break
                     except Exception as err:
                         err_str = str(err)
-                        if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
-                            wait_sec = 3 * (attempt + 1)
-                            logger.warning(
-                                f"Groq 429 rate limit hit, retrying in {wait_sec}s (attempt {attempt + 1}/{max_retries})..."
-                            )
-                            await asyncio.sleep(wait_sec)
-                            continue
+                        is_rate_limit = "429" in err_str or "rate_limit" in err_str.lower() or "tokens per minute" in err_str.lower()
+                        if is_rate_limit:
+                            # Immediately failover across model tiers to bypass exhausted quota
+                            current_m = create_kwargs["model"]
+                            next_model = None
+                            for fb in fallback_models:
+                                if fb != current_m:
+                                    next_model = fb
+                                    break
+                            if next_model:
+                                logger.warning(
+                                    f"Groq {current_m} rate limit hit; failing over to {next_model} (high quota)..."
+                                )
+                                create_kwargs["model"] = next_model
+                                create_kwargs.pop("reasoning_effort", None)
+                                create_kwargs.pop("reasoning_format", None)
+                                continue
+                            else:
+                                wait_sec = 2 * (attempt + 1)
+                                logger.warning(f"Groq rate limit hit, retrying in {wait_sec}s...")
+                                await asyncio.sleep(wait_sec)
+                                continue
                         raise
 
-                content = (
-                    response.choices[0].message.content
-                    if response and response.choices and response.choices[0].message.content
-                    else "No response generated."
-                )
+                raw_msg = response.choices[0].message if (response and response.choices) else None
+                content = None
+                if raw_msg:
+                    content = raw_msg.content
+                    # If content is empty but model produced reasoning output, use it
+                    if not content and hasattr(raw_msg, "reasoning") and raw_msg.reasoning:
+                        content = raw_msg.reasoning
+
+                # If still empty, perform fallback generation on fallback model
+                if (not content or not content.strip()) and create_kwargs.get("model") != "llama-3.1-8b-instant":
+                    try:
+                        create_kwargs["model"] = "llama-3.1-8b-instant"
+                        create_kwargs["messages"] = [
+                            {"role": "system", "content": system_content},
+                            {"role": "user", "content": user_prompt},
+                        ]
+                        retry_resp = await self._client.chat.completions.create(**create_kwargs)
+                        if retry_resp and retry_resp.choices:
+                            content = retry_resp.choices[0].message.content
+                    except Exception as retry_err:
+                        logger.warning(f"Fallback retry failed: {retry_err}")
+
+                content = content or "No response generated."
+
                 prompt_tokens = (
                     response.usage.prompt_tokens if response and response.usage else len(project_context) // 4
                 )
@@ -170,7 +232,7 @@ class GroqProvider(LLMProvider):
                     related_entities=related_entities,
                     confidence=confidence,
                     debug_signals={
-                        "model": self.model,
+                        "model": create_kwargs.get("model", self.model),
                         "provider": "groq",
                         "thinking_tier": policy.tier.value,
                         "reasoning_effort": policy.groq_reasoning_effort,
@@ -181,12 +243,31 @@ class GroqProvider(LLMProvider):
                 )
             except Exception as e:
                 logger.error(
-                    f"Groq API call failed: {e}. Falling back to deterministic synthesis.",
+                    f"Groq API call failed: {e}",
                     exc_info=True,
                 )
                 last_error_reason = str(e)
         else:
             last_error_reason = "No API key configured"
+
+        # If live API fails, return explicit notice instead of synthetic mock data
+        if last_error_reason and "No API key configured" not in last_error_reason:
+            error_notice = (
+                f"### Groq Service Notice\n\n"
+                f"The AI model request could not be completed: `{last_error_reason}`.\n\n"
+                f"Please wait a moment and try asking again."
+            )
+            return GroundedAnswer(
+                content=error_notice,
+                evidence=evidence_items,
+                related_entities=related_entities,
+                confidence="LOW",
+                debug_signals={
+                    "model": self.model,
+                    "provider": "groq",
+                    "error": last_error_reason,
+                },
+            )
 
         # Deterministic offline synthesis fallback (for tests, CI, or when API key is not configured)
         fallback_content = self._generate_offline_grounded_answer(
@@ -225,53 +306,31 @@ class GroqProvider(LLMProvider):
         error_reason: str | None = None,
     ) -> str:
         customer_notes = extract_customer_notes(project_context)
+        integration_notes = extract_integration_notes(project_context)
 
-        if False:  # parsed via extract_customer_notes
-            try:
-                start_tag = "<customer_project_knowledge>"
-                end_tag = "</customer_project_knowledge>"
-                start_idx = project_context.find(start_tag) + len(start_tag)
-                end_idx = project_context.find(end_tag)
-                if start_idx != -1 and end_idx != -1:
-                    raw_knowledge = project_context[start_idx:end_idx].strip()
-                    for block in raw_knowledge.split("### [CUSTOMER:"):
-                        block = block.strip()
-                        if block and not block.startswith("This is user-provided"):
-                            lines_b = block.splitlines()
-                            header = lines_b[0].strip()
-                            content_lines = [
-                                line_text
-                                for line_text in lines_b[1:]
-                                if line_text.strip().startswith("Content:")
-                            ]
-                            content_txt = (
-                                content_lines[0].replace("Content:", "").strip()
-                                if content_lines
-                                else ""
-                            )
-                            customer_notes.append(f"- **[CUSTOMER: {header}]**: {content_txt}")
-            except Exception:
-                pass
-
-        if not evidence_items and not customer_notes:
+        if not evidence_items and not customer_notes and not integration_notes:
             return (
                 "### Analysis\n\n"
-                "I searched the project context, but no matching files, symbols, or dependencies "
-                "were found in the current repository snapshot.\n\n"
-                "**Note**: If this component was recently added, try re-indexing the repository."
+                "I searched the project context, but no matching files, symbols, dependencies, "
+                "or synchronized integration records were found in the current project context.\n\n"
+                "**Note**: If this component or issue was recently added, try re-synchronizing or re-indexing."
             )
 
-        top_evidence = evidence_items[:5]
+        top_evidence = evidence_items[:6]
         files = sorted(
             list(
                 {
                     e.get("file") or e.get("file_path")
                     for e in top_evidence
-                    if e.get("file") or e.get("file_path")
+                    if (e.get("file") or e.get("file_path")) and e.get("type") not in ("integration", "knowledge")
                 }
             )
         )
-        symbols = [e["symbol"] for e in top_evidence if e.get("symbol")]
+        symbols = [
+            e["symbol"]
+            for e in top_evidence
+            if e.get("symbol") and e.get("type") not in ("integration", "knowledge")
+        ]
 
         prefix = ""
         if error_reason:
@@ -288,16 +347,17 @@ class GroqProvider(LLMProvider):
                 f"{prefix}### Quick Summary: {question}\n",
                 f"Direct answer based on {len(top_evidence)} primary evidence sources:",
             ]
+            if integration_notes:
+                hot_lines.append(f"- **Integration Requirement**: {integration_notes[0]}")
             if files:
                 hot_lines.append(f"- **Files**: {', '.join([f'`{f}`' for f in files[:3]])}")
             if symbols:
                 hot_lines.append(f"- **Key Symbols**: {', '.join([f'`{s}`' for s in symbols[:3]])}")
             if top_evidence:
                 first_ev = top_evidence[0]
-                sym = f" (`{first_ev['symbol']}`)" if first_ev.get("symbol") else ""
                 first_file = first_ev.get("file") or first_ev.get("file_path") or "Unknown"
                 hot_lines.append(
-                    f"- **Primary Reference**: `{first_file}`{sym} (Lines {first_ev.get('lines', 'N/A')})"
+                    f"- **Primary Reference**: `{first_file}` (Lines {first_ev.get('lines', 'N/A')})"
                 )
             return "\n".join(hot_lines)
 
@@ -305,6 +365,15 @@ class GroqProvider(LLMProvider):
             f"{prefix}### Project Analysis: {question}\n",
             "Based on the indexed project context, the relevant architecture and implementation details are identified below:\n",
         ]
+
+        if integration_notes:
+            lines.append("**Integrated Specifications & Requirements (Connected Integrations):**")
+            for note in integration_notes:
+                lines.append(note)
+            lines.append(
+                "\n*Note: Integration requirements reflect synchronized issues, specifications, and external documentation from connected tools.*"
+            )
+            lines.append("")
 
         if customer_notes:
             lines.append("**Customer Project Knowledge (User-Provided Context):**")
@@ -330,12 +399,21 @@ class GroqProvider(LLMProvider):
         if top_evidence:
             lines.append("**Observed Implementation Details:**")
             for i, ev in enumerate(top_evidence, start=1):
-                sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
-                ev_file = ev.get("file") or ev.get("file_path") or "Unknown"
-                lines.append(
-                    f"{i}. **{ev_file}**{sym_name} (Lines {ev.get('lines', 'N/A')}):\n"
-                    f"   Contains relevant definitions and logic associated with this query."
-                )
+                ev_type = ev.get("type", "file")
+                if ev_type == "integration" or ev.get("source_reference_id"):
+                    ref_str = f"[{ev.get('source_reference_type') or 'INTEGRATION'} {ev.get('source_reference_id') or ''}]".strip()
+                    title_str = ev.get("title") or ev.get("symbol") or "Requirement"
+                    lines.append(
+                        f"{i}. **{ref_str}**: {title_str}\n"
+                        f"   Content: {ev.get('snippet', '')}"
+                    )
+                else:
+                    sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
+                    ev_file = ev.get("file") or ev.get("file_path") or "Unknown"
+                    lines.append(
+                        f"{i}. **{ev_file}**{sym_name} (Lines {ev.get('lines', 'N/A')}):\n"
+                        f"   Contains relevant definitions and logic associated with this query."
+                    )
 
         if related_entities:
             lines.append("\n**Connected Components:**")
@@ -365,26 +443,25 @@ class GroqProvider(LLMProvider):
             return {}
         import json
         max_retries = 2
+        # Use high-throughput 8B model for lightweight metadata extraction to preserve 70B quota
+        json_model = "llama-3.1-8b-instant"
         for attempt in range(max_retries + 1):
             try:
                 response = await self._client.chat.completions.create(
-                    model=self.model,
+                    model=json_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     response_format={"type": "json_object"},
-                    max_tokens=500,
+                    max_tokens=400,
                 )
                 content = response.choices[0].message.content
                 return json.loads(content)
             except Exception as e:
                 err_str = str(e)
                 if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < max_retries:
-                    wait_sec = 3 * (attempt + 1)
-                    logger.warning(
-                        f"Groq generate_json 429 rate limit hit, retrying in {wait_sec}s..."
-                    )
+                    wait_sec = 2 * (attempt + 1)
                     await asyncio.sleep(wait_sec)
                     continue
                 logger.error(f"Groq generate_json error: {e}")

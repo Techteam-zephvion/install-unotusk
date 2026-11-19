@@ -71,6 +71,11 @@ def _build_evidence_item(e: dict[str, Any]) -> EvidenceItem:
         provenance=e.get("provenance"),
         atomic_code_facts=e.get("atomic_code_facts"),
         temporal_relations=e.get("temporal_relations"),
+        source_type=e.get("source_type"),
+        source_reference_type=e.get("source_reference_type"),
+        source_reference_id=e.get("source_reference_id"),
+        category=e.get("category"),
+        title=e.get("title"),
     )
 
 

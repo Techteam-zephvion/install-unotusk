@@ -54,10 +54,10 @@ class Settings(BaseSettings):
 
     # Groq LLM Settings
     GROQ_API_KEY: str | None = Field(default=None)
-    GROQ_MODEL: str = Field(default="qwen/qwen3.8-27b")
+    GROQ_MODEL: str = Field(default="llama-3.1-8b-instant")
 
     # Context Budget
-    CONTEXT_BUDGET_TOKENS: int = Field(default=3500)
+    CONTEXT_BUDGET_TOKENS: int = Field(default=6000)
 
     # STAR-RAG Temporal Retrieval Settings (arXiv:2510.16715: "Right Answer at the Right Time — Temporal Retrieval-Augmented Generation via Graph Summarization")
     STAR_RAG_ENABLED: bool = Field(default=False)

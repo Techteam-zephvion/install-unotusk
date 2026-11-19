@@ -78,6 +78,25 @@ async def trigger_ingest(
     return await RepositoryService.trigger_ingestion(db, current_user.id, resolved_id, repository_id)
 
 
+@router.post(
+    "/repositories/{repository_id}/sync-issues",
+    status_code=status.HTTP_200_OK,
+    summary="Synchronize GitHub repository issues and requirements into project intelligence context",
+)
+async def sync_repository_issues(
+    project_id: str,
+    repository_id: uuid.UUID,
+    payload: dict | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    issues_data = (payload or {}).get("issues") if payload else None
+    return await RepositoryService.sync_github_issues(
+        db, current_user.id, resolved_id, repository_id, issues_data=issues_data
+    )
+
+
 @router.get("/ingestions/{ingestion_id}", response_model=SnapshotRead)
 async def get_ingestion_status(
     project_id: str,

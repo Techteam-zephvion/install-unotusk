@@ -16,11 +16,15 @@ class WindowTitleBar extends StatelessWidget {
 
   final double height;
 
+  /// When true, omits the solid background fill so full-bleed artwork shows through.
+  final bool transparent;
+
   const WindowTitleBar({
     super.key,
     required this.palette,
     this.trailing,
     this.height = 36.0,
+    this.transparent = false,
   });
 
   @override
@@ -34,7 +38,7 @@ class WindowTitleBar extends StatelessWidget {
 
     return Container(
       height: height,
-      color: palette.bgBase,
+      color: transparent ? Colors.transparent : palette.bgBase,
       padding: EdgeInsets.only(left: isMacOS ? 78.0 : 14.0),
       child: Row(
         children: [

@@ -221,13 +221,7 @@ class _DiscoveriesScreenState extends State<DiscoveriesScreen> {
               // Filter Controls Strip
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                decoration: BoxDecoration(
-                  color: p.bgSurface,
-                  border: Border(
-                    top: BorderSide(color: p.div),
-                    bottom: BorderSide(color: p.div),
-                  ),
-                ),
+                color: Colors.transparent,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(

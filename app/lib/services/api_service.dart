@@ -16,7 +16,7 @@ import 'server_discovery_service.dart';
 /// Strictly wired to the real backend server at port 28000 (Control Plane) and 28100 series (Data Plane).
 /// ZERO MOCK DATA: All data, intelligence, and operations come directly from http://10.0.0.59:28000.
 class ApiService {
-  static String serverHost = '10.0.0.35:28000';
+  static String serverHost = '127.0.0.1:28000';
   static String baseUrl = 'http://$serverHost';
 
   static final List<RecentChat> _recordedChats = [];
@@ -264,11 +264,21 @@ class ApiService {
   //  Health & Preflight
   // ─────────────────────────────────────────────────────────
 
-  /// Probes http://10.0.0.59:28000/health
+  /// Probes server health endpoint
   static Future<bool> checkHealth() async {
+    Uri? uri;
+    try {
+      uri = Uri.parse('$baseUrl/health');
+    } catch (e) {
+      isConnected = false;
+      lastError = 'Invalid server URL: $baseUrl ($e)';
+      debugPrint('[ApiService] Health check aborted: invalid URL $baseUrl');
+      return false;
+    }
+
     try {
       final res = await _client
-          .get(Uri.parse('$baseUrl/health'), headers: _headers)
+          .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 3));
       lastChecked = DateTime.now();
       if (res.statusCode == 200) {
@@ -288,13 +298,16 @@ class ApiService {
     } catch (e) {
       // Fallback check to root '/'
       try {
-        final rootRes = await _client
-            .get(Uri.parse('$baseUrl/'))
-            .timeout(const Duration(seconds: 2));
-        if (rootRes.statusCode == 200) {
-          isConnected = true;
-          lastError = null;
-          return true;
+        final rootUri = Uri.tryParse('$baseUrl/');
+        if (rootUri != null) {
+          final rootRes = await _client
+              .get(rootUri)
+              .timeout(const Duration(seconds: 2));
+          if (rootRes.statusCode == 200) {
+            isConnected = true;
+            lastError = null;
+            return true;
+          }
         }
       } catch (_) {}
 
@@ -1127,6 +1140,13 @@ class ApiService {
     }
     if (files.isEmpty && citations.isNotEmpty) {
       files.addAll(citations.take(4));
+    }
+    if (files.isEmpty) {
+      for (final ev in evidence) {
+        if (ev.file.isNotEmpty && !files.contains(ev.file)) {
+          files.add(ev.file);
+        }
+      }
     }
 
     // Extract connected components
