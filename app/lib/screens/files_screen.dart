@@ -43,8 +43,8 @@ class _FilesScreenState extends State<FilesScreen> {
   bool _loadingDetail = false;
 
   FileContentViewMode _viewMode = FileContentViewMode.rendered;
-  bool _wrapLines = false;
-  bool _showLineNumbers = true;
+  final bool _wrapLines = false;
+  final bool _showLineNumbers = true;
   bool _copied = false;
   String _symbolFilter = '';
 
@@ -495,7 +495,8 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  File Detail View (Header + Switcher + Compilers)
+  // ─────────────────────────────────────────────────────────
+  //  File Detail View (Minimal, Single-Row Header + Compilers)
   // ─────────────────────────────────────────────────────────
   Widget _buildFileDetailView(FileDetail detail) {
     final file = detail.file;
@@ -503,197 +504,293 @@ class _FilesScreenState extends State<FilesScreen> {
     final isMarkdown = (ext == '.md' || ext == '.markdown');
     final isJson = ext == '.json';
     final isSvg = ext == '.svg';
+    final isImage = (ext == '.png' || ext == '.jpg' || ext == '.jpeg' || ext == '.gif' || ext == '.webp' || ext == '.ico');
+    final isBinary = file.isBinary || isImage;
     final hasSymbols = detail.symbols.isNotEmpty;
     final totalDeps = detail.outgoingDependencies.length + detail.incomingReferences.length;
     final hasDeps = totalDeps > 0;
+    final hasTextContent = !isBinary && (detail.fullContent?.isNotEmpty == true);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Top Header Bar (Breadcrumbs, Title, Badges, View Switcher & Actions) ──
+        // ── Minimal Single-Row Header Bar (Height 42px) ──
         Container(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: p.bgSurface,
             border: Border(
-              bottom: BorderSide(color: p.div.withValues(alpha: 0.8)),
+              bottom: BorderSide(color: p.div.withValues(alpha: 0.7)),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              // Breadcrumbs
-              _buildBreadcrumb(file.path),
-              const SizedBox(height: 10),
-
-              // Title row & action buttons
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // File type icon tile
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: _fileColor(ext).withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: _fileColor(ext).withValues(alpha: 0.28)),
-                    ),
-                    child: Center(
-                      child: Icon(_fileIcon(file.filename), size: 18, color: _fileColor(ext)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Filename & path
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              file.filename,
-                              style: TextStyle(
-                                color: p.text,
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'JetBrains Mono',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _chip(file.language.isEmpty ? ext.replaceAll('.', '').toUpperCase() : file.language, _fileColor(ext)),
-                            if (file.isTest) ...[
-                              const SizedBox(width: 6),
-                              _chip('TEST', p.live),
-                            ],
-                            if (file.isGenerated) ...[
-                              const SizedBox(width: 6),
-                              _chip('GENERATED', p.inferred),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          file.path,
-                          style: TextStyle(color: p.textSec, fontSize: 11.5),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Metrics summary pills
-                  _metricPill(LucideIcons.alignLeft, '${file.lineCount} lines'),
-                  const SizedBox(width: 6),
-                  _metricPill(LucideIcons.hardDrive, '${(file.sizeBytes / 1024).toStringAsFixed(1)} KB'),
-                  const SizedBox(width: 6),
-                  if (hasSymbols) ...[
-                    _metricPill(LucideIcons.boxes, '${detail.symbols.length} symbols'),
-                    const SizedBox(width: 6),
-                  ],
-
-                  // Copy Content Button
-                  _actionIconButton(
-                    icon: _copied ? LucideIcons.check : LucideIcons.copy,
-                    label: _copied ? 'Copied!' : 'Copy',
-                    color: _copied ? p.live : p.text,
-                    onTap: () => _copyContent(detail.fullContent ?? ''),
-                  ),
-                ],
+              // Clean File Icon
+              Icon(
+                _fileIcon(file.filename),
+                size: 14,
+                color: _fileColor(ext),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(width: 8),
 
-              // Segmented view mode switcher & editor tools
-              Row(
-                children: [
-                  // Mode Switcher Pills
+              // Minimal Breadcrumb Path (e.g. images / flyer / swastha-yoga-flyer.jpeg)
+              Expanded(
+                child: _buildCleanPath(file.path, file.filename),
+              ),
+
+              // File Metrics: only show lines if lines > 0, and clean KB size
+              if (file.lineCount > 0) ...[
+                Text(
+                  '${file.lineCount} lines',
+                  style: TextStyle(
+                    color: p.textSec,
+                    fontSize: 11,
+                    fontFamily: 'JetBrains Mono',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text('•', style: TextStyle(color: p.div, fontSize: 10)),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                '${(file.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                style: TextStyle(
+                  color: p.textSec,
+                  fontSize: 11,
+                  fontFamily: 'JetBrains Mono',
+                ),
+              ),
+
+              // Contextual actions on the right (only when relevant)
+              if (!isBinary) ...[
+                // Compact Segmented Mode Switcher (only if multiple views exist)
+                if (isMarkdown || isJson || isSvg || hasSymbols) ...[
+                  const SizedBox(width: 14),
                   Container(
-                    padding: const EdgeInsets.all(3),
+                    height: 26,
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF101726) : const Color(0xFFEAE5DC),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: p.div.withValues(alpha: 0.7)),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: p.div.withValues(alpha: 0.6)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isMarkdown) ...[
-                          _viewModePill(FileContentViewMode.rendered, LucideIcons.bookOpen, 'Rendered Preview'),
-                          _viewModePill(FileContentViewMode.source, LucideIcons.code2, 'Raw Markdown'),
+                          _miniModeButton('Preview', FileContentViewMode.rendered),
+                          _miniModeButton('Raw', FileContentViewMode.source),
                         ] else if (isJson) ...[
-                          _viewModePill(FileContentViewMode.rendered, LucideIcons.indent, 'Formatted JSON'),
-                          _viewModePill(FileContentViewMode.source, LucideIcons.code2, 'Raw Code'),
+                          _miniModeButton('Formatted', FileContentViewMode.rendered),
+                          _miniModeButton('Raw', FileContentViewMode.source),
                         ] else if (isSvg) ...[
-                          _viewModePill(FileContentViewMode.rendered, LucideIcons.image, 'Vector Preview'),
-                          _viewModePill(FileContentViewMode.source, LucideIcons.code2, 'XML Code'),
+                          _miniModeButton('Preview', FileContentViewMode.rendered),
+                          _miniModeButton('XML', FileContentViewMode.source),
                         ] else ...[
-                          _viewModePill(FileContentViewMode.source, LucideIcons.code2, 'Source Code'),
+                          _miniModeButton('Code', FileContentViewMode.source),
                         ],
                         if (hasSymbols)
-                          _viewModePill(FileContentViewMode.symbols, LucideIcons.dna, 'AST Symbols (${detail.symbols.length})'),
+                          _miniModeButton('Symbols (${detail.symbols.length})', FileContentViewMode.symbols),
                         if (hasDeps)
-                          _viewModePill(FileContentViewMode.dependencies, LucideIcons.gitFork, 'Dependencies ($totalDeps)'),
+                          _miniModeButton('Deps ($totalDeps)', FileContentViewMode.dependencies),
                       ],
                     ),
                   ),
-
-                  const Spacer(),
-
-                  // Editor tools (when viewing source or formatted JSON)
-                  if (_viewMode == FileContentViewMode.source || (isJson && _viewMode == FileContentViewMode.rendered)) ...[
-                    _toggleButton(
-                      icon: LucideIcons.wrapText,
-                      label: 'Wrap Lines',
-                      active: _wrapLines,
-                      onToggle: () => setState(() => _wrapLines = !_wrapLines),
-                    ),
-                    const SizedBox(width: 6),
-                    _toggleButton(
-                      icon: LucideIcons.listOrdered,
-                      label: 'Line Numbers',
-                      active: _showLineNumbers,
-                      onToggle: () => setState(() => _showLineNumbers = !_showLineNumbers),
-                    ),
-                  ],
                 ],
-              ),
+
+                if (hasTextContent) ...[
+                  const SizedBox(width: 10),
+                  // Sleek minimal copy button
+                  Tooltip(
+                    message: _copied ? 'Copied!' : 'Copy file content',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(5),
+                      onTap: () => _copyContent(detail.fullContent ?? ''),
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: p.bgElevated,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: p.div.withValues(alpha: 0.8)),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _copied ? LucideIcons.check : LucideIcons.copy,
+                            size: 12.5,
+                            color: _copied ? p.live : p.textSec,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ],
           ),
         ),
 
         // ── Active Content Viewer Engine ──
         Expanded(
-          child: _buildActiveContentViewer(detail, isMarkdown, isJson, isSvg),
+          child: isBinary
+              ? _buildBinaryAssetViewer(file)
+              : _buildActiveContentViewer(detail, isMarkdown, isJson, isSvg),
         ),
       ],
     );
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Breadcrumb Header
+  //  Clean Minimal Breadcrumb Path
   // ─────────────────────────────────────────────────────────
-  Widget _buildBreadcrumb(String path) {
-    final parts = path.replaceAll('\\', '/').split('/').where((s) => s.isNotEmpty).toList();
-    return Row(
-      children: [
-        Icon(LucideIcons.gitPullRequestDraft, size: 12, color: p.textSec),
-        const SizedBox(width: 6),
-        Text('Repository', style: TextStyle(color: p.textSec, fontSize: 11)),
-        for (int i = 0; i < parts.length; i++) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 5),
-            child: Icon(LucideIcons.chevronRight, size: 10, color: p.textSec.withValues(alpha: 0.5)),
-          ),
-          Text(
-            parts[i],
-            style: TextStyle(
-              color: i == parts.length - 1 ? p.accent : p.textSec,
-              fontSize: 11,
-              fontWeight: i == parts.length - 1 ? FontWeight.w600 : FontWeight.w400,
+  Widget _buildCleanPath(String path, String filename) {
+    final segments = path.replaceAll('\\', '/').split('/').where((s) => s.isNotEmpty).toList();
+    if (segments.isEmpty) {
+      return Text(
+        filename,
+        style: TextStyle(
+          color: p.text,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'JetBrains Mono',
+        ),
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < segments.length; i++) ...[
+            if (i > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  '/',
+                  style: TextStyle(
+                    color: p.textSec.withValues(alpha: 0.35),
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            Text(
+              segments[i],
+              style: TextStyle(
+                color: i == segments.length - 1 ? p.text : p.textSec,
+                fontSize: 12,
+                fontWeight: i == segments.length - 1 ? FontWeight.w600 : FontWeight.w400,
+                fontFamily: i == segments.length - 1 ? 'JetBrains Mono' : null,
+              ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
+    );
+  }
+
+  Widget _miniModeButton(String label, FileContentViewMode mode) {
+    final active = _viewMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _viewMode = mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active
+              ? (isDark ? const Color(0xFF222C44) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? p.text : p.textSec,
+            fontSize: 11,
+            fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBinaryAssetViewer(ProjectFile file) {
+    final ext = file.extension.toLowerCase();
+    final isImage = (ext == '.png' || ext == '.jpg' || ext == '.jpeg' || ext == '.gif' || ext == '.webp' || ext == '.ico');
+
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        decoration: BoxDecoration(
+          color: p.bgSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: p.div.withValues(alpha: 0.7)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _fileColor(ext).withValues(alpha: 0.12),
+              ),
+              child: Center(
+                child: Icon(_fileIcon(file.filename), size: 20, color: _fileColor(ext)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              file.filename,
+              style: TextStyle(
+                color: p.text,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'JetBrains Mono',
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              isImage
+                  ? 'Binary Image Asset • ${(file.sizeBytes / 1024).toStringAsFixed(1)} KB'
+                  : 'Binary Asset • ${(file.sizeBytes / 1024).toStringAsFixed(1)} KB',
+              style: TextStyle(color: p.textSec, fontSize: 11),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: p.bgBase,
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: p.div.withValues(alpha: 0.6)),
+              ),
+              child: Text(
+                'Stored in repository snapshot',
+                style: TextStyle(
+                  color: p.textSec.withValues(alpha: 0.65),
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1364,146 +1461,7 @@ class _FilesScreenState extends State<FilesScreen> {
   // ─────────────────────────────────────────────────────────
   //  UI Helper Components (Pills, Chips, Badges, Icons)
   // ─────────────────────────────────────────────────────────
-  Widget _viewModePill(FileContentViewMode mode, IconData icon, String label) {
-    final active = _viewMode == mode;
-    return GestureDetector(
-      onTap: () => setState(() => _viewMode = mode),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: active
-              ? (isDark ? const Color(0xFF222C44) : Colors.white)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: active
-                ? (isDark ? p.accent.withValues(alpha: 0.25) : const Color(0xFFD6CEBF))
-                : Colors.transparent,
-          ),
-          boxShadow: active
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: active ? p.accent : p.textSec),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? p.text : p.textSec,
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _toggleButton({
-    required IconData icon,
-    required String label,
-    required bool active,
-    required VoidCallback onToggle,
-  }) {
-    return GestureDetector(
-      onTap: onToggle,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: active
-              ? (isDark ? p.accent.withValues(alpha: 0.14) : const Color(0xFFE8E2D6))
-              : p.bgElevated,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: active ? p.accent.withValues(alpha: 0.3) : p.div,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12.5, color: active ? p.accent : p.textSec),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? p.accent : p.textSec,
-                fontSize: 11.5,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _actionIconButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: p.bgElevated,
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: p.div),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _metricPill(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: p.bgElevated,
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: p.div.withValues(alpha: 0.6)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: p.textSec),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(
-              color: p.textSec,
-              fontSize: 11,
-              fontFamily: 'JetBrains Mono',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _chip(String label, Color color) {
     return Container(
