@@ -143,6 +143,39 @@ class GitHubClient:
             "description": r.get("description"),
         }
 
+    async def list_issues(
+        self, owner: str, repo: str, state: str = "open"
+    ) -> list[dict[str, Any]]:
+        """List issues and PRs for owner/repo."""
+        url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/issues?state={state}&per_page=100"
+        response = await self._request_with_retry("GET", url)
+        if response.status_code != 200:
+            return []
+        items = response.json()
+        if not isinstance(items, list):
+            return []
+        return [
+            {
+                "id": str(it["id"]),
+                "number": it["number"],
+                "title": it["title"],
+                "body": it.get("body") or "",
+                "state": it.get("state", "open"),
+                "html_url": it.get("html_url", ""),
+                "is_pull_request": "pull_request" in it,
+                "labels": [
+                    label["name"]
+                    for label in it.get("labels", [])
+                    if isinstance(label, dict) and "name" in label
+                ],
+                "author": it.get("user", {}).get("login", "unknown") if isinstance(it.get("user"), dict) else "unknown",
+                "created_at": it.get("created_at"),
+                "updated_at": it.get("updated_at"),
+            }
+            for it in items
+            if isinstance(it, dict) and "number" in it
+        ]
+
     def clone_repository(
         self,
         clone_url: str,

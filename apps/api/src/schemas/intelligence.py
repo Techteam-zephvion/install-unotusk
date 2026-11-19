@@ -39,6 +39,11 @@ class EvidenceItem(BaseModel):
     provenance: dict[str, Any] | str | None = Field(default=None, description="Detailed provenance metadata")
     atomic_code_facts: list[Any] | None = Field(default=None, description="Grounded atomic code facts")
     temporal_relations: list[Any] | None = Field(default=None, description="Temporal relationship tuples")
+    source_type: str | None = Field(default=None, description="Originating source type e.g. GITHUB, CUSTOMER, CODE")
+    source_reference_type: str | None = Field(default=None, description="Source reference type e.g. GITHUB_ISSUE, GITHUB_PR, ADR")
+    source_reference_id: str | None = Field(default=None, description="Source reference identifier e.g. #42, PR-10")
+    category: str | None = Field(default=None, description="Category of knowledge, finding, or spec")
+    title: str | None = Field(default=None, description="Title of the source entity or requirement")
 
 
 
