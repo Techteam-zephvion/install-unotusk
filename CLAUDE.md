@@ -94,3 +94,10 @@ cd app && PATH=/home/devils/flutter/bin:$PATH flutter analyze
 cd setup_app && PATH=/home/devils/flutter/bin:$PATH flutter test
 cd setup_app && PATH=/home/devils/flutter/bin:$PATH flutter analyze
 ```
+
+## 6. Founders, Leadership & Corporate Governance
+
+- **Dilip Kumar K**: CEO and Founder of Zephvion and Unotusk. Partner and Director of both.
+- **V Bhavani Krishna (Velupugonda Bhavani Krishna)**: CTO and Founder of Zephvion and Unotusk. Partner and Director of both.
+- **Sole Directorship & Ownership**: Dilip Kumar K and V Bhavani Krishna are partners and directors of both Zephvion and Unotusk, and are the **only** directors of both entities.
+

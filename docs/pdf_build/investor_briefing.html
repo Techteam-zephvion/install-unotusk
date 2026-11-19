@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UNOTUSK — Complete Project & Platform Intelligence Dossier</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 10mm 12mm 10mm 12mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+      font-size: 9.2pt;
+      line-height: 1.38;
+    }
+    
+    .page-container {
+      height: 275mm;
+      max-height: 275mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+    }
+    .page-container:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    .page-content {
+      flex: 1;
+    }
+
+    /* Header styling */
+    .header-bar {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .brand-title {
+      font-size: 22pt;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #0f172a;
+      margin: 0;
+      line-height: 1;
+    }
+    .brand-subtitle {
+      font-size: 10pt;
+      color: #475569;
+      margin-top: 3px;
+      font-weight: 500;
+    }
+    .meta-badge-box {
+      text-align: right;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-primary {
+      background-color: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+    .badge-dark {
+      background-color: #0f172a;
+      color: #ffffff;
+    }
+    .meta-line {
+      font-size: 7.2pt;
+      color: #64748b;
+      margin-top: 3px;
+    }
+
+    /* Typography */
+    h2 {
+      font-size: 11.5pt;
+      border-bottom: 1.5px solid #e2e8f0;
+      padding-bottom: 3px;
+      margin-top: 9px;
+      margin-bottom: 7px;
+      display: flex;
+      align-items: center;
+      letter-spacing: -0.2px;
+      color: #0f172a;
+    }
+    .section-num {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-right: 6px;
+      font-weight: 700;
+    }
+    h3 {
+      font-size: 9.5pt;
+      margin-top: 7px;
+      margin-bottom: 3px;
+      color: #1e293b;
+    }
+    p {
+      margin-top: 0;
+      margin-bottom: 5px;
+    }
+
+    /* Hero / Callouts */
+    .hero-box {
+      background-color: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #0f172a;
+      padding: 9px 12px;
+      border-radius: 4px;
+      margin-bottom: 9px;
+    }
+    .hero-title {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 3px;
+    }
+    .hero-narrative {
+      font-size: 9pt;
+      color: #334155;
+      line-height: 1.4;
+      margin-bottom: 0;
+    }
+
+    /* Feature 3-Grid */
+    .three-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 9px;
+    }
+    .grid-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 7px 9px;
+    }
+    .grid-card-num {
+      font-size: 7pt;
+      font-weight: 700;
+      color: #0284c7;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .grid-card-title {
+      font-size: 9pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+    .grid-card-desc {
+      font-size: 8pt;
+      color: #475569;
+      line-height: 1.3;
+      margin: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 7px;
+      font-size: 8pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 6px;
+      text-align: left;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    /* KPI Highlights */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+      margin-bottom: 9px;
+    }
+    .kpi-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 7px;
+      text-align: center;
+    }
+    .kpi-val {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 1px;
+    }
+    .kpi-label {
+      font-size: 6.8pt;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .kpi-sub {
+      font-size: 6.8pt;
+      color: #0284c7;
+      margin-top: 1px;
+    }
+
+    /* Team Layout */
+    .team-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 7px;
+    }
+    .team-member-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 6px 8px;
+      background: #ffffff;
+    }
+    .tm-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    .tm-name {
+      font-weight: 700;
+      font-size: 8.8pt;
+      color: #0f172a;
+    }
+    .tm-role {
+      font-size: 7.2pt;
+      font-weight: 600;
+      color: #0284c7;
+      background: #f0f9ff;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .tm-desc {
+      font-size: 7.5pt;
+      color: #475569;
+      line-height: 1.25;
+      margin: 0;
+    }
+
+    .governance-callout {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-left: 3px solid #f59e0b;
+      padding: 6px 9px;
+      border-radius: 4px;
+      font-size: 7.8pt;
+      color: #78350f;
+      margin-bottom: 7px;
+      line-height: 1.3;
+    }
+
+    /* Footer */
+    .doc-footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 5px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7.2pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= PAGE 1 ================= -->
+  <div class="page-container">
+    <div class="page-content">
+      <div class="header-bar">
+        <div>
+          <div class="brand-title">UNOTUSK</div>
+          <div class="brand-subtitle">Project Intelligence & Shared Engineering Memory</div>
+        </div>
+        <div class="meta-badge-box">
+          <div><span class="badge badge-dark">Platform Dossier</span> <span class="badge badge-primary">TRL 6 Certified</span></div>
+          <div class="meta-line">UNOTUSK PRIVATE LIMITED • CIN: U62011KA2026PTC224480</div>
+        </div>
+      </div>
+
+      <div class="hero-box">
+        <div class="hero-title">Core Definition & Mission:</div>
+        <div class="hero-narrative">
+          <strong>"An AI memory for software companies."</strong><br>
+          UNOTUSK connects code, technical changes, and architectural design decisions so engineering teams and AI systems understand not just <em>what</em> software does, but <em>why</em> choices were made and <em>what could break</em> when systems change.
+        </div>
+      </div>
+
+      <h2><span class="section-num">01</span> The Core Problem: Why Systems Lose Reasoning</h2>
+      
+      <div style="background: #f1f5f9; padding: 7px 11px; border-radius: 4px; margin-bottom: 7px;">
+        <p style="margin: 0; font-size: 8.8pt; color: #1e293b; line-height: 1.35;">
+          <strong>The Human Reality:</strong> A senior developer leaves a company. Months later, another developer must change a critical feature—but nobody remembers why it was designed that way. The source code remains in the repository, but the reasoning is scattered across old discussions, tickets, merged pull requests, and departed employees' heads.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 9px;">
+        <div style="border: 1px solid #fed7aa; background: #fffaf5; padding: 7px 9px; border-radius: 4px;">
+          <div style="font-weight: 700; font-size: 8.2pt; color: #c2410c; margin-bottom: 2px;">The Context Bottleneck (~25% Time Lost)</div>
+          <p style="font-size: 7.8pt; color: #431407; margin: 0; line-height: 1.3;">
+            Engineers spend ~25% of their workweek rebuilding lost context before judging code changes. Reviewers make decisions in the dark, frequently repeating old architectural mistakes.
+          </p>
+        </div>
+        <div style="border: 1px solid #bae6fd; background: #f0f9ff; padding: 7px 9px; border-radius: 4px;">
+          <div style="font-weight: 700; font-size: 8.2pt; color: #0369a1; margin-bottom: 2px;">The AI Blindspot (10x Code, 0x Memory)</div>
+          <p style="font-size: 7.8pt; color: #0c4a6e; margin: 0; line-height: 1.3;">
+            AI tools (Copilot, Cursor) write code 10x faster, but lack historical memory. They propose changes that violate old constraints, overwhelming human reviewers with verification overhead.
+          </p>
+        </div>
+      </div>
+
+      <h2><span class="section-num">02</span> What the Technology Does (In 3 Simple Verbs)</h2>
+      
+      <div class="three-grid">
+        <div class="grid-card">
+          <div class="grid-card-num">01 / CONNECT</div>
+          <div class="grid-card-title">Code to History</div>
+          <p class="grid-card-desc">
+            Binds AST syntax nodes (Tree-sitter across Python, TypeScript/JS, Go) to Git commits and Architectural Decision Records (ADRs) into an integrated temporal knowledge graph.
+          </p>
+        </div>
+        <div class="grid-card">
+          <div class="grid-card-num">02 / UNDERSTAND</div>
+          <div class="grid-card-title">Systemic Risk</div>
+          <p class="grid-card-desc">
+            Executes 10 proactive architectural analyzers to automatically detect circular dependency cycles, high afferent/efferent coupling, and rule conflicts before code ships.
+          </p>
+        </div>
+        <div class="grid-card">
+          <div class="grid-card-num">03 / EXPLAIN</div>
+          <div class="grid-card-title">Evidence Citations</div>
+          <p class="grid-card-desc">
+            Produces traceable, evidence-linked answers anchored to physical files, exact lines, and past ADRs—never unverified guesses or generic hallucinations.
+          </p>
+        </div>
+      </div>
+
+      <h2><span class="section-num">03</span> Demonstrated Technical Readiness (TRL 6)</h2>
+
+      <div class="kpi-row">
+        <div class="kpi-box">
+          <div class="kpi-val">488 / 488</div>
+          <div class="kpi-label">Automated Tests</div>
+          <div class="kpi-sub">100% Passing (0 Fails)</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-val">2,704</div>
+          <div class="kpi-label">Flask Findings</div>
+          <div class="kpi-sub">Multi-Hop Cycles Found</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-val">10 Analyzers</div>
+          <div class="kpi-label">Proactive Risk Engine</div>
+          <div class="kpi-sub">AST & Dependency Graph</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-val">100% On-Prem</div>
+          <div class="kpi-label">Air-Gapped Privacy</div>
+          <div class="kpi-sub">Zero External Code Leaks</div>
+        </div>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 9px; border-radius: 4px; font-size: 7.8pt; color: #475569;">
+        <strong>Audit Verification:</strong> Validated at <strong>Technology Readiness Level 6 (TRL 6)</strong>: <em>Integrated technology demonstrated in a relevant environment</em>. Verified by 488 automated test suites (356 backend pytest, 85 desktop client tests, 47 server setup wizard tests), alongside empirical benchmarks on production open-source codebases (`pallets/flask` and `psf/requests`).
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <span>UNOTUSK PRIVATE LIMITED • Platform Intelligence Dossier</span>
+      <span>Page 1 of 3</span>
+    </div>
+  </div>
+
+  <!-- ================= PAGE 2 ================= -->
+  <div class="page-container">
+    <div class="page-content">
+      <div class="header-bar">
+        <div>
+          <div class="brand-title">UNOTUSK</div>
+          <div class="brand-subtitle">System Architecture & Operational Workflow</div>
+        </div>
+        <div class="meta-badge-box">
+          <div><span class="badge badge-primary">Technical Architecture</span></div>
+          <div class="meta-line">Control Plane: Port 28000 • Data Planes: 28100+</div>
+        </div>
+      </div>
+
+      <h2><span class="section-num">04</span> End-to-End System Architecture</h2>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+        <div style="border: 1px solid #cbd5e1; background: #ffffff; padding: 7px 9px; border-radius: 4px;">
+          <div style="font-weight: 700; font-size: 8.5pt; color: #0f172a; margin-bottom: 3px;">1. Client Tier (Native Desktop Flutter)</div>
+          <p style="font-size: 7.8pt; color: #475569; margin: 0; line-height: 1.3;">
+            • <strong>Unotusk Server Setup App:</strong> Zero-terminal desktop installer for single-command deployment, pre-flight system checks, Docker daemon checks, and port routing.<br>
+            • <strong>Unotusk Employee Client:</strong> 9-tab workspace featuring Ask AI, Architecture Mermaid graphs, Proactive Discoveries, Files, Knowledge/ADRs, and Ingestion Feed.
+          </p>
+        </div>
+        <div style="border: 1px solid #cbd5e1; background: #ffffff; padding: 7px 9px; border-radius: 4px;">
+          <div style="font-weight: 700; font-size: 8.5pt; color: #0f172a; margin-bottom: 3px;">2. Backend Core (FastAPI Async Engine)</div>
+          <p style="font-size: 7.8pt; color: #475569; margin: 0; line-height: 1.3;">
+            • <strong>Parser Engine:</strong> Tree-sitter multi-language AST extraction.<br>
+            • <strong>Context Engine:</strong> Multi-signal ranker combining lexical BM25, vector embeddings, and 1-hop graph traversal.<br>
+            • <strong>Proactive Discovery Engine:</strong> 10 automated architectural analyzers evaluating coupling, cycles, and security gaps.
+          </p>
+        </div>
+      </div>
+
+      <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 7px 9px; border-radius: 4px; margin-bottom: 8px;">
+        <div style="font-weight: 700; font-size: 8.2pt; color: #0f172a; margin-bottom: 2px;">3. Data & Storage Tier (100% Isolated & On-Premise)</div>
+        <div style="font-size: 7.8pt; color: #334155; line-height: 1.3;">
+          • <strong>PostgreSQL 16 + pgvector:</strong> Stores relational context, AST symbol tables, Architectural Decision Records, and vector chunk embeddings.<br>
+          • <strong>Redis 7 + Background Worker:</strong> Asynchronous ingestion pipeline executing code parsing, commit analysis, and report generation without blocking API endpoints.
+        </div>
+      </div>
+
+      <h2><span class="section-num">05</span> The Dual-Video Operational Demonstration</h2>
+
+      <table style="font-size: 7.8pt; margin-bottom: 8px;">
+        <thead>
+          <tr>
+            <th style="width: 28%;">Demonstrated Subsystem</th>
+            <th style="width: 36%;">Observed Workflow in Demo Video</th>
+            <th style="width: 36%;">Core Enterprise Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Unotusk Server Manager</strong><br><em>(Demo Video 1: 75s)</em></td>
+            <td>Multi-server dashboard, automated pre-flight checks (Ports, Docker daemon, Network), LAN endpoint URL publishing (`http://10.0.0.56:28150`).</td>
+            <td>Zero-terminal deployment: IT administrators can configure, spin up, and manage multiple isolated project servers without CLI scripting.</td>
+          </tr>
+          <tr>
+            <td><strong>Employee Desktop Client</strong><br><em>(Demo Video 2: 98s)</em></td>
+            <td>Secure sign-in to local server (`http://10.0.0.56:28000`), project repository switching (`ai-financial-advisor`), live Ask AI query, and architecture inspection.</td>
+            <td>Instant developer adoption: Engineers query the repository with zero setup, receiving cited answers and interactive system flowcharts.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2><span class="section-num">06</span> Product Licensing Tiers & Customer Economics</h2>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 7px; margin-bottom: 4px;">
+        <div>
+          <p style="font-size: 7.8pt; margin-bottom: 4px;">
+            <strong>Annual Software Licensing Schedule:</strong> Self-serve free developer evaluation converts bottom-up into team-wide and company annual licenses.
+          </p>
+          <div style="display: flex; gap: 4px; font-size: 7.2pt; text-align: center;">
+            <div style="flex: 1; background: #f1f5f9; padding: 4px; border-radius: 3px;"><strong>Free</strong><br>Eval</div>
+            <div style="flex: 1; background: #e0f2fe; padding: 4px; border-radius: 3px;"><strong>Starter</strong><br>₹8L / yr</div>
+            <div style="flex: 1; background: #bae6fd; padding: 4px; border-radius: 3px;"><strong>Pro</strong><br>₹16L / yr</div>
+            <div style="flex: 1; background: #7dd3fc; padding: 4px; border-radius: 3px;"><strong>Business</strong><br>₹24L / yr</div>
+            <div style="flex: 1; background: #0f172a; color: white; padding: 4px; border-radius: 3px;"><strong>Enterprise</strong><br>₹30L+ / yr</div>
+          </div>
+        </div>
+        <div style="background: #ecfdf5; border: 1px solid #a7f3d0; padding: 6px 8px; border-radius: 4px;">
+          <div style="font-weight: 700; font-size: 7.2pt; color: #065f46; margin-bottom: 1px;">Customer ROI Impact</div>
+          <div style="font-size: 11pt; font-weight: 800; color: #047857;">~₹95L / Year</div>
+          <div style="font-size: 6.8pt; color: #065f46; line-height: 1.25;">Annual engineering time and rework saved for a 100-developer software firm.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <span>UNOTUSK PRIVATE LIMITED • Platform Intelligence Dossier</span>
+      <span>Page 2 of 3</span>
+    </div>
+  </div>
+
+  <!-- ================= PAGE 3 ================= -->
+  <div class="page-container">
+    <div class="page-content">
+      <div class="header-bar">
+        <div>
+          <div class="brand-title">UNOTUSK</div>
+          <div class="brand-subtitle">Team Governance & Industry Comparison</div>
+        </div>
+        <div class="meta-badge-box">
+          <div><span class="badge badge-dark">5 Partners • 2 Directors</span></div>
+          <div class="meta-line">Karnataka ELEVATE ID: ELENXT20260071</div>
+        </div>
+      </div>
+
+      <h2><span class="section-num">07</span> Team & Governance: 5 Partners, 2 Directors</h2>
+
+      <div class="governance-callout">
+        <strong>Corporate Governance Architecture:</strong><br>
+        UNOTUSK PRIVATE LIMITED operates with <strong>5 Founding Partners</strong> leading cross-functional engineering, product design, growth, and finance operations. Legal directorship and board representation are strictly unified under <strong>2 Promoter Directors</strong>.
+      </div>
+
+      <div style="border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px 8px; margin-bottom: 7px; background: #f8fafc;">
+        <div style="font-size: 7.5pt; font-weight: 700; color: #0f172a; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px;">The 2 Promoter Directors (Board of Directors)</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px; font-size: 7.8pt;">
+          <div>
+            <strong>Dilip Kumar K</strong> — <em>Managing Director & CEO</em><br>
+            <span style="color: #64748b; font-size: 7.2pt;">DIN: 11369590 • 27,500 Shares</span><br>
+            Leads business strategy, client partnerships, and corporate operations.
+          </div>
+          <div>
+            <strong>Velupugonda Bhavani Krishna</strong> — <em>Director & CTO</em><br>
+            <span style="color: #64748b; font-size: 7.2pt;">DIN: 11369592 • 12,000 Shares</span><br>
+            Leads technical architecture, Tree-sitter parsing engines, and AI research.
+          </div>
+        </div>
+      </div>
+
+      <div class="team-grid">
+        <div class="team-member-card">
+          <div class="tm-header">
+            <span class="tm-name">Naren N</span>
+            <span class="tm-role">Partner • CDO</span>
+          </div>
+          <p class="tm-desc">Head of Product Design & UX. Specializes in design systems, interactive Mermaid architectural flowcharts, and the native Warm Dark desktop experience.</p>
+        </div>
+        <div class="team-member-card">
+          <div class="tm-header">
+            <span class="tm-name">Bhuvan S</span>
+            <span class="tm-role">Partner • CFO</span>
+          </div>
+          <p class="tm-desc">Head of Financial Planning & Operations. Manages enterprise commercial contracts, financial modeling, accounting, and compliance runway.</p>
+        </div>
+        <div class="team-member-card" style="grid-column: span 2;">
+          <div class="tm-header">
+            <span class="tm-name">Manjunatha Poojari</span>
+            <span class="tm-role">Partner • CMO</span>
+          </div>
+          <p class="tm-desc">Head of Growth & Customer Acquisition. Focuses on founder-led sales outreach, design partner onboarding, and customer logistics.</p>
+        </div>
+      </div>
+
+      <h2><span class="section-num">08</span> Competitive Matrix: Why Others Fall Short</h2>
+
+      <table style="font-size: 7.8pt; margin-bottom: 7px;">
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>UNOTUSK</th>
+            <th>Cursor / Copilot</th>
+            <th>Glean</th>
+            <th>Claude Code</th>
+            <th>CodeRabbit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Primary Focus</strong></td>
+            <td><strong>Project Memory</strong></td>
+            <td>Code Generation</td>
+            <td>Enterprise Search</td>
+            <td>Agentic Coding</td>
+            <td>PR Code Review</td>
+          </tr>
+          <tr>
+            <td><strong>Multi-Language AST Parsing</strong></td>
+            <td><strong>Deep (Tree-sitter)</strong></td>
+            <td>Surface Context</td>
+            <td>No</td>
+            <td>File-level</td>
+            <td>File-level</td>
+          </tr>
+          <tr>
+            <td><strong>Remembers Decisions & ADRs</strong></td>
+            <td><strong>YES (Temporal)</strong></td>
+            <td>No</td>
+            <td>No</td>
+            <td>No</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><strong>Proactive Architectural Risk Scan</strong></td>
+            <td><strong>YES (10 Analyzers)</strong></td>
+            <td>No</td>
+            <td>No</td>
+            <td>No</td>
+            <td>Linting Only</td>
+          </tr>
+          <tr>
+            <td><strong>Zero-Hallucination Citations</strong></td>
+            <td><strong>100% Physical Code</strong></td>
+            <td>Hallucinates</td>
+            <td>Mixed Links</td>
+            <td>Unverified</td>
+            <td>PR Diff Only</td>
+          </tr>
+          <tr>
+            <td><strong>100% On-Premise Air-Gapped</strong></td>
+            <td><strong>YES (Docker/VPC)</strong></td>
+            <td>Cloud-dependent</td>
+            <td>Cloud Only</td>
+            <td>Cloud API</td>
+            <td>Cloud SaaS</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2><span class="section-num">09</span> Key Knowledge Principles for Communicating Unotusk</h2>
+
+      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px 9px; margin-bottom: 6px;">
+        <div style="font-weight: 700; font-size: 7.8pt; color: #0f172a; margin-bottom: 2px;">The Core Differentiator</div>
+        <div style="font-size: 7.5pt; color: #334155; line-height: 1.35; font-style: italic;">
+          "Competitors focus on code generation (writing lines faster) or conversational chatbots (general reasoning). UNOTUSK is the first platform that preserves WHY software was built, connecting architectural intent and historical decisions directly to every new pull request."
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 7.2pt;">
+        <div style="border: 1px solid #e2e8f0; padding: 5px 6px; border-radius: 4px;">
+          <strong>Air-Gapped Enterprise Security:</strong><br>
+          <span style="color: #475569;">Unlike cloud AI tools, UNOTUSK operates entirely within customer-controlled private networks. Source code, AST models, and decision records never touch external third-party cloud infrastructure.</span>
+        </div>
+        <div style="border: 1px solid #e2e8f0; padding: 5px 6px; border-radius: 4px;">
+          <strong>Deterministic Grounding:</strong><br>
+          <span style="color: #475569;">Every answer returned by the engine is verified against physical file line numbers and verified commits. When evidence is insufficient, it explicitly reports low confidence rather than fabricating answers.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <span>UNOTUSK PRIVATE LIMITED • contact.unotusk.com • +91 9959490999</span>
+      <span>Page 3 of 3</span>
+    </div>
+  </div>
+
+</body>
+</html>

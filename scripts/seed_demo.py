@@ -100,7 +100,17 @@ async def seed_demo():
             session.add(org)
             await session.commit()
             await session.refresh(org)
+            print(f"✓ Created Demo Organization: {org.name}")
+        else:
+            print(f"✓ Found existing Demo Organization: {org.name}")
 
+        # Ensure user is member of organization
+        mem_stmt = select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == org.id,
+            OrganizationMembership.user_id == user.id,
+        )
+        mem = (await session.execute(mem_stmt)).scalar_one_or_none()
+        if not mem:
             mem = OrganizationMembership(
                 id=uuid.uuid4(),
                 organization_id=org.id,
@@ -109,9 +119,7 @@ async def seed_demo():
             )
             session.add(mem)
             await session.commit()
-            print(f"✓ Created Demo Organization: {org.name}")
-        else:
-            print(f"✓ Found existing Demo Organization: {org.name}")
+            print("✓ Added user to organization membership")
 
         # 3. Clean up existing demo project if present for idempotence
         proj_slug = "core-payment-engine"
