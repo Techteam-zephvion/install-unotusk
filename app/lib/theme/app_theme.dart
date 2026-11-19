@@ -296,12 +296,14 @@ class UnoTypography {
     double fontSize = 14,
     FontWeight fontWeight = FontWeight.normal,
     double height = 1.5,
+    double? letterSpacing,
   }) {
     return GoogleFonts.inter(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
       height: height,
+      letterSpacing: letterSpacing,
     );
   }
 }

@@ -1056,146 +1056,156 @@ class _ProjectsScreenState extends State<ProjectsScreen>
 
                                       return Container(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 14, vertical: 11),
+                                            horizontal: 16, vertical: 12),
                                         color: isConnected
                                             ? palette.accent.withValues(alpha: widget.isDark ? 0.05 : 0.08)
                                             : Colors.transparent,
                                         child: Row(
                                           children: [
-                                            // Status dot indicator
-                                            Container(
+                                            // Status green light: only shown when active
+                                            SizedBox(
                                               width: 8,
                                               height: 8,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: isStopped
-                                                    ? palette.textSec.withValues(alpha: 0.35)
-                                                    : (isReady ? palette.live : palette.textSec),
-                                                boxShadow: isReady
-                                                    ? [
-                                                        BoxShadow(
-                                                          color: palette.live.withValues(alpha: 0.5),
-                                                          blurRadius: 4,
-                                                        ),
-                                                      ]
-                                                    : null,
+                                              child: isReady
+                                                  ? Container(
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: const Color(0xFF22C55E),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: const Color(0xFF22C55E).withValues(alpha: 0.65),
+                                                            blurRadius: 6,
+                                                            spreadRadius: 1,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    )
+                                                  : null,
+                                            ),
+                                            const SizedBox(width: 14),
+                                            // Project title (clean and uncluttered, no port numbers or subtitle noise)
+                                            Expanded(
+                                              child: Text(
+                                                project.name,
+                                                style: UnoTypography.body(
+                                                  color: isStopped
+                                                      ? palette.textSec.withValues(alpha: 0.45)
+                                                      : palette.text,
+                                                  fontSize: 13.5,
+                                                  fontWeight: isConnected ? FontWeight.w600 : FontWeight.w500,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                             const SizedBox(width: 12),
-                                            // Project title & details
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    project.name,
-                                                    style: UnoTypography.body(
-                                                      color: isStopped
-                                                          ? palette.textSec
-                                                          : palette.text,
-                                                      fontSize: 13.5,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    isStopped
-                                                        ? 'Offline · Data plane inactive'
-                                                        : (project.port != null
-                                                            ? 'Port ${project.port} · Active server'
-                                                            : 'Port 28000 · Ready'),
-                                                    style: UnoTypography.mono(
-                                                      color: palette.textSec.withValues(alpha: 0.75),
-                                                      fontSize: 10.5,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
                                             // Action button / pill
-                                            if (isStopped)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.transparent,
-                                                  border: Border.all(
-                                                      color: palette.div.withValues(alpha: 0.6)),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  'Offline',
-                                                  style: UnoTypography.mono(
-                                                    color: palette.textSec.withValues(alpha: 0.6),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              )
-                                            else if (isConnected)
-                                              InkWell(
-                                                onTap: () => _toggleProjectConnection(project),
-                                                borderRadius: BorderRadius.circular(6),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10, vertical: 5),
-                                                  decoration: BoxDecoration(
-                                                    color: palette.live.withValues(alpha: 0.12),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                        color: palette.live.withValues(alpha: 0.35)),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.check,
-                                                        size: 13,
-                                                        color: palette.live,
+                                            if (isConnected)
+                                              Material(
+                                                color: Colors.transparent,
+                                                child: InkWell(
+                                                  onTap: () => _toggleProjectConnection(project),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 12, vertical: 5),
+                                                    decoration: BoxDecoration(
+                                                      borderRadius: BorderRadius.circular(20),
+                                                      gradient: LinearGradient(
+                                                        colors: widget.isDark
+                                                            ? [
+                                                                const Color(0xFF22C55E).withValues(alpha: 0.22),
+                                                                const Color(0xFF15803D).withValues(alpha: 0.12),
+                                                              ]
+                                                            : [
+                                                                const Color(0xFFDCFCE7),
+                                                                const Color(0xFFBBF7D0),
+                                                              ],
+                                                        begin: Alignment.topLeft,
+                                                        end: Alignment.bottomRight,
                                                       ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        'Connected',
-                                                        style: UnoTypography.body(
-                                                          color: palette.live,
-                                                          fontSize: 11.5,
-                                                          fontWeight: FontWeight.w600,
+                                                      border: Border.all(
+                                                        color: widget.isDark
+                                                            ? const Color(0xFF4ADE80).withValues(alpha: 0.55)
+                                                            : const Color(0xFF22C55E).withValues(alpha: 0.50),
+                                                        width: 1.1,
+                                                      ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: const Color(0xFF22C55E).withValues(
+                                                              alpha: widget.isDark ? 0.25 : 0.15),
+                                                          blurRadius: 8,
+                                                          offset: const Offset(0, 1),
                                                         ),
-                                                      ),
-                                                    ],
+                                                      ],
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.check_rounded,
+                                                          size: 13.5,
+                                                          color: widget.isDark
+                                                              ? const Color(0xFF4ADE80)
+                                                              : const Color(0xFF15803D),
+                                                        ),
+                                                        const SizedBox(width: 5),
+                                                        Text(
+                                                          'Connected',
+                                                          style: UnoTypography.body(
+                                                            color: widget.isDark
+                                                                ? const Color(0xFF4ADE80)
+                                                                : const Color(0xFF15803D),
+                                                            fontSize: 11.5,
+                                                            fontWeight: FontWeight.w600,
+                                                            letterSpacing: 0.2,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               )
-                                            else
-                                              InkWell(
-                                                onTap: () => _toggleProjectConnection(project),
-                                                borderRadius: BorderRadius.circular(6),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 12, vertical: 5),
-                                                  decoration: BoxDecoration(
-                                                    color: palette.accent,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.add,
-                                                        size: 13,
-                                                        color: buttonFg,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        'Connect',
-                                                        style: UnoTypography.body(
+                                            else if (isReady)
+                                              Material(
+                                                color: Colors.transparent,
+                                                child: InkWell(
+                                                  onTap: () => _toggleProjectConnection(project),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 13, vertical: 5),
+                                                    decoration: BoxDecoration(
+                                                      color: palette.accent,
+                                                      borderRadius: BorderRadius.circular(20),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: palette.accent.withValues(alpha: 0.18),
+                                                          blurRadius: 6,
+                                                          offset: const Offset(0, 1),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.add_rounded,
+                                                          size: 13.5,
                                                           color: buttonFg,
-                                                          fontSize: 11.5,
-                                                          fontWeight: FontWeight.w600,
                                                         ),
-                                                      ),
-                                                    ],
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          'Connect',
+                                                          style: UnoTypography.body(
+                                                            color: buttonFg,
+                                                            fontSize: 11.5,
+                                                            fontWeight: FontWeight.w600,
+                                                            letterSpacing: 0.1,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               ),
