@@ -62,6 +62,10 @@ class GroundedAskRequest(BaseModel):
         default=None,
         description="Optional override for structure-aware STAR-RAG retrieval (default inherits settings.STRUCTURE_AWARE_STAR_RAG_ENABLED)",
     )
+    branch: str | None = Field(
+        default=None,
+        description="Optional branch name to scope question to a specific feature branch",
+    )
 
     @field_validator("question")
     @classmethod

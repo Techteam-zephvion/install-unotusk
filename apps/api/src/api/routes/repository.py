@@ -195,3 +195,37 @@ async def get_project_graph(
 ) -> GraphResponse:
     resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await GraphService.get_project_graph(db, current_user.id, resolved_id)
+
+
+@router.get("/git/branches")
+async def get_git_branches(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await RepositoryService.get_git_branches(db, current_user.id, resolved_id)
+
+
+@router.get("/git/diff")
+async def get_git_diff(
+    project_id: str,
+    base: str = Query(default="HEAD~1"),
+    head: str = Query(default="HEAD"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await RepositoryService.get_git_diff(db, current_user.id, resolved_id, base_ref=base, head_ref=head)
+
+
+@router.get("/git/log")
+async def get_git_log(
+    project_id: str,
+    count: int = Query(default=20, ge=1, le=100),
+    branch: str = Query(default="HEAD"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await RepositoryService.get_git_log(db, current_user.id, resolved_id, count=count, branch=branch)

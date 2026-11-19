@@ -21,6 +21,7 @@ from apps.api.src.api.routes import (
     repository,
     services,
     tasks,
+    webhooks,
 )
 from apps.api.src.config.settings import settings
 from apps.api.src.core.data_plane_middleware import DataPlaneSecurityMiddleware
@@ -171,6 +172,7 @@ for r in [
     knowledge.router,
     services.router,
     tasks.router,
+    webhooks.router,
 ]:
     app.include_router(r, prefix=settings.API_V1_PREFIX)
     app.include_router(r)

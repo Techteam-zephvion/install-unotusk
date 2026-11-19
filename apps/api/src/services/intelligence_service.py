@@ -118,7 +118,24 @@ class IntelligenceService:
     async def _get_active_snapshot(
         session: AsyncSession,
         project_id: uuid.UUID,
+        branch: str | None = None,
     ) -> RepositorySnapshot:
+        if branch:
+            branch_stmt = (
+                select(RepositorySnapshot)
+                .join(Repository, Repository.id == RepositorySnapshot.repository_id)
+                .where(
+                    Repository.project_id == project_id,
+                    RepositorySnapshot.branch == branch,
+                    RepositorySnapshot.status == SnapshotStatus.COMPLETED,
+                )
+                .order_by(RepositorySnapshot.created_at.desc())
+                .limit(1)
+            )
+            branch_snap = (await session.execute(branch_stmt)).scalar_one_or_none()
+            if branch_snap:
+                return branch_snap
+
         stmt = (
             select(RepositorySnapshot)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
@@ -148,9 +165,10 @@ class IntelligenceService:
         conversation_id: uuid.UUID | None = None,
         thinking_tier: str | None = None,
         enable_structure_aware_star_rag: bool | None = None,
+        branch: str | None = None,
     ) -> GroundedAnswerResponse:
         project = await cls._verify_project_access(session, user_id, project_id)
-        snapshot = await cls._get_active_snapshot(session, project_id)
+        snapshot = await cls._get_active_snapshot(session, project_id, branch=branch)
 
         # 1. Resolve or create Conversation
         if conversation_id:

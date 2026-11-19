@@ -706,3 +706,70 @@ class RepositoryService:
 
         await session.commit()
         return synced_records
+
+    @staticmethod
+    def _resolve_repo_working_dir(repo: Repository) -> str:
+        cache_base = os.getenv("UNOTUSK_REPOS_DIR", "/tmp/unotusk-repos")
+        candidate = os.path.join(cache_base, repo.name)
+        if os.path.exists(candidate) and os.path.isdir(candidate):
+            return candidate
+        if os.path.exists(".git"):
+            return os.getcwd()
+        return candidate
+
+    @staticmethod
+    async def get_git_branches(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+        repo_query = select(Repository).where(Repository.project_id == project.id)
+        repo = (await session.execute(repo_query)).scalar_one_or_none()
+        if repo is None:
+            return {"branches": ["main"], "current": "main"}
+
+        repo_dir = RepositoryService._resolve_repo_working_dir(repo)
+        from apps.api.src.services.git_operations import GitOperationsService
+
+        branches = await GitOperationsService.list_branches(repo_dir)
+        current = await GitOperationsService.get_current_branch(repo_dir)
+        return {"branches": branches, "current": current}
+
+    @staticmethod
+    async def get_git_diff(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        base_ref: str = "HEAD~1",
+        head_ref: str = "HEAD",
+    ) -> dict[str, Any]:
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+        repo_query = select(Repository).where(Repository.project_id == project.id)
+        repo = (await session.execute(repo_query)).scalar_one_or_none()
+        if repo is None:
+            return {"success": False, "error": "No connected repository", "diff": "", "files_changed": []}
+
+        repo_dir = RepositoryService._resolve_repo_working_dir(repo)
+        from apps.api.src.services.git_operations import GitOperationsService
+
+        return await GitOperationsService.get_diff(repo_dir, base_ref, head_ref)
+
+    @staticmethod
+    async def get_git_log(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        count: int = 20,
+        branch: str = "HEAD",
+    ) -> list[dict[str, Any]]:
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+        repo_query = select(Repository).where(Repository.project_id == project.id)
+        repo = (await session.execute(repo_query)).scalar_one_or_none()
+        if repo is None:
+            return []
+
+        repo_dir = RepositoryService._resolve_repo_working_dir(repo)
+        from apps.api.src.services.git_operations import GitOperationsService
+
+        return await GitOperationsService.get_commit_log(repo_dir, max_count=count, branch=branch)

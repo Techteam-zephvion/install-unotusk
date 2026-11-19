@@ -253,6 +253,34 @@ class MultiSignalRanker:
                 score *= 0.7
                 reasons.append("Test/mock file demoted for non-test query")
 
+            # 5c. Markdown, README, and documentation demotion for code implementation queries
+            is_explicit_doc_query = any(
+                k in ("readme", "documentation", "docs", "doc", "overview", "guide", "manual")
+                for k in analyzed_query.keywords
+            )
+            is_doc_or_readme = (
+                path_lower.endswith(".md")
+                or path_lower.endswith(".rst")
+                or "readme" in path_lower
+                or "changelog" in path_lower
+                or "/docs/" in path_normalized
+                or path_normalized.startswith("docs/")
+            )
+            if is_doc_or_readme and not is_explicit_doc_query:
+                score *= 0.4
+                reasons.append("Markdown/README demoted for code-first implementation query")
+
+            # 5d. Code AST definition boost for real class, method, function, and interface symbols
+            chunk_type = str(cand.metadata.get("chunk_type", "")).upper()
+            is_code_definition = (
+                cand.entity_type == "CHUNK"
+                and chunk_type in ("CLASS", "METHOD", "FUNCTION", "INTERFACE", "STRUCT", "TYPE")
+            ) or (cand.symbol_id is not None)
+            if is_code_definition:
+                score *= 1.8
+                type_label = chunk_type or "SYMBOL"
+                reasons.append(f"AST code definition boost ({type_label})")
+
             # MemoTime temporal boundary penalty
             if cand.signals.get("memotime_temporal_mismatch"):
                 score *= 0.3
