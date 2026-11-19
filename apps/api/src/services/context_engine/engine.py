@@ -366,6 +366,7 @@ class ProjectContextEngine:
                 project_id=project_id,
                 analyzed_query=analyzed,
                 query_embedding=query_embedding,
+                ranked_candidates=ranked,
             )
 
         # 5c. Global Repository Architecture Skeleton (Macro/Architecture Context Injection)

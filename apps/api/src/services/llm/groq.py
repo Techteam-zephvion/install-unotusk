@@ -149,15 +149,15 @@ class GroqProvider(LLMProvider):
                     )
                 messages.append({"role": "user", "content": user_prompt})
 
-                # Determine if model supports DeepSeek R1 reasoning parameters
-                is_deepseek_r1 = "r1" in model_name.lower() or "deepseek" in model_name.lower()
+                # Determine if model supports DeepSeek R1 / Qwen reasoning parameters
+                is_reasoning_model = any(k in model_name.lower() for k in ("r1", "deepseek", "qwen"))
                 create_kwargs: dict[str, Any] = {
                     "model": model_name,
                     "messages": messages,
                     "max_tokens": 2500,
                     "temperature": 0.1,
                 }
-                if is_deepseek_r1:
+                if is_reasoning_model:
                     create_kwargs["reasoning_effort"] = policy.groq_reasoning_effort
                     create_kwargs["reasoning_format"] = policy.groq_reasoning_format
 
@@ -396,7 +396,7 @@ class GroqProvider(LLMProvider):
             lines.append("")
 
         if top_evidence:
-            lines.append("**Observed Implementation & Integration Details:**")
+            lines.append("**Observed Implementation Details:**")
             for i, ev in enumerate(top_evidence, start=1):
                 ev_type = ev.get("type", "file")
                 if ev_type == "integration" or ev.get("source_reference_id"):

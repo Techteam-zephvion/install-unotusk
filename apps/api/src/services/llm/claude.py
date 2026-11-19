@@ -298,7 +298,7 @@ class ClaudeProvider(LLMProvider):
             lines.append("")
 
         if top_evidence:
-            lines.append("**Observed Implementation & Integration Details:**")
+            lines.append("**Observed Implementation Details:**")
             for i, ev in enumerate(top_evidence, start=1):
                 ev_type = ev.get("type", "file")
                 if ev_type == "integration" or ev.get("source_reference_id"):

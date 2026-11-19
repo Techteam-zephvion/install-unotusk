@@ -18,6 +18,7 @@ class KnowledgeRetriever:
         analyzed_query: AnalyzedQuery,
         query_embedding: list[float] | None = None,
         limit: int = 5,
+        ranked_candidates: list[Any] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         """
         Retrieves active Customer and Integration Project Knowledge relevant to the query.
@@ -78,6 +79,27 @@ class KnowledgeRetriever:
             for k in analyzed_query.keywords
             if k.lower() not in GENERIC_STOPWORDS and len(k) > 1
         }
+        concepts_set = {
+            c.lower()
+            for c in getattr(analyzed_query, "concept_keywords", [])
+            if c.lower() not in GENERIC_STOPWORDS and len(c) > 1
+        }
+
+        ranked_symbols: set[str] = set()
+        ranked_paths: set[str] = set()
+        if ranked_candidates:
+            for cand in ranked_candidates[:8]:
+                sym = getattr(cand, "symbol_name", None) or (
+                    cand.get("symbol_name") if isinstance(cand, dict) else None
+                )
+                fp = getattr(cand, "file_path", None) or (
+                    cand.get("file_path") if isinstance(cand, dict) else None
+                )
+                if sym:
+                    ranked_symbols.add(str(sym).lower())
+                if fp:
+                    ranked_paths.add(str(fp).lower())
+
         raw_query = (analyzed_query.raw_query or "").lower()
         query_explicit_refs = set(
             re.findall(r"(?:#|issue\s*#?|pr\s*#?|pull\s*#?|ticket\s*#?)\s*(\d+)", raw_query)
@@ -107,12 +129,16 @@ class KnowledgeRetriever:
             # Exact symbol match
             if item.related_symbol and item.related_symbol.lower() in symbols_set:
                 score += 10.0
+            elif item.related_symbol and item.related_symbol.lower() in ranked_symbols:
+                score += 6.0
 
             # Exact or partial path match
             if item.related_file_path:
                 norm_path = item.related_file_path.lower()
                 if norm_path in paths_set or any(norm_path.endswith(p) for p in paths_set):
                     score += 8.0
+                elif norm_path in ranked_paths or any(norm_path.endswith(p) for p in ranked_paths):
+                    score += 5.0
 
             # Keyword matches in title and content
             title_lower = item.title.lower()
@@ -122,6 +148,13 @@ class KnowledgeRetriever:
                     score += 3.5
                 if kw in content_lower:
                     score += 1.5
+
+            # Concept expansion matches in title and content
+            for ck in concepts_set:
+                if ck in title_lower:
+                    score += 2.5
+                if ck in content_lower:
+                    score += 1.0
 
             # Semantic vector similarity if query embedding and record embedding exist
             if query_embedding and item.knowledge_metadata:
@@ -139,8 +172,8 @@ class KnowledgeRetriever:
                     except Exception:
                         pass
 
-            # Only retain items that have genuine relevance to the query (score >= 2.0)
-            if score >= 2.0:
+            # Only retain items that have genuine relevance to the query (score >= 1.5)
+            if score >= 1.5:
                 scored_items.append((score, item))
 
         if not scored_items:
