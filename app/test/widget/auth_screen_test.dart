@@ -179,5 +179,8 @@ void main() {
     expect(find.text('Control Plane'), findsOneWidget);
     // Old unstyled monospace string should not be found
     expect(find.textContaining('Server: http://'), findsNothing);
+    // Popup options like Manual IP must not exist in the screen
+    expect(find.text('Manual IP'), findsNothing);
+    expect(find.text('Re-scan Subnet'), findsNothing);
   });
 }
