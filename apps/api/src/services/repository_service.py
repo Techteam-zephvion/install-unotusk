@@ -123,6 +123,78 @@ class RepositoryService:
         }
 
     @staticmethod
+    async def list_project_integrations(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> list[dict]:
+        project = await RepositoryService._verify_project_access(session, user_id, project_id)
+
+        # 1. Fetch real integrations from the database
+        int_query = select(Integration).where(Integration.project_id == project.id)
+        int_res = await session.execute(int_query)
+        integrations = {
+            (integ.provider.value if hasattr(integ.provider, "value") else str(integ.provider)).upper(): integ
+            for integ in int_res.scalars().all()
+        }
+
+        # 2. Fetch repository info if any
+        repo_query = (
+            select(Repository)
+            .where(Repository.project_id == project.id)
+            .order_by(Repository.created_at.desc())
+        )
+        repo_res = await session.execute(repo_query)
+        repo = repo_res.scalars().first()
+
+        # Define standard supported integrations and resolve their real-time state
+        standard_apps = [
+            {"name": "GitHub", "provider": "GITHUB", "icon": "GH"},
+            {"name": "Jira", "provider": "JIRA", "icon": "JR"},
+            {"name": "Confluence", "provider": "CONFLUENCE", "icon": "CF"},
+            {"name": "Linear", "provider": "LINEAR", "icon": "LN"},
+            {"name": "Slack", "provider": "SLACK", "icon": "SL"},
+            {"name": "GitLab", "provider": "GITLAB", "icon": "GL"},
+            {"name": "PagerDuty", "provider": "PAGERDUTY", "icon": "PD"},
+        ]
+
+        out = []
+        for app in standard_apps:
+            provider_key = app["provider"]
+            integ = integrations.get(provider_key)
+
+            is_connected = False
+            details = "Not configured"
+            external_id = None
+            url = None
+
+            if provider_key == "GITHUB":
+                if repo is not None or (integ and integ.status == IntegrationStatus.CONNECTED):
+                    is_connected = True
+                    repo_name = repo.full_name if repo else (integ.integration_metadata.get("username") if integ else "Connected")
+                    details = f"Repository: {repo_name}" if repo else "Account Connected"
+                    external_id = repo.external_id if repo else (integ.external_id if integ else None)
+                    url = repo.url if repo else None
+            elif integ and integ.status == IntegrationStatus.CONNECTED:
+                is_connected = True
+                details = integ.integration_metadata.get("name", "Connected")
+                external_id = integ.external_id
+
+            out.append({
+                "name": app["name"],
+                "icon": app["icon"],
+                "provider": provider_key,
+                "status": "Connected" if is_connected else "Not connected",
+                "details": details,
+                "is_connected": is_connected,
+                "external_id": external_id,
+                "url": url,
+                "connected_at": integ.created_at.isoformat() if (integ and is_connected and hasattr(integ, "created_at") and integ.created_at) else None,
+            })
+
+        return out
+
+    @staticmethod
     async def list_available_repositories(
         session: AsyncSession,
         user_id: uuid.UUID,

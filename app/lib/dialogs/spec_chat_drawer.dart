@@ -92,10 +92,9 @@ class SpecChatDrawer extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   spec.query,
-                  style: UnoTypography.body(
-                    color: palette.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                  style: UnoTypography.accentSerif(
+                    palette: palette,
+                    fontSize: 18,
                   ),
                 ),
                 const SizedBox(height: 8),

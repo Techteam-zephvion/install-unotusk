@@ -182,7 +182,7 @@ class _DiscoveriesScreenState extends State<DiscoveriesScreen> {
                       children: [
                         Text(
                           'Project Discoveries',
-                          style: UnoTypography.body(color: p.text, fontSize: 18, fontWeight: FontWeight.w600),
+                          style: UnoTypography.displaySerif(palette: p, fontSize: 26),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -447,7 +447,7 @@ class _DiscoveriesScreenState extends State<DiscoveriesScreen> {
                                             const SizedBox(height: 10),
                                             Text(
                                               finding.title,
-                                              style: UnoTypography.body(color: p.text, fontSize: 14, fontWeight: FontWeight.w600),
+                                              style: UnoTypography.accentSerif(palette: p, fontSize: 16),
                                             ),
                                             const SizedBox(height: 6),
                                             Text(
@@ -541,7 +541,7 @@ class _DiscoveriesScreenState extends State<DiscoveriesScreen> {
 
           Text(
             finding.title,
-            style: UnoTypography.body(color: p.text, fontSize: 16, fontWeight: FontWeight.w600),
+            style: UnoTypography.accentSerif(palette: p, fontSize: 18),
           ),
           const SizedBox(height: 14),
 

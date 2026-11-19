@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
+
 
 class SettingsModal extends StatefulWidget {
   final UnoPalette palette;
@@ -10,6 +12,7 @@ class SettingsModal extends StatefulWidget {
   final VoidCallback onClose;
   final String defaultTab;
   final UserModel user;
+  final String? projectId;
 
   const SettingsModal({
     super.key,
@@ -19,6 +22,7 @@ class SettingsModal extends StatefulWidget {
     required this.onClose,
     this.defaultTab = 'profile',
     required this.user,
+    this.projectId,
   });
 
   @override
@@ -35,7 +39,11 @@ class _SettingsModalState extends State<SettingsModal> {
     {'id': 'profile', 'label': 'Profile', 'icon': LucideIcons.user},
     {'id': 'appearance', 'label': 'Appearance', 'icon': LucideIcons.palette},
     {'id': 'intelligence', 'label': 'Intelligence', 'icon': LucideIcons.sparkles},
+    {'id': 'apps', 'label': 'Connected Apps', 'icon': LucideIcons.layers},
   ];
+
+  List<Map<String, dynamic>> _connectedApps = [];
+  bool _isLoadingApps = true;
 
   @override
   void initState() {
@@ -44,10 +52,30 @@ class _SettingsModalState extends State<SettingsModal> {
       _activeTab = 'appearance';
     } else if (widget.defaultTab == 'personalization') {
       _activeTab = 'intelligence';
+    } else if (widget.defaultTab == 'apps') {
+      _activeTab = 'apps';
     } else if (_tabs.any((t) => t['id'] == widget.defaultTab)) {
       _activeTab = widget.defaultTab;
     } else {
       _activeTab = 'profile';
+    }
+    _loadConnectedApps();
+  }
+
+  Future<void> _loadConnectedApps() async {
+    setState(() => _isLoadingApps = true);
+    try {
+      final apps = await ApiService.fetchConnectedApps(widget.projectId);
+      if (mounted) {
+        setState(() {
+          _connectedApps = apps;
+          _isLoadingApps = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingApps = false);
+      }
     }
   }
 
@@ -253,6 +281,8 @@ class _SettingsModalState extends State<SettingsModal> {
         return _buildAppearanceTab(palette);
       case 'intelligence':
         return _buildIntelligenceTab(palette);
+      case 'apps':
+        return _buildAppsTab(palette);
       default:
         return _buildProfileTab(palette);
     }
@@ -1126,6 +1156,327 @@ class _SettingsModalState extends State<SettingsModal> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // ─────────────────────────────────────────────────────────────
+  // 4. Connected Apps Tab: Real-Time Integration Statuses
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildAppsTab(UnoPalette palette) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(LucideIcons.layers, size: 17, color: palette.accent),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Connected Integrations',
+                      style: UnoTypography.body(
+                        color: palette.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Real-time status synced with backend (${ApiService.serverHost})',
+                  style: UnoTypography.mono(
+                    color: palette.textSec,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: _isLoadingApps
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: palette.accent,
+                      ),
+                    )
+                  : Icon(LucideIcons.refreshCw,
+                      size: 14, color: palette.textSec),
+              tooltip: 'Refresh real-time status',
+              onPressed: _isLoadingApps ? null : _loadConnectedApps,
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        if (_isLoadingApps)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Querying live server integrations...',
+                    style: UnoTypography.mono(
+                      color: palette.textSec,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ..._connectedApps.map((app) {
+            final isConnected =
+                app['status'] == 'Connected' || app['is_connected'] == true;
+            final details = app['details'] as String? ??
+                (isConnected ? 'Active' : 'Not configured');
+            final provider = app['provider'] as String? ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: palette.bgElevated,
+                border: Border.all(color: palette.div),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: palette.bgSurface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: palette.div),
+                          ),
+                          child: Center(
+                            child: Text(
+                              (app['icon'] as String? ?? '??'),
+                              style: UnoTypography.mono(
+                                color: isConnected
+                                    ? palette.accent
+                                    : palette.textSec,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                app['name'] as String? ?? '',
+                                style: UnoTypography.body(
+                                  color: palette.text,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                details,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: UnoTypography.mono(
+                                  color: isConnected
+                                      ? palette.accent
+                                      : palette.textSec,
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isConnected
+                              ? palette.live.withValues(alpha: 0.12)
+                              : palette.textSec.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isConnected
+                                ? palette.live.withValues(alpha: 0.3)
+                                : palette.div,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isConnected
+                                    ? palette.live
+                                    : palette.textSec,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isConnected ? 'Connected' : 'Not connected',
+                              style: UnoTypography.mono(
+                                color: isConnected
+                                    ? palette.live
+                                    : palette.textSec,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (provider == 'GITHUB' && !isConnected) ...[
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () => _showConnectGitHubDialog(palette),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'Connect',
+                            style: UnoTypography.mono(
+                              color: palette.accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  void _showConnectGitHubDialog(UnoPalette palette) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgSurface,
+        title: Text(
+          'Connect GitHub Repository',
+          style: UnoTypography.body(
+            color: palette.text,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter a GitHub Personal Access Token (or repo owner token) to link with this project:',
+              style: UnoTypography.body(
+                color: palette.textSec,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              style: UnoTypography.mono(
+                color: palette.text,
+                fontSize: 12,
+              ),
+              decoration: InputDecoration(
+                hintText: 'ghp_...',
+                hintStyle: UnoTypography.mono(
+                  color: palette.textSec,
+                  fontSize: 12,
+                ),
+                filled: true,
+                fillColor: palette.bgElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: UnoTypography.body(color: palette.textSec),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final token = controller.text.trim();
+              if (token.isNotEmpty) {
+                final ok = await ApiService.connectGitHub(token, widget.projectId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(ok
+                          ? 'GitHub connected successfully!'
+                          : 'Failed to connect GitHub token'),
+                      backgroundColor: ok ? palette.live : palette.warn,
+                    ),
+                  );
+                  _loadConnectedApps();
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.accent,
+            ),
+            child: Text(
+              'Save Token',
+              style: UnoTypography.body(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
