@@ -455,13 +455,6 @@ class _AuthScreenState extends State<AuthScreen>
               title: _serverToastTitle!,
               description: _serverToastDescription ?? '',
               isDark: isDark,
-              onDismiss: () {
-                _serverNotificationTimer?.cancel();
-                setState(() {
-                  _serverToastTitle = null;
-                  _serverToastDescription = null;
-                });
-              },
             ),
     );
   }
@@ -2461,40 +2454,29 @@ class _TactileServerPillState extends State<_TactileServerPill> {
 // ─────────────────────────────────────────────────────────────
 //  Floating Auto-Vanishing Server Notification Toast HUD
 // ─────────────────────────────────────────────────────────────
-class _ServerToastHUD extends StatefulWidget {
+class _ServerToastHUD extends StatelessWidget {
   final String title;
   final String description;
   final bool isDark;
-  final VoidCallback onDismiss;
 
   const _ServerToastHUD({
     super.key,
     required this.title,
     required this.description,
     required this.isDark,
-    required this.onDismiss,
   });
 
   @override
-  State<_ServerToastHUD> createState() => _ServerToastHUDState();
-}
-
-class _ServerToastHUDState extends State<_ServerToastHUD> {
-  bool _isCloseHovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDark;
-
-    // Luxurious glassmorphic tonal palette
+    // Luxurious solid tonal palette (no BackdropFilter / no margin clipping artifacts)
     final bgColors = isDark
-        ? [const Color(0xFA141926), const Color(0xFA0D111D)]
-        : [const Color(0xFDFDFBF8), const Color(0xF7F4EFE8)];
+        ? const [Color(0xFF161B28), Color(0xFF0F1320)]
+        : const [Color(0xFFFFFFFF), Color(0xFFF7F4EE)];
 
     // Hairline warm terracotta stroke
     final borderColor = isDark
-        ? const Color(0xFFD4725A).withValues(alpha: 0.28)
-        : const Color(0xFFD4725A).withValues(alpha: 0.38);
+        ? const Color(0xFFD4725A).withValues(alpha: 0.35)
+        : const Color(0xFFD4725A).withValues(alpha: 0.45);
 
     final textPrimary =
         isDark ? const Color(0xFFF4F1EC) : const Color(0xFF0B1020);
@@ -2503,129 +2485,82 @@ class _ServerToastHUDState extends State<_ServerToastHUD> {
 
     return Material(
       color: Colors.transparent,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            constraints: const BoxConstraints(maxWidth: 440),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: bgColors,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor, width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.10),
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: const Color(0xFFD4725A).withValues(alpha: 0.07),
-                  blurRadius: 14,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Glowing Icon Badge
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD4725A).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFD4725A).withValues(alpha: 0.22),
-                      width: 0.75,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    LucideIcons.cloudOff,
-                    size: 14.5,
-                    color: Color(0xFFE87A64),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Text Stack (Title + Clean Context)
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: textPrimary,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.1,
-                        ),
-                      ),
-                      if (widget.description.isNotEmpty) ...[
-                        const SizedBox(height: 1.5),
-                        Text(
-                          widget.description,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: textMuted,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Minimal Tactile Close Button
-                MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _isCloseHovered = true),
-                  onExit: (_) => setState(() => _isCloseHovered = false),
-                  child: Tooltip(
-                    message: 'Dismiss',
-                    child: GestureDetector(
-                      onTap: widget.onDismiss,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _isCloseHovered
-                              ? (isDark
-                                  ? Colors.white.withValues(alpha: 0.08)
-                                  : Colors.black.withValues(alpha: 0.06))
-                              : Colors.transparent,
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          LucideIcons.x,
-                          size: 13,
-                          color: _isCloseHovered ? textPrimary : textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: bgColors,
           ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 0.85),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.10),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFFD4725A).withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Glowing Icon Badge
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4725A).withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFD4725A).withValues(alpha: 0.25),
+                  width: 0.75,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                LucideIcons.cloudOff,
+                size: 14,
+                color: Color(0xFFE87A64),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Text Stack (Title + Clean Context)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: GoogleFonts.inter(
+                      color: textMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
       ),
     );
