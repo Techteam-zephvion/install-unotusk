@@ -29,6 +29,7 @@ class _SettingsModalState extends State<SettingsModal> {
   late String _activeTab;
   String _selectedReasoningTier = 'warm';
   String _selectedSpecFormat = 'bdd';
+  final ScrollController _scrollController = ScrollController();
 
   static const List<Map<String, dynamic>> _tabs = [
     {'id': 'profile', 'label': 'Profile', 'icon': LucideIcons.user},
@@ -51,6 +52,21 @@ class _SettingsModalState extends State<SettingsModal> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _switchTab(String tabId) {
+    if (_activeTab != tabId) {
+      setState(() => _activeTab = tabId);
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
 
@@ -58,29 +74,30 @@ class _SettingsModalState extends State<SettingsModal> {
       color: Colors.black.withValues(alpha: widget.isDark ? 0.65 : 0.40),
       child: Center(
         child: Container(
-          width: 760,
-          height: 560,
-          margin: const EdgeInsets.all(20),
+          width: 800,
+          height: 570,
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           decoration: BoxDecoration(
             color: palette.bgSurface,
-            border: Border.all(color: palette.div.withValues(alpha: 0.8)),
-            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: palette.div.withValues(alpha: 0.7)),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: widget.isDark ? 0.55 : 0.22),
-                blurRadius: 54,
-                offset: const Offset(0, 22),
+                color: Colors.black.withValues(alpha: widget.isDark ? 0.50 : 0.18),
+                blurRadius: 48,
+                offset: const Offset(0, 20),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Header Bar ──
+              // ── Symmetric Header Bar ──
               Padding(
-                padding: const EdgeInsets.fromLTRB(26, 20, 20, 18),
+                padding: const EdgeInsets.fromLTRB(24, 18, 18, 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,17 +123,18 @@ class _SettingsModalState extends State<SettingsModal> {
                     InkWell(
                       onTap: widget.onClose,
                       borderRadius: BorderRadius.circular(8),
+                      hoverColor: palette.accent.withValues(alpha: 0.1),
                       child: Container(
-                        width: 32,
-                        height: 32,
+                        width: 30,
+                        height: 30,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: palette.bgElevated,
+                          color: Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: palette.div.withValues(alpha: 0.7)),
                         ),
                         child: Icon(
                           LucideIcons.x,
-                          size: 16,
+                          size: 17,
                           color: palette.textSec,
                         ),
                       ),
@@ -124,37 +142,39 @@ class _SettingsModalState extends State<SettingsModal> {
                   ],
                 ),
               ),
-              Divider(height: 1, thickness: 1, color: palette.div.withValues(alpha: 0.6)),
+              Divider(height: 1, thickness: 1, color: palette.div.withValues(alpha: 0.5)),
 
               // ── Split Layout ──
               Expanded(
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Left Tab Sidebar
                     Container(
-                      width: 210,
+                      width: 190,
                       decoration: BoxDecoration(
                         color: palette.bgSurface,
                         border: Border(
-                          right: BorderSide(color: palette.div.withValues(alpha: 0.6)),
+                          right: BorderSide(color: palette.div.withValues(alpha: 0.5)),
                         ),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
                       child: ListView(
+                        padding: EdgeInsets.zero,
                         children: _tabs.map((t) {
                           final active = _activeTab == t['id'];
                           return InkWell(
-                            onTap: () => setState(() => _activeTab = t['id']),
+                            onTap: () => _switchTab(t['id']),
                             borderRadius: BorderRadius.circular(10),
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
+                              duration: const Duration(milliseconds: 160),
                               margin: const EdgeInsets.only(bottom: 4),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
+                                  horizontal: 12, vertical: 9.5),
                               decoration: BoxDecoration(
                                 color: active
                                     ? palette.accent.withValues(
-                                        alpha: widget.isDark ? 0.12 : 0.15)
+                                        alpha: widget.isDark ? 0.12 : 0.14)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                                 border: active
@@ -166,7 +186,7 @@ class _SettingsModalState extends State<SettingsModal> {
                                 children: [
                                   Icon(
                                     t['icon'] as IconData,
-                                    size: 16,
+                                    size: 15.5,
                                     color: active
                                         ? palette.accent
                                         : palette.textSec,
@@ -184,17 +204,6 @@ class _SettingsModalState extends State<SettingsModal> {
                                           : FontWeight.w500,
                                     ),
                                   ),
-                                  if (active) ...[
-                                    const Spacer(),
-                                    Container(
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: palette.accent,
-                                      ),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),
@@ -203,14 +212,26 @@ class _SettingsModalState extends State<SettingsModal> {
                       ),
                     ),
 
-                    // Right Content Pane
+                    // Right Content Pane with Ultra-Thin Hairline Scrollbar
                     Expanded(
-                      child: Container(
-                        color: palette.bgSurface,
-                        padding: const EdgeInsets.all(28),
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: _buildTabContent(palette),
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                        child: RawScrollbar(
+                          controller: _scrollController,
+                          thumbVisibility: false,
+                          thickness: 1.5,
+                          radius: const Radius.circular(1),
+                          thumbColor: palette.accent.withValues(alpha: 0.35),
+                          padding: const EdgeInsets.only(right: 2, top: 4, bottom: 4),
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 28, vertical: 22),
+                            child: _buildTabContent(palette),
+                          ),
                         ),
                       ),
                     ),
@@ -269,7 +290,7 @@ class _SettingsModalState extends State<SettingsModal> {
       children: [
         Row(
           children: [
-            Icon(LucideIcons.userCheck, size: 18, color: palette.accent),
+            Icon(LucideIcons.userCheck, size: 17, color: palette.accent),
             const SizedBox(width: 8),
             Text(
               'User Profile',
@@ -285,7 +306,7 @@ class _SettingsModalState extends State<SettingsModal> {
 
         // ── Hero Profile Monogram Card ──
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: palette.bgElevated,
             borderRadius: BorderRadius.circular(14),
@@ -308,16 +329,16 @@ class _SettingsModalState extends State<SettingsModal> {
             children: [
               // Monogram Avatar
               Container(
-                width: 60,
-                height: 60,
+                width: 58,
+                height: 58,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: palette.accent,
                   boxShadow: [
                     BoxShadow(
-                      color: palette.accent.withValues(alpha: 0.25),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
+                      color: palette.accent.withValues(alpha: 0.22),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
@@ -328,7 +349,7 @@ class _SettingsModalState extends State<SettingsModal> {
                       color: widget.isDark
                           ? const Color(0xFF0A0F20)
                           : Colors.white,
-                      fontSize: 22,
+                      fontSize: 21,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
@@ -346,7 +367,7 @@ class _SettingsModalState extends State<SettingsModal> {
                           displayName,
                           style: UnoTypography.body(
                             color: palette.text,
-                            fontSize: 17,
+                            fontSize: 16.5,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -354,7 +375,7 @@ class _SettingsModalState extends State<SettingsModal> {
                         // Live Session Beacon
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2.5),
+                              horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFF22C55E).withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(12),
@@ -397,10 +418,10 @@ class _SettingsModalState extends State<SettingsModal> {
                         fontSize: 12.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2.5),
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: palette.accent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
@@ -411,7 +432,7 @@ class _SettingsModalState extends State<SettingsModal> {
                         displayRole.toUpperCase(),
                         style: UnoTypography.mono(
                           color: palette.accent,
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.5,
                         ),
@@ -424,7 +445,7 @@ class _SettingsModalState extends State<SettingsModal> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
 
         // ── Account Details Card ──
         Text(
@@ -450,7 +471,7 @@ class _SettingsModalState extends State<SettingsModal> {
               Divider(
                   height: 1,
                   thickness: 1,
-                  color: palette.div.withValues(alpha: 0.5)),
+                  color: palette.div.withValues(alpha: 0.45)),
               _buildInfoRow('Email Address', displayEmail,
                   icon: LucideIcons.mail,
                   palette: palette,
@@ -458,20 +479,20 @@ class _SettingsModalState extends State<SettingsModal> {
               Divider(
                   height: 1,
                   thickness: 1,
-                  color: palette.div.withValues(alpha: 0.5)),
+                  color: palette.div.withValues(alpha: 0.45)),
               _buildInfoRow('Workspace Role', displayRole,
                   icon: LucideIcons.shieldCheck, palette: palette),
               Divider(
                   height: 1,
                   thickness: 1,
-                  color: palette.div.withValues(alpha: 0.5)),
+                  color: palette.div.withValues(alpha: 0.45)),
               _buildInfoRow('Organization', 'Acme Corporation',
                   icon: LucideIcons.building2, palette: palette),
             ],
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
 
         // ── Security Summary Card ──
         Container(
@@ -525,7 +546,7 @@ class _SettingsModalState extends State<SettingsModal> {
       children: [
         Row(
           children: [
-            Icon(LucideIcons.palette, size: 18, color: palette.accent),
+            Icon(LucideIcons.palette, size: 17, color: palette.accent),
             const SizedBox(width: 8),
             Text(
               'Appearance & Interface',
@@ -537,15 +558,15 @@ class _SettingsModalState extends State<SettingsModal> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
           'Select your workspace theme mode and visual ambiance',
           style: UnoTypography.body(
             color: palette.textSec,
-            fontSize: 12.5,
+            fontSize: 12,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
 
         Text(
           'THEME MODE',
@@ -566,7 +587,7 @@ class _SettingsModalState extends State<SettingsModal> {
                 onTap: () => widget.onThemeChange(true),
                 borderRadius: BorderRadius.circular(14),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: widget.isDark
@@ -577,14 +598,14 @@ class _SettingsModalState extends State<SettingsModal> {
                       color: widget.isDark
                           ? palette.accent
                           : palette.div,
-                      width: widget.isDark ? 1.8 : 1.0,
+                      width: widget.isDark ? 1.6 : 1.0,
                     ),
                     boxShadow: widget.isDark
                         ? [
                             BoxShadow(
-                              color: palette.accent.withValues(alpha: 0.15),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
+                              color: palette.accent.withValues(alpha: 0.14),
+                              blurRadius: 14,
+                              offset: const Offset(0, 3),
                             ),
                           ]
                         : null,
@@ -596,7 +617,7 @@ class _SettingsModalState extends State<SettingsModal> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(7.5),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: const Color(0xFF0A0F20),
@@ -605,7 +626,7 @@ class _SettingsModalState extends State<SettingsModal> {
                             ),
                             child: Icon(
                               LucideIcons.moon,
-                              size: 16,
+                              size: 15,
                               color: palette.accent,
                             ),
                           ),
@@ -621,14 +642,14 @@ class _SettingsModalState extends State<SettingsModal> {
                                 'ACTIVE',
                                 style: UnoTypography.mono(
                                   color: const Color(0xFF0A0F20),
-                                  fontSize: 9.5,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                       Text(
                         'Warm Dark',
                         style: UnoTypography.body(
@@ -652,7 +673,7 @@ class _SettingsModalState extends State<SettingsModal> {
               ),
             ),
 
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
 
             // Light Mode Card
             Expanded(
@@ -660,7 +681,7 @@ class _SettingsModalState extends State<SettingsModal> {
                 onTap: () => widget.onThemeChange(false),
                 borderRadius: BorderRadius.circular(14),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: !widget.isDark
@@ -671,14 +692,14 @@ class _SettingsModalState extends State<SettingsModal> {
                       color: !widget.isDark
                           ? palette.accent
                           : palette.div,
-                      width: !widget.isDark ? 1.8 : 1.0,
+                      width: !widget.isDark ? 1.6 : 1.0,
                     ),
                     boxShadow: !widget.isDark
                         ? [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
+                              blurRadius: 14,
+                              offset: const Offset(0, 3),
                             ),
                           ]
                         : null,
@@ -690,7 +711,7 @@ class _SettingsModalState extends State<SettingsModal> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(7.5),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: const Color(0xFFEFEAE0),
@@ -698,7 +719,7 @@ class _SettingsModalState extends State<SettingsModal> {
                             ),
                             child: const Icon(
                               LucideIcons.sun,
-                              size: 16,
+                              size: 15,
                               color: Color(0xFF181816),
                             ),
                           ),
@@ -714,14 +735,14 @@ class _SettingsModalState extends State<SettingsModal> {
                                 'ACTIVE',
                                 style: UnoTypography.mono(
                                   color: Colors.white,
-                                  fontSize: 9.5,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                       Text(
                         'Warm Light',
                         style: UnoTypography.body(
@@ -747,7 +768,7 @@ class _SettingsModalState extends State<SettingsModal> {
           ],
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
 
         // ── Typography System Spec ──
         Text(
@@ -761,7 +782,7 @@ class _SettingsModalState extends State<SettingsModal> {
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgElevated,
             borderRadius: BorderRadius.circular(12),
@@ -774,13 +795,13 @@ class _SettingsModalState extends State<SettingsModal> {
               Divider(
                   height: 1,
                   thickness: 1,
-                  color: palette.div.withValues(alpha: 0.5)),
+                  color: palette.div.withValues(alpha: 0.45)),
               _buildTypeSpecRow('Interface Body', 'Inter',
                   'High-legibility studio UI and dialogue text', palette),
               Divider(
                   height: 1,
                   thickness: 1,
-                  color: palette.div.withValues(alpha: 0.5)),
+                  color: palette.div.withValues(alpha: 0.45)),
               _buildTypeSpecRow('Technical Mono', 'IBM Plex Mono',
                   'AST symbols, code citations & telemetry', palette),
             ],
@@ -791,7 +812,7 @@ class _SettingsModalState extends State<SettingsModal> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 3. Intelligence Tab: Real Reasoning Tiers & Specs
+  // 3. Intelligence Tab: Real Reasoning Tiers & Wrapped Specs
   // ─────────────────────────────────────────────────────────────
   Widget _buildIntelligenceTab(UnoPalette palette) {
     return Column(
@@ -799,7 +820,7 @@ class _SettingsModalState extends State<SettingsModal> {
       children: [
         Row(
           children: [
-            Icon(LucideIcons.sparkles, size: 18, color: palette.accent),
+            Icon(LucideIcons.sparkles, size: 17, color: palette.accent),
             const SizedBox(width: 8),
             Text(
               'Intelligence & Reasoning',
@@ -811,15 +832,15 @@ class _SettingsModalState extends State<SettingsModal> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
           'Configure AI reasoning depth and architectural specification outputs',
           style: UnoTypography.body(
             color: palette.textSec,
-            fontSize: 12.5,
+            fontSize: 12,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
 
         Text(
           'DEFAULT REASONING DEPTH',
@@ -859,7 +880,7 @@ class _SettingsModalState extends State<SettingsModal> {
           palette: palette,
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
 
         Text(
           'SPECIFICATION OUTPUT FORMAT',
@@ -871,12 +892,14 @@ class _SettingsModalState extends State<SettingsModal> {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
+
+        // Wrap guarantees zero overflow on any window or font scaling!
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _buildSpecFormatChip('bdd', 'Gherkin BDD Contracts', palette),
-            const SizedBox(width: 8),
             _buildSpecFormatChip('adr', 'Markdown ADR Records', palette),
-            const SizedBox(width: 8),
             _buildSpecFormatChip('ts', 'TypeScript Interfaces', palette),
           ],
         ),
@@ -898,27 +921,27 @@ class _SettingsModalState extends State<SettingsModal> {
       onTap: () => setState(() => _selectedReasoningTier = id),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(14),
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
           color: isSelected
-              ? badgeColor.withValues(alpha: widget.isDark ? 0.12 : 0.08)
+              ? badgeColor.withValues(alpha: widget.isDark ? 0.10 : 0.07)
               : palette.bgElevated,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? badgeColor : palette.div,
-            width: isSelected ? 1.5 : 1.0,
+            color: isSelected ? badgeColor.withValues(alpha: 0.65) : palette.div,
+            width: isSelected ? 1.4 : 1.0,
           ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(7.5),
               decoration: BoxDecoration(
                 color: badgeColor.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, size: 16, color: badgeColor),
+              child: Icon(icon, size: 15.5, color: badgeColor),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -939,26 +962,26 @@ class _SettingsModalState extends State<SettingsModal> {
                     style: UnoTypography.body(
                       color: palette.textSec,
                       fontSize: 11.5,
-                      height: 1.3,
+                      height: 1.32,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Container(
-              width: 16,
-              height: 16,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? badgeColor : palette.textSec,
-                  width: 1.8,
+                  color: isSelected ? badgeColor : palette.div,
+                  width: 1.5,
                 ),
                 color: isSelected ? badgeColor : Colors.transparent,
               ),
               child: isSelected
-                  ? Icon(Icons.check, size: 11, color: widget.isDark ? Colors.black : Colors.white)
+                  ? Icon(Icons.check, size: 12, color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white)
                   : null,
             ),
           ],
@@ -974,8 +997,8 @@ class _SettingsModalState extends State<SettingsModal> {
       onTap: () => setState(() => _selectedSpecFormat = id),
       borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
         decoration: BoxDecoration(
           color: isSelected
               ? palette.accent.withValues(alpha: widget.isDark ? 0.16 : 0.14)
@@ -1007,7 +1030,7 @@ class _SettingsModalState extends State<SettingsModal> {
     bool isMono = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       child: Row(
         children: [
           Icon(icon, size: 15, color: palette.textSec),
@@ -1068,12 +1091,12 @@ class _SettingsModalState extends State<SettingsModal> {
   Widget _buildTypeSpecRow(
       String category, String fontName, String usage, UnoPalette palette) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 116,
             child: Text(
               category,
               style: UnoTypography.body(
@@ -1094,7 +1117,7 @@ class _SettingsModalState extends State<SettingsModal> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1.5),
                 Text(
                   usage,
                   style: UnoTypography.body(

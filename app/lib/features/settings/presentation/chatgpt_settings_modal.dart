@@ -21,6 +21,7 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
   String _selectedReasoningTier = 'warm';
   String _selectedSpecFormat = 'bdd';
   String _selectedTheme = 'Dark';
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -31,6 +32,21 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
       _activeTab = 'personalization';
     } else {
       _activeTab = 'profile';
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _switchTab(String tabId) {
+    if (_activeTab != tabId) {
+      setState(() => _activeTab = tabId);
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
     }
   }
 
@@ -118,7 +134,7 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
                         children: _tabs.map((tab) {
                           final bool isActive = _activeTab == tab['id'];
                           return InkWell(
-                            onTap: () => setState(() => _activeTab = tab['id'] as String),
+                            onTap: () => _switchTab(tab['id'] as String),
                             borderRadius: BorderRadius.circular(10),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 180),
@@ -157,13 +173,25 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
                       ),
                     ),
 
-                    // Right Content Pane
+                    // Right Content Pane with Ultra-Thin Hairline Scrollbar
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(28),
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: _buildTabContent(),
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                        child: RawScrollbar(
+                          controller: _scrollController,
+                          thumbVisibility: false,
+                          thickness: 1.5,
+                          radius: const Radius.circular(1),
+                          thumbColor: AppColors.accent.withValues(alpha: 0.35),
+                          padding: const EdgeInsets.only(right: 2, top: 4, bottom: 4),
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+                            child: _buildTabContent(),
+                          ),
                         ),
                       ),
                     ),
@@ -478,12 +506,12 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
         ),
         const SizedBox(height: 10),
 
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _buildSpecChip('bdd', 'Gherkin BDD Contracts'),
-            const SizedBox(width: 8),
             _buildSpecChip('adr', 'Markdown ADR Records'),
-            const SizedBox(width: 8),
             _buildSpecChip('ts', 'TypeScript Interfaces'),
           ],
         ),
