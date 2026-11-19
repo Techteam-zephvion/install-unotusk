@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -150,24 +151,56 @@ class _ChatScreenState extends State<ChatScreen> {
                       Text(
                         '${_getGreeting()}, $name',
                         textAlign: TextAlign.center,
-                        style: UnoTypography.displaySerif(
-                          palette: widget.palette,
-                          fontSize: 33,
+                        style: GoogleFonts.youngSerif(
+                          fontSize: 38,
+                          color: widget.palette.text,
+                          letterSpacing: -0.7,
+                          height: 1.15,
+                          shadows: [
+                            Shadow(
+                              color: widget.palette.text.withValues(
+                                alpha: widget.palette.isDark ? 0.22 : 0.07,
+                              ),
+                              blurRadius: 16,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.projectName != null &&
-                                widget.projectName!.isNotEmpty
-                            ? 'Investigate ${formatDisplayTitle(widget.projectName!)}, architecture, or code decisions'
-                            : 'Investigate your project, architecture, or code decisions',
+                      const SizedBox(height: 10),
+                      Text.rich(
+                        TextSpan(
+                          style: GoogleFonts.inter(
+                            color: widget.palette.textSec,
+                            fontSize: 16.5,
+                            height: 1.5,
+                            letterSpacing: 0.1,
+                          ),
+                          children: [
+                            const TextSpan(text: 'Investigate '),
+                            if (widget.projectName != null &&
+                                widget.projectName!.isNotEmpty) ...[
+                              TextSpan(
+                                text: formatDisplayTitle(widget.projectName!),
+                                style: GoogleFonts.inter(
+                                  color: widget.palette.text,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              const TextSpan(
+                                  text: ', architecture, or code decisions'),
+                            ] else ...[
+                              const TextSpan(
+                                text:
+                                    'your project, architecture, or code decisions',
+                              ),
+                            ],
+                          ],
+                        ),
                         textAlign: TextAlign.center,
-                        style: UnoTypography.body(
-                          color: widget.palette.textSec,
-                          fontSize: 15,
-                        ),
                       ),
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 30),
                       ChatInputBox(
                         controller: _inputController,
                         palette: widget.palette,
