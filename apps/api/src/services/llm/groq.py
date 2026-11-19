@@ -202,7 +202,7 @@ class GroqProvider(LLMProvider):
                     # If content is empty but model produced reasoning output, use it
                     if not content and hasattr(raw_msg, "reasoning") and raw_msg.reasoning:
                         content = raw_msg.reasoning
-                
+
                 # If still empty, perform fallback generation on fallback model
                 if (not content or not content.strip()) and create_kwargs.get("model") != "llama-3.1-8b-instant":
                     try:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
-from sqlalchemy import func, select
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.models.dependency import CodeDependency
@@ -122,7 +122,7 @@ class RepositorySkeletonBuilder:
         data_symbols: list[str] = []
         infra_symbols: list[str] = []
 
-        for name, qname, stype, fpath in all_symbols:
+        for name, qname, _stype, fpath in all_symbols:
             low = f"{name} {qname} {fpath}".lower()
             ref_str = f"`{name}` ({fpath})"
 
