@@ -1128,6 +1128,13 @@ class ApiService {
     if (files.isEmpty && citations.isNotEmpty) {
       files.addAll(citations.take(4));
     }
+    if (files.isEmpty) {
+      for (final ev in evidence) {
+        if (ev.file.isNotEmpty && !files.contains(ev.file)) {
+          files.add(ev.file);
+        }
+      }
+    }
 
     // Extract connected components
     final compMatch = RegExp(

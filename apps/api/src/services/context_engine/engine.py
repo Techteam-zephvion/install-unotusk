@@ -366,10 +366,25 @@ class ProjectContextEngine:
                 analyzed_query=analyzed,
             )
 
+        # 5c. Global Repository Architecture Skeleton (Macro/Architecture Context Injection)
+        skeleton_context = ""
+        if analyzed.is_architectural_query or len(ranked) < 5:
+            try:
+                from apps.api.src.services.context_engine.skeleton import RepositorySkeletonBuilder
+
+                skeleton_context = await RepositorySkeletonBuilder.build_skeleton(
+                    session=session,
+                    snapshot_id=snapshot_id,
+                )
+            except Exception:
+                skeleton_context = ""
+
         full_prompt_context = assembled.prompt_context
+        if skeleton_context:
+            full_prompt_context = f"{skeleton_context}\n\n## DETAILED REPOSITORY CODE EVIDENCE\n{full_prompt_context}"
         if knowledge_context:
             full_prompt_context = (
-                f"{knowledge_context}\n\n## REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}"
+                f"{knowledge_context}\n\n{full_prompt_context}"
             )
 
         # 6. LLM Grounded Synthesis (Claude, Groq, or deterministic offline)
@@ -391,6 +406,8 @@ class ProjectContextEngine:
                 "symbols_detected": analyzed.symbol_candidates,
                 "paths_detected": analyzed.path_candidates,
                 "concept_keywords": analyzed.concept_keywords,
+                "is_architectural_query": analyzed.is_architectural_query,
+                "skeleton_injected": bool(skeleton_context),
                 "vector_search_used": has_vector,
                 "semantic_search_used": has_semantic,
                 "graph_traversal_depth": 2,

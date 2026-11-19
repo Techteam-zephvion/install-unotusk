@@ -178,9 +178,12 @@ class ContextAssembler:
         for r in ranked_candidates:
             cand = r.candidate
 
-            # Truncate overly long content (e.g., max 1500 chars per single candidate)
-            truncated_content = cand.content[:1500]
-            if len(cand.content) > 1500:
+            # Compact whitespace and format content (max 2500 chars per candidate)
+            compact_content = "\n".join(
+                line for line in cand.content.splitlines() if line.strip()
+            ) if cand.content else ""
+            truncated_content = compact_content[:2500]
+            if len(compact_content) > 2500:
                 truncated_content += "\n... [truncated]"
 
             commit_info = ""

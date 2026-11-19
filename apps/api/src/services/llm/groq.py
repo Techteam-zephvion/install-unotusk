@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from typing import Any
 
 from apps.api.src.config.settings import settings
@@ -105,15 +106,23 @@ class GroqProvider(LLMProvider):
                 if conversation_history:
                     for msg in conversation_history[-4:]:
                         c_text = str(msg.get("content", ""))
-                        if len(c_text) > 500:
-                            c_text = c_text[:500] + "..."
+                        # Sanitize previous turns to prevent TPM exhaustion:
+                        # 1. Strip bulky previous mermaid blocks from history
+                        c_text = re.sub(r"```mermaid[\s\S]*?```", "[Diagram shown previously]", c_text)
+                        # 2. Strip large code blocks from history
+                        c_text = re.sub(r"```[\s\S]*?```", "[Code snippet shown previously]", c_text)
+                        # 3. Omit previous error notices or unhelpful status banners
+                        if any(err_token in c_text for err_token in ("Groq Service Notice", "No response generated", "Server Response:")):
+                            continue
+                        if len(c_text) > 400:
+                            c_text = c_text[:400] + "..."
                         messages.append({"role": msg["role"], "content": c_text})
 
                 # Cap context characters based on model capacity:
-                # 70B has a tight 6,000 TPM limit; cap context to 6,000 chars (~1.5k tokens) to prevent 429s.
-                # 8B has a 30,000 TPM limit; allow up to 14,000 chars (~3.5k tokens).
+                # 70B has a tight 6,000 TPM limit; cap context to 7,500 chars to prevent 429s.
+                # 8B / 9B has a 30,000 TPM limit; allow up to 28,000 chars (~7k tokens).
                 model_name = self.model or "llama-3.1-8b-instant"
-                max_ctx_chars = 6000 if "70b" in model_name.lower() else 14000
+                max_ctx_chars = 7500 if "70b" in model_name.lower() else 28000
                 safe_context = project_context
                 if len(safe_context) > max_ctx_chars:
                     safe_context = safe_context[:max_ctx_chars] + "\n... [context trimmed to stay within rate limit]"
@@ -126,13 +135,14 @@ class GroqProvider(LLMProvider):
                     f"Please provide an evidence-grounded answer based strictly on the above context."
                 )
                 q_lower = question.lower()
-                if any(k in q_lower for k in ("diagram", "architecture", "flowchart", "workflow", "design", "sequence", "graph", "structure", "spec")):
+                if any(k in q_lower for k in ("diagram", "architecture", "flowchart", "workflow", "design", "sequence", "graph", "structure", "spec", "overview", "components")):
                     user_prompt += (
                         "\n\nDIAGRAM REQUIREMENT:\n"
-                        "Include a tailored, syntactically valid Mermaid diagram (```mermaid ... ```) illustrating the "
-                        "specific components, modules, dependencies, and execution flow for this question. "
+                        "You MUST generate a comprehensive, deeply tailored Mermaid diagram (```mermaid ... ```) "
+                        "illustrating the REAL components, modules, dependencies, and execution flow found in the context above. "
+                        "Include 8 to 15 distinct nodes grouped into semantic subgraphs (e.g. UI, API / Controllers, Domain Services, Data Models, Infrastructure). "
                         "Always enclose node labels in double quotes (e.g. NodeId[\"Module Name (detail)\"]) to ensure valid parsing, "
-                        "and organize components into semantic subgraphs with distinct directional flow."
+                        "and declare the diagram type on the very first line inside the code fence (e.g. flowchart TD)."
                     )
                 messages.append({"role": "user", "content": user_prompt})
 
@@ -141,7 +151,7 @@ class GroqProvider(LLMProvider):
                 create_kwargs: dict[str, Any] = {
                     "model": model_name,
                     "messages": messages,
-                    "max_tokens": 2000,
+                    "max_tokens": 2500,
                     "temperature": 0.1,
                 }
                 if is_deepseek_r1:
@@ -189,6 +199,21 @@ class GroqProvider(LLMProvider):
                     # If content is empty but model produced reasoning output, use it
                     if not content and hasattr(raw_msg, "reasoning") and raw_msg.reasoning:
                         content = raw_msg.reasoning
+                
+                # If still empty, perform fallback generation on fallback model
+                if (not content or not content.strip()) and create_kwargs.get("model") != "llama-3.1-8b-instant":
+                    try:
+                        create_kwargs["model"] = "llama-3.1-8b-instant"
+                        create_kwargs["messages"] = [
+                            {"role": "system", "content": system_content},
+                            {"role": "user", "content": user_prompt},
+                        ]
+                        retry_resp = await self._client.chat.completions.create(**create_kwargs)
+                        if retry_resp and retry_resp.choices:
+                            content = retry_resp.choices[0].message.content
+                    except Exception as retry_err:
+                        logger.warning(f"Fallback retry failed: {retry_err}")
+
                 content = content or "No response generated."
 
                 prompt_tokens = (
