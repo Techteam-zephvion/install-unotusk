@@ -85,7 +85,7 @@ class ServerSwitcherButton extends ConsumerWidget {
     final currentPort = currentUri?.port ?? 28000;
     
     final currentServer = serverList.where((s) => s.apiPort == currentPort).firstOrNull;
-    final displayLabel = currentServer?.name ?? 'Server on $currentPort';
+    final displayLabel = currentServer?.name ?? 'Server Instance';
 
     return PopupMenuButton<String>(
       color: isDark ? AppColors.bgElevated : AppColors.bgElevatedLight,
@@ -98,7 +98,7 @@ class ServerSwitcherButton extends ConsumerWidget {
       itemBuilder: (context) => serverList.map((p) {
         return PopupMenuItem(
           value: p.id,
-          child: Text('${p.name} (Port: ${p.apiPort})', style: AppTextStyles.inter(fontSize: 13)),
+          child: Text(p.name, style: AppTextStyles.inter(fontSize: 13)),
         );
       }).toList(),
       child: Container(

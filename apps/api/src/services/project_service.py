@@ -376,7 +376,7 @@ class ProjectService:
                     organization_id=organization_id,
                     name=server.name.strip(),
                     slug=slug,
-                    description=server.description or f"Server instance for {server.name}",
+                    description=server.description,
                     status=target_status,
                     port=server.port,
                 )

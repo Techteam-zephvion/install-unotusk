@@ -25,6 +25,8 @@ class AssembledContext:
     candidate_count: int = 0
     proof_chains: list[dict[str, Any]] = field(default_factory=list)
     proof_chain_count: int = 0
+    evidence_paths: list[dict[str, Any]] = field(default_factory=list)
+    evidence_path_count: int = 0
 
 
 class ContextAssembler:
@@ -33,6 +35,7 @@ class ContextAssembler:
         ranked_candidates: list[RankedCandidate],
         max_tokens: int | None = None,
         proof_chains: list[Any] | None = None,
+        evidence_paths: list[Any] | None = None,
     ) -> AssembledContext:
         budget_tokens = max_tokens or settings.CONTEXT_BUDGET_TOKENS
         # Approximate 4 characters per token
@@ -171,9 +174,149 @@ class ContextAssembler:
                         related_entities.add(h.target_entity)
 
         # -------------------------------------------------------------
+        # 1b. Format Structure-Aware STAR-RAG Evidence Paths (<= 25% budget)
+        # -------------------------------------------------------------
+        formatted_evidence_paths: list[dict[str, Any]] = []
+        evidence_path_sections: list[str] = []
+        path_budget_chars = min(int(char_budget * 0.25), 2500) if evidence_paths else 0
+        current_path_chars = 0
+
+        if evidence_paths:
+            for ep in evidence_paths:
+                full_path_str = getattr(ep, "full_path_str", None) or (
+                    ep.get("full_path_str", "") if isinstance(ep, dict) else ""
+                )
+                source_ent = getattr(ep, "source_entity", None) or (
+                    ep.get("source_entity", "") if isinstance(ep, dict) else ""
+                )
+                target_ent = getattr(ep, "target_entity", None) or (
+                    ep.get("target_entity", "") if isinstance(ep, dict) else ""
+                )
+                hops = getattr(ep, "hops", None) or (
+                    ep.get("hops", []) if isinstance(ep, dict) else []
+                )
+                conf = getattr(ep, "confidence", None) or (
+                    ep.get("confidence", 1.0) if isinstance(ep, dict) else 1.0
+                )
+                path_id = getattr(ep, "path_id", None) or (
+                    ep.get("path_id", "") if isinstance(ep, dict) else f"path:{uuid.uuid4().hex[:8]}"
+                )
+
+                if not hops and not full_path_str:
+                    continue
+
+                hop_lines = []
+                for idx, h in enumerate(hops, start=1):
+                    s_name = getattr(h, "source_name", None) or (
+                        h.get("source_name") if isinstance(h, dict) else ""
+                    )
+                    t_name = getattr(h, "target_name", None) or (
+                        h.get("target_name") if isinstance(h, dict) else ""
+                    )
+                    rel = getattr(h, "relation", None) or (
+                        h.get("relation") if isinstance(h, dict) else "CALLS"
+                    )
+                    s_file = getattr(h, "source_file", None) or (
+                        h.get("source_file") if isinstance(h, dict) else ""
+                    )
+                    t_file = getattr(h, "target_file", None) or (
+                        h.get("target_file") if isinstance(h, dict) else ""
+                    )
+                    line_no = getattr(h, "line_number", 1) or (
+                        h.get("line_number", 1) if isinstance(h, dict) else 1
+                    )
+                    hop_lines.append(
+                        f"  {idx}. ({s_name}, {rel}, {t_name}) [{s_file} -> {t_file}] (line {line_no})"
+                    )
+
+                hops_formatted = "\n".join(hop_lines) if hop_lines else f"  - {full_path_str}"
+                path_text = (
+                    f"### [STRUCTURE-AWARE STAR-RAG EVIDENCE PATH] {source_ent} -> {target_ent}\n"
+                    f"- Call Hierarchy: {full_path_str}\n"
+                    f"- Structural Confidence: {float(conf):.2f}\n"
+                    f"- Traversed Hops:\n{hops_formatted}\n"
+                )
+
+                if current_path_chars + len(path_text) > path_budget_chars and formatted_evidence_paths:
+                    break
+
+                evidence_path_sections.append(path_text)
+                current_path_chars += len(path_text)
+
+                first_file = ""
+                first_line = "1"
+                if hops:
+                    h0 = hops[0]
+                    first_file = getattr(h0, "source_file", None) or (
+                        h0.get("source_file") if isinstance(h0, dict) else ""
+                    )
+                    first_line = str(
+                        getattr(h0, "line_number", "1")
+                        or (h0.get("line_number", "1") if isinstance(h0, dict) else "1")
+                    )
+
+                first_rel = "CALLS"
+                if hops:
+                    h0 = hops[0]
+                    first_rel = getattr(h0, "relation", "CALLS") if not isinstance(h0, dict) else h0.get("relation", "CALLS")
+
+                path_item: dict[str, Any] = {
+                    "type": "evidence_path",
+                    "file": first_file,
+                    "symbol": f"{source_ent} -> {target_ent}",
+                    "lines": first_line,
+                    "relevance": round(float(conf), 4),
+                    "snippet": f"Structural call path: {full_path_str}",
+                    "path_id": path_id,
+                    "source_entity": source_ent,
+                    "target_entity": target_ent,
+                    "full_path_str": full_path_str,
+                    "relationship_path": full_path_str,
+                    "relationship_type": first_rel,
+                    "relationship_hop": len(hops),
+                    "connected_from": source_ent,
+                    "retrieval_reason": f"STAR-RAG Structure-Aware path: {full_path_str}",
+                    "hops": [
+                        {
+                            "hop_index": getattr(h, "hop_index", i) if not isinstance(h, dict) else h.get("hop_index", i),
+                            "source": getattr(h, "source_name", "") if not isinstance(h, dict) else h.get("source_name", ""),
+                            "source_file": getattr(h, "source_file", "") if not isinstance(h, dict) else h.get("source_file", ""),
+                            "relation": getattr(h, "relation", "") if not isinstance(h, dict) else h.get("relation", ""),
+                            "target": getattr(h, "target_name", "") if not isinstance(h, dict) else h.get("target_name", ""),
+                            "target_file": getattr(h, "target_file", "") if not isinstance(h, dict) else h.get("target_file", ""),
+                            "line_number": getattr(h, "line_number", 1) if not isinstance(h, dict) else h.get("line_number", 1),
+                        }
+                        for i, h in enumerate(hops)
+                    ],
+                    "provenance": {
+                        "engine": "structure_aware_star_rag",
+                        "path_id": path_id,
+                        "hops_count": len(hops),
+                    },
+                }
+                formatted_evidence_paths.append(path_item)
+                evidence_items.append(path_item)
+
+                if source_ent:
+                    related_entities.add(source_ent)
+                if target_ent:
+                    related_entities.add(target_ent)
+                for h in hops:
+                    sn = getattr(h, "source_name", None) or (
+                        h.get("source_name") if isinstance(h, dict) else None
+                    )
+                    tn = getattr(h, "target_name", None) or (
+                        h.get("target_name") if isinstance(h, dict) else None
+                    )
+                    if sn:
+                        related_entities.add(sn)
+                    if tn:
+                        related_entities.add(tn)
+
+        # -------------------------------------------------------------
         # 2. Format Candidate Code Chunks
         # -------------------------------------------------------------
-        current_chars += current_proof_chars
+        current_chars += current_proof_chars + current_path_chars
 
         for r in ranked_candidates:
             cand = r.candidate
@@ -364,8 +507,11 @@ class ContextAssembler:
         if proof_chain_sections:
             context_parts.append("## EVOREASONER GROUNDED PROOF CHAINS\n" + "\n".join(proof_chain_sections))
 
+        if evidence_path_sections:
+            context_parts.append("## STRUCTURE-AWARE STAR-RAG EVIDENCE PATHS\n" + "\n".join(evidence_path_sections))
+
         if sections:
-            if proof_chain_sections:
+            if proof_chain_sections or evidence_path_sections:
                 context_parts.append("## REPOSITORY CODE EVIDENCE\n" + "\n".join(sections))
             else:
                 context_parts.append("\n".join(sections))
@@ -384,4 +530,6 @@ class ContextAssembler:
             candidate_count=used_count,
             proof_chains=formatted_proof_chains,
             proof_chain_count=len(formatted_proof_chains),
+            evidence_paths=formatted_evidence_paths,
+            evidence_path_count=len(formatted_evidence_paths),
         )

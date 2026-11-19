@@ -61,7 +61,8 @@ class _AuthScreenState extends State<AuthScreen>
   bool _isScanning = false;
   ServerDiscoveryResult? _discoveryResult;
   Timer? _healthTimer;
-  String? _serverNotificationToast;
+  String? _serverToastTitle;
+  String? _serverToastDescription;
   Timer? _serverNotificationTimer;
   late bool _localIsDark;
 
@@ -170,16 +171,21 @@ class _AuthScreenState extends State<AuthScreen>
           );
   }
 
-  void _showServerErrorToast(String message) {
+  void _showServerErrorToast({
+    required String title,
+    String description = '',
+  }) {
     _serverNotificationTimer?.cancel();
     if (!mounted) return;
     setState(() {
-      _serverNotificationToast = message;
+      _serverToastTitle = title;
+      _serverToastDescription = description;
     });
     _serverNotificationTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) {
         setState(() {
-          _serverNotificationToast = null;
+          _serverToastTitle = null;
+          _serverToastDescription = null;
         });
       }
     });
@@ -197,7 +203,10 @@ class _AuthScreenState extends State<AuthScreen>
         _discoveryResult = result;
       });
       if (!_isServerConnected && !result.isSuccess) {
-        _showServerErrorToast('No Unotusk servers found on local network.');
+        _showServerErrorToast(
+          title: 'Unable to Connect to Server',
+          description: 'No active Unotusk instance was found on local network',
+        );
       }
     }
   }
@@ -210,7 +219,10 @@ class _AuthScreenState extends State<AuthScreen>
         _isServerConnected = ok;
       });
       if (wasConnected && !ok) {
-        _showServerErrorToast('Lost connection to Unotusk Control Plane.');
+        _showServerErrorToast(
+          title: 'Server Connection Lost',
+          description: 'The Unotusk Control Plane is no longer responding',
+        );
       }
     }
   }
@@ -289,7 +301,8 @@ class _AuthScreenState extends State<AuthScreen>
           lower.contains('network is unreachable') ||
           lower.contains('timed out')) {
         _showServerErrorToast(
-          'Server unreachable at ${_formatEndpoint(ApiService.baseUrl)}',
+          title: 'Unable to Connect to Server',
+          description: 'Please ensure your local Unotusk server is running',
         );
       } else {
         setState(() {
@@ -359,7 +372,8 @@ class _AuthScreenState extends State<AuthScreen>
           lower.contains('network is unreachable') ||
           lower.contains('timed out')) {
         _showServerErrorToast(
-          'Server unreachable at ${_formatEndpoint(ApiService.baseUrl)}',
+          title: 'Unable to Connect to Server',
+          description: 'Please ensure your local Unotusk server is running',
         );
       } else {
         setState(() {
@@ -409,15 +423,8 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  static String _formatEndpoint(String url) {
-    final clean = url
-        .trim()
-        .replaceFirst(RegExp(r'^https?:\/\/'), '')
-        .replaceFirst(RegExp(r'\/+$'), '');
-    return clean.isEmpty ? '127.0.0.1:28000' : clean;
-  }
-
   Widget _buildFloatingServerToast(bool isDark, UnoPalette palette) {
+    final isShowing = _serverToastTitle != null;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 320),
       switchInCurve: Curves.easeOutCubic,
@@ -425,35 +432,29 @@ class _AuthScreenState extends State<AuthScreen>
       transitionBuilder: (child, animation) {
         return SlideTransition(
           position: Tween<Offset>(
-            begin: const Offset(0.0, -0.45),
+            begin: const Offset(0.0, -0.4),
             end: Offset.zero,
-          ).animate(animation),
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          )),
           child: FadeTransition(
-            opacity: animation,
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
             child: child,
           ),
         );
       },
-      child: _serverNotificationToast == null
+      child: !isShowing
           ? const SizedBox.shrink(key: ValueKey('empty-server-toast'))
           : _ServerToastHUD(
-              key: ValueKey('server-toast-$_serverNotificationToast'),
-              message: _serverNotificationToast!,
+              key: ValueKey(
+                  'server-toast-$_serverToastTitle-$_serverToastDescription'),
+              title: _serverToastTitle!,
+              description: _serverToastDescription ?? '',
               isDark: isDark,
-              onDismiss: () {
-                _serverNotificationTimer?.cancel();
-                setState(() => _serverNotificationToast = null);
-              },
-              onConfigure: () {
-                _serverNotificationTimer?.cancel();
-                setState(() => _serverNotificationToast = null);
-                _showServerSwitchDialog();
-              },
-              onRescan: () {
-                _serverNotificationTimer?.cancel();
-                setState(() => _serverNotificationToast = null);
-                _initServer(forceRescan: true);
-              },
             ),
     );
   }
@@ -2454,57 +2455,56 @@ class _TactileServerPillState extends State<_TactileServerPill> {
 //  Floating Auto-Vanishing Server Notification Toast HUD
 // ─────────────────────────────────────────────────────────────
 class _ServerToastHUD extends StatelessWidget {
-  final String message;
+  final String title;
+  final String description;
   final bool isDark;
-  final VoidCallback onDismiss;
-  final VoidCallback onConfigure;
-  final VoidCallback onRescan;
 
   const _ServerToastHUD({
     super.key,
-    required this.message,
+    required this.title,
+    required this.description,
     required this.isDark,
-    required this.onDismiss,
-    required this.onConfigure,
-    required this.onRescan,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Luxurious solid tonal palette (no BackdropFilter / no margin clipping artifacts)
     final bgColors = isDark
-        ? [const Color(0xFF181F33), const Color(0xFF101524)]
-        : [const Color(0xFFFFFDF9), const Color(0xFFF7F2E9)];
+        ? const [Color(0xFF161B28), Color(0xFF0F1320)]
+        : const [Color(0xFFFFFFFF), Color(0xFFF7F4EE)];
+
+    // Hairline warm terracotta stroke
     final borderColor = isDark
-        ? const Color(0xFFE05A5A).withValues(alpha: 0.40)
-        : const Color(0xFFE05A5A).withValues(alpha: 0.50);
+        ? const Color(0xFFD4725A).withValues(alpha: 0.35)
+        : const Color(0xFFD4725A).withValues(alpha: 0.45);
+
     final textPrimary =
-        isDark ? _AuthColors.pureWhite : _AuthColors.obsidianNavy;
-    final textMuted = isDark ? _AuthColors.coolSlate : _AuthColors.mutedDark;
+        isDark ? const Color(0xFFF4F1EC) : const Color(0xFF0B1020);
+    final textMuted =
+        isDark ? const Color(0xFF8E94A4) : const Color(0xFF6B686A);
 
     return Material(
       color: Colors.transparent,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
-        constraints: const BoxConstraints(maxWidth: 500),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: bgColors,
           ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor, width: 1.0),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 0.85),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.12),
+              color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.10),
               blurRadius: 20,
-              offset: const Offset(0, 8),
+              offset: const Offset(0, 6),
             ),
             BoxShadow(
-              color: const Color(0xFFE05A5A).withValues(alpha: 0.10),
+              color: const Color(0xFFD4725A).withValues(alpha: 0.06),
               blurRadius: 10,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 1),
             ),
           ],
         ),
@@ -2512,118 +2512,53 @@ class _ServerToastHUD extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Glowing Icon Badge
             Container(
-              width: 26,
-              height: 26,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
-                color: const Color(0xFFE05A5A).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
+                color: const Color(0xFFD4725A).withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFD4725A).withValues(alpha: 0.25),
+                  width: 0.75,
+                ),
               ),
               alignment: Alignment.center,
               child: const Icon(
-                LucideIcons.serverOff,
+                LucideIcons.cloudOff,
                 size: 14,
-                color: Color(0xFFE05A5A),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                message,
-                style: GoogleFonts.inter(
-                  color: textPrimary,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                ),
+                color: Color(0xFFE87A64),
               ),
             ),
             const SizedBox(width: 12),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: onConfigure,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF222838)
-                        : _AuthColors.sandCreamBorder,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isDark
-                          ? _AuthColors.darkBorderHover
-                          : _AuthColors.warmSand,
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        LucideIcons.slidersHorizontal,
-                        size: 11,
-                        color: textPrimary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Manual IP',
-                        style: GoogleFonts.inter(
-                          color: textPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+
+            // Text Stack (Title + Clean Context)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: Tooltip(
-                message: 'Re-scan Subnet',
-                child: GestureDetector(
-                  onTap: onRescan,
-                  child: Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF222838)
-                          : _AuthColors.sandCreamBorder,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      LucideIcons.refreshCw,
-                      size: 12,
-                      color: textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: Tooltip(
-                message: 'Dismiss',
-                child: GestureDetector(
-                  onTap: onDismiss,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    child: Icon(
-                      LucideIcons.x,
-                      size: 13,
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: GoogleFonts.inter(
                       color: textMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
-                ),
-              ),
+                ],
+              ],
             ),
           ],
         ),

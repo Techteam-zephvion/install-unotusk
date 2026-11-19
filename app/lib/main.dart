@@ -20,6 +20,7 @@ import 'screens/overview_screen.dart';
 import 'screens/projects_screen.dart';
 import 'screens/spec_history_screen.dart';
 import 'services/api_service.dart';
+import 'theme/app_fonts.dart';
 import 'theme/app_theme.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/top_nav_bar.dart';
@@ -83,6 +84,9 @@ class _UnotuskAppState extends State<UnotuskApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: _isDark ? Brightness.dark : Brightness.light,
+        textTheme: AppFonts.textTheme(
+          _isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+        ),
         scaffoldBackgroundColor: palette.bgBase,
         canvasColor: palette.bgSurface,
         dividerColor: palette.div,
@@ -737,6 +741,7 @@ class _AppShellState extends State<AppShell> {
               onClose: () => setState(() => _settingsModalOpen = false),
               defaultTab: _defaultSettingsTab,
               user: _user,
+              projectId: _openedProject?.id,
             ),
 
           // Archived Modal Overlay

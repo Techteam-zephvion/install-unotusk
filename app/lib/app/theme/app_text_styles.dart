@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../theme/app_fonts.dart';
 import 'app_colors.dart';
 
 class AppTextStyles {
   // ─── Font family shortcuts ───────────────────────────────────────────────────
 
-  /// Young Serif — logo wordmark + auth headings (Figma: "Young Serif")
+  /// Young Serif — logo wordmark + auth headings
   static TextStyle youngSerif({
     double? fontSize,
     FontWeight fontWeight = FontWeight.w400,
@@ -13,15 +13,14 @@ class AppTextStyles {
     double? letterSpacing,
     double? height,
   }) =>
-      GoogleFonts.youngSerif(
-        fontSize: fontSize,
-        fontWeight: fontWeight,
+      AppFonts.youngSerif(
+        fontSize: fontSize ?? 20,
         color: color ?? AppColors.textPrimary,
         letterSpacing: letterSpacing,
-        height: height,
+        lineHeight: height,
       );
 
-  /// Instrument Serif — hero "Investigate your project?" (Figma: "Instrument Serif")
+  /// Instrument Serif — hero headings (Instrument Serif, Regular weight only)
   static TextStyle instrumentSerif({
     double? fontSize,
     FontWeight fontWeight = FontWeight.w400,
@@ -29,15 +28,14 @@ class AppTextStyles {
     double? letterSpacing,
     double? height,
   }) =>
-      GoogleFonts.instrumentSerif(
-        fontSize: fontSize,
-        fontWeight: fontWeight,
+      AppFonts.display(
+        fontSize: fontSize ?? 26,
         color: color ?? AppColors.textPrimary,
         letterSpacing: letterSpacing,
-        height: height,
+        lineHeight: height ?? 1.2,
       );
 
-  /// Inter / Geist — body text, nav labels, general UI (Figma: "Geist" / "Inter")
+  /// DM Sans — body text, nav labels, general UI
   static TextStyle inter({
     double? fontSize,
     FontWeight fontWeight = FontWeight.w400,
@@ -45,15 +43,15 @@ class AppTextStyles {
     double? letterSpacing,
     double? height,
   }) =>
-      GoogleFonts.inter(
-        fontSize: fontSize,
+      AppFonts.body(
+        fontSize: fontSize ?? 14,
         fontWeight: fontWeight,
         color: color ?? AppColors.textPrimary,
         letterSpacing: letterSpacing,
         height: height,
       );
 
-  /// IBM Plex Mono — badge labels, processing phases (Figma: "Geist Mono" / "IBM Plex Mono")
+  /// JetBrains Mono — badge labels, processing phases, code
   static TextStyle mono({
     double? fontSize,
     FontWeight fontWeight = FontWeight.w400,
@@ -61,56 +59,48 @@ class AppTextStyles {
     double? letterSpacing,
     double? height,
   }) =>
-      GoogleFonts.ibmPlexMono(
-        fontSize: fontSize,
+      AppFonts.mono(
+        fontSize: fontSize ?? 11,
         fontWeight: fontWeight,
         color: color ?? AppColors.textSecondary,
         letterSpacing: letterSpacing,
         height: height,
       );
 
-  // ─── Named semantic styles (matching Figma exactly) ─────────────────────────
+  // ─── Named semantic styles ─────────────────────────────────────────────────
 
   /// Logo wordmark "Unotusk" in sidebar
-  /// Figma: Young Serif, 17px, -0.01em, color: text
-  static TextStyle get logoWordmark => GoogleFonts.youngSerif(
+  static TextStyle get logoWordmark => AppFonts.youngSerif(
         fontSize: 17,
-        fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
         letterSpacing: -0.17,
       );
 
   /// Auth screen h1 — "Sign in to Unotusk"
-  /// Figma: Young Serif, 24px, -0.02em, color: text
-  static TextStyle get authHeading => GoogleFonts.youngSerif(
+  static TextStyle get authHeading => AppFonts.accent(
         fontSize: 24,
-        fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
         letterSpacing: -0.48,
-        height: 1.2,
+        lineHeight: 1.2,
       );
 
   /// Chat hero h1 — "Investigate your project?"
-  /// Figma: Instrument Serif, 26px, -0.01em, weight 400
-  static TextStyle get heroHeading => GoogleFonts.instrumentSerif(
+  static TextStyle get heroHeading => AppFonts.display(
         fontSize: 26,
-        fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
         letterSpacing: -0.26,
-        height: 1.2,
+        lineHeight: 1.2,
       );
 
   /// Sidebar nav item label
-  /// Figma: Geist, 13px, weight 400 (inactive) / 600 (active)
-  static TextStyle navLabel({bool active = false}) => GoogleFonts.inter(
+  static TextStyle navLabel({bool active = false}) => AppFonts.body(
         fontSize: 13,
         fontWeight: active ? FontWeight.w600 : FontWeight.w400,
         color: active ? AppColors.accent : AppColors.textSecondary,
       );
 
   /// Section header (RECENT, etc.)
-  /// Figma: Geist Mono, 10px, 0.06em tracking, uppercase
-  static TextStyle get sectionLabel => GoogleFonts.ibmPlexMono(
+  static TextStyle get sectionLabel => AppFonts.mono(
         fontSize: 10,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
@@ -118,8 +108,7 @@ class AppTextStyles {
       );
 
   /// Standard body text
-  /// Figma: Geist/Inter, 13px, weight 400
-  static TextStyle get body => GoogleFonts.inter(
+  static TextStyle get body => AppFonts.body(
         fontSize: 13,
         fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
@@ -127,7 +116,7 @@ class AppTextStyles {
       );
 
   /// Body 14px (auth descriptions, input labels)
-  static TextStyle get bodyMd => GoogleFonts.inter(
+  static TextStyle get bodyMd => AppFonts.body(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
@@ -135,7 +124,7 @@ class AppTextStyles {
       );
 
   /// Caption / secondary 12px
-  static TextStyle get caption => GoogleFonts.inter(
+  static TextStyle get caption => AppFonts.body(
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
@@ -143,8 +132,7 @@ class AppTextStyles {
       );
 
   /// Monospace badge/tag
-  /// Figma: Geist Mono, 10px, 0.04em tracking
-  static TextStyle get monoBadge => GoogleFonts.ibmPlexMono(
+  static TextStyle get monoBadge => AppFonts.mono(
         fontSize: 10,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.4,
@@ -152,8 +140,7 @@ class AppTextStyles {
       );
 
   /// Phase processing label ("INGESTING ΔDOC")
-  /// Figma: IBM Plex Mono, 11px, 0.08em tracking
-  static TextStyle get monoPhaseLabel => GoogleFonts.ibmPlexMono(
+  static TextStyle get monoPhaseLabel => AppFonts.mono(
         fontSize: 11,
         fontWeight: FontWeight.w400,
         letterSpacing: 0.88,
@@ -161,7 +148,7 @@ class AppTextStyles {
       );
 
   /// Code display
-  static TextStyle get code => GoogleFonts.ibmPlexMono(
+  static TextStyle get code => AppFonts.mono(
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
@@ -170,26 +157,25 @@ class AppTextStyles {
   // ─── Legacy aliases for backward-compat ─────────────────────────────────────
   static TextStyle get editorialHero => heroHeading;
   static TextStyle get editorialSub => caption;
-  static TextStyle get h1 => GoogleFonts.youngSerif(
+  static TextStyle get h1 => AppFonts.accent(
         fontSize: 20,
-        fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,
         letterSpacing: -0.3,
       );
-  static TextStyle get h2 => GoogleFonts.inter(
+  static TextStyle get h2 => AppFonts.body(
         fontSize: 15,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
         letterSpacing: -0.2,
       );
-  static TextStyle get h3 => GoogleFonts.inter(
+  static TextStyle get h3 => AppFonts.body(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
       );
   static TextStyle get bodyMedium => body;
   static TextStyle get bodySmall => caption;
-  static TextStyle get label => GoogleFonts.inter(
+  static TextStyle get label => AppFonts.body(
         fontSize: 12,
         fontWeight: FontWeight.w500,
         color: AppColors.textSecondary,

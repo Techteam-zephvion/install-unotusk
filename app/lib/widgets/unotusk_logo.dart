@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_fonts.dart';
 
 class UnotuskLogo extends StatelessWidget {
   final double size;
@@ -29,11 +30,9 @@ class UnotuskLogo extends StatelessWidget {
           child: Center(
             child: Text(
               'U',
-              style: TextStyle(
+              style: AppFonts.youngSerif(
                 color: onDark ? const Color(0xFF0A0F20) : Colors.white,
-                fontWeight: FontWeight.bold,
                 fontSize: size * 0.55,
-                fontFamily: 'serif',
               ),
             ),
           ),

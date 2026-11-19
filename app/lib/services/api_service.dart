@@ -328,7 +328,7 @@ class ApiService {
     final healthOk = await checkHealth();
     if (!healthOk) {
       throw Exception(
-          lastError ?? 'Cannot reach backend server at http://10.0.0.59:28000');
+          lastError ?? 'Cannot reach backend server. Please verify network connection.');
     }
 
     try {
@@ -400,7 +400,7 @@ class ApiService {
       return user;
     } else if (res.statusCode == 401) {
       throw Exception(
-          'Invalid email or password on http://10.0.0.59:28000. Please verify credentials.');
+          'Invalid email or password. Please verify credentials.');
     } else {
       throw Exception('Server returned HTTP ${res.statusCode}: ${res.body}');
     }
@@ -1936,6 +1936,91 @@ class ApiService {
   // ─────────────────────────────────────────────────────────
   //  Workspace Features (from repo: files, symbols, etc.)
   // ─────────────────────────────────────────────────────────
+
+  /// Fetches real-time connected apps and integration statuses from the server
+  static Future<List<Map<String, dynamic>>> fetchConnectedApps([String? projectId]) async {
+    try {
+      final pid = _resolveProjectId(projectId);
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/integrations');
+      final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+      if (res.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(res.body);
+        return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+
+    // Fallback: Check repository context directly if integrations endpoint is unreachable
+    try {
+      final pid = _resolveProjectId(projectId);
+      final repoCtx = await fetchRepositoryContext(pid);
+      final hasRepo = repoCtx.repository != null;
+      final repoName = repoCtx.repository?.fullName ?? '';
+      return [
+        {
+          'name': 'GitHub',
+          'icon': 'GH',
+          'provider': 'GITHUB',
+          'status': hasRepo ? 'Connected' : 'Not connected',
+          'details': hasRepo ? 'Repository: $repoName' : 'Not configured',
+          'is_connected': hasRepo,
+        },
+        {'name': 'Jira', 'icon': 'JR', 'provider': 'JIRA', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+        {'name': 'Confluence', 'icon': 'CF', 'provider': 'CONFLUENCE', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+        {'name': 'Linear', 'icon': 'LN', 'provider': 'LINEAR', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+        {'name': 'Slack', 'icon': 'SL', 'provider': 'SLACK', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+        {'name': 'GitLab', 'icon': 'GL', 'provider': 'GITLAB', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+        {'name': 'PagerDuty', 'icon': 'PD', 'provider': 'PAGERDUTY', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+      ];
+    } catch (_) {}
+
+    // If no project selected yet, check if any connected projects have repos
+    final hasAnyRepo = connectedWorkspaceProjects.any((p) => p.repositoryName != null && p.repositoryName!.isNotEmpty);
+    final firstRepo = connectedWorkspaceProjects.firstWhere(
+      (p) => p.repositoryName != null && p.repositoryName!.isNotEmpty,
+      orElse: () => connectedWorkspaceProjects.isNotEmpty ? connectedWorkspaceProjects.first : const ProjectItem(
+        id: '',
+        name: '',
+        upsStatus: '',
+        ingestionStatus: '',
+        lastIngestion: '',
+        fpr: 0.0,
+        days: 0,
+      ),
+    );
+    final repoDetails = hasAnyRepo ? 'Repository: ${firstRepo.repositoryName}' : 'Not configured';
+    return [
+      {
+        'name': 'GitHub',
+        'icon': 'GH',
+        'provider': 'GITHUB',
+        'status': hasAnyRepo ? 'Connected' : 'Not connected',
+        'details': repoDetails,
+        'is_connected': hasAnyRepo,
+      },
+      {'name': 'Jira', 'icon': 'JR', 'provider': 'JIRA', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+      {'name': 'Confluence', 'icon': 'CF', 'provider': 'CONFLUENCE', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+      {'name': 'Linear', 'icon': 'LN', 'provider': 'LINEAR', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+      {'name': 'Slack', 'icon': 'SL', 'provider': 'SLACK', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+      {'name': 'GitLab', 'icon': 'GL', 'provider': 'GITLAB', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+      {'name': 'PagerDuty', 'icon': 'PD', 'provider': 'PAGERDUTY', 'status': 'Not connected', 'details': 'Not configured', 'is_connected': false},
+    ];
+  }
+
+  /// Connects GitHub integration with personal access token
+  static Future<bool> connectGitHub(String token, [String? projectId]) async {
+    try {
+      final pid = _resolveProjectId(projectId);
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/github/connect');
+      final res = await _client.post(
+        uri,
+        headers: _headers,
+        body: jsonEncode({'github_token': token}),
+      ).timeout(_timeout);
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Fetches repository context (repo info, snapshot, metrics)
   static Future<ProjectRepositoryContext> fetchRepositoryContext([String? projectId]) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/workspace_models.dart';
 import '../services/api_service.dart';
+import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 
 /// Files browser screen — shows file tree and file detail.
@@ -215,7 +216,7 @@ class _FilesScreenState extends State<FilesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(detail.file.filename, style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w600)),
-                    Text(detail.file.path, style: TextStyle(color: p.textSec, fontSize: 11)),
+                    Text(detail.file.path, style: AppFonts.mono(color: p.textSec, fontSize: 11)),
                   ],
                 ),
               ),
@@ -254,8 +255,8 @@ class _FilesScreenState extends State<FilesScreen> {
                 children: [
                   _chip(s.symbolType, p.neutral),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(s.name, style: TextStyle(color: p.text, fontSize: 12, fontFamily: 'JetBrains Mono'))),
-                  Text('L${s.startLine}–${s.endLine}', style: TextStyle(color: p.textSec, fontSize: 10)),
+                  Expanded(child: Text(s.name, style: AppFonts.mono(color: p.text, fontSize: 12))),
+                  Text('L${s.startLine}–${s.endLine}', style: AppFonts.mono(color: p.textSec, fontSize: 10)),
                 ],
               ),
             )),
@@ -276,7 +277,7 @@ class _FilesScreenState extends State<FilesScreen> {
               ),
               child: SelectableText(
                 detail.fullContent!,
-                style: TextStyle(color: p.text, fontSize: 11, fontFamily: 'JetBrains Mono', height: 1.5),
+                style: AppFonts.mono(color: p.text, fontSize: 11, height: 1.5),
               ),
             ),
           ],

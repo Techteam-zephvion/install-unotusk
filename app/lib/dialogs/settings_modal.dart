@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
-import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
+
 
 class SettingsModal extends StatefulWidget {
   final UnoPalette palette;
@@ -11,6 +12,7 @@ class SettingsModal extends StatefulWidget {
   final VoidCallback onClose;
   final String defaultTab;
   final UserModel user;
+  final String? projectId;
 
   const SettingsModal({
     super.key,
@@ -18,8 +20,9 @@ class SettingsModal extends StatefulWidget {
     required this.isDark,
     required this.onThemeChange,
     required this.onClose,
-    this.defaultTab = 'general',
+    this.defaultTab = 'profile',
     required this.user,
+    this.projectId,
   });
 
   @override
@@ -28,133 +31,205 @@ class SettingsModal extends StatefulWidget {
 
 class _SettingsModalState extends State<SettingsModal> {
   late String _activeTab;
-  bool _shareUsageData = true;
-  bool _includeMetadata = true;
-  bool _allowSpecMatching = true;
+  String _selectedReasoningTier = 'warm';
+  String _selectedSpecFormat = 'bdd';
+  final ScrollController _scrollController = ScrollController();
 
-  final List<Map<String, dynamic>> _tabs = const [
+  static const List<Map<String, dynamic>> _tabs = [
     {'id': 'profile', 'label': 'Profile', 'icon': LucideIcons.user},
-    {'id': 'general', 'label': 'General', 'icon': LucideIcons.settings},
-    {'id': 'personalization', 'label': 'Personalization', 'icon': LucideIcons.sliders},
-    {'id': 'data', 'label': 'Data controls', 'icon': LucideIcons.database},
-    {'id': 'apps', 'label': 'Connected apps', 'icon': LucideIcons.layers},
-    {'id': 'security', 'label': 'Security', 'icon': LucideIcons.shield},
+    {'id': 'appearance', 'label': 'Appearance', 'icon': LucideIcons.palette},
+    {'id': 'intelligence', 'label': 'Intelligence', 'icon': LucideIcons.sparkles},
+    {'id': 'apps', 'label': 'Connected Apps', 'icon': LucideIcons.layers},
   ];
 
-  final List<Map<String, String>> _connectedApps = const [
-    {'name': 'GitHub', 'status': 'Connected', 'icon': 'GH'},
-    {'name': 'Jira', 'status': 'Connected', 'icon': 'JR'},
-    {'name': 'Confluence', 'status': 'Connected', 'icon': 'CF'},
-    {'name': 'Linear', 'status': 'Not connected', 'icon': 'LN'},
-    {'name': 'Slack', 'status': 'Connected', 'icon': 'SL'},
-    {'name': 'GitLab', 'status': 'Not connected', 'icon': 'GL'},
-    {'name': 'PagerDuty', 'status': 'Connected', 'icon': 'PD'},
-  ];
+  List<Map<String, dynamic>> _connectedApps = [];
+  bool _isLoadingApps = true;
 
   @override
   void initState() {
     super.initState();
-    _activeTab = widget.defaultTab == 'settings' ? 'general' : widget.defaultTab;
+    if (widget.defaultTab == 'general' || widget.defaultTab == 'settings') {
+      _activeTab = 'appearance';
+    } else if (widget.defaultTab == 'personalization') {
+      _activeTab = 'intelligence';
+    } else if (widget.defaultTab == 'apps') {
+      _activeTab = 'apps';
+    } else if (_tabs.any((t) => t['id'] == widget.defaultTab)) {
+      _activeTab = widget.defaultTab;
+    } else {
+      _activeTab = 'profile';
+    }
+    _loadConnectedApps();
+  }
+
+  Future<void> _loadConnectedApps() async {
+    setState(() => _isLoadingApps = true);
+    try {
+      final apps = await ApiService.fetchConnectedApps(widget.projectId);
+      if (mounted) {
+        setState(() {
+          _connectedApps = apps;
+          _isLoadingApps = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingApps = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _switchTab(String tabId) {
+    if (_activeTab != tabId) {
+      setState(() => _activeTab = tabId);
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final palette = widget.palette;
+
     return Material(
-      color: Colors.black.withValues(alpha: 0.55),
+      color: Colors.black.withValues(alpha: widget.isDark ? 0.65 : 0.40),
       child: Center(
         child: Container(
-          width: 740,
-          height: 540,
-          margin: const EdgeInsets.all(16),
+          width: 800,
+          height: 570,
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           decoration: BoxDecoration(
-            color: widget.palette.bgSurface,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(20),
+            color: palette.bgSurface,
+            border: Border.all(color: palette.div.withValues(alpha: 0.7)),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.36),
-                blurRadius: 60,
-                offset: const Offset(0, 24),
+                color: Colors.black.withValues(alpha: widget.isDark ? 0.50 : 0.18),
+                blurRadius: 48,
+                offset: const Offset(0, 20),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
+              // ── Symmetric Header Bar ──
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 20, 18),
+                padding: const EdgeInsets.fromLTRB(24, 18, 18, 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Settings',
-                      style: UnoTypography.body(
-                        color: widget.palette.text,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Settings',
+                          style: UnoTypography.body(
+                            color: palette.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Manage your profile, preferences, and workspace experience',
+                          style: UnoTypography.body(
+                            color: palette.textSec,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: Icon(LucideIcons.x,
-                          size: 18, color: widget.palette.textSec),
-                      onPressed: widget.onClose,
+                    InkWell(
+                      onTap: widget.onClose,
+                      borderRadius: BorderRadius.circular(8),
+                      hoverColor: palette.accent.withValues(alpha: 0.1),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          LucideIcons.x,
+                          size: 17,
+                          color: palette.textSec,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              Divider(height: 1, thickness: 1, color: widget.palette.div),
+              Divider(height: 1, thickness: 1, color: palette.div.withValues(alpha: 0.5)),
 
-              // Split Layout
+              // ── Split Layout ──
               Expanded(
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Left Tab Sidebar
                     Container(
-                      width: 200,
+                      width: 190,
                       decoration: BoxDecoration(
-                        color: widget.palette.bgSurface,
+                        color: palette.bgSurface,
                         border: Border(
-                            right: BorderSide(color: widget.palette.div)),
+                          right: BorderSide(color: palette.div.withValues(alpha: 0.5)),
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
                       child: ListView(
+                        padding: EdgeInsets.zero,
                         children: _tabs.map((t) {
                           final active = _activeTab == t['id'];
                           return InkWell(
-                            onTap: () => setState(() => _activeTab = t['id']),
+                            onTap: () => _switchTab(t['id']),
                             borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 3),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              margin: const EdgeInsets.only(bottom: 4),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 9),
+                                  horizontal: 12, vertical: 9.5),
                               decoration: BoxDecoration(
                                 color: active
-                                    ? widget.palette.bgElevated
+                                    ? palette.accent.withValues(
+                                        alpha: widget.isDark ? 0.12 : 0.14)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
+                                border: active
+                                    ? Border.all(
+                                        color: palette.accent.withValues(alpha: 0.35))
+                                    : Border.all(color: Colors.transparent),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
                                     t['icon'] as IconData,
-                                    size: 15,
+                                    size: 15.5,
                                     color: active
-                                        ? widget.palette.accent
-                                        : widget.palette.textSec,
+                                        ? palette.accent
+                                        : palette.textSec,
                                   ),
                                   const SizedBox(width: 10),
                                   Text(
                                     t['label'] as String,
                                     style: UnoTypography.body(
                                       color: active
-                                          ? widget.palette.text
-                                          : widget.palette.textSec,
+                                          ? palette.text
+                                          : palette.textSec,
                                       fontSize: 13,
                                       fontWeight: active
                                           ? FontWeight.w600
-                                          : FontWeight.w400,
+                                          : FontWeight.w500,
                                     ),
                                   ),
                                 ],
@@ -165,489 +240,325 @@ class _SettingsModalState extends State<SettingsModal> {
                       ),
                     ),
 
-                    // Right Content Pane
+                    // Right Content Pane with Ultra-Thin Hairline Scrollbar
                     Expanded(
-                      child: Container(
-                        color: widget.palette.bgSurface,
-                        padding: const EdgeInsets.all(28),
-                        child: SingleChildScrollView(
-                          child: _buildTabContent(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabContent() {
-    switch (_activeTab) {
-      case 'profile':
-        return _buildProfileTab();
-      case 'general':
-        return _buildGeneralTab();
-      case 'personalization':
-        return _buildPersonalizationTab();
-      case 'data':
-        return _buildDataTab();
-      case 'apps':
-        return _buildAppsTab();
-      case 'security':
-        return _buildSecurityTab();
-      default:
-        return _buildGeneralTab();
-    }
-  }
-
-  Widget _buildProfileTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'User Profile',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: widget.palette.accent,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  widget.user.name.trim().isNotEmpty
-                      ? widget.user.name.trim().split(' ').map((s) => s.isNotEmpty ? s[0].toUpperCase() : '').take(2).join()
-                      : (widget.user.email.isNotEmpty ? widget.user.email[0].toUpperCase() : 'U'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.user.name.isNotEmpty ? widget.user.name : widget.user.email.split('@').first,
-                  style: UnoTypography.body(
-                    color: widget.palette.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: widget.palette.div),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                      ),
-                      child: Text(
-                        'Change picture',
-                        style: UnoTypography.body(
-                            color: widget.palette.text, fontSize: 12),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        'Remove',
-                        style: UnoTypography.body(
-                            color: widget.palette.textSec, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildTextField('Full Name',
-            widget.user.name.isNotEmpty ? widget.user.name : widget.user.email.split('@').first),
-        const SizedBox(height: 14),
-        _buildTextField('Email Address',
-            widget.user.email.isNotEmpty ? widget.user.email : 'lead@acme.com'),
-        const SizedBox(height: 14),
-        _buildTextField('Role in Workspace', widget.user.role.isNotEmpty ? widget.user.role : 'Pilot Admin'),
-        const SizedBox(height: 14),
-        _buildTextField('Connected Backend', ApiService.baseUrl),
-      ],
-    );
-  }
-
-  Widget _buildGeneralTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Theme & Appearance',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => widget.onThemeChange(false),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: !widget.isDark
-                        ? widget.palette.accent.withValues(alpha: 0.08)
-                        : widget.palette.bgSurface,
-                    border: Border.all(
-                      color: !widget.isDark
-                          ? widget.palette.accent
-                          : widget.palette.div,
-                      width: !widget.isDark ? 2 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.sun,
-                          size: 16,
-                          color: !widget.isDark
-                              ? widget.palette.accent
-                              : widget.palette.textSec),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Light Mode',
-                        style: UnoTypography.body(
-                          color: widget.palette.text,
-                          fontWeight:
-                              !widget.isDark ? FontWeight.w600 : FontWeight.w400,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                onTap: () => widget.onThemeChange(true),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: widget.isDark
-                        ? widget.palette.accent.withValues(alpha: 0.08)
-                        : widget.palette.bgSurface,
-                    border: Border.all(
-                      color: widget.isDark
-                          ? widget.palette.accent
-                          : widget.palette.div,
-                      width: widget.isDark ? 2 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.moon,
-                          size: 16,
-                          color: widget.isDark
-                              ? widget.palette.accent
-                              : widget.palette.textSec),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Dark Mode',
-                        style: UnoTypography.body(
-                          color: widget.palette.text,
-                          fontWeight:
-                              widget.isDark ? FontWeight.w600 : FontWeight.w400,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildTextField('Display Language', 'English (US)'),
-        const SizedBox(height: 14),
-        _buildTextField('Voice Engine', 'Ember (Warm & Natural)'),
-      ],
-    );
-  }
-
-  Widget _buildPersonalizationTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Personalization Preferences',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Default Reasoning Tier',
-          style: UnoTypography.mono(
-            color: widget.palette.textSec,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildTierChip('Warm (Balanced)', UnoPalette.queryWarm, true),
-            const SizedBox(width: 8),
-            _buildTierChip('Cold (Deep proof)', UnoPalette.queryCold, false),
-            const SizedBox(width: 8),
-            _buildTierChip('Hot (Quick lookup)', UnoPalette.queryHot, false),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Code Generation & Spec Formats',
-          style: UnoTypography.mono(
-            color: widget.palette.textSec,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildTierChip('Gherkin BDD', widget.palette.accent, true),
-            const SizedBox(width: 8),
-            _buildTierChip('TypeScript Contracts', widget.palette.textSec, false),
-            const SizedBox(width: 8),
-            _buildTierChip('Markdown ADRs', widget.palette.textSec, false),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTierChip(String label, Color color, bool selected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: selected ? color.withValues(alpha: 0.14) : widget.palette.bgSurface,
-        border: Border.all(color: selected ? color : widget.palette.div),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: UnoTypography.body(
-          color: selected ? color : widget.palette.textSec,
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Data & Privacy Controls',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        SwitchListTile(
-          title: Text(
-            'Share anonymised usage data to improve Unotusk',
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-          ),
-          value: _shareUsageData,
-          activeThumbColor: widget.palette.accent,
-          onChanged: (val) => setState(() => _shareUsageData = val),
-        ),
-        SwitchListTile(
-          title: Text(
-            'Include project metadata in diagnostics',
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-          ),
-          value: _includeMetadata,
-          activeThumbColor: widget.palette.accent,
-          onChanged: (val) => setState(() => _includeMetadata = val),
-        ),
-        SwitchListTile(
-          title: Text(
-            'Allow Unotusk to suggest similar specs across projects',
-            style: UnoTypography.body(color: widget.palette.text, fontSize: 13),
-          ),
-          value: _allowSpecMatching,
-          activeThumbColor: widget.palette.accent,
-          onChanged: (val) => setState(() => _allowSpecMatching = val),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAppsTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Connected Integrations (Read-Only)',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 14),
-        ..._connectedApps.map((app) {
-          final isConnected = app['status'] == 'Connected';
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: widget.palette.bgSurface,
-              border: Border.all(color: widget.palette.div),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: widget.palette.bgElevated,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          app['icon']!,
-                          style: UnoTypography.mono(
-                            color: widget.palette.text,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                        child: RawScrollbar(
+                          controller: _scrollController,
+                          thumbVisibility: false,
+                          thickness: 1.5,
+                          radius: const Radius.circular(1),
+                          thumbColor: palette.accent.withValues(alpha: 0.35),
+                          padding: const EdgeInsets.only(right: 2, top: 4, bottom: 4),
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 28, vertical: 22),
+                            child: _buildTabContent(palette),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabContent(UnoPalette palette) {
+    switch (_activeTab) {
+      case 'profile':
+        return _buildProfileTab(palette);
+      case 'appearance':
+        return _buildAppearanceTab(palette);
+      case 'intelligence':
+        return _buildIntelligenceTab(palette);
+      case 'apps':
+        return _buildAppsTab(palette);
+      default:
+        return _buildProfileTab(palette);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. Profile Tab: Elegant Executive Monogram & Verified Info
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildProfileTab(UnoPalette palette) {
+    final displayName = widget.user.name.trim().isNotEmpty
+        ? widget.user.name.trim()
+        : (widget.user.email.isNotEmpty
+            ? widget.user.email.split('@').first
+            : 'Developer Lead');
+
+    final displayEmail = widget.user.email.isNotEmpty
+        ? widget.user.email
+        : 'lead@acme.com';
+
+    final displayRole = widget.user.role.isNotEmpty
+        ? widget.user.role
+        : 'Workspace Administrator';
+
+    final initials = displayName.contains(' ')
+        ? displayName
+            .split(' ')
+            .where((s) => s.isNotEmpty)
+            .take(2)
+            .map((s) => s[0].toUpperCase())
+            .join()
+        : (displayName.isNotEmpty ? displayName[0].toUpperCase() : 'DL');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(LucideIcons.userCheck, size: 17, color: palette.accent),
+            const SizedBox(width: 8),
+            Text(
+              'User Profile',
+              style: UnoTypography.body(
+                color: palette.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // ── Hero Profile Monogram Card ──
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: palette.bgElevated,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.div),
+            gradient: LinearGradient(
+              colors: widget.isDark
+                  ? [
+                      const Color(0xFF161E32),
+                      const Color(0xFF111728),
+                    ]
+                  : [
+                      const Color(0xFFFCF9F4),
+                      const Color(0xFFF7F3EA),
+                    ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Monogram Avatar
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.accent,
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.accent.withValues(alpha: 0.22),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      color: widget.isDark
+                          ? const Color(0xFF0A0F20)
+                          : Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          displayName,
+                          style: UnoTypography.body(
+                            color: palette.text,
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Live Session Beacon
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E).withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: const Color(0xFF22C55E)
+                                    .withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF22C55E),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Active',
+                                style: UnoTypography.body(
+                                  color: widget.isDark
+                                      ? const Color(0xFF4ADE80)
+                                      : const Color(0xFF15803D),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
                     Text(
-                      app['name']!,
+                      displayEmail,
                       style: UnoTypography.body(
-                        color: widget.palette.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        color: palette.textSec,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: palette.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: palette.accent.withValues(alpha: 0.28)),
+                      ),
+                      child: Text(
+                        displayRole.toUpperCase(),
+                        style: UnoTypography.mono(
+                          color: palette.accent,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isConnected
-                        ? widget.palette.live.withValues(alpha: 0.12)
-                        : widget.palette.textSec.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    app['status']!,
-                    style: UnoTypography.mono(
-                      color: isConnected
-                          ? widget.palette.live
-                          : widget.palette.textSec,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildSecurityTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Enterprise OIDC Authentication',
-          style: UnoTypography.body(
-            color: widget.palette.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
+
+        const SizedBox(height: 22),
+
+        // ── Account Details Card ──
+        Text(
+          'WORKSPACE ACCOUNT DETAILS',
+          style: UnoTypography.mono(
+            color: palette.textSec,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.palette.bgSurface,
-            border: Border.all(color: widget.palette.div),
+            color: palette.bgElevated,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.div),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'ACTIVE OIDC SESSION',
-                style: UnoTypography.mono(
-                  color: widget.palette.accent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+              _buildInfoRow('Full Name', displayName,
+                  icon: LucideIcons.user, palette: palette),
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: palette.div.withValues(alpha: 0.45)),
+              _buildInfoRow('Email Address', displayEmail,
+                  icon: LucideIcons.mail,
+                  palette: palette,
+                  badge: 'Verified'),
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: palette.div.withValues(alpha: 0.45)),
+              _buildInfoRow('Workspace Role', displayRole,
+                  icon: LucideIcons.shieldCheck, palette: palette),
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: palette.div.withValues(alpha: 0.45)),
+              _buildInfoRow('Organization', 'Acme Corporation',
+                  icon: LucideIcons.building2, palette: palette),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        // ── Security Summary Card ──
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgElevated,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.div),
+          ),
+          child: Row(
+            children: [
+              Icon(LucideIcons.lock, size: 16, color: palette.accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Local Cryptographic Authentication',
+                      style: UnoTypography.body(
+                        color: palette.text,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Signed via secure local HS256 JWT tokens. Codebase intelligence and credentials remain private on your server.',
+                      style: UnoTypography.body(
+                        color: palette.textSec,
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Issuer: https://accounts.google.com',
-                style: UnoTypography.mono(color: widget.palette.text, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Algorithm: RS256 with PKCE Code Verification',
-                style: UnoTypography.mono(color: widget.palette.textSec, fontSize: 11),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Claims: openid, profile, email, org, groups',
-                style: UnoTypography.mono(color: widget.palette.textSec, fontSize: 11),
               ),
             ],
           ),
@@ -656,35 +567,920 @@ class _SettingsModalState extends State<SettingsModal> {
     );
   }
 
-  Widget _buildTextField(String label, String value) {
+  // ─────────────────────────────────────────────────────────────
+  // 2. Appearance Tab: Tactile Theme Mode Switcher
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildAppearanceTab(UnoPalette palette) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Icon(LucideIcons.palette, size: 17, color: palette.accent),
+            const SizedBox(width: 8),
+            Text(
+              'Appearance & Interface',
+              style: UnoTypography.body(
+                color: palette.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
         Text(
-          label,
+          'Select your workspace theme mode and visual ambiance',
           style: UnoTypography.body(
-            color: widget.palette.textSec,
+            color: palette.textSec,
             fontSize: 12,
           ),
         ),
-        const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: widget.palette.bgElevated,
-            border: Border.all(color: widget.palette.div),
-            borderRadius: BorderRadius.circular(10),
+        const SizedBox(height: 18),
+
+        Text(
+          'THEME MODE',
+          style: UnoTypography.mono(
+            color: palette.textSec,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
           ),
-          child: Text(
-            value,
-            style: UnoTypography.body(
-              color: widget.palette.text,
-              fontSize: 13,
+        ),
+        const SizedBox(height: 10),
+
+        Row(
+          children: [
+            // Dark Mode Card
+            Expanded(
+              child: InkWell(
+                onTap: () => widget.onThemeChange(true),
+                borderRadius: BorderRadius.circular(14),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: widget.isDark
+                        ? const Color(0xFF161E32)
+                        : palette.bgElevated,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: widget.isDark
+                          ? palette.accent
+                          : palette.div,
+                      width: widget.isDark ? 1.6 : 1.0,
+                    ),
+                    boxShadow: widget.isDark
+                        ? [
+                            BoxShadow(
+                              color: palette.accent.withValues(alpha: 0.14),
+                              blurRadius: 14,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7.5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF0A0F20),
+                              border: Border.all(
+                                  color: palette.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Icon(
+                              LucideIcons.moon,
+                              size: 15,
+                              color: palette.accent,
+                            ),
+                          ),
+                          if (widget.isDark)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: palette.accent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'ACTIVE',
+                                style: UnoTypography.mono(
+                                  color: const Color(0xFF0A0F20),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Warm Dark',
+                        style: UnoTypography.body(
+                          color: palette.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Obsidian Navy (#0A0F20) with Warm Ivory accents. Optimized for low-light focus.',
+                        style: UnoTypography.body(
+                          color: palette.textSec,
+                          fontSize: 11.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
+
+            const SizedBox(width: 12),
+
+            // Light Mode Card
+            Expanded(
+              child: InkWell(
+                onTap: () => widget.onThemeChange(false),
+                borderRadius: BorderRadius.circular(14),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: !widget.isDark
+                        ? const Color(0xFFFAF7F2)
+                        : palette.bgElevated,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: !widget.isDark
+                          ? palette.accent
+                          : palette.div,
+                      width: !widget.isDark ? 1.6 : 1.0,
+                    ),
+                    boxShadow: !widget.isDark
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 14,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7.5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFEFEAE0),
+                              border: Border.all(color: const Color(0xFFDDD5C9)),
+                            ),
+                            child: const Icon(
+                              LucideIcons.sun,
+                              size: 15,
+                              color: Color(0xFF181816),
+                            ),
+                          ),
+                          if (!widget.isDark)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: palette.accent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'ACTIVE',
+                                style: UnoTypography.mono(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Warm Light',
+                        style: UnoTypography.body(
+                          color: palette.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Natural ivory tones with high-contrast typography. Crisp readability for daytime.',
+                        style: UnoTypography.body(
+                          color: palette.textSec,
+                          fontSize: 11.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 22),
+
+        // ── Typography System Spec ──
+        Text(
+          'TYPOGRAPHY SYSTEM',
+          style: UnoTypography.mono(
+            color: palette.textSec,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: palette.bgElevated,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.div),
+          ),
+          child: Column(
+            children: [
+              _buildTypeSpecRow('Editorial Serifs', 'Young Serif & Instrument Serif',
+                  'Headings, branding & project hero titles', palette),
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: palette.div.withValues(alpha: 0.45)),
+              _buildTypeSpecRow('Interface Body', 'Inter',
+                  'High-legibility studio UI and dialogue text', palette),
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: palette.div.withValues(alpha: 0.45)),
+              _buildTypeSpecRow('Technical Mono', 'IBM Plex Mono',
+                  'AST symbols, code citations & telemetry', palette),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 3. Intelligence Tab: Real Reasoning Tiers & Wrapped Specs
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildIntelligenceTab(UnoPalette palette) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(LucideIcons.sparkles, size: 17, color: palette.accent),
+            const SizedBox(width: 8),
+            Text(
+              'Intelligence & Reasoning',
+              style: UnoTypography.body(
+                color: palette.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Configure AI reasoning depth and architectural specification outputs',
+          style: UnoTypography.body(
+            color: palette.textSec,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        Text(
+          'DEFAULT REASONING DEPTH',
+          style: UnoTypography.mono(
+            color: palette.textSec,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        _buildTierOption(
+          id: 'warm',
+          title: 'Warm Tier · Multi-Signal AST (Recommended)',
+          desc: 'Balanced synthesis combining AST symbol hierarchy, call-graph edges, and code snippets.',
+          icon: LucideIcons.flame,
+          badgeColor: UnoPalette.queryWarm,
+          palette: palette,
+        ),
+        const SizedBox(height: 8),
+        _buildTierOption(
+          id: 'cold',
+          title: 'Cold Tier · Deep Proof Verification',
+          desc: 'Exhaustive multi-hop traversal with deterministic contract and invariant verification.',
+          icon: LucideIcons.snowflake,
+          badgeColor: UnoPalette.queryCold,
+          palette: palette,
+        ),
+        const SizedBox(height: 8),
+        _buildTierOption(
+          id: 'hot',
+          title: 'Hot Tier · Direct Symbol Retrieval',
+          desc: 'Low-latency search targeting exact symbols, interfaces, and function signatures.',
+          icon: LucideIcons.zap,
+          badgeColor: UnoPalette.queryHot,
+          palette: palette,
+        ),
+
+        const SizedBox(height: 22),
+
+        Text(
+          'SPECIFICATION OUTPUT FORMAT',
+          style: UnoTypography.mono(
+            color: palette.textSec,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Wrap guarantees zero overflow on any window or font scaling!
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildSpecFormatChip('bdd', 'Gherkin BDD Contracts', palette),
+            _buildSpecFormatChip('adr', 'Markdown ADR Records', palette),
+            _buildSpecFormatChip('ts', 'TypeScript Interfaces', palette),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTierOption({
+    required String id,
+    required String title,
+    required String desc,
+    required IconData icon,
+    required Color badgeColor,
+    required UnoPalette palette,
+  }) {
+    final isSelected = _selectedReasoningTier == id;
+
+    return InkWell(
+      onTap: () => setState(() => _selectedReasoningTier = id),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? badgeColor.withValues(alpha: widget.isDark ? 0.10 : 0.07)
+              : palette.bgElevated,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? badgeColor.withValues(alpha: 0.65) : palette.div,
+            width: isSelected ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7.5),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 15.5, color: badgeColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: UnoTypography.body(
+                      color: palette.text,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    desc,
+                    style: UnoTypography.body(
+                      color: palette.textSec,
+                      fontSize: 11.5,
+                      height: 1.32,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? badgeColor : palette.div,
+                  width: 1.5,
+                ),
+                color: isSelected ? badgeColor : Colors.transparent,
+              ),
+              child: isSelected
+                  ? Icon(Icons.check, size: 12, color: widget.isDark ? const Color(0xFF0A0F20) : Colors.white)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpecFormatChip(String id, String label, UnoPalette palette) {
+    final isSelected = _selectedSpecFormat == id;
+
+    return InkWell(
+      onTap: () => setState(() => _selectedSpecFormat = id),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? palette.accent.withValues(alpha: widget.isDark ? 0.16 : 0.14)
+              : palette.bgElevated,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? palette.accent : palette.div,
+            width: isSelected ? 1.4 : 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: UnoTypography.body(
+            color: isSelected ? palette.text : palette.textSec,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    String label,
+    String value, {
+    required IconData icon,
+    required UnoPalette palette,
+    String? badge,
+    bool isMono = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: palette.textSec),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: UnoTypography.body(
+              color: palette.textSec,
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const Spacer(),
+          if (badge != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check, size: 11, color: Color(0xFF22C55E)),
+                  const SizedBox(width: 3),
+                  Text(
+                    badge,
+                    style: UnoTypography.mono(
+                      color: const Color(0xFF22C55E),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            value,
+            style: isMono
+                ? UnoTypography.mono(
+                    color: palette.text,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  )
+                : UnoTypography.body(
+                    color: palette.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeSpecRow(
+      String category, String fontName, String usage, UnoPalette palette) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 116,
+            child: Text(
+              category,
+              style: UnoTypography.body(
+                color: palette.textSec,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fontName,
+                  style: UnoTypography.body(
+                    color: palette.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1.5),
+                Text(
+                  usage,
+                  style: UnoTypography.body(
+                    color: palette.textSec.withValues(alpha: 0.75),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // ─────────────────────────────────────────────────────────────
+  // 4. Connected Apps Tab: Real-Time Integration Statuses
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildAppsTab(UnoPalette palette) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(LucideIcons.layers, size: 17, color: palette.accent),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Connected Integrations',
+                      style: UnoTypography.body(
+                        color: palette.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Real-time status synced with backend (${ApiService.serverHost})',
+                  style: UnoTypography.mono(
+                    color: palette.textSec,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: _isLoadingApps
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: palette.accent,
+                      ),
+                    )
+                  : Icon(LucideIcons.refreshCw,
+                      size: 14, color: palette.textSec),
+              tooltip: 'Refresh real-time status',
+              onPressed: _isLoadingApps ? null : _loadConnectedApps,
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        if (_isLoadingApps)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Querying live server integrations...',
+                    style: UnoTypography.mono(
+                      color: palette.textSec,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ..._connectedApps.map((app) {
+            final isConnected =
+                app['status'] == 'Connected' || app['is_connected'] == true;
+            final details = app['details'] as String? ??
+                (isConnected ? 'Active' : 'Not configured');
+            final provider = app['provider'] as String? ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: palette.bgElevated,
+                border: Border.all(color: palette.div),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: palette.bgSurface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: palette.div),
+                          ),
+                          child: Center(
+                            child: Text(
+                              (app['icon'] as String? ?? '??'),
+                              style: UnoTypography.mono(
+                                color: isConnected
+                                    ? palette.accent
+                                    : palette.textSec,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                app['name'] as String? ?? '',
+                                style: UnoTypography.body(
+                                  color: palette.text,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                details,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: UnoTypography.mono(
+                                  color: isConnected
+                                      ? palette.accent
+                                      : palette.textSec,
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isConnected
+                              ? palette.live.withValues(alpha: 0.12)
+                              : palette.textSec.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isConnected
+                                ? palette.live.withValues(alpha: 0.3)
+                                : palette.div,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isConnected
+                                    ? palette.live
+                                    : palette.textSec,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isConnected ? 'Connected' : 'Not connected',
+                              style: UnoTypography.mono(
+                                color: isConnected
+                                    ? palette.live
+                                    : palette.textSec,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (provider == 'GITHUB' && !isConnected) ...[
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () => _showConnectGitHubDialog(palette),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'Connect',
+                            style: UnoTypography.mono(
+                              color: palette.accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  void _showConnectGitHubDialog(UnoPalette palette) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgSurface,
+        title: Text(
+          'Connect GitHub Repository',
+          style: UnoTypography.body(
+            color: palette.text,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter a GitHub Personal Access Token (or repo owner token) to link with this project:',
+              style: UnoTypography.body(
+                color: palette.textSec,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              style: UnoTypography.mono(
+                color: palette.text,
+                fontSize: 12,
+              ),
+              decoration: InputDecoration(
+                hintText: 'ghp_...',
+                hintStyle: UnoTypography.mono(
+                  color: palette.textSec,
+                  fontSize: 12,
+                ),
+                filled: true,
+                fillColor: palette.bgElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: UnoTypography.body(color: palette.textSec),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final token = controller.text.trim();
+              if (token.isNotEmpty) {
+                final ok = await ApiService.connectGitHub(token, widget.projectId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(ok
+                          ? 'GitHub connected successfully!'
+                          : 'Failed to connect GitHub token'),
+                      backgroundColor: ok ? palette.live : palette.warn,
+                    ),
+                  );
+                  _loadConnectedApps();
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.accent,
+            ),
+            child: Text(
+              'Save Token',
+              style: UnoTypography.body(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

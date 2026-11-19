@@ -158,9 +158,9 @@ class _IngestionProgressViewState extends ConsumerState<IngestionProgressView> {
                         const SizedBox(height: 2),
                         Text(
                           widget.repository?.fullName ?? widget.project.name,
-                          style: AppTextStyles.bodySmall.copyWith(
+                          style: AppTextStyles.mono(
                             color: AppColors.slate600,
-                            fontFamily: 'monospace',
+                            fontSize: 12,
                           ),
                         ),
                       ],

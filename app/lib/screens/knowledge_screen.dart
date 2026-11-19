@@ -327,7 +327,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
                 children: [
                   Text(
                     'Knowledge Base',
-                    style: UnoTypography.body(color: p.text, fontSize: 18, fontWeight: FontWeight.w600),
+                    style: UnoTypography.displaySerif(palette: p, fontSize: 26),
                   ),
                   const SizedBox(height: 2),
                   Text(
