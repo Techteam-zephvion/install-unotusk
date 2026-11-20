@@ -5,6 +5,7 @@ class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final Color? backgroundColor;
+  final Gradient? gradient;
   final Border? border;
   final BorderRadius? borderRadius;
   final List<BoxShadow>? boxShadow;
@@ -15,6 +16,7 @@ class AppCard extends StatelessWidget {
     required this.child,
     this.padding,
     this.backgroundColor,
+    this.gradient,
     this.border,
     this.borderRadius,
     this.boxShadow,
@@ -28,8 +30,8 @@ class AppCard extends StatelessWidget {
 
     final defaultShadow = [
       BoxShadow(
-        color: Colors.black.withValues(alpha: palette.isDark ? 0.32 : 0.05),
-        blurRadius: palette.isDark ? 36 : 18,
+        color: Colors.black.withValues(alpha: palette.isDark ? 0.35 : 0.05),
+        blurRadius: palette.isDark ? 28 : 14,
         offset: const Offset(0, 8),
       ),
     ];
@@ -37,7 +39,8 @@ class AppCard extends StatelessWidget {
     Widget content = Container(
       padding: padding ?? const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: backgroundColor ?? palette.bgSurface,
+        color: gradient == null ? (backgroundColor ?? palette.bgSurface) : null,
+        gradient: gradient,
         borderRadius: radius,
         border: border ?? Border.all(color: palette.div),
         boxShadow: boxShadow ?? defaultShadow,
@@ -51,7 +54,7 @@ class AppCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: radius,
-          hoverColor: palette.accent.withValues(alpha: 0.04),
+          hoverColor: palette.accent.withValues(alpha: 0.05),
           child: content,
         ),
       );

@@ -5,26 +5,30 @@ class ConfigState {
   final ServerConfig config;
   final String? repoUrlError;
   final String? apiKeyError;
+  final String? backupApiKeyError;
   final String? portError;
 
   const ConfigState({
     required this.config,
     this.repoUrlError,
     this.apiKeyError,
+    this.backupApiKeyError,
     this.portError,
   });
 
   bool get isValid =>
       repoUrlError == null &&
       apiKeyError == null &&
+      backupApiKeyError == null &&
       portError == null &&
       config.repoUrl.isNotEmpty &&
-      config.llmApiKey.isNotEmpty;
+      (config.llmProvider == LlmProviderType.offline || config.llmApiKey.isNotEmpty);
 
   ConfigState copyWith({
     ServerConfig? config,
     Object? repoUrlError = _sentinel,
     Object? apiKeyError = _sentinel,
+    Object? backupApiKeyError = _sentinel,
     Object? portError = _sentinel,
   }) {
     return ConfigState(
@@ -35,6 +39,9 @@ class ConfigState {
       apiKeyError: identical(apiKeyError, _sentinel)
           ? this.apiKeyError
           : apiKeyError as String?,
+      backupApiKeyError: identical(backupApiKeyError, _sentinel)
+          ? this.backupApiKeyError
+          : backupApiKeyError as String?,
       portError: identical(portError, _sentinel)
           ? this.portError
           : portError as String?,
@@ -67,7 +74,6 @@ class ConfigController extends StateNotifier<ConfigState> {
     }
   }
 
-  
   void updateRepoUrl(String url) {
     final trimmed = url.trim();
     if (trimmed.isEmpty) {
@@ -82,15 +88,17 @@ class ConfigController extends StateNotifier<ConfigState> {
       );
     }
   }
-void updateLlmProvider(LlmProviderType provider) {
+
+  void updateLlmProvider(LlmProviderType provider) {
     state = state.copyWith(
       config: state.config.copyWith(llmProvider: provider),
+      apiKeyError: null,
     );
   }
 
   void updateLlmApiKey(String key) {
     final trimmed = key.trim();
-    if (trimmed.isEmpty) {
+    if (trimmed.isEmpty && state.config.llmProvider != LlmProviderType.offline) {
       state = state.copyWith(
         config: state.config.copyWith(llmApiKey: trimmed),
         apiKeyError: 'API key is required for intelligence features.',
@@ -101,6 +109,27 @@ void updateLlmProvider(LlmProviderType provider) {
         apiKeyError: null,
       );
     }
+  }
+
+  void toggleBackupLlm(bool enable) {
+    state = state.copyWith(
+      config: state.config.copyWith(enableBackupLlm: enable),
+      backupApiKeyError: null,
+    );
+  }
+
+  void updateBackupLlmProvider(LlmProviderType provider) {
+    state = state.copyWith(
+      config: state.config.copyWith(backupLlmProvider: provider),
+    );
+  }
+
+  void updateBackupLlmApiKey(String key) {
+    final trimmed = key.trim();
+    state = state.copyWith(
+      config: state.config.copyWith(backupLlmApiKey: trimmed),
+      backupApiKeyError: null,
+    );
   }
 
   void updateLanIp(String ip) {

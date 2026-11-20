@@ -227,78 +227,13 @@ class _AppShellState extends State<AppShell> {
       _appStage = 'workspace';
     });
     
-    // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
-    if (project.port != null) {
-      final currentHost = Uri.parse(ApiService.baseUrl).host;
-      final targetUrl = 'http://$currentHost:${project.port}';
-      if (ApiService.baseUrl != targetUrl) {
-        ApiService.setBaseUrl(targetUrl, persist: false);
-        try {
-          // Signup acts as auto-login via our modified backend
-          await ApiService.createOrganisation(
-            fullName: _user.name,
-            orgName: 'Acme Corporation',
-            password: 'password123',
-            role: _user.role,
-            email: _user.email,
-          );
-        } catch (_) {
-          try {
-            await ApiService.login(
-              email: _user.email,
-              password: 'password123',
-            );
-          } catch (_) {}
-        }
-        
-        // After logging into the target server, fetch its real project UUID
-        try {
-          final serverProjects = await ApiService.fetchProjects();
-          if (serverProjects.isNotEmpty) {
-            final targetServerProj = serverProjects.first;
-            project = targetServerProj.copyWith(
-              repositoryName: (targetServerProj.repositoryName != null && targetServerProj.repositoryName!.isNotEmpty)
-                  ? targetServerProj.repositoryName
-                  : project.repositoryName,
-              defaultBranch: targetServerProj.defaultBranch ?? project.defaultBranch,
-            );
-            setState(() {
-              _openedProject = project;
-            });
-          }
-        } catch (_) {}
-      }
-    }
-
+    // Control Plane Gateway (:28000) routes /api/v1/projects/{project.id}/*
+    // automatically using the user's Control Plane JWT. No password123 login!
     ApiService.setActiveProject(project);
   }
 
-  void _handleBackToProjects() async {
+  void _handleBackToProjects() {
     _clearTimers();
-    
-    // Revert to Control Plane Server
-    final currentHost = Uri.parse(ApiService.baseUrl).host;
-    final controlPlaneUrl = 'http://$currentHost:28000';
-    if (ApiService.baseUrl != controlPlaneUrl) {
-      ApiService.setBaseUrl(controlPlaneUrl);
-      try {
-        await ApiService.createOrganisation(
-          fullName: _user.name,
-          orgName: 'Acme Corporation',
-          password: 'password123',
-          role: _user.role,
-          email: _user.email,
-        );
-      } catch (_) {
-        try {
-          await ApiService.login(
-            email: _user.email,
-            password: 'password123',
-          );
-        } catch (_) {}
-      }
-    }
-
     setState(() {
       _activeConversationId = null;
       _messages.clear();

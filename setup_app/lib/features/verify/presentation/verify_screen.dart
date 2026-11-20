@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/uno_palette.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../config/presentation/config_controller.dart';
+import '../../wizard/domain/wizard_step.dart';
 import '../../wizard/presentation/wizard_controller.dart';
 import 'verify_controller.dart';
 
@@ -21,6 +22,16 @@ class VerifyScreen extends ConsumerWidget {
     final localUrl = 'http://localhost:${serverConfig.serverPort}';
     final lanUrl = verifyState.lanServerUrl;
 
+    ref.listen(verifyControllerProvider, (prev, next) {
+      if (next.isSuccess && (prev == null || !prev.isSuccess)) {
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (ref.read(wizardControllerProvider).currentStep == WizardStep.verify) {
+            wizardNotifier.nextStep();
+          }
+        });
+      }
+    });
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580),
@@ -30,16 +41,16 @@ class VerifyScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Verifying Server Health',
-                style: UnoTypography.brandSerif(
-                  palette: palette,
-                  fontSize: 21,
+                'Data Plane Health Verification',
+                style: AppFonts.display(
+                  fontSize: 28,
+                  color: palette.text,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Checking server responsiveness, database transactions, and network handshake.',
-                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                'Verifying REST endpoints, PostgreSQL + pgvector vector indexes, and Redis pipelines.',
+                style: AppFonts.body(
                   color: palette.textSec,
                   fontSize: 13.5,
                 ),
@@ -60,8 +71,8 @@ class VerifyScreen extends ConsumerWidget {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Waiting for services to start...',
-                            style: AppTextStyles.bodyMediumOf(context).copyWith(
+                            'Performing health checks...',
+                            style: AppFonts.body(
                               fontWeight: FontWeight.w500,
                               color: palette.text,
                             ),
@@ -70,20 +81,20 @@ class VerifyScreen extends ConsumerWidget {
                           Icon(Icons.check_circle_rounded, size: 22, color: palette.live),
                           const SizedBox(width: 10),
                           Text(
-                            'Services Running & Healthy',
-                            style: AppTextStyles.h2Of(context).copyWith(
+                            'Data Plane Healthy & Online',
+                            style: AppFonts.youngSerif(
                               color: palette.live,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 17,
                             ),
                           ),
                         ] else ...[
                           Icon(Icons.cancel_rounded, size: 22, color: palette.error),
                           const SizedBox(width: 10),
                           Text(
-                            'Verification Failed',
-                            style: AppTextStyles.h2Of(context).copyWith(
+                            'Health Check Failed',
+                            style: AppFonts.youngSerif(
                               color: palette.error,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 17,
                             ),
                           ),
                         ],
@@ -94,7 +105,7 @@ class VerifyScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     _buildMetricRow(
                       context,
-                      'Local Health Check',
+                      'Local Loopback Endpoint',
                       localUrl,
                       isSuccess: verifyState.isLocalHealthy ? true : (verifyState.isVerifying ? null : false),
                       isChecking: verifyState.isVerifying && !verifyState.isLocalHealthy,
@@ -103,7 +114,7 @@ class VerifyScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       _buildMetricRow(
                         context,
-                        'LAN Health Check',
+                        'LAN Interface Reachability',
                         lanUrl,
                         isSuccess: verifyState.isLanHealthy ? true : (verifyState.isVerifying ? null : false),
                         isChecking: verifyState.isVerifying && !verifyState.isLanHealthy,
@@ -112,7 +123,7 @@ class VerifyScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _buildMetricRow(
                       context,
-                      'PostgreSQL & pgvector',
+                      'PostgreSQL 16 + pgvector',
                       verifyState.healthStatus?.databaseStatus ??
                           (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
                       isSuccess: verifyState.healthStatus?.databaseStatus == 'connected'
@@ -124,7 +135,7 @@ class VerifyScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _buildMetricRow(
                       context,
-                      'Redis Cache & Queue',
+                      'Redis Task Consumer',
                       verifyState.healthStatus?.redisStatus ??
                           (verifyState.isVerifying ? 'Checking...' : 'Disconnected'),
                       isSuccess: verifyState.healthStatus?.redisStatus == 'connected'
@@ -153,15 +164,15 @@ class VerifyScreen extends ConsumerWidget {
                           Icon(Icons.error_outline_rounded, size: 18, color: palette.error),
                           const SizedBox(width: 8),
                           Text(
-                            'Health check failed',
-                            style: AppTextStyles.h3Of(context).copyWith(color: palette.error),
+                            'Health Check Failed',
+                            style: AppFonts.youngSerif(color: palette.error, fontSize: 16),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        verifyState.errorMessage ?? 'Server failed to start in time or LAN connection was blocked.',
-                        style: AppTextStyles.bodyMediumOf(context).copyWith(color: palette.text),
+                        verifyState.errorMessage ?? 'Server failed to start in time or port is blocked by firewall.',
+                        style: AppFonts.body(color: palette.text, fontSize: 13),
                       ),
                     ],
                   ),
@@ -169,24 +180,38 @@ class VerifyScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 32),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   if (!verifyState.isVerifying && !verifyState.isSuccess) ...[
                     AppButton(
-                      label: 'Retry Check',
+                      label: 'Back to Configuration',
                       variant: AppButtonVariant.secondary,
-                      icon: Icons.refresh_rounded,
-                      onPressed: () => verifyNotifier.verifyServer(),
+                      icon: Icons.arrow_back_rounded,
+                      onPressed: () => wizardNotifier.setStep(WizardStep.configure),
                     ),
-                    const SizedBox(width: 12),
+                  ] else ...[
+                    const SizedBox.shrink(),
                   ],
-                  AppButton(
-                    label: 'Continue',
-                    icon: Icons.arrow_forward_rounded,
-                    isLoading: verifyState.isVerifying,
-                    onPressed: verifyState.isSuccess
-                        ? () => wizardNotifier.nextStep()
-                        : null,
+                  Row(
+                    children: [
+                      if (!verifyState.isVerifying && !verifyState.isSuccess) ...[
+                        AppButton(
+                          label: 'Retry Check',
+                          variant: AppButtonVariant.secondary,
+                          icon: Icons.refresh_rounded,
+                          onPressed: () => verifyNotifier.verifyServer(),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      AppButton(
+                        label: 'Complete Setup',
+                        icon: Icons.arrow_forward_rounded,
+                        isLoading: verifyState.isVerifying,
+                        onPressed: verifyState.isSuccess
+                            ? () => wizardNotifier.nextStep()
+                            : null,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -211,7 +236,7 @@ class VerifyScreen extends ConsumerWidget {
       children: [
         Text(
           label,
-          style: AppTextStyles.bodyMediumOf(context).copyWith(
+          style: AppFonts.body(
             color: palette.textSec,
             fontSize: 13,
           ),
@@ -236,7 +261,7 @@ class VerifyScreen extends ConsumerWidget {
             ],
             Text(
               value,
-              style: UnoTypography.mono(
+              style: AppFonts.mono(
                 color: isChecking
                     ? palette.textSec
                     : isSuccess == true

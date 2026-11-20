@@ -81,9 +81,5 @@ async def test_sync_servers_does_not_delete_existing_projects():
         mock_list.return_value = [existing_real_project]
         await ProjectService.sync_servers(mock_session, user_id, sync_request)
 
-    # Stale mock project MUST be deleted
-    mock_session.delete.assert_called_once_with(stale_mock_project)
-
-    # Existing real project MUST NOT be deleted
-    deleted_items = [call.args[0] for call in mock_session.delete.call_args_list]
-    assert existing_real_project not in deleted_items
+    # Projects MUST NOT be destructively deleted during server sync
+    mock_session.delete.assert_not_called()

@@ -45,7 +45,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3005",
     ]
 
-    # LLM Settings (Explicit Provider: 'claude', 'groq', 'offline')
+    # LLM Settings (Explicit Provider: 'claude', 'groq', 'openrouter', 'offline')
     LLM_PROVIDER: str = Field(default="groq")
 
     # Anthropic / Claude LLM Settings
@@ -54,7 +54,11 @@ class Settings(BaseSettings):
 
     # Groq LLM Settings
     GROQ_API_KEY: str | None = Field(default=None)
-    GROQ_MODEL: str = Field(default="llama-3.1-8b-instant")
+    GROQ_MODEL: str = Field(default="openai/gpt-oss-120b")
+
+    # OpenRouter LLM Settings
+    OPENROUTER_API_KEY: str | None = Field(default=None)
+    OPENROUTER_MODEL: str = Field(default="openrouter/free")
 
     # Context Budget
     CONTEXT_BUDGET_TOKENS: int = Field(default=6000)
@@ -116,15 +120,27 @@ class Settings(BaseSettings):
     VOYAGE_MODEL: str = Field(default="voyage-code-2")
     EMBEDDING_DIMENSION: int = Field(default=1536)
 
-    # Data Plane Isolation (set when running as dedicated project container)
+    # Data Plane Isolation & Federation
     DATA_PLANE_PROJECT_ID: str | None = Field(default=None)
+    DATA_PLANE_PROJECT_SLUG: str | None = Field(default=None)
     DATA_PLANE_ORG_ID: str | None = Field(default=None)
+    DATA_PLANE_ORG_SLUG: str = Field(default="acme-corporation")
     SERVER_PORT: int | None = Field(default=None)
     TARGET_REPO_URL: str | None = Field(default=None)
+    CONTROL_PLANE_URL: str = Field(default="http://127.0.0.1:28000")
+    DATA_PLANE_HOST: str = Field(default="127.0.0.1")
+    CLUSTER_FEDERATION_SECRET: str | None = Field(default=None)
+
+    @property
+    def effective_federation_secret(self) -> str:
+        return (self.CLUSTER_FEDERATION_SECRET or self.AUTH_SECRET).strip()
 
     @property
     def is_data_plane(self) -> bool:
-        return bool(self.DATA_PLANE_PROJECT_ID and self.DATA_PLANE_PROJECT_ID.strip())
+        return bool(
+            (self.DATA_PLANE_PROJECT_ID and self.DATA_PLANE_PROJECT_ID.strip())
+            or (self.DATA_PLANE_PROJECT_SLUG and self.DATA_PLANE_PROJECT_SLUG.strip())
+        )
 
 
 settings = Settings()

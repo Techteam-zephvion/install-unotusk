@@ -29,7 +29,14 @@ class WizardShell extends ConsumerWidget {
               currentStep: wizardState.currentStep,
               onBack: wizardState.isBusy || !wizardState.currentStep.canGoBack
                   ? null
-                  : wizardNotifier.previousStep,
+                  : () {
+                      if (wizardState.currentStep == WizardStep.target &&
+                          Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        wizardNotifier.previousStep();
+                      }
+                    },
               onStepTapped: (step) {
                 if (!wizardState.isBusy &&
                     step.index < wizardState.currentStep.index) {

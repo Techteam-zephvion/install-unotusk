@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,17 +9,132 @@ from apps.api.src.api.dependencies.database import get_db
 from apps.api.src.api.exceptions import ForbiddenException, UnauthorizedException
 from apps.api.src.auth.security import decode_access_token
 from apps.api.src.config.settings import settings
+from apps.api.src.core.federation import verify_federation_token
 from apps.api.src.models.enums import MembershipRole
 from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
+from apps.api.src.models.organization import Organization
+from apps.api.src.models.project import Project
 from apps.api.src.models.user import User
 
 security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    # 1. Fast-Path: Control-Plane-Signed Federation Token on Data Plane
+    fed_token = request.headers.get("X-Unotusk-Federation-Token") if request else None
+    if fed_token and settings.is_data_plane and settings.DATA_PLANE_PROJECT_ID:
+        claims = verify_federation_token(
+            fed_token,
+            settings.DATA_PLANE_PROJECT_SLUG or settings.DATA_PLANE_PROJECT_ID,
+        )
+        if claims is None:
+            raise UnauthorizedException(
+                code="INVALID_FEDERATION_TOKEN",
+                message="Invalid or expired federation token",
+            )
+
+        user_id = uuid.UUID(claims["sub"])
+        claim_org_id = uuid.UUID(claims["org_id"])
+        proj_id = uuid.UUID(claims["project_id"])
+        role_raw = claims.get("role", "MEMBER")
+        role_enum = (
+            MembershipRole(role_raw)
+            if role_raw in MembershipRole._value2member_map_
+            else MembershipRole.MEMBER
+        )
+
+        # 1a. JIT Upsert User by ID or Email (preserving existing user row if present)
+        user = await db.get(User, user_id)
+        if user is None:
+            q_user = select(User).where(User.email == claims["email"])
+            user = (await db.execute(q_user)).scalar_one_or_none()
+
+        if user is None:
+            user = User(
+                id=user_id,
+                email=claims["email"],
+                name=claims.get("name") or "Member",
+                password_hash="",
+            )
+            db.add(user)
+            await db.flush()
+
+        # 1b. Resolve Project & Organization without violating unique slug constraint
+        proj = await db.get(Project, proj_id)
+        if proj is None and claims.get("project_slug"):
+            q_proj = select(Project).where(Project.slug == claims["project_slug"])
+            proj = (await db.execute(q_proj)).scalar_one_or_none()
+
+        target_org_id = proj.organization_id if proj is not None else claim_org_id
+
+        org = await db.get(Organization, target_org_id)
+        if org is None:
+            q_org = select(Organization).where(
+                Organization.slug == settings.DATA_PLANE_ORG_SLUG
+            )
+            org = (await db.execute(q_org)).scalar_one_or_none()
+
+        if org is None:
+            org = (
+                await db.execute(select(Organization).limit(1))
+            ).scalar_one_or_none()
+
+        if org is None:
+            org = Organization(
+                id=target_org_id,
+                name="Acme Corporation",
+                slug=settings.DATA_PLANE_ORG_SLUG,
+            )
+            db.add(org)
+            await db.flush()
+
+        # Ensure project points to the resolved local Organization ID
+        if proj is not None and proj.organization_id != org.id:
+            proj.organization_id = org.id
+            await db.flush()
+
+        # 1c. CRITICAL: Upsert OrganizationMembership (required by all Data Plane services)
+        om_q = select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == org.id,
+            OrganizationMembership.user_id == user.id,
+        )
+        om = (await db.execute(om_q)).scalar_one_or_none()
+        if om is None:
+            db.add(
+                OrganizationMembership(
+                    organization_id=org.id,
+                    user_id=user.id,
+                    role=role_enum,
+                )
+            )
+        elif om.role != role_enum:
+            om.role = role_enum
+
+        # 1d. Upsert ProjectMembership
+        if proj is not None:
+            pm_q = select(ProjectMembership).where(
+                ProjectMembership.project_id == proj.id,
+                ProjectMembership.user_id == user.id,
+            )
+            pm = (await db.execute(pm_q)).scalar_one_or_none()
+            if pm is None:
+                db.add(
+                    ProjectMembership(
+                        project_id=proj.id,
+                        user_id=user.id,
+                        role=role_enum,
+                    )
+                )
+            elif pm.role != role_enum:
+                pm.role = role_enum
+        await db.commit()
+        return user
+
+    # 2. Standard Bearer Token Path (Control Plane & Direct-Mode fallback)
     if not credentials or not credentials.credentials:
         raise UnauthorizedException(
             code="MISSING_TOKEN",

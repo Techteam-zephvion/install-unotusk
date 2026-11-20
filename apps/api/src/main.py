@@ -23,6 +23,7 @@ from apps.api.src.api.routes import (
     tasks,
 )
 from apps.api.src.config.settings import settings
+from apps.api.src.core.data_plane_gateway import DataPlaneGatewayMiddleware
 from apps.api.src.core.data_plane_middleware import DataPlaneSecurityMiddleware
 from apps.api.src.core.logging import RequestTracingMiddleware, setup_server_logging
 
@@ -34,9 +35,168 @@ setup_server_logging()
 logger = logging.getLogger("unotusk-api")
 
 
+async def bootstrap_data_plane_on_startup() -> None:
+    import urllib.parse
+    import uuid
+    import httpx
+    from sqlalchemy import select
+    from apps.api.src.core.federation import (
+        derive_canonical_project_id,
+        sign_cluster_sync_payload,
+    )
+    from apps.api.src.db.session import AsyncSessionLocal
+    from apps.api.src.models.organization import Organization
+    from apps.api.src.models.project import Project
+    from apps.api.src.models.repository import Repository
+    from apps.api.src.models.snapshot import RepositorySnapshot
+    from apps.api.src.models.enums import (
+        ProjectStatus,
+        IntegrationProvider,
+        IntegrationStatus,
+    )
+    from apps.api.src.models.integration import Integration
+    from apps.api.src.services.slug import slugify
+    from apps.api.src.services.repository_service import RepositoryService
+
+    if AsyncSessionLocal is None:
+        return
+
+    async with AsyncSessionLocal() as session:
+        org_q = select(Organization).limit(1)
+        org = (await session.execute(org_q)).scalar_one_or_none()
+        if org is None:
+            org = Organization(
+                name="Acme Corporation", slug=settings.DATA_PLANE_ORG_SLUG
+            )
+            session.add(org)
+            await session.flush()
+
+        repo_url = (settings.TARGET_REPO_URL or "").strip()
+        parsed = urllib.parse.urlparse(repo_url).path.strip("/").split("/")
+        owner = parsed[-2] if len(parsed) >= 2 else "default"
+        default_name = settings.DATA_PLANE_PROJECT_SLUG or "project"
+        raw_name = (
+            parsed[-1].removesuffix(".git")
+            if len(parsed) >= 2 and parsed[-1]
+            else default_name
+        )
+        proj_slug = settings.DATA_PLANE_PROJECT_SLUG or slugify(raw_name)
+        canonical_id = (
+            uuid.UUID(settings.DATA_PLANE_PROJECT_ID)
+            if settings.DATA_PLANE_PROJECT_ID
+            else derive_canonical_project_id(
+                settings.DATA_PLANE_ORG_SLUG, proj_slug
+            )
+        )
+
+        proj = await session.get(Project, canonical_id)
+        if proj is None:
+            proj = (
+                await session.execute(
+                    select(Project).where(
+                        Project.organization_id == org.id,
+                        Project.slug == proj_slug,
+                    )
+                )
+            ).scalar_one_or_none()
+        if proj is None:
+            proj = Project(
+                id=canonical_id,
+                organization_id=org.id,
+                name=raw_name,
+                slug=proj_slug,
+                status=ProjectStatus.CREATED,
+                port=settings.SERVER_PORT or settings.PORT,
+            )
+            session.add(proj)
+            await session.commit()
+        else:
+            if settings.SERVER_PORT or settings.PORT:
+                proj.port = settings.SERVER_PORT or settings.PORT
+            await session.commit()
+
+        # Lock DataPlaneSecurityMiddleware to canonical ID & slug immediately
+        settings.DATA_PLANE_PROJECT_ID = str(proj.id)
+        settings.DATA_PLANE_PROJECT_SLUG = proj.slug
+
+        if repo_url:
+            ig_q = select(Integration).where(Integration.project_id == proj.id)
+            integ = (await session.execute(ig_q)).scalars().first()
+            if integ is None:
+                integ = Integration(
+                    project_id=proj.id,
+                    provider=IntegrationProvider.GITHUB,
+                    status=IntegrationStatus.CONNECTED,
+                    metadata={},
+                )
+                session.add(integ)
+                await session.flush()
+
+            rp_q = select(Repository).where(Repository.project_id == proj.id)
+            repo = (await session.execute(rp_q)).scalars().first()
+            if repo is None:
+                repo = Repository(
+                    project_id=proj.id,
+                    integration_id=integ.id,
+                    provider=IntegrationProvider.GITHUB,
+                    external_id=f"{owner}_{raw_name}",
+                    owner=owner,
+                    name=raw_name,
+                    full_name=f"{owner}/{raw_name}",
+                    default_branch="main",
+                    url=repo_url,
+                    is_private=False,
+                )
+                session.add(repo)
+                await session.commit()
+
+            sn_q = select(RepositorySnapshot).where(
+                RepositorySnapshot.repository_id == repo.id
+            )
+            snap = (await session.execute(sn_q)).scalars().first()
+            if snap is None:
+                try:
+                    await RepositoryService.trigger_ingestion_system(
+                        session, proj.id, repo.id
+                    )
+                except Exception as ing_err:
+                    logger.warning("Ingestion trigger deferred or failed: %s", ing_err)
+
+        # Register canonical project_id & port with Control Plane via HMAC
+        active_port = settings.SERVER_PORT or settings.PORT
+        if settings.CONTROL_PLANE_URL and active_port != 28000:
+            payload = {
+                "servers": [{
+                    "project_id": str(proj.id),
+                    "name": proj.name,
+                    "slug": proj.slug,
+                    "port": active_port,
+                    "state": "running",
+                    "repo_url": repo_url or None,
+                }]
+            }
+            ts, sig, raw_body = sign_cluster_sync_payload(payload)
+            sync_url = (
+                f"{settings.CONTROL_PLANE_URL.rstrip('/')}"
+                "/api/v1/projects/sync-servers"
+            )
+            hdrs = {
+                "Content-Type": "application/json",
+                "X-Unotusk-Timestamp": ts,
+                "X-Unotusk-Cluster-Signature": sig,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    await client.post(sync_url, content=raw_body, headers=hdrs)
+            except Exception as sync_err:
+                logger.warning("Sync heartbeat deferred: %s", sync_err)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME} in [{settings.APP_ENV}] mode...")
+    if settings.TARGET_REPO_URL or settings.is_data_plane:
+        await bootstrap_data_plane_on_startup()
     yield
     logger.info(f"Shutting down {settings.APP_NAME}...")
 
@@ -55,7 +215,10 @@ app.add_middleware(RequestTracingMiddleware)
 # Response Compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Data Plane Container-Level Authorization & Boundary Middleware
+# Data Plane Reverse-Proxy Gateway (active on Control Plane, proxies to Data Planes)
+app.add_middleware(DataPlaneGatewayMiddleware)
+
+# Data Plane Container-Level Authorization & Boundary Middleware (active on Data Plane)
 app.add_middleware(DataPlaneSecurityMiddleware)
 
 # CORS Middleware

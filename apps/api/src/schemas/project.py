@@ -25,6 +25,8 @@ class ProjectUpdate(BaseModel):
 
 
 class ServerSyncItem(BaseModel):
+    project_id: uuid.UUID | None = None
+    slug: str | None = None
     name: str
     port: int
     state: str = "running"

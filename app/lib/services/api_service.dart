@@ -596,8 +596,35 @@ class ApiService {
         final verifiedProjects = await Future.wait(projects.map((proj) async {
           if (accessToken == null) return proj;
           try {
-            // 1. If project was already returned with READY status from the current server,
-            // it is definitively live on this server!
+            // 1. If project has a designated data-plane port, probe it directly
+            if (proj.port != null && proj.port! > 0 && proj.port != 28000) {
+              final hosts = <String>{'127.0.0.1', if (currentHost.isNotEmpty && currentHost != 'localhost') currentHost};
+              bool isPortHealthy = false;
+              for (final h in hosts) {
+                try {
+                  final portHealthUri = Uri.parse('http://$h:${proj.port}/health');
+                  final portRes = await _client.get(portHealthUri).timeout(const Duration(milliseconds: 1000));
+                  if (portRes.statusCode == 200) {
+                    isPortHealthy = true;
+                    break;
+                  }
+                } catch (_) {}
+              }
+
+              if (isPortHealthy) {
+                return proj.copyWith(
+                  upsStatus: 'READY',
+                  ingestionStatus: 'live',
+                );
+              } else {
+                return proj.copyWith(
+                  upsStatus: 'STOPPED',
+                  ingestionStatus: 'stopped',
+                );
+              }
+            }
+
+            // 2. Control Plane project or project without a separate port
             if (proj.upsStatus.toUpperCase() == 'READY') {
               final currentUri = Uri.tryParse(baseUrl);
               return proj.copyWith(
@@ -606,54 +633,10 @@ class ApiService {
               );
             }
 
-            // 2. If project has a designated data-plane port, probe it directly
-            if (proj.port != null && proj.port! > 0) {
-              final hosts = <String>{'127.0.0.1', if (currentHost.isNotEmpty && currentHost != 'localhost') currentHost};
-              for (final h in hosts) {
-                try {
-                  final portHealthUri = Uri.parse('http://$h:${proj.port}/health');
-                  final portRes = await _client.get(portHealthUri).timeout(const Duration(milliseconds: 1200));
-                  if (portRes.statusCode == 200) {
-                    return proj.copyWith(
-                      upsStatus: 'READY',
-                      ingestionStatus: 'live',
-                    );
-                  }
-                } catch (_) {}
-              }
-            }
-
-            final dp = await fetchDataPlaneStatus(proj.id);
-            if (dp.port != null && dp.port! > 0) {
-              final hosts = <String>{'127.0.0.1', if (currentHost.isNotEmpty && currentHost != 'localhost') currentHost};
-              for (final h in hosts) {
-                try {
-                  final portHealthUri = Uri.parse('http://$h:${dp.port}/health');
-                  final portRes = await _client.get(portHealthUri).timeout(const Duration(milliseconds: 1200));
-                  if (portRes.statusCode == 200) {
-                    return proj.copyWith(
-                      upsStatus: 'READY',
-                      ingestionStatus: 'live',
-                      port: dp.port,
-                    );
-                  }
-                } catch (_) {}
-              }
-            }
-
-            if (!dp.isRunning && proj.upsStatus.toUpperCase() != 'READY') {
-              return proj.copyWith(
-                upsStatus: 'STOPPED',
-                ingestionStatus: 'stopped',
-                port: dp.port ?? proj.port,
-              );
-            } else {
-              return proj.copyWith(
-                upsStatus: 'READY',
-                ingestionStatus: 'live',
-                port: dp.port ?? proj.port,
-              );
-            }
+            return proj.copyWith(
+              upsStatus: 'STOPPED',
+              ingestionStatus: 'stopped',
+            );
           } catch (_) {
             return proj;
           }
@@ -695,7 +678,7 @@ class ApiService {
               } catch (_) {}
             }
 
-            final isLive = isPortHealthy || ls.state == 'running' || ls.state == 'degraded' || ls.state == 'active';
+            final isLive = isPortHealthy;
 
             bool mappedFromApi = false;
             if (isPortHealthy) {
@@ -828,13 +811,9 @@ class ApiService {
   /// Sets the currently active project
   static void setActiveProject(ProjectItem project) {
     activeProject = project;
-    if (project.port != null && project.port! > 0) {
-      final currentUri = Uri.tryParse(baseUrl);
-      if (currentUri != null && currentUri.port != project.port) {
-        baseUrl = currentUri.replace(port: project.port).toString().replaceAll(RegExp(r'/+$'), '');
-        serverHost = baseUrl.replaceAll('http://', '').replaceAll('https://', '');
-      }
-    }
+    // Client remains strictly single-origin on Control Plane (port 28000).
+    // The Control Plane Gateway (DataPlaneGatewayMiddleware) reverse-proxies
+    // project requests to dedicated data plane ports internally with signed Federation Tokens.
   }
 
   /// Creates and connects a codebase to http://10.0.0.59:28000/api/v1/projects

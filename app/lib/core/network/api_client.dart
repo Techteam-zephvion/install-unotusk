@@ -32,28 +32,10 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          final baseServerUrl = _storage.getServerUrl();
-          options.baseUrl = baseServerUrl;
-
-          // Automatic port switching: check if path targets a specific project workspace
-          int? targetPort;
-          final match = RegExp(r'^/projects/([a-zA-Z0-9-]+)').firstMatch(options.path);
-          if (match != null) {
-            final pid = match.group(1);
-            if (pid != null && _projectPortMap.containsKey(pid)) {
-              targetPort = _projectPortMap[pid];
-            }
-          } else if (_activeProjectId != null && _projectPortMap.containsKey(_activeProjectId)) {
-            targetPort = _projectPortMap[_activeProjectId];
-          }
-
-          if (targetPort != null && targetPort != 28000 && targetPort != 8000) {
-            final uri = Uri.tryParse(baseServerUrl);
-            if (uri != null && uri.hasPort && uri.port != targetPort) {
-              options.baseUrl = uri.replace(port: targetPort).toString().replaceAll(RegExp(r'/+$'), '');
-            }
-          }
-
+          // Always route through the Control Plane Gateway (:28000).
+          // DataPlaneGatewayMiddleware proxies project sub-resources internally
+          // with a signed X-Unotusk-Federation-Token.
+          options.baseUrl = _storage.getServerUrl();
           final token = _storage.getAuthToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -84,6 +66,8 @@ class ApiClient {
   void setActiveProjectId(String? projectId) {
     _activeProjectId = projectId;
   }
+
+  String? get activeProjectId => _activeProjectId;
 
   void updateBaseUrl(String newUrl) {
     _dio.options.baseUrl = newUrl;

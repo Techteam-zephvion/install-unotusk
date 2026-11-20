@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/uno_palette.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/error_state_card.dart';
+import '../../wizard/domain/wizard_step.dart';
 import '../../wizard/presentation/wizard_controller.dart';
 import '../data/deployment_engine.dart';
 import 'deploy_controller.dart';
@@ -61,23 +62,23 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Installing Unotusk',
-                style: UnoTypography.brandSerif(
-                  palette: palette,
-                  fontSize: 21,
+                'Deploying Container Services',
+                style: AppFonts.display(
+                  fontSize: 28,
+                  color: palette.text,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Deploying containers, bootstrapping PostgreSQL + pgvector, and configuring infrastructure.',
-                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                'Starting isolated PostgreSQL + pgvector, Redis, and Unotusk Intelligence engines.',
+                style: AppFonts.body(
                   color: palette.textSec,
                   fontSize: 13.5,
                 ),
               ),
               const SizedBox(height: 24),
               AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 child: Column(
                   children: stages.map((stage) {
                     return _buildStageRow(context, stage, deployState.currentStage);
@@ -87,7 +88,7 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
               if (deployState.currentStage == DeployStage.failed) ...[
                 const SizedBox(height: 16),
                 ErrorStateCard(
-                  title: 'Installation failed',
+                  title: 'Deployment Failed',
                   message: deployState.errorMessage ?? 'An error occurred while launching Docker services.',
                   technicalLogs: deployState.technicalLogs,
                   onRetry: () => deployNotifier.startDeployment(),
@@ -95,11 +96,21 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
               ],
               const SizedBox(height: 32),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  if (deployState.currentStage == DeployStage.failed) ...[
+                    AppButton(
+                      label: 'Back to Configuration',
+                      variant: AppButtonVariant.secondary,
+                      icon: Icons.arrow_back_rounded,
+                      onPressed: () => wizardNotifier.setStep(WizardStep.configure),
+                    ),
+                  ] else ...[
+                    const SizedBox.shrink(),
+                  ],
                   if (deployState.isSuccess) ...[
                     AppButton(
-                      label: 'Continue',
+                      label: 'Verify Installation',
                       icon: Icons.arrow_forward_rounded,
                       onPressed: () => wizardNotifier.nextStep(),
                     ),
@@ -149,7 +160,7 @@ class _DeployScreenState extends ConsumerState<DeployScreen> {
           Expanded(
             child: Text(
               stage.label,
-              style: AppTextStyles.bodyMediumOf(context).copyWith(
+              style: AppFonts.body(
                 fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
                 fontSize: 13.5,
                 color: isPending ? palette.textSec : palette.text,

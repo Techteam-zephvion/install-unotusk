@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/network/lan_detector.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/uno_palette.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../config/presentation/config_controller.dart';
+import '../../manager/data/server_manager_controller.dart';
 import '../data/app_launcher.dart';
 
 final appLauncherProvider = Provider<AppLauncher>((ref) {
@@ -25,11 +28,20 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
   bool _copied = false;
   bool _copiedLocal = false;
   bool _launching = false;
+  bool _isReturning = false;
+  bool _isRedirectPaused = false;
+  int _countdown = 4;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Refresh server fleet immediately in background
+      try {
+        ref.read(serverManagerProvider.notifier).loadServers();
+      } catch (_) {}
+
       final config = ref.read(configControllerProvider).config;
       if (config.lanIp == null || config.lanIp!.isEmpty) {
         final detector = ref.read(lanDetectorProvider);
@@ -38,11 +50,60 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
           ref.read(configControllerProvider.notifier).updateLanIp(primaryIp);
         }
       }
+
+      _startAutoRedirectTimer();
     });
   }
 
+  void _startAutoRedirectTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_isRedirectPaused || _isReturning) return;
+
+      setState(() {
+        if (_countdown > 1) {
+          _countdown--;
+        } else {
+          _countdown = 0;
+          timer.cancel();
+          _returnToDashboard();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _returnToDashboard() async {
+    if (_isReturning) return;
+    setState(() => _isReturning = true);
+    _countdownTimer?.cancel();
+
+    // Reload servers to ensure all data planes are visible
+    try {
+      await ref.read(serverManagerProvider.notifier).loadServers();
+    } catch (_) {}
+
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      context.go('/');
+    }
+  }
+
   Future<void> _copyUrl(String url, {bool isLocal = false}) async {
+    // Pause auto redirect so user has time to use the copied URL
     setState(() {
+      _isRedirectPaused = true;
       if (isLocal) {
         _copiedLocal = true;
       } else {
@@ -66,7 +127,10 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
   }
 
   Future<void> _launchApp(String serverUrl) async {
-    setState(() => _launching = true);
+    setState(() {
+      _launching = true;
+      _isRedirectPaused = true;
+    });
     final launcher = ref.read(appLauncherProvider);
     await launcher.launchEmployeeApp(serverUrl: serverUrl);
     if (mounted) setState(() => _launching = false);
@@ -120,16 +184,16 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Unotusk is ready.',
-                  style: UnoTypography.brandSerif(
-                    palette: palette,
-                    fontSize: 22,
+                  'Unotusk Data Plane Ready',
+                  style: AppFonts.display(
+                    fontSize: 32,
+                    color: palette.text,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Your Unotusk Server is operational and ready to accept employee connections over your Local Area Network (LAN).',
-                  style: AppTextStyles.bodyMediumOf(context).copyWith(
+                  'Your isolated project server is running and ready to accept employee client connections.',
+                  style: AppFonts.body(
                     color: palette.textSec,
                     fontSize: 13.5,
                   ),
@@ -139,10 +203,11 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        isLanDetected ? 'LAN Server URL (Employee Clients)' : 'Server URL',
-                        style: AppTextStyles.labelOf(context).copyWith(
+                        isLanDetected ? 'LAN Endpoint (Employee Client Connect)' : 'Server Endpoint',
+                        style: AppFonts.body(
                           color: palette.text,
                           fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -169,7 +234,7 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                       Expanded(
                         child: SelectableText(
                           serverUrl,
-                          style: UnoTypography.mono(
+                          style: AppFonts.mono(
                             color: palette.accent,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -189,9 +254,9 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                 const SizedBox(height: 10),
                 Text(
                   isLanDetected
-                      ? 'Share this LAN URL with Windows and macOS laptops connected to the same Wi-Fi / network.'
+                      ? 'Share this LAN URL with colleagues to connect from their laptops.'
                       : 'Configure the Employee App to connect to this server address.',
-                  style: AppTextStyles.bodySmallOf(context).copyWith(
+                  style: AppFonts.body(
                     color: palette.textSec,
                     fontSize: 12,
                   ),
@@ -202,12 +267,12 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                     children: [
                       Text(
                         'Local host address: ',
-                        style: AppTextStyles.bodySmallOf(context).copyWith(color: palette.textSec),
+                        style: AppFonts.body(color: palette.textSec, fontSize: 12),
                       ),
                       Expanded(
                         child: SelectableText(
                           serverConfig.localUrl,
-                          style: UnoTypography.mono(
+                          style: AppFonts.mono(
                             color: palette.text,
                             fontSize: 12,
                           ),
@@ -220,9 +285,10 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           child: Text(
                             _copiedLocal ? 'Copied' : 'Copy Local',
-                            style: AppTextStyles.bodySmallOf(context).copyWith(
+                            style: AppFonts.body(
                               color: palette.accent,
                               fontWeight: FontWeight.w600,
+                              fontSize: 12,
                             ),
                           ),
                         ),
@@ -240,7 +306,7 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                           children: [
                             Text(
                               'Available Network Interfaces:',
-                              style: AppTextStyles.labelOf(context).copyWith(fontSize: 11.5),
+                              style: AppFonts.body(fontSize: 11.5, color: palette.textSec),
                             ),
                             const SizedBox(height: 8),
                             Wrap(
@@ -266,7 +332,7 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                                     ),
                                     child: Text(
                                       '${addr.ip} (${addr.interfaceName})',
-                                      style: UnoTypography.mono(
+                                      style: AppFonts.mono(
                                         color: isSelected ? palette.accent : palette.textSec,
                                         fontSize: 11,
                                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -285,14 +351,79 @@ class _ReadyScreenState extends ConsumerState<ReadyScreen> {
                   loading: () => const SizedBox.shrink(),
                   error: (_, _) => const SizedBox.shrink(),
                 ),
-                const SizedBox(height: 28),
-                Divider(color: palette.div),
                 const SizedBox(height: 24),
+                // Auto-redirect status banner
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: palette.live.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: palette.live.withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: palette.live, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _isRedirectPaused
+                              ? 'Auto-redirect paused. Return whenever you are ready.'
+                              : 'Deployment verified! Returning to Server Fleet in ${_countdown}s...',
+                          style: AppFonts.body(
+                            color: palette.text,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (_isRedirectPaused) {
+                              _isRedirectPaused = false;
+                              _countdown = 4;
+                              _startAutoRedirectTimer();
+                            } else {
+                              _isRedirectPaused = true;
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Text(
+                            _isRedirectPaused ? 'Resume' : 'Pause',
+                            style: AppFonts.body(
+                              color: palette.accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Divider(color: palette.div),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
+                      flex: 3,
                       child: AppButton(
-                        label: 'Open Employee App',
+                        label: 'Return to Server Dashboard',
+                        icon: Icons.dashboard_rounded,
+                        isLoading: _isReturning,
+                        onPressed: _returnToDashboard,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: AppButton(
+                        label: 'Launch Client',
+                        variant: AppButtonVariant.secondary,
                         icon: Icons.launch_rounded,
                         isLoading: _launching,
                         onPressed: () => _launchApp(serverUrl),
