@@ -530,22 +530,28 @@ class _AuthScreenState extends State<AuthScreen>
                 ),
               ),
 
-              // ── Layer 2: Full-Bleed Sculptural Bas-Relief Artwork ──
+              // ── Layer 2: Full-Bleed Sculptural Bas-Relief Artwork (Slight Zoom to Eliminate Edge Artifacts) ──
               Positioned.fill(
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: reliefOpacity,
-                    child: ColorFiltered(
-                      colorFilter: ColorFilter.mode(
-                        reliefTint,
-                        BlendMode.color,
-                      ),
-                      child: Image.asset(
-                        'assets/auth_relief_bg.jpg',
-                        fit: BoxFit.cover,
-                        alignment: const Alignment(-0.28, 0.0),
-                        filterQuality: FilterQuality.medium,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                child: ClipRect(
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: reliefOpacity,
+                      child: ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          reliefTint,
+                          BlendMode.color,
+                        ),
+                        child: Transform.scale(
+                          scale: 1.08,
+                          alignment: const Alignment(-0.28, 0.0),
+                          child: Image.asset(
+                            'assets/auth_relief_bg.jpg',
+                            fit: BoxFit.cover,
+                            alignment: const Alignment(-0.28, 0.0),
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -751,11 +757,6 @@ class _AuthScreenState extends State<AuthScreen>
       _AuthColors.warmSand.withValues(alpha: 0.76),
       t,
     )!;
-    final mutedColor = Color.lerp(
-      _AuthColors.mutedDark,
-      _AuthColors.warmSand.withValues(alpha: 0.62),
-      t,
-    )!;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -773,124 +774,63 @@ class _AuthScreenState extends State<AuthScreen>
             32,
             42,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // ── Top Spacer (keeps brand lockup vertically centered) ──
-              const SizedBox(height: 1),
-
-              // ── Centerpiece Free-Standing Logo & Aligned Wordmark Lockup ──
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    UnotuskLogo(size: logoMarkSize, onDark: isDark),
-                    const SizedBox(width: 6),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Unotusk',
-                          style: GoogleFonts.youngSerif(
-                            color: brandColor,
-                            fontSize: wordmarkSize,
-                            letterSpacing: -1.3,
-                            height: 0.98,
-                            shadows: [
-                              Shadow(
-                                color: (isDark
-                                        ? const Color(0xFF040712)
-                                        : _AuthColors.sandBg)
-                                    .withValues(alpha: 0.55),
-                                blurRadius: 18,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 3),
-                          child: Text(
-                            'Project Intelligence Layer',
-                            maxLines: 1,
-                            style: GoogleFonts.cormorantGaramond(
-                              color: subColor,
-                              fontSize: taglineSize,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.8,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Bottom Studio Capability Strip ──
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 0,
-                runSpacing: 8,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _buildHeroPillar(
-                    LucideIcons.gitBranch,
-                    'AST-Grounded',
-                    mutedColor,
-                  ),
-                  _buildHeroPillarDivider(brandColor),
-                  _buildHeroPillar(
-                    LucideIcons.shieldCheck,
-                    'Zero Hallucination',
-                    mutedColor,
-                  ),
-                  _buildHeroPillarDivider(brandColor),
-                  _buildHeroPillar(
-                    LucideIcons.cpu,
-                    'Local-First',
-                    mutedColor,
+                  UnotuskLogo(size: logoMarkSize, onDark: isDark),
+                  const SizedBox(width: 6),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Unotusk',
+                        style: GoogleFonts.youngSerif(
+                          color: brandColor,
+                          fontSize: wordmarkSize,
+                          letterSpacing: -1.3,
+                          height: 0.98,
+                          shadows: [
+                            Shadow(
+                              color: (isDark
+                                      ? const Color(0xFF040712)
+                                      : _AuthColors.sandBg)
+                                  .withValues(alpha: 0.55),
+                              blurRadius: 18,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 3),
+                        child: Text(
+                          'Project Intelligence Layer',
+                          maxLines: 1,
+                          style: GoogleFonts.cormorantGaramond(
+                            color: subColor,
+                            fontSize: taglineSize,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.8,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildHeroPillar(IconData icon, String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color: color,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.2,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeroPillarDivider(Color color) {
-    return Container(
-      width: 1,
-      height: 12,
-      margin: const EdgeInsets.symmetric(horizontal: 14),
-      color: color.withValues(alpha: 0.24),
     );
   }
 

@@ -365,11 +365,5 @@ class MultiSignalRanker:
 
 
         # 6. Filter out negligible relevance candidates (noise threshold)
-        # Ensure we keep at least 3 candidates (floor guarantee) if candidates exist
-        if len(ranked) > 3:
-            filtered = [r for r in ranked if r.score >= noise_threshold]
-            if len(filtered) >= 3:
-                return filtered
-            return ranked[:3]
-
-        return ranked
+        # Never force irrelevant candidates (score < noise_threshold or 0.0) into final results
+        return [r for r in ranked if r.score >= noise_threshold and r.score > 0.0]

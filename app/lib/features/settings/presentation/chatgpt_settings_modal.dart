@@ -19,7 +19,6 @@ class ChatGPTSettingsModal extends StatefulWidget {
 class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
   late String _activeTab;
   String _selectedReasoningTier = 'warm';
-  String _selectedSpecFormat = 'bdd';
   String _selectedTheme = 'Dark';
   final ScrollController _scrollController = ScrollController();
 
@@ -131,45 +130,147 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
                       child: Column(
-                        children: _tabs.map((tab) {
-                          final bool isActive = _activeTab == tab['id'];
-                          return InkWell(
-                            onTap: () => _switchTab(tab['id'] as String),
-                            borderRadius: BorderRadius.circular(10),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              margin: const EdgeInsets.only(bottom: 4),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isActive
-                                    ? AppColors.accent.withValues(alpha: 0.12)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                border: isActive
-                                    ? Border.all(color: AppColors.accent.withValues(alpha: 0.35))
-                                    : Border.all(color: Colors.transparent),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    tab['icon'] as IconData,
-                                    size: 16,
-                                    color: isActive ? AppColors.accent : AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    tab['label'] as String,
-                                    style: AppTextStyles.inter(
-                                      fontSize: 13,
-                                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                                      color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ..._tabs.map((tab) {
+                            final bool isActive = _activeTab == tab['id'];
+                            return InkWell(
+                              onTap: () => _switchTab(tab['id'] as String),
+                              borderRadius: BorderRadius.circular(10),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                margin: const EdgeInsets.only(bottom: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? AppColors.accent.withValues(alpha: 0.12)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isActive
+                                      ? Border.all(color: AppColors.accent.withValues(alpha: 0.35))
+                                      : Border.all(color: Colors.transparent),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      tab['icon'] as IconData,
+                                      size: 16,
+                                      color: isActive ? AppColors.accent : AppColors.textSecondary,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      tab['label'] as String,
+                                      style: AppTextStyles.inter(
+                                        fontSize: 13,
+                                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                                        color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                            );
+                          }),
+
+                          const Spacer(),
+
+                          // Left Bottom Anchor Card
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgSurface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.divider.withValues(alpha: 0.6)),
                             ),
-                          );
-                        }).toList(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppColors.accent.withValues(alpha: 0.18),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          'DL',
+                                          style: TextStyle(
+                                            color: AppColors.accent,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Dev Lead',
+                                            style: TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            'Administrator',
+                                            style: TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 10,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Divider(height: 1, thickness: 1, color: AppColors.divider),
+                                const SizedBox(height: 7),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: AppColors.live,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          'Local-First',
+                                          style: AppTextStyles.mono(
+                                            fontSize: 9.5,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      'v0.1.0',
+                                      style: AppTextStyles.mono(
+                                        fontSize: 9.5,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -498,22 +599,96 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
         const SizedBox(height: 8),
         _buildTierRow('hot', 'Hot Tier · Direct Symbol Retrieval', 'Low-latency search targeting exact symbols and interfaces.', Icons.bolt_outlined, AppColors.warning),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
 
         Text(
-          'SPECIFICATION OUTPUT FORMAT',
+          'EVIDENCE GROUNDING SAFEGUARDS',
           style: AppTextStyles.mono(fontSize: 10.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
 
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildSpecChip('bdd', 'Gherkin BDD Contracts'),
-            _buildSpecChip('adr', 'Markdown ADR Records'),
-            _buildSpecChip('ts', 'TypeScript Interfaces'),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.live.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.shield_outlined, size: 16, color: AppColors.live),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Zero-Hallucination Synthesis Gate', style: AppTextStyles.inter(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('Enforces strict factual citations. Automatically abstains with evidence audit when confidence is low.', style: AppTextStyles.caption),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: AppColors.live.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.live.withValues(alpha: 0.35)),
+                ),
+                child: Text('ENFORCED', style: AppTextStyles.mono(fontSize: 9, color: AppColors.live, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.account_tree_outlined, size: 16, color: AppColors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Structure-Aware STAR-RAG Traversal', style: AppTextStyles.inter(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('2-Hop BFS graph expansion over AST symbols, call hierarchies, and dependency edges.', style: AppTextStyles.caption),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+                ),
+                child: Text('ACTIVE', style: AppTextStyles.mono(fontSize: 9, color: AppColors.accent, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -548,27 +723,6 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
             ),
             if (isSelected) Icon(Icons.check_circle, size: 16, color: color),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSpecChip(String id, String label) {
-    final isSelected = _selectedSpecFormat == id;
-    return InkWell(
-      onTap: () => setState(() => _selectedSpecFormat = id),
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.accent.withValues(alpha: 0.16) : AppColors.bgSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppColors.accent : AppColors.divider, width: isSelected ? 1.4 : 1.0),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.inter(fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400, color: isSelected ? AppColors.textPrimary : AppColors.textSecondary),
         ),
       ),
     );

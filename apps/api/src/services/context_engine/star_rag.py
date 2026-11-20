@@ -23,8 +23,9 @@ from __future__ import annotations
 import logging
 import math
 import re
+import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from itertools import combinations
 from typing import Any
 
@@ -59,6 +60,12 @@ class TemporalCodeEvent:
     candidate_id: str = ""
     candidate: RetrievedCandidate | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    commit_sha: str | None = None
+    file_path: str | None = None
+    symbol_name: str | None = None
+    change_type: str | None = None
+    description: str | None = None
+    snippet: str | None = None
 
 
 @dataclass
@@ -89,6 +96,49 @@ class StarRagResult:
     final_mdl_cost: float
     is_fallback: bool = False
     fallback_reason: str | None = None
+    ranked_events: list[TemporalCodeEvent] = field(default_factory=list)
+    temporal_evidence: list[dict[str, Any]] = field(default_factory=list)
+    temporal_intent: str | None = None
+    temporal_bounds: dict[str, Any] | None = None
+
+
+class TemporalStarRagRouter:
+    """
+    Selective Intent Router for Temporal STAR-RAG (Zhu et al., arXiv:2510.16715).
+    Determines whether a developer query requires historical / temporal retrieval.
+    Strictly preserves global feature-flag safety gates.
+    """
+
+    @classmethod
+    def should_route_to_temporal_star_rag(
+        cls,
+        query_text: str,
+        analyzed_query: AnalyzedQuery | None = None,
+        flag_enabled: bool = False,
+        force_temporal_star_rag: bool = False,
+    ) -> tuple[bool, str]:
+        # 1. Feature flag safety gate
+        if not flag_enabled and not force_temporal_star_rag:
+            return False, "feature_flag_disabled"
+
+        # 2. Forced parameter override
+        if force_temporal_star_rag:
+            return True, "forced_by_parameter"
+
+        # 3. Temporal query intent detection from AnalyzedQuery
+        if analyzed_query and analyzed_query.is_temporal:
+            intent = analyzed_query.temporal_intent or "HISTORICAL"
+            return True, f"temporal_intent:{intent}"
+
+        # 4. Fallback classification if AnalyzedQuery was not pre-computed
+        if query_text:
+            from apps.api.src.services.code_atom.temporal import classify_temporal_intent
+
+            is_temp, intent, _ = classify_temporal_intent(query_text)
+            if is_temp:
+                return True, f"temporal_intent:{intent or 'HISTORICAL'}"
+
+        return False, "query_lacks_temporal_intent"
 
 
 class EntityRelationMiner:
@@ -683,7 +733,10 @@ class StarRagContextService:
 
         for cand in candidates:
             cand_ts = parse_candidate_timestamp(cand)
-            rels = cand.metadata.get("temporal_relations")
+            prov = cand.metadata.get("provenance") or {}
+            c_sha = cand.metadata.get("commit_sha") or prov.get("commit_sha")
+            c_msg = cand.metadata.get("commit_message") or prov.get("commit_message") or ""
+            rels = cand.metadata.get("temporal_relations") or prov.get("temporal_relations")
 
             if isinstance(rels, list) and rels:
                 for idx, r in enumerate(rels):
@@ -696,12 +749,20 @@ class StarRagContextService:
                     if not s or not o:
                         continue
 
-                    # Determine event timestamp: t_obs or t_start, falling back to candidate commit time
                     t_val = parse_iso_timestamp(r.get("t_obs") or r.get("t_start")) or cand_ts
+                    ev_sha = r.get("commit_sha") or c_sha
                     ev_id = f"ev:{cand.candidate_id}:{idx}:{s}:{rel_name}:{o}"
+                    if ev_sha and ev_sha != "unknown":
+                        ev_id = f"ev:{ev_sha[:8]}:{idx}:{s}:{rel_name}:{o}"
 
                     if ev_id not in seen_events:
                         seen_events.add(ev_id)
+                        f_path = r.get("file_path") or cand.path
+                        sym_name = r.get("symbol_name") or cand.name
+                        change_t = r.get("change_type") or cand.metadata.get("change_type") or rel_name
+                        desc = r.get("statement") or f"{s} {rel_name} {o}"
+                        if c_msg and c_msg not in desc:
+                            desc = f"{desc} ({c_msg})"
                         events.append(
                             TemporalCodeEvent(
                                 event_id=ev_id,
@@ -711,26 +772,41 @@ class StarRagContextService:
                                 timestamp=t_val,
                                 candidate_id=cand.candidate_id,
                                 candidate=cand,
+                                commit_sha=ev_sha,
+                                file_path=f_path,
+                                symbol_name=sym_name,
+                                change_type=change_t,
+                                description=desc,
+                                snippet=r.get("snippet") or cand.content[:400],
                                 metadata={
                                     "t_start": r.get("t_start"),
                                     "t_end": r.get("t_end"),
                                     "t_obs": r.get("t_obs"),
                                     "confidence": r.get("confidence", "HIGH"),
+                                    "commit_sha": ev_sha,
+                                    "commit_message": c_msg,
+                                    "file_path": f_path,
+                                    "symbol_name": sym_name,
                                 },
                             )
                         )
             else:
                 # If no explicit temporal relations list, extract change-level event for ATOM chunks
-                c_type = cand.metadata.get("chunk_type") or (cand.metadata.get("provenance") or {}).get("change_type")
+                c_type = cand.metadata.get("chunk_type") or prov.get("change_type") or cand.metadata.get("change_type")
                 sym = cand.metadata.get("symbol_name") or cand.name
                 if c_type or sym:
                     rel_name = str(c_type or "DEFINES").strip().upper()
                     s = str(sym or cand.path).strip()
                     o = cand.path.strip()
                     ev_id = f"ev:{cand.candidate_id}:chunk:{s}:{rel_name}:{o}"
+                    if c_sha and c_sha != "unknown":
+                        ev_id = f"ev:{c_sha[:8]}:chunk:{s}:{rel_name}:{o}"
 
                     if ev_id not in seen_events:
                         seen_events.add(ev_id)
+                        desc = f"{s} ({rel_name}) in {cand.path}"
+                        if c_msg:
+                            desc = f"{desc}: {c_msg}"
                         events.append(
                             TemporalCodeEvent(
                                 event_id=ev_id,
@@ -740,8 +816,228 @@ class StarRagContextService:
                                 timestamp=cand_ts,
                                 candidate_id=cand.candidate_id,
                                 candidate=cand,
+                                commit_sha=c_sha,
+                                file_path=cand.path,
+                                symbol_name=cand.name,
+                                change_type=rel_name,
+                                description=desc,
+                                snippet=cand.content[:400],
+                                metadata={
+                                    "commit_sha": c_sha,
+                                    "commit_message": c_msg,
+                                    "file_path": cand.path,
+                                    "symbol_name": cand.name,
+                                },
                             )
                         )
+
+        return events
+
+    @classmethod
+    def extract_events_from_commit_artifacts(
+        cls,
+        artifacts: list[Any],
+        symbol_catalog: list[dict[str, Any]] | None = None,
+    ) -> list[TemporalCodeEvent]:
+        """
+        Extracts verified historical events f = (s, r, o, t) directly from GitCommitArtifact instances
+        using CodeAtomDecomposer.
+        """
+        from apps.api.src.services.code_atom.decomposer import CodeAtomDecomposer
+
+        decomposer = CodeAtomDecomposer()
+        events: list[TemporalCodeEvent] = []
+        seen_events: set[str] = set()
+
+        for art in artifacts:
+            decomp_res = decomposer.decompose(art, symbol_catalog=symbol_catalog)
+            ts = getattr(art, "committed_at", None)
+            c_sha = getattr(art, "commit_sha", "unknown")
+            c_msg = getattr(art, "commit_message", "")
+
+            # 1. Relations
+            for rel in getattr(decomp_res, "relations", []):
+                s = str(rel.subject).strip()
+                r_type = str(
+                    rel.relation.value if hasattr(rel.relation, "value") else rel.relation
+                ).strip().upper()
+                o = str(rel.object).strip()
+                t_val = rel.t_obs or rel.t_start or ts
+                ev_id = f"ev:{c_sha[:8] if c_sha else 'rel'}:{s}:{r_type}:{o}"
+                if ev_id not in seen_events:
+                    seen_events.add(ev_id)
+                    events.append(
+                        TemporalCodeEvent(
+                            event_id=ev_id,
+                            subject=s,
+                            relation=r_type,
+                            object=o,
+                            timestamp=t_val,
+                            commit_sha=c_sha,
+                            file_path=rel.file_path,
+                            symbol_name=rel.symbol_name,
+                            change_type=r_type,
+                            description=f"{s} {r_type} {o}",
+                            metadata={
+                                "commit_sha": c_sha,
+                                "commit_message": c_msg,
+                                "file_path": rel.file_path,
+                                "symbol_name": rel.symbol_name,
+                                "confidence": str(rel.confidence),
+                            },
+                        )
+                    )
+
+            # 2. Atomic changes
+            for chg in getattr(decomp_res, "changes", []):
+                s = str(chg.symbol_name or chg.file_path).strip()
+                r_type = str(
+                    chg.change_type.value if hasattr(chg.change_type, "value") else chg.change_type
+                ).strip().upper()
+                o = str(chg.file_path).strip()
+                ev_id = f"ev:{c_sha[:8] if c_sha else 'chg'}:chg:{s}:{r_type}:{o}"
+                if ev_id not in seen_events:
+                    seen_events.add(ev_id)
+                    events.append(
+                        TemporalCodeEvent(
+                            event_id=ev_id,
+                            subject=s,
+                            relation=r_type,
+                            object=o,
+                            timestamp=ts,
+                            commit_sha=c_sha,
+                            file_path=chg.file_path,
+                            symbol_name=chg.symbol_name,
+                            change_type=r_type,
+                            description=f"{s} {r_type} in {chg.file_path}: {c_msg}",
+                            snippet=chg.raw_content[:400] if chg.raw_content else "",
+                            metadata={
+                                "commit_sha": c_sha,
+                                "commit_message": c_msg,
+                                "file_path": chg.file_path,
+                                "symbol_name": chg.symbol_name,
+                                "old_start_line": chg.old_start_line,
+                                "new_start_line": chg.new_start_line,
+                            },
+                        )
+                    )
+
+        return events
+
+    @classmethod
+    async def load_historical_events_from_db(
+        cls,
+        session: Any,
+        snapshot_id: uuid.UUID,
+        repository_id: uuid.UUID | None = None,
+        limit: int = 200,
+    ) -> list[TemporalCodeEvent]:
+        """
+        Loads persisted historical code events from CodeChunk records in PostgreSQL.
+        Guarantees retrieval survives server restart.
+        """
+        from sqlalchemy import select
+
+        from apps.api.src.models.chunk import CodeChunk
+
+        stmt = (
+            select(CodeChunk)
+            .where(
+                CodeChunk.snapshot_id == snapshot_id,
+                CodeChunk.chunk_type.like("ATOM_%"),
+            )
+            .order_by(CodeChunk.created_at.desc())
+            .limit(limit)
+        )
+        res = await session.execute(stmt)
+        chunks = res.scalars().all()
+
+        events: list[TemporalCodeEvent] = []
+        seen_events: set[str] = set()
+
+        for chunk in chunks:
+            prov = chunk.provenance or {}
+            c_sha = chunk.commit_sha or prov.get("commit_sha", "unknown")
+            c_msg = chunk.commit_message or prov.get("commit_message", "")
+            ts_str = prov.get("committed_at")
+            ts = parse_iso_timestamp(ts_str) or (
+                chunk.created_at if hasattr(chunk, "created_at") else None
+            )
+
+            rels = prov.get("temporal_relations")
+            if isinstance(rels, list) and rels:
+                for r in rels:
+                    if not isinstance(r, dict):
+                        continue
+                    s = str(r.get("subject") or chunk.name).strip()
+                    rel_name = str(r.get("relation") or "CALLS").strip().upper()
+                    o = str(r.get("canonical_object") or r.get("object") or "").strip()
+                    if not s or not o:
+                        continue
+                    ev_id = f"ev:{c_sha[:8]}:{s}:{rel_name}:{o}"
+                    if ev_id not in seen_events:
+                        seen_events.add(ev_id)
+                        events.append(
+                            TemporalCodeEvent(
+                                event_id=ev_id,
+                                subject=s,
+                                relation=rel_name,
+                                object=o,
+                                timestamp=parse_iso_timestamp(r.get("t_obs") or r.get("t_start"))
+                                or ts,
+                                commit_sha=c_sha,
+                                file_path=r.get("file_path") or chunk.path,
+                                symbol_name=r.get("symbol_name") or chunk.name,
+                                change_type=rel_name,
+                                description=f"{s} {rel_name} {o} ({c_msg})" if c_msg else f"{s} {rel_name} {o}",
+                                snippet=chunk.content[:400] if chunk.content else "",
+                                metadata={
+                                    "commit_sha": c_sha,
+                                    "commit_message": c_msg,
+                                    "file_path": chunk.path,
+                                    "symbol_name": chunk.name,
+                                    "chunk_id": str(chunk.id),
+                                    "start_line": chunk.start_line,
+                                    "end_line": chunk.end_line,
+                                },
+                            )
+                        )
+
+            # Chunk level change event
+            s = str(prov.get("symbol_name") or chunk.name).strip()
+            chg_type = str(
+                prov.get("change_type") or chunk.chunk_type.replace("ATOM_", "")
+            ).strip().upper()
+            o = chunk.path.strip()
+            ev_id = f"ev:{c_sha[:8]}:chunk:{s}:{chg_type}:{o}"
+            if ev_id not in seen_events:
+                seen_events.add(ev_id)
+                events.append(
+                    TemporalCodeEvent(
+                        event_id=ev_id,
+                        subject=s,
+                        relation=chg_type,
+                        object=o,
+                        timestamp=ts,
+                        commit_sha=c_sha,
+                        file_path=chunk.path,
+                        symbol_name=prov.get("symbol_name") or chunk.name,
+                        change_type=chg_type,
+                        description=f"{s} ({chg_type}) in {chunk.path}: {c_msg}"
+                        if c_msg
+                        else f"{s} ({chg_type}) in {chunk.path}",
+                        snippet=chunk.content[:400] if chunk.content else "",
+                        metadata={
+                            "commit_sha": c_sha,
+                            "commit_message": c_msg,
+                            "file_path": chunk.path,
+                            "symbol_name": chunk.name,
+                            "chunk_id": str(chunk.id),
+                            "start_line": chunk.start_line,
+                            "end_line": chunk.end_line,
+                        },
+                    )
+                )
 
         return events
 
@@ -917,6 +1213,7 @@ class StarRagContextService:
         min_support: int | None = None,
         min_anchor_score: float | None = None,
         hub_attenuation: bool | None = None,
+        extra_events: list[TemporalCodeEvent] | None = None,
     ) -> StarRagResult:
         """
         Executes the full STAR-RAG retrieval pipeline and returns diagnostic results.
@@ -937,7 +1234,7 @@ class StarRagContextService:
             else getattr(settings, "STAR_RAG_HUB_ATTENUATION", True)
         )
 
-        if not candidates:
+        if not candidates and not extra_events:
             return StarRagResult(
                 candidates=[],
                 rule_nodes={},
@@ -951,8 +1248,15 @@ class StarRagContextService:
             )
 
         try:
-            # 1. Extract events
+            # 1. Extract and merge events
             events = cls.extract_events_from_candidates(candidates)
+            if extra_events:
+                seen_event_ids = {ev.event_id for ev in events}
+                for ex in extra_events:
+                    if ex.event_id not in seen_event_ids:
+                        seen_event_ids.add(ex.event_id)
+                        events.append(ex)
+
             if len(events) < 2:
                 return StarRagResult(
                     candidates=candidates,
@@ -991,7 +1295,6 @@ class StarRagContextService:
             )
 
             # 5. Determine query anchors
-            # Prioritize candidates by principled anchor relevance with deterministic tie-breaking
             ranked_anchor_candidates = sorted(
                 candidates,
                 key=lambda c: (-cls.compute_anchor_relevance(c, analyzed_query), c.candidate_id),
@@ -1002,14 +1305,32 @@ class StarRagContextService:
                 else 0.0
             )
 
-            # Absent-evidence / weak-anchor gate (reconciled scoring scale):
-            # - Raw unnormalized multi-signal anchor relevance uses threshold 1.0 (STAR_RAG_MIN_ANCHOR_SCORE),
-            #   which requires at least one strong keyword or symbol match.
-            # - When candidates carry pre-computed normalized ranker scores in [0, 1], effective threshold scales
-            #   to min(min_anchor_th, 0.40).
-            # - Note on architectural reconciliation: The ~0.15 score reported in previous audits is the MultiSignalRanker
-            #   background floor score of an unaugmented chunk (and the separate Architecture V1 Low-Confidence Synthesis Gate),
-            #   not the STAR-RAG raw anchor relevance threshold (1.0).
+            # Check if extra_events match query keywords
+            raw_tokens = cls._tokenize_code_text(query_text) if query_text else set()
+            query_tokens = {
+                t
+                for t in raw_tokens
+                if t not in STOP_WORDS and t not in NEGATION_WORDS and len(t) > 2
+            }
+            if analyzed_query:
+                for kw in list(analyzed_query.keywords) + list(analyzed_query.symbol_candidates):
+                    for t in cls._tokenize_code_text(kw):
+                        if t not in STOP_WORDS and t not in NEGATION_WORDS and len(t) > 2:
+                            query_tokens.add(t)
+
+            event_anchor_matches = []
+            if query_tokens:
+                for ev in events:
+                    ev_str = f"{ev.subject} {ev.relation} {ev.object} {ev.description or ''}".lower()
+                    toks = cls._tokenize_code_text(ev_str)
+                    filtered_toks = {
+                        t
+                        for t in toks
+                        if t not in STOP_WORDS and t not in NEGATION_WORDS and len(t) > 2
+                    }
+                    if query_tokens & filtered_toks:
+                        event_anchor_matches.append(ev)
+
             has_precomputed = (
                 bool(ranked_anchor_candidates)
                 and "score" in ranked_anchor_candidates[0].signals
@@ -1017,7 +1338,8 @@ class StarRagContextService:
             )
             effective_gate = min(min_anchor_th, 0.40) if has_precomputed else min_anchor_th
 
-            if top_anchor_rel < effective_gate:
+            # If anchor candidates are weak, check if direct event anchors are available
+            if top_anchor_rel < effective_gate and not event_anchor_matches:
                 return StarRagResult(
                     candidates=candidates,
                     rule_nodes=rule_nodes,
@@ -1032,10 +1354,13 @@ class StarRagContextService:
 
             anchor_candidates = ranked_anchor_candidates[:k1]
             anchor_cids = {c.candidate_id for c in anchor_candidates}
-            anchor_events = [ev for ev in events if ev.candidate_id in anchor_cids]
+            anchor_events = [ev for ev in events if ev.candidate_id and ev.candidate_id in anchor_cids]
 
             if not anchor_events:
-                anchor_events = events[:k1]
+                if event_anchor_matches:
+                    anchor_events = event_anchor_matches[:k1]
+                else:
+                    anchor_events = events[:k1]
 
             # 6. PPR retrieval on rule graph
             top_rules, ppr_dist = SeededPprRetriever.retrieve_top_rules(
@@ -1060,21 +1385,64 @@ class StarRagContextService:
                     fallback_reason="PPR found no matching rule nodes",
                 )
 
-            # 7. Map selected rules back to original code evidence
-            # Collect candidates supported by top rule nodes
+            # 7. Map selected rules back to original code evidence and rerank supporting events
             cand_map: dict[str, RetrievedCandidate] = {c.candidate_id: c for c in candidates}
             augmented_cands: dict[str, RetrievedCandidate] = {}
 
-            # First add all original candidates to retain baseline evidence
+            # Retain baseline evidence
             for c in candidates:
                 augmented_cands[c.candidate_id] = c
 
-            # Boost and link candidates from top rule nodes
+            # Parse query temporal constraints from analyzed_query if present
+            struct_intent = getattr(analyzed_query, "structured_temporal_intent", None)
+            target_bound_end: datetime | None = None
+            target_bound_start: datetime | None = None
+            is_as_of_query = False
+
+            if struct_intent and hasattr(struct_intent, "constraints"):
+                for constraint in struct_intent.constraints:
+                    bound = getattr(constraint, "bound", None)
+                    if bound:
+                        if getattr(bound, "end", None):
+                            target_bound_end = bound.end
+                        if getattr(bound, "start", None):
+                            target_bound_start = bound.start
+                        op = getattr(constraint, "operator", None)
+                        if op in ("POINT_IN_TIME", "EQUALS"):
+                            is_as_of_query = True
+
+            q_lower = (query_text or "").lower()
+            if not target_bound_end:
+                m_asof = re.search(
+                    r"\b(?:as\s+of|as-of|before|prior\s+to)\s+(\d{4}-\d{2}-\d{2})\b",
+                    q_lower,
+                )
+                if m_asof:
+                    try:
+                        target_bound_end = datetime.fromisoformat(m_asof.group(1)).replace(
+                            tzinfo=UTC
+                        )
+                        if "as of" in q_lower or "as-of" in q_lower:
+                            is_as_of_query = True
+                    except Exception:
+                        pass
+
+            if not target_bound_start:
+                m_after = re.search(r"\b(?:after|since)\s+(\d{4}-\d{2}-\d{2})\b", q_lower)
+                if m_after:
+                    try:
+                        target_bound_start = datetime.fromisoformat(m_after.group(1)).replace(
+                            tzinfo=UTC
+                        )
+                    except Exception:
+                        pass
+
+            supporting_events: list[tuple[float, TemporalCodeEvent, RuleNode]] = []
+            seen_ev_ids: set[str] = set()
+
             for rule in top_rules:
                 pi_val = ppr_dist.get(rule.node_id, 0.0)
                 if enable_hub_attenuation and len(rule.events) > 1:
-                    # Attenuate generic hub rules inversely with event cardinality
-                    # to prevent hyper-generic rules (e.g. 200+ calls) from dominating specific relations
                     rule_weight = 1.0 / math.log2(2.0 + len(rule.events))
                 else:
                     rule_weight = 1.0
@@ -1084,7 +1452,6 @@ class StarRagContextService:
                     c = ev.candidate or cand_map.get(ev.candidate_id)
                     if c:
                         existing = augmented_cands.setdefault(c.candidate_id, c)
-                        # Record PPR signal
                         existing.signals["star_rag_ppr"] = max(
                             existing.signals.get("star_rag_ppr", 0.0),
                             round(effective_pi, 4),
@@ -1099,9 +1466,120 @@ class StarRagContextService:
                                 f"STAR-RAG temporal rule propagation ({rule.node_id})"
                             )
 
+                    # Event scoring and collection for temporal evidence
+                    if ev.event_id not in seen_ev_ids:
+                        seen_ev_ids.add(ev.event_id)
+                        ev_score = effective_pi
+
+                        # Lexical match boost
+                        ev_text = f"{ev.subject} {ev.relation} {ev.object} {ev.description or ''} {ev.file_path or ''}".lower()
+                        ev_tokens = cls._tokenize_code_text(ev_text)
+                        overlap = len(query_tokens & ev_tokens)
+                        if overlap > 0:
+                            ev_score += 0.35 * min(overlap, 5)
+
+                        # Temporal constraint alignment
+                        if ev.timestamp:
+                            if target_bound_end:
+                                if ev.timestamp <= target_bound_end:
+                                    ev_score += 1.0
+                                    days_diff = (
+                                        abs((target_bound_end - ev.timestamp).total_seconds())
+                                        / 86400.0
+                                    )
+                                    ev_score += max(0.0, 1.0 / (1.0 + days_diff * 0.1))
+                                else:
+                                    ev_score *= 0.15
+                            if target_bound_start:
+                                if ev.timestamp >= target_bound_start:
+                                    ev_score += 0.8
+                                else:
+                                    ev_score *= 0.15
+
+                        supporting_events.append((ev_score, ev, rule))
+
+            # Sort supporting events by score descending
+            supporting_events.sort(key=lambda x: -x[0])
+            ranked_events = [ev for _, ev, _ in supporting_events]
+
+            # Build structured temporal evidence list
+            temporal_evidence: list[dict[str, Any]] = []
+            for ev_score, ev, rule in supporting_events[:15]:
+                c_sha = (
+                    ev.commit_sha
+                    or (ev.metadata.get("commit_sha") if ev.metadata else None)
+                    or (getattr(ev.candidate, "commit_sha", None) if ev.candidate else None)
+                )
+                f_path = (
+                    ev.file_path
+                    or (ev.metadata.get("file_path") if ev.metadata else None)
+                    or (getattr(ev.candidate, "path", None) if ev.candidate else "codebase")
+                )
+                s_name = (
+                    ev.symbol_name
+                    or (ev.metadata.get("symbol_name") if ev.metadata else None)
+                    or ev.subject
+                )
+                c_msg = (
+                    ev.metadata.get("commit_message")
+                    if ev.metadata
+                    else (
+                        getattr(ev.candidate, "commit_message", "") if ev.candidate else ""
+                    )
+                )
+                desc = ev.description or f"{ev.subject} {ev.relation} {ev.object}"
+                if c_msg and c_msg not in desc:
+                    desc = f"{desc} (Commit: {c_msg})"
+                snippet = ev.snippet or (ev.candidate.content[:400] if ev.candidate else desc)
+
+                temporal_evidence.append(
+                    {
+                        "type": "temporal_event",
+                        "event_id": ev.event_id,
+                        "subject": ev.subject,
+                        "relation": ev.relation,
+                        "object": ev.object,
+                        "timestamp": ev.timestamp.isoformat() if ev.timestamp else None,
+                        "commit_sha": c_sha,
+                        "file": f_path,
+                        "symbol": s_name,
+                        "change_type": ev.change_type or ev.relation,
+                        "lines": (
+                            f"{ev.candidate.start_line}-{ev.candidate.end_line}"
+                            if ev.candidate
+                            else (
+                                f"{ev.metadata.get('start_line', 1)}-{ev.metadata.get('end_line', 20)}"
+                                if ev.metadata
+                                else "1-20"
+                            )
+                        ),
+                        "snippet": snippet,
+                        "relationship_path": f"{ev.subject} --[{ev.relation}]--> {ev.object}",
+                        "retrieval_reason": f"STAR-RAG temporal rule propagation ({rule.node_id})",
+                        "rule_node": rule.node_id,
+                        "score": round(ev_score, 4),
+                        "relevance": min(1.0, max(0.5, round(ev_score, 2))),
+                        "provenance": {
+                            "engine": "temporal_star_rag",
+                            "commit_sha": c_sha,
+                            "timestamp": ev.timestamp.isoformat() if ev.timestamp else None,
+                            "rule_node": rule.node_id,
+                            "temporal_status": "HISTORICAL",
+                        },
+                    }
+                )
+
             # 8. Resolve temporal supersession across the augmented candidate set
             final_cands = list(augmented_cands.values())
             resolve_temporal_supersession(final_cands)
+
+            bounds_info = {}
+            if target_bound_end:
+                bounds_info["target_bound_end"] = target_bound_end.isoformat()
+            if target_bound_start:
+                bounds_info["target_bound_start"] = target_bound_start.isoformat()
+            if is_as_of_query:
+                bounds_info["is_as_of_query"] = True
 
             return StarRagResult(
                 candidates=final_cands,
@@ -1112,6 +1590,10 @@ class StarRagContextService:
                 initial_mdl_cost=init_mdl,
                 final_mdl_cost=final_mdl,
                 is_fallback=False,
+                ranked_events=ranked_events,
+                temporal_evidence=temporal_evidence,
+                temporal_intent=getattr(analyzed_query, "temporal_intent", None),
+                temporal_bounds=bounds_info or None,
             )
 
         except Exception as e:
@@ -1127,3 +1609,51 @@ class StarRagContextService:
                 is_fallback=True,
                 fallback_reason=str(e),
             )
+
+    @classmethod
+    async def run_star_rag_pipeline_async(
+        cls,
+        candidates: list[RetrievedCandidate],
+        analyzed_query: AnalyzedQuery | None = None,
+        query_text: str = "",
+        session: Any | None = None,
+        snapshot_id: uuid.UUID | None = None,
+        repository_id: uuid.UUID | None = None,
+        top_k1: int | None = None,
+        top_k2: int | None = None,
+        alpha: float | None = None,
+        epsilon: float | None = None,
+        min_support: int | None = None,
+        min_anchor_score: float | None = None,
+        hub_attenuation: bool | None = None,
+        extra_events: list[TemporalCodeEvent] | None = None,
+    ) -> StarRagResult:
+        """
+        Asynchronous STAR-RAG retrieval pipeline that integrates database-persisted
+        historical repository events with candidates.
+        """
+        all_extra = list(extra_events or [])
+        if session is not None and snapshot_id is not None:
+            try:
+                db_events = await cls.load_historical_events_from_db(
+                    session=session,
+                    snapshot_id=snapshot_id,
+                    repository_id=repository_id,
+                )
+                all_extra.extend(db_events)
+            except Exception as e:
+                logger.debug(f"Could not load historical events from database: {e}")
+
+        return cls.run_star_rag_pipeline(
+            candidates=candidates,
+            analyzed_query=analyzed_query,
+            query_text=query_text,
+            top_k1=top_k1,
+            top_k2=top_k2,
+            alpha=alpha,
+            epsilon=epsilon,
+            min_support=min_support,
+            min_anchor_score=min_anchor_score,
+            hub_attenuation=hub_attenuation,
+            extra_events=all_extra if all_extra else None,
+        )

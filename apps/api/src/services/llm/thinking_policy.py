@@ -87,11 +87,22 @@ def get_thinking_tier(val: str | ThinkingTier | None) -> ThinkingTier:
     if not val_str:
         return ThinkingTier.WARM
 
+    tier_synonyms = {
+        "fast": ThinkingTier.HOT,
+        "hot": ThinkingTier.HOT,
+        "medium": ThinkingTier.WARM,
+        "warm": ThinkingTier.WARM,
+        "deep": ThinkingTier.COLD,
+        "cold": ThinkingTier.COLD,
+    }
+    if val_str in tier_synonyms:
+        return tier_synonyms[val_str]
+
     try:
         return ThinkingTier(val_str)
     except ValueError:
         raise ValueError(
-            f"Invalid thinking tier: '{val}'. Supported tiers are: 'hot', 'warm', 'cold'."
+            f"Invalid thinking tier: '{val}'. Supported tiers are: 'hot'/'fast', 'warm'/'medium', 'cold'/'deep'."
         ) from None
 
 

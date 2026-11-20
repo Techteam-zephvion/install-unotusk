@@ -12,7 +12,6 @@ import '../models/workspace_models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/desktop_window_controls.dart';
-import '../widgets/unotusk_logo.dart';
 
 /// Projects dashboard screen with top nav bar and project list.
 /// Matches the reference design: Unotusk logo, Projects/Settings tabs,
@@ -2537,55 +2536,16 @@ class _ProjectsScreenState extends State<ProjectsScreen>
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
     final isMacOS = !kIsWeb && Platform.isMacOS;
     final isWindowsOrLinux = !kIsWeb && (Platform.isWindows || Platform.isLinux);
-    final brandColor = Color.lerp(
-      const Color(0xFF0A0F20),
-      const Color(0xFFCBC1B4),
-      t,
-    )!;
 
     return Container(
       height: 54,
       color: Colors.transparent,
       padding: EdgeInsets.only(
-        left: isMacOS ? 78 : (isNarrow ? 14 : 24),
-        right: isWindowsOrLinux ? 0 : (isNarrow ? 14 : 24),
+        left: isMacOS ? 78 : (isNarrow ? 14 : 20),
+        right: isWindowsOrLinux ? 0 : (isNarrow ? 14 : 20),
       ),
       child: Row(
         children: [
-          // ── Left: Unotusk Logo, Wordmark & Quiet Workspace Tag ──
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              UnotuskLogo(size: 22, onDark: widget.isDark),
-              const SizedBox(width: 8),
-              Text(
-                'Unotusk',
-                style: GoogleFonts.youngSerif(
-                  color: brandColor,
-                  fontSize: 15.5,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              if (!isNarrow) ...[
-                Container(
-                  width: 1,
-                  height: 14,
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  color: brandColor.withValues(alpha: 0.20),
-                ),
-                Text(
-                  'WORKSPACE',
-                  style: GoogleFonts.inter(
-                    color: brandColor.withValues(alpha: 0.62),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
-            ],
-          ),
-
           // ── Draggable window area ──
           Expanded(
             child: isDesktop

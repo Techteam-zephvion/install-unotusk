@@ -166,6 +166,7 @@ class IntelligenceService:
         thinking_tier: str | None = None,
         enable_structure_aware_star_rag: bool | None = None,
         branch: str | None = None,
+        enable_star_rag: bool | None = None,
     ) -> GroundedAnswerResponse:
         project = await cls._verify_project_access(session, user_id, project_id)
         snapshot = await cls._get_active_snapshot(session, project_id, branch=branch)
@@ -239,6 +240,7 @@ class IntelligenceService:
             project_id=project.id,
             thinking_tier=thinking_tier,
             enable_structure_aware_star_rag=enable_structure_aware_star_rag,
+            enable_star_rag=enable_star_rag,
         )
 
         # 5. Persist Assistant Message

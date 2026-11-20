@@ -49,24 +49,60 @@ class ProjectContextEngine:
             repository_id = (await session.execute(snap_repo_stmt)).scalar_one_or_none()
 
         # 1c. Generate Query Embedding for semantic retrieval if not provided
+        vector_status = "not_attempted"
+        vector_provider = None
+        is_synthetic = False
         if query_embedding is None and question:
             try:
-                from apps.api.src.services.code_atom.embedding import generate_code_embedding
+                from apps.api.src.services.code_atom.embedding import (
+                    generate_code_embedding,
+                    get_embedding_provenance,
+                )
+
+                prov = get_embedding_provenance()
+                vector_provider = prov.get("provider")
+                is_synthetic = prov.get("is_synthetic", False)
 
                 query_embedding = generate_code_embedding(question, input_type="query")
-            except Exception:
+                if query_embedding is not None:
+                    vector_status = "synthetic" if is_synthetic else "semantic"
+                else:
+                    vector_status = "failed"
+            except Exception as e:
                 query_embedding = None
+                vector_status = f"error: {str(e)}"
+        elif query_embedding is not None:
+            vector_status = "provided"
 
-            if query_embedding is None:
-                from apps.api.src.services.context_engine.retriever import generate_text_embedding
-
-                query_embedding = generate_text_embedding(question)
+        # 1d. Stratified Retrieval Depth (AI PIE V1 Section 8)
+        # HOT (FAST): 10 candidates per signal
+        # WARM (MEDIUM): 20 candidates per signal
+        # COLD (DEEP): 40 candidates per signal
+        tier_upper = (thinking_tier or "FAST").upper()
+        if tier_upper == "DEEP" or (
+            tier_upper == "MEDIUM" and (analyzed.is_architectural_query or analyzed.is_temporal)
+        ):
+            retrieval_depth = "COLD"
+            limit_per_signal = 40
+            expansion_max = 40
+            expansion_depth = 2
+        elif tier_upper == "MEDIUM" or analyzed.is_architectural_query or analyzed.is_temporal:
+            retrieval_depth = "WARM"
+            limit_per_signal = 20
+            expansion_max = 20
+            expansion_depth = 2
+        else:
+            retrieval_depth = "HOT"
+            limit_per_signal = 10
+            expansion_max = 10
+            expansion_depth = 2
 
         # 2. Multi-Signal Retrieval (Lexical + Vector + Semantic)
         raw_candidates = await MultiSignalRetriever.retrieve_candidates(
             session=session,
             snapshot_id=snapshot_id,
             analyzed_query=analyzed,
+            limit_per_signal=limit_per_signal,
             query_embedding=query_embedding,
             repository_id=repository_id,
         )
@@ -76,45 +112,81 @@ class ProjectContextEngine:
             session=session,
             snapshot_id=snapshot_id,
             seed_candidates=raw_candidates,
-            max_depth=2,
+            max_expansions=expansion_max,
+            max_depth=expansion_depth,
         )
 
         # 3b. STAR-RAG Temporal Rule Graph Retrieval
-        use_star_rag = (
+        use_star_rag_flag = (
             enable_star_rag
             if enable_star_rag is not None
             else getattr(settings, "STAR_RAG_ENABLED", False)
         )
-        star_rag_diagnostics: dict[str, Any] = {}
-        star_rag_applied = False
-        if use_star_rag:
-            try:
-                from apps.api.src.services.context_engine.star_rag import StarRagContextService
+        from apps.api.src.services.context_engine.star_rag import (
+            StarRagContextService,
+            TemporalStarRagRouter,
+        )
 
-                star_res = StarRagContextService.run_star_rag_pipeline(
+        should_route_temporal, temporal_route_reason = (
+            TemporalStarRagRouter.should_route_to_temporal_star_rag(
+                query_text=question,
+                analyzed_query=analyzed,
+                flag_enabled=use_star_rag_flag,
+                force_temporal_star_rag=(enable_star_rag is True),
+            )
+        )
+
+        star_rag_diagnostics: dict[str, Any] = {
+            "routing_decision": temporal_route_reason,
+            "selective_routing_applied": True,
+        }
+        star_rag_applied = False
+        temporal_star_rag_evidence: list[dict[str, Any]] = []
+
+        if should_route_temporal:
+            try:
+                star_res = await StarRagContextService.run_star_rag_pipeline_async(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
                     query_text=question,
+                    session=session,
+                    snapshot_id=snapshot_id,
+                    repository_id=repository_id,
                 )
                 expanded_candidates = star_res.candidates
                 star_rag_applied = not star_res.is_fallback
-                star_rag_diagnostics = {
-                    "is_fallback": star_res.is_fallback,
-                    "fallback_reason": star_res.fallback_reason,
-                    "top_rules_count": len(star_res.top_rules),
-                    "rule_nodes_count": len(star_res.rule_nodes),
-                    "selected_edges_count": len(star_res.selected_edges),
-                    "initial_mdl_cost": round(star_res.initial_mdl_cost, 2),
-                    "final_mdl_cost": round(star_res.final_mdl_cost, 2),
-                }
+                star_rag_diagnostics.update(
+                    {
+                        "is_fallback": star_res.is_fallback,
+                        "fallback_reason": star_res.fallback_reason,
+                        "top_rules_count": len(star_res.top_rules),
+                        "rule_nodes_count": len(star_res.rule_nodes),
+                        "selected_edges_count": len(star_res.selected_edges),
+                        "initial_mdl_cost": round(star_res.initial_mdl_cost, 2),
+                        "final_mdl_cost": round(star_res.final_mdl_cost, 2),
+                        "ranked_events_count": len(star_res.ranked_events),
+                        "temporal_evidence_count": len(star_res.temporal_evidence),
+                    }
+                )
+                if not star_res.is_fallback and star_res.temporal_evidence:
+                    temporal_star_rag_evidence = star_res.temporal_evidence
             except Exception as exc:
                 star_rag_applied = False
-                star_rag_diagnostics = {
-                    "exception_occurred": True,
+                star_rag_diagnostics.update(
+                    {
+                        "exception_occurred": True,
+                        "is_fallback": True,
+                        "fallback_reason": str(exc),
+                        "error": str(exc),
+                    }
+                )
+        else:
+            star_rag_diagnostics.update(
+                {
                     "is_fallback": True,
-                    "fallback_reason": str(exc),
-                    "error": str(exc),
+                    "fallback_reason": temporal_route_reason,
                 }
+            )
 
         # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
         use_memotime = (
@@ -343,14 +415,7 @@ class ProjectContextEngine:
                     "error": str(exc),
                 }
 
-        # 5. Context Assembly & Budgeting
-        assembled = ContextAssembler.assemble_context(
-            ranked_candidates=ranked,
-            proof_chains=proof_chains,
-            evidence_paths=struct_evidence_paths,
-        )
-
-        # 5b. Retrieve Customer Project Knowledge
+        # 5a. Retrieve Customer Project Knowledge
         if project_id is None:
             snap_stmt = (
                 select(Repository.project_id)
@@ -373,7 +438,7 @@ class ProjectContextEngine:
                 ranked_candidates=ranked,
             )
 
-        # 5c. Global Repository Architecture Skeleton (Macro/Architecture Context Injection)
+        # 5b. Global Repository Architecture Skeleton (Macro/Architecture Context Injection)
         skeleton_context = ""
         if analyzed.is_architectural_query or len(ranked) < 5:
             try:
@@ -385,6 +450,34 @@ class ProjectContextEngine:
                 )
             except Exception:
                 skeleton_context = ""
+
+        # 5c. Unified Context Budget Envelope (AI PIE V1 Section 8)
+        total_token_budget = settings.CONTEXT_BUDGET_TOKENS
+        total_char_budget = total_token_budget * 4
+
+        # Skeleton capped at max 15% of budget
+        skeleton_budget_chars = int(total_char_budget * 0.15)
+        if skeleton_context and len(skeleton_context) > skeleton_budget_chars:
+            skeleton_context = skeleton_context[:skeleton_budget_chars] + "\n... [skeleton truncated to budget]"
+
+        # Knowledge capped at max 20% of budget
+        knowledge_budget_chars = int(total_char_budget * 0.20)
+        if knowledge_context and len(knowledge_context) > knowledge_budget_chars:
+            knowledge_context = knowledge_context[:knowledge_budget_chars] + "\n... [knowledge truncated to budget]"
+
+        # Allocate remainder to code candidates and structural paths (at least 65% of budget)
+        used_aux_chars = len(skeleton_context) + len(knowledge_context)
+        code_char_budget = max(2000, total_char_budget - used_aux_chars)
+        code_token_budget = max(500, code_char_budget // 4)
+
+        # 5d. Assemble Code Context within Envelope Budget
+        assembled = ContextAssembler.assemble_context(
+            ranked_candidates=ranked,
+            max_tokens=code_token_budget,
+            proof_chains=proof_chains,
+            evidence_paths=struct_evidence_paths,
+            temporal_evidence=temporal_star_rag_evidence,
+        )
 
         # Convert retrieved knowledge and integration records into evidence items
         knowledge_evidence_items: list[dict[str, Any]] = []
@@ -495,14 +588,20 @@ class ProjectContextEngine:
 
         assembled.evidence_items = all_evidence_items
 
-        full_prompt_context = assembled.prompt_context
+        full_prompt_parts = []
         if skeleton_context:
-            full_prompt_context = f"{skeleton_context}\n\n## DETAILED REPOSITORY CODE EVIDENCE\n{full_prompt_context}"
+            full_prompt_parts.append(skeleton_context)
         if knowledge_context:
-            if full_prompt_context:
-                full_prompt_context = f"{knowledge_context}\n\n{full_prompt_context}"
+            full_prompt_parts.append(knowledge_context)
+        if assembled.prompt_context:
+            if skeleton_context:
+                full_prompt_parts.append(f"## DETAILED REPOSITORY CODE EVIDENCE\n{assembled.prompt_context}")
             else:
-                full_prompt_context = knowledge_context
+                full_prompt_parts.append(assembled.prompt_context)
+
+        full_prompt_context = "\n\n".join(full_prompt_parts)
+        if len(full_prompt_context) > total_char_budget:
+            full_prompt_context = full_prompt_context[:total_char_budget] + "\n... [context budget ceiling reached]"
 
         # 6. LLM Grounded Synthesis (Claude, Groq, or deterministic offline)
         answer = await self.llm_provider.generate_grounded_answer(
@@ -527,15 +626,29 @@ class ProjectContextEngine:
                 "skeleton_injected": bool(skeleton_context),
                 "vector_search_used": has_vector,
                 "semantic_search_used": has_semantic,
-                "graph_traversal_depth": 2,
+                "graph_traversal_depth": expansion_depth,
                 "candidates_retrieved": len(raw_candidates),
                 "candidates_expanded": len(expanded_candidates),
                 "customer_knowledge_count": len(knowledge_records),
                 "top_score": ranked[0].score if ranked else 0.0,
+                "retrieval_depth": retrieval_depth,
+                "limit_per_signal": limit_per_signal,
+                "vector_status": vector_status,
+                "vector_provider": vector_provider,
+                "is_synthetic_vector": is_synthetic,
+                "context_budget_tokens": total_token_budget,
+                "context_budget_chars": total_char_budget,
+                "final_context_chars": len(full_prompt_context),
+                "skeleton_chars": len(skeleton_context) if skeleton_context else 0,
+                "knowledge_chars": len(knowledge_context) if knowledge_context else 0,
+                "code_context_chars": len(assembled.prompt_context),
+                "analysis_metrics": analyzed.analysis_metrics,
                 "memotime_used": memotime_success if use_memotime else False,
                 "memotime_diagnostics": memotime_diagnostics,
-                "star_rag_used": star_rag_applied if use_star_rag else False,
+                "star_rag_used": star_rag_applied if should_route_temporal else False,
                 "star_rag_diagnostics": star_rag_diagnostics,
+                "star_rag_temporal_evidence_count": len(temporal_star_rag_evidence),
+                "star_rag_temporal_routing_decision": temporal_route_reason,
                 "structure_aware_star_rag_used": (
                     struct_star_rag_applied if should_route_star else False
                 ),

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../theme/app_theme.dart';
 import 'desktop_window_controls.dart';
-import 'unotusk_logo.dart';
+import 'unotusk_workspace_brand.dart';
 
 /// Custom window title bar for standalone screens like AuthScreen.
 /// Displays branding on the left, draggable middle, and DesktopWindowControls on the right.
@@ -23,7 +23,7 @@ class WindowTitleBar extends StatelessWidget {
     super.key,
     required this.palette,
     this.trailing,
-    this.height = 36.0,
+    this.height = 54.0,
     this.transparent = false,
   });
 
@@ -39,18 +39,13 @@ class WindowTitleBar extends StatelessWidget {
     return Container(
       height: height,
       color: transparent ? Colors.transparent : palette.bgBase,
-      padding: EdgeInsets.only(left: isMacOS ? 78.0 : 14.0),
+      padding: EdgeInsets.only(left: isMacOS ? 78.0 : 20.0),
       child: Row(
         children: [
-          // ── Logo + Brand Name ──
-          UnotuskLogo(size: 16, onDark: isDark),
-          const SizedBox(width: 8),
-          Text(
-            'Unotusk',
-            style: UnoTypography.brandSerif(
-              palette: palette,
-              fontSize: 13,
-            ),
+          // ── Logo + Brand Name + Quiet Workspace Tag ──
+          UnotuskWorkspaceBrand(
+            palette: palette,
+            isDark: isDark,
           ),
 
           // ── Optional trailing (e.g. badge) ──

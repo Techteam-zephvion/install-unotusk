@@ -66,6 +66,11 @@ class GroundedAskRequest(BaseModel):
         default=None,
         description="Optional branch name to scope question to a specific feature branch",
     )
+    enable_star_rag: bool | None = Field(
+        default=None,
+        description="Optional override for temporal STAR-RAG retrieval (default inherits settings.STAR_RAG_ENABLED)",
+    )
+    )
 
     @field_validator("question")
     @classmethod
