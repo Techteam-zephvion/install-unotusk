@@ -1,4 +1,5 @@
 import '../../../core/constants/app_constants.dart';
+import '../../../core/security/cluster_authority.dart';
 import '../../../core/security/secret_generator.dart';
 
 enum LlmProviderType {
@@ -113,7 +114,8 @@ class ServerConfig {
     buffer.writeln('AUTH_SECRET=$authSecret');
     buffer.writeln('NEXT_PUBLIC_API_URL=$serverUrl');
     buffer.writeln('CONTROL_PLANE_URL=http://127.0.0.1:28000');
-    buffer.writeln('CLUSTER_FEDERATION_SECRET=unotusk-shared-cluster-secret-key-2026');
+    final dataPlaneSecret = ClusterAuthority.deriveDataPlaneSecret(serverName);
+    buffer.writeln('CLUSTER_FEDERATION_SECRET=$dataPlaneSecret');
     if (repoUrl.isNotEmpty) buffer.writeln('TARGET_REPO_URL=$repoUrl');
 
     // Primary Provider Setting

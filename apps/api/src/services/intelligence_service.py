@@ -148,12 +148,52 @@ class IntelligenceService:
         )
         res = await session.execute(stmt)
         snap = res.scalar_one_or_none()
-        if snap is None:
-            raise BadRequestException(
-                code="NO_INDEXED_SNAPSHOT",
-                message="Project repository has not been indexed yet. Please ingest a repository first.",
+        if snap is not None:
+            return snap
+
+        # Check if snapshot is currently being indexed/processed
+        in_progress_stmt = (
+            select(RepositorySnapshot)
+            .join(Repository, Repository.id == RepositorySnapshot.repository_id)
+            .where(
+                Repository.project_id == project_id,
+                RepositorySnapshot.status.in_([
+                    SnapshotStatus.QUEUED,
+                    SnapshotStatus.CLONING,
+                    SnapshotStatus.SCANNING,
+                    SnapshotStatus.PARSING,
+                    SnapshotStatus.INDEXING,
+                ]),
             )
-        return snap
+            .order_by(RepositorySnapshot.created_at.desc())
+            .limit(1)
+        )
+        in_progress = (await session.execute(in_progress_stmt)).scalar_one_or_none()
+        if in_progress is not None:
+            raise BadRequestException(
+                code="INGESTION_IN_PROGRESS",
+                message=f"Repository ingestion is currently in progress (status: {in_progress.status.value}). Please allow a few moments for indexing to complete.",
+            )
+
+        # Check if repository exists and auto-trigger initial ingestion
+        repo_stmt = select(Repository).where(Repository.project_id == project_id).limit(1)
+        repo = (await session.execute(repo_stmt)).scalar_one_or_none()
+        if repo is not None:
+            try:
+                from apps.api.src.services.repository_service import RepositoryService
+
+                await RepositoryService.trigger_ingestion_system(session, project_id, repo.id)
+                raise BadRequestException(
+                    code="INGESTION_TRIGGERED",
+                    message="Repository indexing has been automatically triggered. Please allow a few moments for analysis to complete before asking questions.",
+                )
+            except Exception:
+                pass
+
+        raise BadRequestException(
+            code="NO_INDEXED_SNAPSHOT",
+            message="Project repository has not been indexed yet. Please ingest a repository first.",
+        )
 
     @classmethod
     async def ask_question(

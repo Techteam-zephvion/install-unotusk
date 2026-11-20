@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/security/cluster_authority.dart';
 import '../../../../core/utils/platform_environment.dart';
 import '../../config/presentation/config_controller.dart';
 import '../../target/presentation/target_controller.dart';
@@ -118,10 +119,7 @@ class DeployController extends StateNotifier<DeployState> {
           };
         }).toList();
 
-        const federationSecret = String.fromEnvironment(
-          'CLUSTER_FEDERATION_SECRET',
-          defaultValue: 'unotusk-shared-cluster-secret-key-2026',
-        );
+        final federationSecret = ClusterAuthority.getMasterSecret();
         final rawJson = jsonEncode({'servers': syncList});
         final ts = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
         final msgBytes = utf8.encode('$ts.$rawJson');

@@ -18,6 +18,13 @@ def derive_canonical_project_id(org_slug: str, project_slug: str) -> uuid.UUID:
     return uuid.uuid5(UNOTUSK_PROJECT_NAMESPACE, key)
 
 
+def derive_data_plane_secret(master_secret: str, project_slug: str) -> str:
+    """Cryptographically derive a project-scoped shared secret from the cluster master authority key."""
+    key_bytes = master_secret.strip().encode("utf-8")
+    msg = f"unotusk-data-plane:{project_slug.strip().lower()}".encode()
+    return hmac.new(key_bytes, msg, hashlib.sha256).hexdigest()
+
+
 def mint_federation_token(
     *,
     user_id: uuid.UUID,
@@ -28,6 +35,7 @@ def mint_federation_token(
     project_slug: str,
     role: str,
     ttl_seconds: int = 60,
+    target_secret: str | None = None,
 ) -> str:
     now = int(time.time())
     payload = {
@@ -44,9 +52,11 @@ def mint_federation_token(
         "exp": now + ttl_seconds,
         "token_use": "data_plane_federation",
     }
+    # Secret priority: explicit target secret > effective federation secret
+    secret = target_secret or settings.effective_federation_secret
     return jwt.encode(
         payload,
-        settings.effective_federation_secret,
+        secret,
         algorithm="HS256",
     )
 
@@ -55,35 +65,44 @@ def verify_federation_token(
     token: str,
     expected_project_id: uuid.UUID | str,
 ) -> dict[str, Any] | None:
-    try:
-        # First decode token verifying signature and issuer
-        payload = jwt.decode(
-            token,
-            settings.effective_federation_secret,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-            issuer="unotusk-control-plane",
-        )
-        if payload.get("token_use") != "data_plane_federation":
-            return None
+    # Accept token verified by effective_federation_secret, or derived secret from cluster authority
+    candidate_secrets = [settings.effective_federation_secret]
+    derived = derive_data_plane_secret(settings.effective_federation_secret, str(expected_project_id))
+    if derived not in candidate_secrets:
+        candidate_secrets.append(derived)
 
-        # Verify target audience / project ref binding
-        ref_str = str(expected_project_id).strip().lower()
-        aud = str(payload.get("aud") or "").lower()
-        proj_id = str(payload.get("project_id") or "").lower()
-        proj_slug = str(payload.get("project_slug") or "").lower()
+    for secret in candidate_secrets:
+        try:
+            # First decode token verifying signature and issuer
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+                issuer="unotusk-control-plane",
+            )
+            if payload.get("token_use") != "data_plane_federation":
+                continue
 
-        if (
-            ref_str != proj_id
-            and ref_str != proj_slug
-            and aud != f"unotusk-data-plane:{ref_str}"
-            and aud != ref_str
-        ):
-            return None
+            # Verify target audience / project ref binding
+            ref_str = str(expected_project_id).strip().lower()
+            aud = str(payload.get("aud") or "").lower()
+            proj_id = str(payload.get("project_id") or "").lower()
+            proj_slug = str(payload.get("project_slug") or "").lower()
 
-        return payload
-    except Exception:
-        return None
+            if (
+                ref_str != proj_id
+                and ref_str != proj_slug
+                and aud != f"unotusk-data-plane:{ref_str}"
+                and aud != ref_str
+            ):
+                continue
+
+            return payload
+        except Exception:
+            continue
+
+    return None
 
 
 def sign_cluster_sync_payload(
@@ -115,6 +134,12 @@ def verify_cluster_sync_signature(
     if abs(int(time.time()) - ts) > max_skew_sec:
         return False
     msg = ts_header.encode("utf-8") + b"." + raw_body
-    secret_bytes = settings.effective_federation_secret.encode("utf-8")
-    expected = hmac.new(secret_bytes, msg, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, sig_header)
+    candidate_keys = [settings.effective_federation_secret.encode("utf-8")]
+    if settings.AUTH_SECRET and settings.AUTH_SECRET.encode("utf-8") not in candidate_keys:
+        candidate_keys.append(settings.AUTH_SECRET.encode("utf-8"))
+
+    for key in candidate_keys:
+        expected = hmac.new(key, msg, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(expected, sig_header):
+            return True
+    return False
