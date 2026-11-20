@@ -179,6 +179,11 @@ class EvidenceItem {
   final double relevance;
   final String? snippet;
   final String? symbol;
+  final int? startLine;
+  final int? endLine;
+  final String? relationshipPath;
+  final String? commitSha;
+  final String? committedAt;
 
   const EvidenceItem({
     required this.type,
@@ -187,16 +192,26 @@ class EvidenceItem {
     required this.relevance,
     this.snippet,
     this.symbol,
+    this.startLine,
+    this.endLine,
+    this.relationshipPath,
+    this.commitSha,
+    this.committedAt,
   });
 
   factory EvidenceItem.fromJson(Map<String, dynamic> json) {
     return EvidenceItem(
       type: json['type']?.toString() ?? 'symbol',
-      file: json['file']?.toString() ?? '',
+      file: json['file']?.toString() ?? (json['file_path']?.toString() ?? ''),
       lines: json['lines']?.toString(),
       relevance: (json['relevance'] as num?)?.toDouble() ?? 1.0,
-      snippet: json['snippet']?.toString(),
-      symbol: json['symbol']?.toString(),
+      snippet: json['snippet']?.toString() ?? (json['content']?.toString()),
+      symbol: json['symbol']?.toString() ?? (json['name']?.toString()),
+      startLine: (json['start_line'] as num?)?.toInt(),
+      endLine: (json['end_line'] as num?)?.toInt(),
+      relationshipPath: json['relationship_path']?.toString(),
+      commitSha: json['commit_sha']?.toString(),
+      committedAt: json['committed_at']?.toString(),
     );
   }
 }

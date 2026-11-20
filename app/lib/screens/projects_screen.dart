@@ -3244,7 +3244,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            'ONLINE (v0.1.0)',
+                            'ONLINE (v0.5.0 Loki)',
                             style: UnoTypography.mono(
                               color: palette.live,
                               fontSize: 10,

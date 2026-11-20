@@ -42,7 +42,7 @@ class HealthVerifier {
         );
       }
 
-      final version = healthRes.data['version'] as String? ?? '0.1.0';
+      final version = healthRes.data['version'] as String? ?? '0.5.0';
 
       // 2. Ready Endpoint (DB + Redis check)
       final readyRes = await _dio.get('$serverUrl/health/ready');

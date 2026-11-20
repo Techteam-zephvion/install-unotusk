@@ -54,7 +54,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.api
-    image: unotusk-api:0.1.0
+    image: unotusk-api:0.5.0
     container_name: unotusk-api
     restart: unless-stopped
     extra_hosts:
@@ -99,7 +99,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.worker
-    image: unotusk-worker:0.1.0
+    image: unotusk-worker:0.5.0
     container_name: unotusk-worker
     restart: unless-stopped
     depends_on:

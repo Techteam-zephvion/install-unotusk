@@ -259,7 +259,7 @@ class _ChatGPTSettingsModalState extends State<ChatGPTSettingsModal> {
                                       ],
                                     ),
                                     Text(
-                                      'v0.1.0',
+                                      'v0.5.0 Loki',
                                       style: AppTextStyles.mono(
                                         fontSize: 9.5,
                                         color: AppColors.textSecondary,

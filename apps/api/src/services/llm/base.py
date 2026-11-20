@@ -121,7 +121,7 @@ def should_abstain_due_to_insufficient_evidence(
     """
     max_rel = max((float(e.get("relevance", 0.0)) for e in evidence_items), default=0.0)
     if customer_notes or (integration_notes and len(integration_notes) > 0):
-        return False, max(max_rel, 0.8)
+        return False, max_rel
     if not evidence_items or max_rel < threshold:
         return True, max_rel
     return False, max_rel

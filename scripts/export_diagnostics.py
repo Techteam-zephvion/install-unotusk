@@ -30,7 +30,8 @@ import tarfile
 import urllib.error
 import urllib.request
 
-VERSION = "0.1.0"
+VERSION = "0.5.0"
+RELEASE_CODENAME = "Loki"
 
 UNOTUSK_CONTAINER_NAMES = {
     "unotusk-api",

@@ -8,7 +8,6 @@ Create Date: 2026-11-20 16:30:00.000000
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0014_conversation_archived_pinned"
@@ -18,6 +17,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Expand alembic_version version_num column to allow revisions > 32 chars
+    op.execute(
+        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128);"
+    )
     # Add is_archived and is_pinned columns to conversations table safely
     op.execute(
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;"

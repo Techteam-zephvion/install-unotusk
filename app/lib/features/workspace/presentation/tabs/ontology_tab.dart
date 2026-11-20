@@ -253,9 +253,14 @@ class _OntologyTabState extends ConsumerState<OntologyTab> {
                                   final isSelected = _selectedNode?.id == node.id;
                                   final isService = node.type.toUpperCase() == 'SERVICE';
                                   final isRepo = node.type.toUpperCase() == 'REPOSITORY';
+                                  final hasCycle = node.metadata['has_circular_dependency'] == true;
+                                  final isHotspot = node.metadata['is_hotspot'] == true;
 
                                   final double size = isService ? 28 : (isRepo ? 22 : 16);
                                   final double activeSize = size + (isHovered || isSelected ? 6 : 0);
+                                  final borderColor = hasCycle
+                                      ? Colors.redAccent
+                                      : (isHotspot ? const Color(0xFFFFA726) : color);
 
                                   return Positioned(
                                     left: pNode.x - 50,
@@ -285,14 +290,14 @@ class _OntologyTabState extends ConsumerState<OntologyTab> {
                                                       ? color
                                                       : (isService ? color.withValues(alpha: 0.25) : AppColors.bgElevated),
                                                   border: Border.all(
-                                                    color: color,
-                                                    width: (isHovered || isSelected) ? 2.5 : 1.5,
+                                                    color: borderColor,
+                                                    width: (isHovered || isSelected || hasCycle || isHotspot) ? 2.5 : 1.5,
                                                   ),
-                                                  boxShadow: (isHovered || isSelected || isService)
+                                                  boxShadow: (isHovered || isSelected || isService || hasCycle || isHotspot)
                                                       ? [
                                                           BoxShadow(
-                                                            color: color.withValues(alpha: isService ? 0.35 : 0.4),
-                                                            blurRadius: isService ? 12 : 8,
+                                                            color: borderColor.withValues(alpha: isService ? 0.35 : 0.4),
+                                                            blurRadius: (hasCycle || isHotspot) ? 14 : (isService ? 12 : 8),
                                                           ),
                                                         ]
                                                       : null,
@@ -449,6 +454,48 @@ class _OntologyTabState extends ConsumerState<OntologyTab> {
               ),
             ],
           ),
+          if (node.metadata['has_circular_dependency'] == true) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.redAccent),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Circular Dependency Detected in Cycle',
+                    style: AppTextStyles.caption.copyWith(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (node.metadata['is_hotspot'] == true) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFA726).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bolt, size: 16, color: Color(0xFFFFA726)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'High Architectural Coupling Hotspot (in: ${node.metadata['in_degree'] ?? 0}, out: ${node.metadata['out_degree'] ?? 0})',
+                    style: AppTextStyles.caption.copyWith(color: const Color(0xFFFFA726), fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (node.metadata.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(color: AppColors.divider, height: 1),

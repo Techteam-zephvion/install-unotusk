@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from datetime import UTC, datetime
@@ -6,10 +7,13 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
 from apps.api.src.api.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
+from apps.api.src.config.settings import settings
 from apps.api.src.core.security_vault import decrypt_secret, encrypt_secret
 from apps.api.src.models.chunk import CodeChunk
 from apps.api.src.models.dependency import CodeDependency
@@ -66,15 +70,21 @@ class RepositoryService:
         )
         mem_res = await session.execute(mem_query)
         if mem_res.scalar_one_or_none() is None:
-            # In single-tenant MVP, grant verified user automatic membership
-            auto_mem = OrganizationMembership(
-                id=uuid.uuid4(),
-                organization_id=project.organization_id,
-                user_id=user_id,
-                role=MembershipRole.MEMBER,
-            )
-            session.add(auto_mem)
-            await session.commit()
+            if settings.is_data_plane:
+                # In single-tenant MVP data plane, grant verified user automatic membership
+                auto_mem = OrganizationMembership(
+                    id=uuid.uuid4(),
+                    organization_id=project.organization_id,
+                    user_id=user_id,
+                    role=MembershipRole.MEMBER,
+                )
+                session.add(auto_mem)
+                await session.commit()
+            else:
+                raise ForbiddenException(
+                    code="ORGANIZATION_ACCESS_DENIED",
+                    message="You do not have access to this project",
+                )
 
         return project
 
@@ -435,6 +445,8 @@ class RepositoryService:
         repo = repo_res.scalars().first()
 
         if repo is None:
+            if not settings.is_data_plane:
+                return ProjectRepositoryContext(repository=None, active_snapshot=None)
             repo_name = project.slug or project.name.lower().replace(" ", "-")
             repo = Repository(
                 id=uuid.uuid4(),
@@ -460,7 +472,7 @@ class RepositoryService:
         snap_res = await session.execute(snap_query)
         snapshot = snap_res.scalars().first()
 
-        if snapshot is None:
+        if snapshot is None and settings.is_data_plane and repo is not None:
             snapshot = RepositorySnapshot(
                 id=uuid.uuid4(),
                 repository_id=repo.id,
@@ -570,6 +582,8 @@ class RepositoryService:
 
         snapshot = await RepositoryService._get_latest_snapshot(session, project.id)
         if snapshot is None:
+            if not settings.is_data_plane:
+                return []
             repo_query = select(Repository).where(Repository.project_id == project.id).order_by(Repository.created_at.desc())
             repo = (await session.execute(repo_query)).scalars().first()
             if repo is None:
@@ -617,7 +631,7 @@ class RepositoryService:
         res = await session.execute(query)
         files = res.scalars().all()
 
-        if not files:
+        if not files and settings.is_data_plane:
             from apps.api.src.services.ingestion_service import IngestionService
             await IngestionService.run_ingestion(snapshot.id)
             res = await session.execute(query)
@@ -774,7 +788,7 @@ class RepositoryService:
             file_on_disk = os.path.join(repo_dir, file.path)
             if os.path.exists(file_on_disk) and os.path.isfile(file_on_disk):
                 try:
-                    with open(file_on_disk, "r", encoding="utf-8", errors="replace") as f:
+                    with open(file_on_disk, encoding="utf-8", errors="replace") as f:
                         full_content = f.read()
                 except Exception as read_err:
                     logger.warning("Could not read file from disk %s: %s", file_on_disk, read_err)

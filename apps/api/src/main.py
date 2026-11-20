@@ -200,6 +200,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME} in [{settings.APP_ENV}] mode...")
     try:
         from sqlalchemy import text
+
         from apps.api.src.db.session import engine
         if engine:
             async with engine.begin() as conn:
@@ -226,7 +227,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    version="0.1.0",
+    version=settings.APP_VERSION,
     docs_url="/docs" if settings.DEBUG or settings.APP_ENV == "development" else None,
     redoc_url=None,
     lifespan=lifespan,

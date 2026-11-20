@@ -5,9 +5,9 @@ class ComposeGenerator {
   static String generateProductionCompose(ServerConfig config, {required String imageVersion}) {
     final String apiImage;
     final String workerImage;
-    if (imageVersion == '0.1.0' || imageVersion == 'local') {
-      apiImage = "unotusk-api:0.1.0";
-      workerImage = "unotusk-worker:0.1.0";
+    if (imageVersion == '0.5.0' || imageVersion == '0.1.0' || imageVersion == 'local') {
+      apiImage = "unotusk-api:$imageVersion";
+      workerImage = "unotusk-worker:$imageVersion";
     } else {
       apiImage = "ghcr.io/techteam-zephvion/unotusk-api:$imageVersion";
       workerImage = "ghcr.io/techteam-zephvion/unotusk-worker:$imageVersion";

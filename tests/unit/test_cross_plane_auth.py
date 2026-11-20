@@ -1,12 +1,10 @@
 import asyncio
-import os
 import unittest
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from apps.api.src.auth.security import create_access_token
 from apps.api.src.config.settings import settings
-from apps.api.src.models.user import User
 
 
 class TestCrossPlaneAuth(unittest.TestCase):

@@ -349,10 +349,33 @@ class MultiSignalRanker:
 
             # Normalize score (capped at 1.0)
             normalized_score = min(1.0, round(score / 3.0, 2))
+
+            # Apply hard score ceilings to demoted categories in non-temporal queries
+            if not analyzed_query.is_temporal:
+                if cand.metadata.get("is_deleted"):
+                    normalized_score = min(0.30, normalized_score)
+                elif cand.metadata.get("is_superseded"):
+                    normalized_score = min(0.65, normalized_score)
+            if is_test_file and not is_test_query:
+                normalized_score = min(0.70, normalized_score)
+
             intermediate.append((score, normalized_score, cand, reasons))
 
         # Sort descending by raw score to preserve discrimination between strong candidates
         intermediate.sort(key=lambda item: item[0], reverse=True)
+
+        # Enforce strict monotonicity on normalized scores when raw scores differ
+        adjusted_intermediate: list[tuple[float, float, RetrievedCandidate, list[str]]] = []
+        prev_raw = None
+        prev_norm = 1.0
+        for raw_s, norm_s, cand, reasons in intermediate:
+            curr_norm = norm_s
+            if prev_raw is not None and raw_s < prev_raw:
+                if curr_norm >= prev_norm:
+                    curr_norm = max(0.01, round(prev_norm - 0.05, 2))
+            adjusted_intermediate.append((raw_s, curr_norm, cand, reasons))
+            prev_raw = raw_s
+            prev_norm = curr_norm
 
         ranked = [
             RankedCandidate(
@@ -360,7 +383,7 @@ class MultiSignalRanker:
                 score=norm_s,
                 matched_reasons=reasons,
             )
-            for _, norm_s, cand, reasons in intermediate
+            for _, norm_s, cand, reasons in adjusted_intermediate
         ]
 
 

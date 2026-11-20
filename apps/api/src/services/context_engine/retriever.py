@@ -1,4 +1,3 @@
-import hashlib
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -17,10 +16,8 @@ except ImportError:
     or_ = select = AsyncSession = None  # type: ignore[assignment]
     CodeChunk = CodeDependency = RepositoryFile = RepositorySnapshot = CodeSymbol = None  # type: ignore[assignment]
 from apps.api.src.services.context_engine.embeddings import (
-    CONCEPT_CLUSTERS,
-    WORD_TO_CONCEPTS,
     compute_cosine_similarity,
-    generate_text_embedding,
+    generate_text_embedding,  # noqa: F401
 )
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
 

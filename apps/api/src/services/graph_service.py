@@ -302,6 +302,64 @@ class GraphService:
                         },
                     )
 
+        # 9. Detect circular dependencies and coupling hotspots
+        adj: dict[str, list[str]] = {}
+        in_degree: dict[str, int] = {}
+        out_degree: dict[str, int] = {}
+        for edge in edges.values():
+            if edge.type == GraphEdgeType.DEPENDS_ON:
+                adj.setdefault(edge.source, []).append(edge.target)
+                out_degree[edge.source] = out_degree.get(edge.source, 0) + 1
+                in_degree[edge.target] = in_degree.get(edge.target, 0) + 1
+
+        cycles: list[list[str]] = []
+        visited: set[str] = set()
+        rec_stack: list[str] = []
+
+        def dfs(node: str):
+            visited.add(node)
+            rec_stack.append(node)
+            for neighbor in adj.get(node, []):
+                if neighbor not in visited:
+                    dfs(neighbor)
+                elif neighbor in rec_stack:
+                    idx = rec_stack.index(neighbor)
+                    cycle_nodes = rec_stack[idx:] + [neighbor]
+                    if cycle_nodes not in cycles:
+                        cycles.append(cycle_nodes)
+            rec_stack.pop()
+
+        for start_node in list(adj.keys()):
+            if start_node not in visited:
+                dfs(start_node)
+
+        hotspots: list[dict] = []
+        for n_id, deg in sorted(in_degree.items(), key=lambda x: x[1], reverse=True)[:5]:
+            if deg >= 2:
+                hotspots.append({
+                    "node_id": n_id,
+                    "metric": "high_in_degree",
+                    "score": deg,
+                    "description": f"Heavily depended on by {deg} components",
+                })
+        for n_id, deg in sorted(out_degree.items(), key=lambda x: x[1], reverse=True)[:5]:
+            if deg >= 3:
+                hotspots.append({
+                    "node_id": n_id,
+                    "metric": "high_coupling",
+                    "score": deg,
+                    "description": f"Coupled to {deg} outgoing dependencies",
+                })
+
+        cycle_node_set = {n for c in cycles for n in c}
+        for n in nodes.values():
+            n.metadata["in_degree"] = in_degree.get(n.id, 0)
+            n.metadata["out_degree"] = out_degree.get(n.id, 0)
+            if n.id in cycle_node_set:
+                n.metadata["has_circular_dependency"] = True
+            if any(h["node_id"] == n.id for h in hotspots):
+                n.metadata["is_hotspot"] = True
+
         node_list = list(nodes.values())
         edge_list = list(edges.values())
 
@@ -311,4 +369,6 @@ class GraphService:
             snapshot_id=snapshot.id,
             total_nodes=len(node_list),
             total_edges=len(edge_list),
+            circular_dependencies=cycles[:10],
+            hotspots=hotspots,
         )

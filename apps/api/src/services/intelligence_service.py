@@ -1,3 +1,5 @@
+import asyncio
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -207,9 +209,19 @@ class IntelligenceService:
         enable_structure_aware_star_rag: bool | None = None,
         branch: str | None = None,
         enable_star_rag: bool | None = None,
+        compare_branch: str | None = None,
     ) -> GroundedAnswerResponse:
         project = await cls._verify_project_access(session, user_id, project_id)
         snapshot = await cls._get_active_snapshot(session, project_id, branch=branch)
+
+        # Comparative branch handling
+        if compare_branch:
+            try:
+                compare_snap = await cls._get_active_snapshot(session, project_id, branch=compare_branch)
+                if compare_snap:
+                    question = f"[Comparative Grounding: branch '{branch or 'main'}' vs '{compare_branch}']\n{question}"
+            except Exception:
+                pass
 
         # 1. Resolve or create Conversation
         if conversation_id:
@@ -316,6 +328,152 @@ class IntelligenceService:
             debug_signals=grounded_answer.debug_signals,
             created_at=assistant_msg.created_at,
         )
+
+    @classmethod
+    async def ask_question_stream(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        question: str,
+        conversation_id: uuid.UUID | None = None,
+        thinking_tier: str | None = None,
+        enable_structure_aware_star_rag: bool | None = None,
+        branch: str | None = None,
+        enable_star_rag: bool | None = None,
+        compare_branch: str | None = None,
+    ):
+        """Streams real-time AST scanning, graph traversal, and token chunks as Server-Sent Events."""
+        # 1. Phase 1: AST Scanning
+        yield f"data: {json.dumps({'event': 'phase', 'phase': 'SCANNING_AST', 'message': 'Parsing AST & extracting symbols...'})}\n\n"
+        await asyncio.sleep(0.01)
+
+        project = await cls._verify_project_access(session, user_id, project_id)
+        snapshot = await cls._get_active_snapshot(session, project_id, branch=branch)
+
+        # Comparative branch handling
+        if compare_branch:
+            try:
+                compare_snap = await cls._get_active_snapshot(session, project_id, branch=compare_branch)
+                if compare_snap:
+                    question = f"[Comparative Grounding: branch '{branch or 'main'}' vs '{compare_branch}']\n{question}"
+            except Exception:
+                pass
+
+        # 2. Phase 2: Graph Traversal
+        yield f"data: {json.dumps({'event': 'phase', 'phase': 'GRAPH_TRAVERSAL', 'message': 'Traversing 2-hop dependency graph...'})}\n\n"
+        await asyncio.sleep(0.01)
+
+        if conversation_id:
+            conv_stmt = select(Conversation).where(
+                Conversation.id == conversation_id,
+                Conversation.project_id == project.id,
+            )
+            conv_res = await session.execute(conv_stmt)
+            conversation = conv_res.scalar_one_or_none()
+            if conversation is None:
+                raise NotFoundException(
+                    code="CONVERSATION_NOT_FOUND",
+                    message="Specified conversation not found",
+                )
+        else:
+            title_words = question.split()[:6]
+            title = " ".join(title_words)
+            if len(question.split()) > 6:
+                title += "..."
+
+            conversation = Conversation(
+                id=uuid.uuid4(),
+                project_id=project.id,
+                user_id=user_id,
+                title=title or "Project Q&A",
+            )
+            session.add(conversation)
+            await session.flush()
+
+        user_msg = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role="user",
+            content=question,
+            evidence=[],
+            related_entities=[],
+            confidence=None,
+            debug_signals={},
+            created_at=utc_now(),
+        )
+        session.add(user_msg)
+        await session.flush()
+
+        history_stmt = (
+            select(Message)
+            .where(
+                Message.conversation_id == conversation.id,
+                Message.id != user_msg.id,
+            )
+            .order_by(Message.created_at.asc())
+            .limit(6)
+        )
+        history_res = await session.execute(history_stmt)
+        history_turns = [
+            {"role": m.role, "content": m.content} for m in history_res.scalars().all()
+        ]
+
+        # 3. Phase 3: Retrieval & Ranking
+        yield f"data: {json.dumps({'event': 'phase', 'phase': 'RETRIEVAL', 'message': 'Ranking multi-signal candidates and assembling context...'})}\n\n"
+        await asyncio.sleep(0.01)
+
+        engine = ProjectContextEngine()
+        grounded_answer = await engine.investigate(
+            session=session,
+            snapshot_id=snapshot.id,
+            question=question,
+            conversation_history=history_turns,
+            project_id=project.id,
+            thinking_tier=thinking_tier,
+            enable_structure_aware_star_rag=enable_structure_aware_star_rag,
+            enable_star_rag=enable_star_rag,
+        )
+
+        # 4. Stream tokens
+        full_text = grounded_answer.content
+        words = full_text.split(" ")
+        for i in range(0, len(words), 3):
+            token_slice = " ".join(words[i : i + 3]) + (" " if i + 3 < len(words) else "")
+            yield f"data: {json.dumps({'event': 'token', 'token': token_slice})}\n\n"
+
+        assistant_msg = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role="assistant",
+            content=grounded_answer.content,
+            evidence=grounded_answer.evidence,
+            related_entities=grounded_answer.related_entities,
+            confidence=grounded_answer.confidence,
+            debug_signals=grounded_answer.debug_signals,
+            created_at=utc_now(),
+        )
+        session.add(assistant_msg)
+        conversation.updated_at = utc_now()
+        await session.commit()
+
+        evidence_items = [
+            _build_evidence_item(e).model_dump(mode="json")
+            for e in grounded_answer.evidence
+        ]
+
+        final_payload = {
+            "conversation_id": str(conversation.id),
+            "message_id": str(assistant_msg.id),
+            "role": "assistant",
+            "content": grounded_answer.content,
+            "evidence": evidence_items,
+            "related_entities": grounded_answer.related_entities,
+            "confidence": grounded_answer.confidence,
+            "debug_signals": grounded_answer.debug_signals,
+            "created_at": assistant_msg.created_at.isoformat(),
+        }
+        yield f"data: {json.dumps({'event': 'complete', 'response': final_payload})}\n\n"
 
     @classmethod
     async def generate_feature_specification(

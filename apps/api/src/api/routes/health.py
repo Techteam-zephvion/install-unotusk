@@ -16,7 +16,8 @@ async def root():
     return {
         "service": "Unotusk MVP API",
         "status": "online",
-        "version": "0.1.0",
+        "version": settings.APP_VERSION,
+        "release": settings.RELEASE_CODENAME,
         "health": "/health",
         "message": f"Unotusk MVP API is running. Connect via the Unotusk Employee Desktop Client using Server URL: http://10.0.0.59:{port}",
     }
@@ -26,7 +27,8 @@ async def root():
 async def health_check() -> HealthResponse:
     return HealthResponse(
         status="ok",
-        version="0.1.0",
+        version=settings.APP_VERSION,
+        release=settings.RELEASE_CODENAME,
         environment=settings.APP_ENV,
     )
 

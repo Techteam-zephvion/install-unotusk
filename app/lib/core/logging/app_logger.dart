@@ -82,7 +82,8 @@ class AppLogRecord {
 }
 
 class AppLogger {
-  static const String currentVersion = '0.1.0';
+  static const String currentVersion = '0.5.0';
+  static const String releaseCodename = 'Loki';
   final String osName;
   final List<AppLogRecord> _logs = [];
   final int maxBuffer;

@@ -27,7 +27,7 @@ void main() {
 
       expect(record.event, AppLogEvent.serverConnectionSuccess);
       expect(record.severity, AppLogLevel.info);
-      expect(record.appVersion, '0.1.0');
+      expect(record.appVersion, '0.5.0');
       expect(record.os, 'linux');
       expect(record.message, 'Connected to server');
       expect(record.metadata?['url'], 'http://10.0.0.59:8000');
@@ -37,7 +37,7 @@ void main() {
       final json = record.toJson();
       expect(json['event'], 'SERVER_CONNECTION_SUCCESS');
       expect(json['severity'], 'INFO');
-      expect(json['version'], '0.1.0');
+      expect(json['version'], '0.5.0');
     });
 
     test('sanitizes Bearer tokens and raw JWTs from log messages', () {

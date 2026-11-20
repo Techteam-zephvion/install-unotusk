@@ -70,6 +70,10 @@ class GroundedAskRequest(BaseModel):
         default=None,
         description="Optional override for temporal STAR-RAG retrieval (default inherits settings.STAR_RAG_ENABLED)",
     )
+    compare_branch: str | None = Field(
+        default=None,
+        description="Optional branch name to perform comparative grounded diff Q&A against",
+    )
 
     @field_validator("question")
     @classmethod

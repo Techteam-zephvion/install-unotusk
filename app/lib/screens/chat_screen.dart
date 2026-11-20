@@ -8,7 +8,6 @@ import '../widgets/badges.dart';
 import '../widgets/chat_input_box.dart';
 import '../widgets/markdown_text.dart';
 import '../widgets/thinking_scanner.dart';
-import '../services/api_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final UnoPalette palette;
@@ -700,12 +699,7 @@ class _ResponseCardState extends State<_ResponseCard> {
           ...widget.data.segments.map((seg) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: MarkdownText(
-                  text: ApiService.synthesizeMermaidDiagram(
-                    question: '',
-                    content: seg.text,
-                    citations: widget.data.reasoning?.citations ?? const [],
-                    evidence: widget.data.reasoning?.evidence ?? const [],
-                  ),
+                  text: seg.text,
                   palette: p,
                   selectable: true,
                   baseStyle: GoogleFonts.inter(

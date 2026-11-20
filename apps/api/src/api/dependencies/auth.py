@@ -20,7 +20,7 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    request: Request,
+    request: Request = None,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -160,10 +160,31 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise UnauthorizedException(
-            code="USER_NOT_FOUND",
-            message="User associated with token does not exist",
-        )
+        email = payload.get("email")
+        if email:
+            email_res = await db.execute(select(User).where(User.email == email))
+            user = email_res.scalar_one_or_none()
+
+        if user is None:
+            if settings.is_data_plane:
+                # Cryptographic Cross-Plane Trust: JIT-provision user from verified Control Plane JWT
+                from apps.api.src.auth.security import hash_password
+
+                user_email = email or f"user_{str(user_id)[:8]}@acme.com"
+                user_name = user_email.split("@")[0].replace(".", " ").title()
+                user = User(
+                    id=user_id,
+                    email=user_email,
+                    name=user_name,
+                    password_hash=hash_password(""),
+                )
+                db.add(user)
+                await db.commit()
+            else:
+                raise UnauthorizedException(
+                    code="USER_NOT_FOUND",
+                    message="User associated with token does not exist",
+                )
 
     # Data Plane Container-Level Authorization Guardrail
     if settings.is_data_plane:

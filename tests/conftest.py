@@ -44,6 +44,10 @@ from sqlalchemy.pool import NullPool
 
 os.environ["APP_ENV"] = "test"
 os.environ["DEBUG"] = "true"
+os.environ["LLM_PROVIDER"] = "offline"
+os.environ.pop("GROQ_API_KEY", None)
+os.environ.pop("ANTHROPIC_API_KEY", None)
+os.environ.pop("OPENROUTER_API_KEY", None)
 TEST_DB_URL = os.getenv(
     "TEST_DATABASE_URL",
     os.getenv(

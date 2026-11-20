@@ -356,20 +356,32 @@ class GroqProvider(LLMProvider):
                 except Exception as fo_err:
                     logger.error(f"OpenRouter failover also failed: {fo_err}")
 
-            error_notice = (
-                f"### Groq Service Notice\n\n"
-                f"The AI model request could not be completed: `{last_error_reason}`.\n\n"
-                f"Please wait a moment and try asking again."
+            logger.warning(
+                "Groq live provider failed (%s); falling back to deterministic offline grounded answer",
+                last_error_reason,
+            )
+            fallback_content = self._generate_offline_grounded_answer(
+                question=question,
+                evidence_items=evidence_items,
+                related_entities=related_entities,
+                project_context=project_context,
+                confidence=confidence,
+                policy=policy,
+                error_reason=last_error_reason,
             )
             return GroundedAnswer(
-                content=error_notice,
+                content=fallback_content,
                 evidence=evidence_items,
                 related_entities=related_entities,
-                confidence="LOW",
+                confidence=confidence,
                 debug_signals={
-                    "model": self.model,
-                    "provider": "groq",
-                    "error": last_error_reason,
+                    "model": "offline-grounded-synthesizer",
+                    "provider": "offline",
+                    "thinking_tier": policy.tier.value,
+                    "reasoning_effort": policy.groq_reasoning_effort,
+                    "evidence_count": len(evidence_items),
+                    "error_reason": last_error_reason,
+                    "failover_from": "groq",
                     "latency_sec": round(time.time() - start_time, 2),
                 },
             )

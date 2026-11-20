@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     APP_NAME: str = "Unotusk API"
+    APP_VERSION: str = "0.5.0"
+    RELEASE_CODENAME: str = "Loki"
     APP_ENV: str = Field(default="development")
     DEBUG: bool = Field(default=False)
 

@@ -75,6 +75,7 @@ class TestPersistentGitStorage(unittest.TestCase):
                 mock_file.extension = ".py"
                 mock_file.language = "python"
                 mock_file.size_bytes = len(raw_code)
+                mock_file.content_hash = "mockhash123"
                 mock_file.line_count = 6
                 mock_file.is_binary = False
                 mock_file.is_generated = False

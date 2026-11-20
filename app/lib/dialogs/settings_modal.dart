@@ -349,7 +349,7 @@ class _SettingsModalState extends State<SettingsModal> {
                                       ],
                                     ),
                                     Text(
-                                      'v0.1.0',
+                                      'v0.5.0 Loki',
                                       style: UnoTypography.mono(
                                         color: palette.textSec,
                                         fontSize: 9.5,

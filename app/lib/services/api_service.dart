@@ -967,6 +967,7 @@ class ApiService {
     bool thinkingEnabled = true,
     bool? enableStructureAwareStarRag,
     String? branch,
+    String? compareBranch,
   }) async {
     final pid = _resolveProjectId(projectId);
     final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask');
@@ -987,6 +988,9 @@ class ApiService {
     }
     if (branch != null && branch.isNotEmpty) {
       bodyPayload['branch'] = branch;
+    }
+    if (compareBranch != null && compareBranch.isNotEmpty) {
+      bodyPayload['compare_branch'] = compareBranch;
     }
 
     final stopwatch = Stopwatch()..start();
@@ -1569,6 +1573,67 @@ class ApiService {
       return response.segments.first.text;
     }
     return 'Grounded response received';
+  }
+
+  /// Streams real-time SSE phases (Scanning AST, Graph Traversal, Retrieval) and token chunks
+  static Stream<Map<String, dynamic>> askQuestionStream({
+    String? projectId,
+    required String question,
+    String? conversationId,
+    String thinkingTier = 'warm',
+    bool thinkingEnabled = true,
+    bool? enableStructureAwareStarRag,
+    String? branch,
+    String? compareBranch,
+  }) async* {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ask/stream');
+    final effectiveTier = thinkingEnabled ? thinkingTier.toLowerCase() : 'hot';
+
+    final bodyPayload = <String, dynamic>{
+      'question': question,
+      'thinking_tier': effectiveTier,
+    };
+    if (conversationId != null &&
+        conversationId.isNotEmpty &&
+        !conversationId.startsWith('temp-') &&
+        !conversationId.startsWith('conv-')) {
+      bodyPayload['conversation_id'] = conversationId;
+    }
+    if (enableStructureAwareStarRag != null) {
+      bodyPayload['enable_structure_aware_star_rag'] = enableStructureAwareStarRag;
+    }
+    if (branch != null && branch.isNotEmpty) {
+      bodyPayload['branch'] = branch;
+    }
+    if (compareBranch != null && compareBranch.isNotEmpty) {
+      bodyPayload['compare_branch'] = compareBranch;
+    }
+
+    final request = http.Request('POST', uri);
+    request.headers.addAll(_headers);
+    request.body = jsonEncode(bodyPayload);
+
+    try {
+      final streamedResponse = await _client.send(request);
+      final lineStream = streamedResponse.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      await for (final line in lineStream) {
+        if (line.startsWith('data: ')) {
+          final dataStr = line.substring(6).trim();
+          if (dataStr.isNotEmpty) {
+            try {
+              final parsed = jsonDecode(dataStr) as Map<String, dynamic>;
+              yield parsed;
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiService] askQuestionStream error: $e');
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -2182,7 +2247,7 @@ class ApiService {
           cy: 0,
           label: s.name.length > 14 ? '${s.name.substring(0, 12)}…' : s.name,
           type: type,
-          subtitle: s.qualifiedName ?? s.name,
+          subtitle: s.qualifiedName.isNotEmpty ? s.qualifiedName : s.name,
         ));
         idx++;
       }
@@ -2507,7 +2572,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchRepositoryContext(healedId);
+          return await fetchRepositoryContext(healedId);
         }
       }
 
@@ -2539,7 +2604,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchProjectFiles(healedId, limit);
+          return await fetchProjectFiles(healedId, limit);
         }
       }
 
@@ -2566,7 +2631,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchFileDetail(fileId, healedId);
+          return await fetchFileDetail(fileId, healedId);
         }
       }
 
@@ -2590,7 +2655,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchProjectSymbols(healedId, limit);
+          return await fetchProjectSymbols(healedId, limit);
         }
       }
 
@@ -2615,7 +2680,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchProjectDependencies(healedId, limit);
+          return await fetchProjectDependencies(healedId, limit);
         }
       }
 

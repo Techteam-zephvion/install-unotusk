@@ -12,7 +12,6 @@ enums_mod = importlib.machinery.SourceFileLoader(
 ).load_module()
 sys.modules["apps.api.src.models.enums"] = enums_mod
 
-from apps.api.src.models.enums import DependencyType, SymbolType
 from apps.api.src.services.parser.dependency_extractor import (
     extract_dependencies_from_tree,
 )
@@ -25,6 +24,7 @@ from apps.api.src.services.parser.symbol_extractor import (
 from apps.api.src.services.parser.tree_sitter_parser import (
     get_parser,
     is_native_tree_sitter_candidate,
+    parse_code,
 )
 
 
@@ -115,6 +115,108 @@ class TestNativeTreeSitterLanguages(unittest.TestCase):
         self.assertGreaterEqual(len(deps), 2)
         self.assertTrue(any("package:flutter/material.dart" in d.raw_target for d in deps))
         self.assertTrue(any("auth_service.dart" in d.raw_target for d in deps))
+
+    def test_native_tree_sitter_rust_parsing(self):
+        """Verify native tree-sitter symbol and dependency extraction for Rust."""
+        rust_code = b"""
+        use std::sync::Arc;
+        use crate::config::ServerConfig;
+
+        pub struct ConnectionPool {
+            size: usize,
+        }
+
+        pub fn create_pool() -> ConnectionPool {
+            ConnectionPool { size: 10 }
+        }
+        """
+        tree = parse_code(rust_code, "Rust")
+        symbols = extract_symbols_from_tree(tree, rust_code, "Rust")
+        self.assertGreaterEqual(len(symbols), 2)
+        sym_names = [s.name for s in symbols]
+        self.assertIn("ConnectionPool", sym_names)
+        self.assertIn("create_pool", sym_names)
+
+        deps = extract_dependencies_from_tree(tree, rust_code, "Rust")
+        self.assertGreaterEqual(len(deps), 2)
+        raw_deps = [d.raw_target for d in deps]
+        self.assertTrue(any("std::sync::Arc" in r for r in raw_deps))
+        self.assertTrue(any("crate::config::ServerConfig" in r for r in raw_deps))
+
+    def test_native_tree_sitter_java_parsing(self):
+        """Verify native tree-sitter symbol and dependency extraction for Java."""
+        java_code = b"""
+        package com.unotusk.service;
+        import java.util.List;
+        import com.unotusk.model.User;
+
+        public class UserService {
+            public User findUser(String id) {
+                return null;
+            }
+        }
+        """
+        tree = parse_code(java_code, "Java")
+        symbols = extract_symbols_from_tree(tree, java_code, "Java")
+        self.assertGreaterEqual(len(symbols), 1)
+        sym_names = [s.name for s in symbols]
+        self.assertIn("UserService", sym_names)
+
+        deps = extract_dependencies_from_tree(tree, java_code, "Java")
+        self.assertGreaterEqual(len(deps), 2)
+        raw_deps = [d.raw_target for d in deps]
+        self.assertTrue(any("java.util.List" in r for r in raw_deps))
+        self.assertTrue(any("com.unotusk.model.User" in r for r in raw_deps))
+
+    def test_native_tree_sitter_csharp_parsing(self):
+        """Verify native tree-sitter symbol and dependency extraction for C#."""
+        cs_code = b"""
+        using System;
+        using System.Collections.Generic;
+
+        namespace Unotusk.App {
+            public class PaymentProcessor {
+                public void ProcessPayment() {}
+            }
+        }
+        """
+        tree = parse_code(cs_code, "C#")
+        symbols = extract_symbols_from_tree(tree, cs_code, "C#")
+        self.assertGreaterEqual(len(symbols), 1)
+        sym_names = [s.name for s in symbols]
+        self.assertIn("PaymentProcessor", sym_names)
+
+        deps = extract_dependencies_from_tree(tree, cs_code, "C#")
+        self.assertGreaterEqual(len(deps), 2)
+        raw_deps = [d.raw_target for d in deps]
+        self.assertTrue(any("System" in r for r in raw_deps))
+        self.assertTrue(any("System.Collections.Generic" in r for r in raw_deps))
+
+    def test_native_tree_sitter_cpp_parsing(self):
+        """Verify native tree-sitter symbol and dependency extraction for C++."""
+        cpp_code = b"""
+        #include <vector>
+        #include "engine/core.h"
+
+        class GameEngine {
+        public:
+            void init();
+        };
+
+        void run_simulation() {}
+        """
+        tree = parse_code(cpp_code, "C++")
+        symbols = extract_symbols_from_tree(tree, cpp_code, "C++")
+        self.assertGreaterEqual(len(symbols), 2)
+        sym_names = [s.name for s in symbols]
+        self.assertIn("GameEngine", sym_names)
+        self.assertIn("run_simulation", sym_names)
+
+        deps = extract_dependencies_from_tree(tree, cpp_code, "C++")
+        self.assertGreaterEqual(len(deps), 2)
+        raw_deps = [d.raw_target for d in deps]
+        self.assertTrue(any("vector" in r for r in raw_deps))
+        self.assertTrue(any("engine/core.h" in r for r in raw_deps))
 
 
 if __name__ == "__main__":

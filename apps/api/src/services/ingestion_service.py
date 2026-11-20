@@ -2,7 +2,6 @@ import hashlib
 import logging
 import os
 import shutil
-import tempfile
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -36,6 +35,7 @@ from apps.api.src.services.parser.dependency_extractor import (
 )
 from apps.api.src.services.parser.heuristics import (
     PARSER_SUPPORTED_LANGUAGES,
+    PYTHON_STDLIB_MODULES,
     detect_language,
     is_file_binary,
     is_file_generated,
@@ -394,6 +394,18 @@ class IngestionService:
                 snapshot.status = SnapshotStatus.SCANNING
                 await session.commit()
 
+                # Extract latest commit message for ATOM semantic embedding
+                latest_commit_msg = None
+                try:
+                    from apps.api.src.services.git_operations import GitOperationsService
+                    c_logs = await GitOperationsService.get_commit_log(source_dir, max_count=1)
+                    if c_logs:
+                        latest_commit_msg = c_logs[0].get("message")
+                except Exception:
+                    pass
+                if not latest_commit_msg:
+                    latest_commit_msg = f"Commit {commit_sha[:8]}" if commit_sha else None
+
                 # 3. SCANNING: File Discovery
                 discovered_files: list[dict] = []
                 for root, dirs, files in os.walk(source_dir):
@@ -544,11 +556,103 @@ class IngestionService:
 
                 await session.flush()
 
+                # Query previous completed snapshot for incremental delta caching
+                prev_snap_query = (
+                    select(RepositorySnapshot)
+                    .where(
+                        RepositorySnapshot.repository_id == snapshot.repository_id,
+                        RepositorySnapshot.status == SnapshotStatus.COMPLETED,
+                        RepositorySnapshot.id != snapshot.id,
+                    )
+                    .order_by(RepositorySnapshot.created_at.desc())
+                    .limit(1)
+                )
+                prev_snap_res = await session.execute(prev_snap_query)
+                prev_snap = prev_snap_res.scalar_one_or_none()
+
+                prev_files_by_path: dict[str, RepositoryFile] = {}
+                prev_symbols_by_file_id: dict[uuid.UUID, list[CodeSymbol]] = {}
+                prev_chunks_by_file_id: dict[uuid.UUID, list[CodeChunk]] = {}
+                prev_deps_by_file_id: dict[uuid.UUID, list[CodeDependency]] = {}
+
+                if prev_snap:
+                    pf_query = select(RepositoryFile).where(RepositoryFile.snapshot_id == prev_snap.id)
+                    pf_res = await session.execute(pf_query)
+                    for pf in pf_res.scalars().all():
+                        prev_files_by_path[pf.path] = pf
+
+                    if prev_files_by_path:
+                        prev_f_ids = [f.id for f in prev_files_by_path.values()]
+                        ps_query = select(CodeSymbol).where(CodeSymbol.file_id.in_(prev_f_ids))
+                        ps_res = await session.execute(ps_query)
+                        for ps in ps_res.scalars().all():
+                            prev_symbols_by_file_id.setdefault(ps.file_id, []).append(ps)
+
+                        pc_query = select(CodeChunk).where(CodeChunk.file_id.in_(prev_f_ids))
+                        pc_res = await session.execute(pc_query)
+                        for pc in pc_res.scalars().all():
+                            prev_chunks_by_file_id.setdefault(pc.file_id, []).append(pc)
+
+                        pd_query = select(CodeDependency).where(CodeDependency.file_id.in_(prev_f_ids))
+                        pd_res = await session.execute(pd_query)
+                        for pd in pd_res.scalars().all():
+                            prev_deps_by_file_id.setdefault(pd.file_id, []).append(pd)
+
                 # Second pass: Parse AST for symbols, chunks, and dependencies
                 processed_count = 0
                 created_symbols_list: list[tuple[str, CodeSymbol]] = []
                 for f_info in discovered_files:
                     repo_file = created_files_map[f_info["path"]]
+
+                    # Check incremental snapshot delta cache
+                    prev_f = prev_files_by_path.get(f_info["path"])
+                    if prev_f and prev_f.content_hash == f_info["content_hash"] and f_info["content_hash"]:
+                        sym_id_map: dict[uuid.UUID, uuid.UUID] = {}
+                        for old_sym in prev_symbols_by_file_id.get(prev_f.id, []):
+                            new_sym_id = uuid.uuid4()
+                            sym_id_map[old_sym.id] = new_sym_id
+                            new_sym = CodeSymbol(
+                                id=new_sym_id,
+                                file_id=repo_file.id,
+                                name=old_sym.name,
+                                symbol_type=old_sym.symbol_type,
+                                qualified_name=old_sym.qualified_name,
+                                start_line=old_sym.start_line,
+                                end_line=old_sym.end_line,
+                                symbol_metadata=old_sym.symbol_metadata,
+                            )
+                            session.add(new_sym)
+                            created_symbols_list.append((f_info["path"], new_sym))
+
+                        for old_chunk in prev_chunks_by_file_id.get(prev_f.id, []):
+                            new_chunk = CodeChunk(
+                                id=uuid.uuid4(),
+                                snapshot_id=snapshot.id,
+                                file_id=repo_file.id,
+                                symbol_id=sym_id_map.get(old_chunk.symbol_id) if old_chunk.symbol_id else None,
+                                chunk_type=old_chunk.chunk_type,
+                                name=old_chunk.name,
+                                path=repo_file.path,
+                                content=old_chunk.content,
+                                start_line=old_chunk.start_line,
+                                end_line=old_chunk.end_line,
+                                embedding=old_chunk.embedding,
+                            )
+                            session.add(new_chunk)
+
+                        for old_dep in prev_deps_by_file_id.get(prev_f.id, []):
+                            new_dep = CodeDependency(
+                                id=uuid.uuid4(),
+                                source_file_id=repo_file.id,
+                                target_file_id=old_dep.target_file_id,
+                                external_package=old_dep.external_package,
+                                dependency_type=old_dep.dependency_type,
+                                line_number=old_dep.line_number,
+                            )
+                            session.add(new_dep)
+
+                        processed_count += 1
+                        continue
                     content = b""
                     if not f_info["is_binary"] and os.path.exists(f_info["full_path"]):
                         try:
@@ -590,7 +694,7 @@ class IngestionService:
                                 ]
                                 sym_chunk_content = _clean_null("\n".join(sym_lines)) or ""
                                 sym_embedding = generate_atom_code_embedding(
-                                    commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                    commit_message=latest_commit_msg,
                                     content=sym_chunk_content,
                                     file_path=_clean_null(repo_file.path) or "",
                                     symbol_name=clean_sym_name or None,
@@ -636,7 +740,7 @@ class IngestionService:
                                     ]
                                     child_chunk_content = _clean_null("\n".join(child_lines)) or ""
                                     child_embedding = generate_atom_code_embedding(
-                                        commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                        commit_message=latest_commit_msg,
                                         content=child_chunk_content,
                                         file_path=_clean_null(repo_file.path) or "",
                                         symbol_name=clean_child_name or None,
@@ -693,7 +797,7 @@ class IngestionService:
                                 else "MODULE"
                             )
 
-                            for chunk_idx, start_idx in enumerate(range(0, total_lines, step)):
+                            for _chunk_idx, start_idx in enumerate(range(0, total_lines, step)):
                                 end_idx = min(start_idx + chunk_size, total_lines)
                                 slice_lines = all_lines[start_idx:end_idx]
                                 if not slice_lines:
@@ -706,9 +810,7 @@ class IngestionService:
                                     else (_clean_null(f_info["filename"]) or "")
                                 )
                                 file_embedding = generate_atom_code_embedding(
-                                    commit_message=snapshot.commit_sha
-                                    if snapshot and snapshot.commit_sha
-                                    else None,
+                                    commit_message=latest_commit_msg,
                                     content=file_chunk_content,
                                     file_path=_clean_null(repo_file.path) or "",
                                     symbol_name=None,
@@ -853,12 +955,14 @@ class IngestionService:
                                 target_file_id = rf.id
                                 break
                     else:
-                        for p, rf in created_files_map.items():
-                            p_no_ext = os.path.splitext(p)[0]
-                            target_as_path = dep.raw_target.replace(".", "/")
-                            if p_no_ext == target_as_path or p_no_ext.endswith(target_as_path):
-                                target_file_id = rf.id
-                                break
+                        target_as_path = dep.raw_target.replace(".", "/")
+                        first_pkg = dep.raw_target.split(".")[0]
+                        if first_pkg not in PYTHON_STDLIB_MODULES:
+                            for p, rf in created_files_map.items():
+                                p_no_ext = os.path.splitext(p)[0]
+                                if p_no_ext == target_as_path or p_no_ext.endswith("/" + target_as_path):
+                                    target_file_id = rf.id
+                                    break
 
                     clean_ext_pkg = _clean_null(ext_pkg) if ext_pkg else None
                     code_dep = CodeDependency(

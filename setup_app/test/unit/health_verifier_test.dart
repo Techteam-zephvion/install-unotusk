@@ -8,7 +8,7 @@ void main() {
       final dio = Dio();
       dio.httpClientAdapter = _MockHttpClientAdapter((options) {
         if (options.path.endsWith('/health')) {
-          return ResponseBody.fromString('{"status":"ok","version":"0.1.0"}', 200, headers: {
+          return ResponseBody.fromString('{"status":"ok","version":"0.5.0"}', 200, headers: {
             Headers.contentTypeHeader: [Headers.jsonContentType],
           });
         }
@@ -29,14 +29,14 @@ void main() {
       expect(status.isReady, true);
       expect(status.databaseStatus, 'connected');
       expect(status.redisStatus, 'connected');
-      expect(status.version, '0.1.0');
+      expect(status.version, '0.5.0');
     });
 
     test('checkHealth reports degraded when database is disconnected', () async {
       final dio = Dio();
       dio.httpClientAdapter = _MockHttpClientAdapter((options) {
         if (options.path.endsWith('/health')) {
-          return ResponseBody.fromString('{"status":"ok","version":"0.1.0"}', 200, headers: {
+          return ResponseBody.fromString('{"status":"ok","version":"0.5.0"}', 200, headers: {
             Headers.contentTypeHeader: [Headers.jsonContentType],
           });
         }

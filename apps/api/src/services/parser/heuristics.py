@@ -171,6 +171,18 @@ def is_native_tree_sitter_target(language: str) -> bool:
     return language in PRIMARY_TREE_SITTER_LANGUAGES
 
 
+# Python Standard Library Modules (to prevent hijacking by local files)
+PYTHON_STDLIB_MODULES = {
+    "sys", "os", "re", "logging", "json", "math", "time", "datetime", "typing",
+    "asyncio", "hashlib", "uuid", "pathlib", "collections", "itertools", "functools",
+    "unittest", "tempfile", "shutil", "abc", "io", "copy", "contextlib", "enum",
+    "dataclasses", "inspect", "socket", "http", "urllib", "threading", "subprocess",
+    "traceback", "gc", "warnings", "platform", "signal", "random", "string", "struct",
+    "queue", "weakref", "pickle", "csv", "sqlite3", "xml", "html", "base64", "binascii",
+    "multiprocessing", "concurrent", "argparse", "optparse", "pdb", "cProfile", "pstats",
+}
+
+
 def is_path_excluded(relative_path: str) -> bool:
     """Check if relative file or directory path matches any exclusion rule."""
     parts = Path(relative_path).parts

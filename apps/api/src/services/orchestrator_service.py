@@ -61,10 +61,10 @@ class OrchestratorService:
 
         try:
             # We assume the image `ghcr.io/techteam-zephvion/unotusk-api:v1.0.1` is used,
-            # or `unotusk-api:0.1.0` if running locally.
+            # or `unotusk-api:0.5.0` if running locally.
             # We will use the same image as the current container running this code.
             # To find it, we can inspect our own container, or hardcode it for MVP.
-            image_name = "unotusk-api:0.1.0"
+            image_name = f"unotusk-api:{settings.APP_VERSION}"
 
             # Discover our own network if running inside docker
             hostname = socket.gethostname()

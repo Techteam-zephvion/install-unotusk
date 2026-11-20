@@ -77,6 +77,42 @@ def extract_dependencies_from_tree(
                     return deps
         return _extract_go_regex_dependencies(code_bytes)
 
+    if language == "Rust":
+        if tree is not None:
+            root = getattr(tree, "root_node", None)
+            if root is not None:
+                _extract_rust_dependencies(root, code_bytes, deps)
+                if deps:
+                    return deps
+        return extract_universal_dependencies(code_bytes, language)
+
+    if language == "Java":
+        if tree is not None:
+            root = getattr(tree, "root_node", None)
+            if root is not None:
+                _extract_java_dependencies(root, code_bytes, deps)
+                if deps:
+                    return deps
+        return extract_universal_dependencies(code_bytes, language)
+
+    if language == "C#":
+        if tree is not None:
+            root = getattr(tree, "root_node", None)
+            if root is not None:
+                _extract_csharp_dependencies(root, code_bytes, deps)
+                if deps:
+                    return deps
+        return extract_universal_dependencies(code_bytes, language)
+
+    if language in ("C", "C++", "C++ Header", "C/C++ Header"):
+        if tree is not None:
+            root = getattr(tree, "root_node", None)
+            if root is not None:
+                _extract_cpp_dependencies(root, code_bytes, deps)
+                if deps:
+                    return deps
+        return extract_universal_dependencies(code_bytes, language)
+
     # Tier-2 Universal Dependency Extraction for all other languages (Dart, Java, Kotlin, Rust, C#, C++, PHP, Ruby, Swift, etc.)
     return extract_universal_dependencies(code_bytes, language)
 
@@ -482,6 +518,98 @@ def _extract_go_dependencies(
                         )
         elif child.type in GO_CONTAINERS:
             _extract_go_dependencies(child, code_bytes, result)
+
+
+def _extract_rust_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        if child.type == "use_declaration":
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace").strip()
+            # Remove 'use ', 'pub use ', and trailing ';'
+            target = re.sub(r"^(?:pub\s+)?use\s+", "", raw_text).rstrip(";").strip()
+            if target:
+                is_rel = target.startswith("crate::") or target.startswith("super::") or target.startswith("self::")
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=code_bytes[:child.start_byte].count(b"\n") + 1,
+                        is_relative=is_rel,
+                    )
+                )
+        elif child.type in ("declaration_list", "mod_item"):
+            _extract_rust_dependencies(child, code_bytes, result)
+
+
+def _extract_java_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        if child.type == "import_declaration":
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace").strip()
+            target = re.sub(r"^import\s+(?:static\s+)?", "", raw_text).rstrip(";").strip()
+            if target:
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=code_bytes[:child.start_byte].count(b"\n") + 1,
+                        is_relative=False,
+                    )
+                )
+        elif child.type in ("program", "class_body"):
+            _extract_java_dependencies(child, code_bytes, result)
+
+
+def _extract_csharp_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        if child.type == "using_directive":
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace").strip()
+            target = re.sub(r"^using\s+(?:static\s+)?", "", raw_text).rstrip(";").strip()
+            if target:
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=code_bytes[:child.start_byte].count(b"\n") + 1,
+                        is_relative=False,
+                    )
+                )
+        elif child.type in ("compilation_unit", "namespace_declaration", "file_scoped_namespace_declaration"):
+            _extract_csharp_dependencies(child, code_bytes, result)
+
+
+def _extract_cpp_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        if child.type == "preproc_include":
+            path_node = child.child_by_field_name("path")
+            if path_node:
+                raw_path = code_bytes[path_node.start_byte : path_node.end_byte].decode("utf-8", errors="replace").strip()
+                cleaned = raw_path.strip('<>"')
+                is_rel = raw_path.startswith('"')
+                result.append(
+                    ExtractedDependency(
+                        raw_target=cleaned,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=code_bytes[:child.start_byte].count(b"\n") + 1,
+                        is_relative=is_rel,
+                    )
+                )
+        elif child.type in ("translation_unit", "declaration_list", "namespace_definition"):
+            _extract_cpp_dependencies(child, code_bytes, result)
 
 
 # ---------------------------------------------------------------------------

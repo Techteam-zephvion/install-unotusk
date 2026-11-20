@@ -50,5 +50,7 @@ class GraphResponse(BaseModel):
     snapshot_id: uuid.UUID | None = None
     total_nodes: int = 0
     total_edges: int = 0
+    circular_dependencies: list[list[str]] = Field(default_factory=list)
+    hotspots: list[dict[str, Any]] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

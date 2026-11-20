@@ -2,6 +2,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.api.dependencies.auth import get_current_user
@@ -48,6 +49,45 @@ async def ask_project(
         enable_structure_aware_star_rag=payload.enable_structure_aware_star_rag,
         enable_star_rag=payload.enable_star_rag,
         branch=payload.branch,
+        compare_branch=payload.compare_branch,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/ask/stream",
+    summary="Ask a grounded question with real-time SSE streaming status and tokens",
+)
+async def ask_project_stream(
+    project_id: str,
+    payload: GroundedAskRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+
+    async def event_generator():
+        async for chunk in IntelligenceService.ask_question_stream(
+            session=db,
+            user_id=current_user.id,
+            project_id=resolved_id,
+            question=payload.question,
+            conversation_id=payload.conversation_id,
+            thinking_tier=payload.thinking_tier,
+            enable_structure_aware_star_rag=payload.enable_structure_aware_star_rag,
+            enable_star_rag=payload.enable_star_rag,
+            branch=payload.branch,
+            compare_branch=payload.compare_branch,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
