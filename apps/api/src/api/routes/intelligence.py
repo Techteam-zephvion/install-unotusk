@@ -150,6 +150,9 @@ async def post_conversation_message(
         project_id=resolved_id,
         question=payload.question,
         conversation_id=conversation_id,
+        thinking_tier=payload.thinking_tier,
+        enable_structure_aware_star_rag=payload.enable_structure_aware_star_rag,
+        enable_star_rag=payload.enable_star_rag,
     )
 
 

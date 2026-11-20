@@ -45,14 +45,18 @@ TEMPORAL_KEYWORDS = {
 }
 
 TEMPORAL_REGEX_PATTERNS = [
-    re.compile(r"\b(how|what)\s+(did|has|have|was|were)\s+.*?\b(change|evolve|modify|update|differ|introduced?)\b", re.I),
-    re.compile(r"\b(who|when)\s+.*?\b(changed|added|removed|deleted|created|modified|wrote|committed|introduced)\b", re.I),
+    re.compile(r"\b(how|what|which)\s+(did|has|have|was|were|happened)\s+.*?\b(change|evolve|modify|update|differ|introduced?|happen)\b", re.I),
+    re.compile(r"\b(who|when|which)\s+.*?\b(changed|added|removed|deleted|created|modified|wrote|committed|introduced|happened)\b", re.I),
+    re.compile(r"\b(which|what)\s+change\s+(happened|occurred|was made|was committed)\b", re.I),
     re.compile(r"\b(evolution|history|changes|commits|timeline)\s+of\b", re.I),
     re.compile(r"\bchanges\s+(in|to|for|across)\b", re.I),
     re.compile(r"\b(previous|earlier|past|older|former)\s+(version|implementation|commit|code|state)\b", re.I),
     re.compile(r"\b(version|commit|change)\s+history\b", re.I),
     re.compile(r"\bhow\s+.*\b(evolved|changed)\b", re.I),
     re.compile(r"\bwhat\s+(changed|was\s+changed|were\s+the\s+changes)\b", re.I),
+    re.compile(r"\b(before|after|prior to)\s+(the|a|any)?\s*.*?\b(refactor|update|commit|release|change|migration|database)\b", re.I),
+    re.compile(r"\bas\s+of\b", re.I),
+    re.compile(r"\bwhat\s+did\s+.*?\b(look\s+like|do|have|contain|work)\b", re.I),
 ]
 
 

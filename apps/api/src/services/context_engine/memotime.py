@@ -1408,6 +1408,16 @@ class MemoTimeService:
         has_between = bool(re.search(r"\bbetween\b.*?\band\b", q_lower) or re.search(r"\bfrom\b.*?\bto\b", q_lower))
         has_before = bool(re.search(r"\b(before|prior\s+to)\b", q_lower))
         has_after = bool(re.search(r"\b(after|since)\b", q_lower))
+        has_as_of = bool(re.search(r"\bas\s+of\b", q_lower))
+        has_at_point = bool(
+            re.search(
+                r"\b(at|on|as\s+of)\s+(the\s+time\s+of|commit|\d{4}|january|february|march|april|may|june|july|august|september|october|november|december)\b",
+                q_lower,
+            )
+        )
+        has_look_like_past = bool(
+            re.search(r"\bwhat\s+did\s+.*?\b(look\s+like|do|have|contain|work)\b", q_lower)
+        )
 
         # Check for contradictory or mutually exclusive intent directives
         if has_current and has_historical and not has_evolution and not has_between:
@@ -1573,8 +1583,8 @@ class MemoTimeService:
                 target_entities=entities,
             )
 
-        # 3. BEFORE: Constrained prior to commit or date
-        if has_before and (parsed_dates or commits_found or has_historical):
+        # 3. BEFORE: Constrained prior to commit, date, or event
+        if has_before:
             d_end = parsed_dates[0] if parsed_dates else None
             c_ref = commits_found[0] if commits_found else None
             constraint = TemporalConstraint(
@@ -1595,8 +1605,8 @@ class MemoTimeService:
                 target_entities=entities,
             )
 
-        # 4. AFTER: Constrained following commit or date
-        if has_after and (parsed_dates or commits_found or has_current):
+        # 4. AFTER: Constrained following commit, date, or event
+        if has_after:
             d_start = parsed_dates[0] if parsed_dates else None
             c_ref = commits_found[0] if commits_found else None
             constraint = TemporalConstraint(
@@ -1612,6 +1622,28 @@ class MemoTimeService:
                 confidence=0.9,
                 constraints=[constraint],
                 detected_keywords=detected_keywords or ["after"],
+                raw_query=query_text,
+                reference_commits=commits_found,
+                target_entities=entities,
+            )
+
+        # 4b. AS_OF / POINT_IN_TIME: Constrained as of a date, commit, or past state
+        if has_as_of or has_at_point or has_look_like_past:
+            d_target = parsed_dates[0] if parsed_dates else None
+            c_ref = commits_found[0] if commits_found else None
+            constraint = TemporalConstraint(
+                constraint_id="c_as_of_0",
+                operator="BEFORE",
+                target_entity=entities[0] if entities else "code",
+                bound=TemporalBound(end=d_target, reference_commit=c_ref, is_end_inclusive=True),
+                description=f"State as of {d_target or c_ref or 'date'}",
+            )
+            return StructuredTemporalIntent(
+                intent_type=TemporalIntentType.HISTORICAL,
+                is_temporal=True,
+                confidence=0.9,
+                constraints=[constraint],
+                detected_keywords=detected_keywords or ["as of"],
                 raw_query=query_text,
                 reference_commits=commits_found,
                 target_entities=entities,
