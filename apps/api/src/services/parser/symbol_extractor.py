@@ -79,6 +79,16 @@ def extract_symbols_from_tree(
             _extract_js_ts_symbols(root, code_bytes, "", symbols)
         elif language == "Go":
             _extract_go_symbols(root, code_bytes, "", symbols)
+        elif language == "Java":
+            _extract_java_symbols(root, code_bytes, "", symbols)
+        elif language == "Rust":
+            _extract_rust_symbols(root, code_bytes, "", symbols)
+        elif language in ("C++", "C++ Header", "C", "C/C++ Header"):
+            _extract_cpp_c_symbols(root, code_bytes, "", symbols)
+        elif language == "C#":
+            _extract_csharp_symbols(root, code_bytes, "", symbols)
+        elif language == "Dart":
+            _extract_dart_symbols(root, code_bytes, "", symbols)
 
     # Phase B: Universal Regex & Brace/Indentation Chunker Fallback
     # Active for Dart, Rust, Java, Kotlin, Swift, C++, PHP, Ruby, etc., or when AST has 0 symbols
@@ -304,3 +314,239 @@ def _extract_go_symbols(
                         )
         elif child.type in GO_CONTAINERS:
             _extract_go_symbols(child, code_bytes, parent_scope, result)
+
+
+def _extract_java_symbols(
+    node: Any,
+    code_bytes: bytes,
+    parent_scope: str,
+    result: list[ExtractedSymbol],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type in ("class_declaration", "interface_declaration", "record_declaration", "enum_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}.{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                sym_type = SymbolType.CLASS if c_type == "class_declaration" else SymbolType.TYPE
+                cls_sym = ExtractedSymbol(
+                    name=name,
+                    symbol_type=sym_type,
+                    qualified_name=qual,
+                    start_line=st,
+                    end_line=et,
+                )
+                result.append(cls_sym)
+                body = child.child_by_field_name("body")
+                if body:
+                    _extract_java_symbols(body, code_bytes, qual, result)
+        elif c_type in ("method_declaration", "constructor_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}.{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=SymbolType.METHOD,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+        elif c_type in ("program", "class_body", "interface_body"):
+            _extract_java_symbols(child, code_bytes, parent_scope, result)
+
+
+def _extract_rust_symbols(
+    node: Any,
+    code_bytes: bytes,
+    parent_scope: str,
+    result: list[ExtractedSymbol],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type in ("struct_item", "enum_item", "trait_item", "union_item"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}::{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=SymbolType.TYPE,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+        elif c_type == "function_item":
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}::{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=SymbolType.FUNCTION if not parent_scope else SymbolType.METHOD,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+        elif c_type == "impl_item":
+            type_node = child.child_by_field_name("type")
+            scope_name = _get_node_text(type_node, code_bytes) if type_node else parent_scope
+            body = child.child_by_field_name("body")
+            if body:
+                _extract_rust_symbols(body, code_bytes, scope_name, result)
+        elif c_type in ("source_file", "declaration_list"):
+            _extract_rust_symbols(child, code_bytes, parent_scope, result)
+
+
+def _extract_cpp_c_symbols(
+    node: Any,
+    code_bytes: bytes,
+    parent_scope: str,
+    result: list[ExtractedSymbol],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type in ("class_specifier", "struct_specifier", "enum_specifier"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}::{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                sym_type = SymbolType.CLASS if c_type == "class_specifier" else SymbolType.TYPE
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=sym_type,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+                body = child.child_by_field_name("body")
+                if body:
+                    _extract_cpp_c_symbols(body, code_bytes, qual, result)
+        elif c_type == "function_definition":
+            decl = child.child_by_field_name("declarator")
+            # Navigate nested declarators to find identifier
+            while decl and getattr(decl, "child_by_field_name", None) and decl.child_by_field_name("declarator"):
+                decl = decl.child_by_field_name("declarator")
+            if decl:
+                name = _get_node_text(decl, code_bytes).split("(")[0].strip()
+                if name:
+                    qual = f"{parent_scope}::{name}" if parent_scope else name
+                    st, et = _get_node_lines(child, code_bytes)
+                    result.append(
+                        ExtractedSymbol(
+                            name=name,
+                            symbol_type=SymbolType.FUNCTION if not parent_scope else SymbolType.METHOD,
+                            qualified_name=qual,
+                            start_line=st,
+                            end_line=et,
+                        )
+                    )
+        elif c_type in ("translation_unit", "field_declaration_list"):
+            _extract_cpp_c_symbols(child, code_bytes, parent_scope, result)
+
+
+def _extract_csharp_symbols(
+    node: Any,
+    code_bytes: bytes,
+    parent_scope: str,
+    result: list[ExtractedSymbol],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type in ("class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}.{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                sym_type = SymbolType.CLASS if c_type in ("class_declaration", "record_declaration") else SymbolType.TYPE
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=sym_type,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+                body = child.child_by_field_name("body")
+                if body:
+                    _extract_csharp_symbols(body, code_bytes, qual, result)
+        elif c_type in ("method_declaration", "constructor_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}.{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=SymbolType.METHOD,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+        elif c_type in ("compilation_unit", "declaration_list", "namespace_declaration"):
+            _extract_csharp_symbols(child, code_bytes, parent_scope, result)
+
+
+def _extract_dart_symbols(
+    node: Any,
+    code_bytes: bytes,
+    parent_scope: str,
+    result: list[ExtractedSymbol],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type in ("class_definition", "enum_declaration", "mixin_declaration", "extension_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}.{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                sym_type = SymbolType.CLASS if c_type == "class_definition" else SymbolType.TYPE
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=sym_type,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+                body = child.child_by_field_name("body")
+                if body:
+                    _extract_dart_symbols(body, code_bytes, qual, result)
+        elif c_type in ("method_signature", "function_signature", "function_declaration"):
+            name_node = child.child_by_field_name("name")
+            if name_node:
+                name = _get_node_text(name_node, code_bytes)
+                qual = f"{parent_scope}.{name}" if parent_scope else name
+                st, et = _get_node_lines(child, code_bytes)
+                result.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=SymbolType.FUNCTION if not parent_scope else SymbolType.METHOD,
+                        qualified_name=qual,
+                        start_line=st,
+                        end_line=et,
+                    )
+                )
+        elif c_type in ("program", "class_body"):
+            _extract_dart_symbols(child, code_bytes, parent_scope, result)
+

@@ -112,15 +112,50 @@ EXTENSION_LANGUAGE_MAP = {
     ".php": "PHP",
 }
 
-# Parser supported languages (Tree-sitter)
-PARSER_SUPPORTED_LANGUAGES = {
+# Primary Main Languages targeted for Native Tree-sitter AST parsing (TRUE condition in flowchart)
+PRIMARY_TREE_SITTER_LANGUAGES = {
     "Python",
     "TypeScript",
     "TypeScript/TSX",
     "JavaScript",
     "JavaScript/JSX",
     "Go",
+    "Dart",
+    "Java",
+    "Rust",
+    "C++",
+    "C++ Header",
+    "C",
+    "C/C++ Header",
+    "C#",
 }
+
+# Parser supported languages (Tree-sitter)
+PARSER_SUPPORTED_LANGUAGES = PRIMARY_TREE_SITTER_LANGUAGES
+
+# Secondary Languages handled via Universal Regex / Indentation / Brace Chunker (NO condition in flowchart)
+SECONDARY_UNIVERSAL_LANGUAGES = {
+    "Kotlin",
+    "Swift",
+    "PHP",
+    "Ruby",
+    "Shell",
+    "SQL",
+    "HTML",
+    "CSS",
+    "SCSS",
+    "JSON",
+    "YAML",
+    "XML",
+    "TOML",
+    "Markdown",
+}
+
+
+def is_native_tree_sitter_target(language: str) -> bool:
+    """Returns True if language belongs to the primary native Tree-Sitter target group (TRUE branch),
+    or False if it falls under Universal Chunker (NO branch)."""
+    return language in PRIMARY_TREE_SITTER_LANGUAGES
 
 
 def is_path_excluded(relative_path: str) -> bool:

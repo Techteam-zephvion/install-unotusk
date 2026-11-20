@@ -73,6 +73,16 @@ def extract_dependencies_from_tree(
     root = tree.root_node
     if language == "Go":
         _extract_go_dependencies(root, code_bytes, deps)
+    elif language == "Java":
+        _extract_java_tree_dependencies(root, code_bytes, deps)
+    elif language == "Rust":
+        _extract_rust_tree_dependencies(root, code_bytes, deps)
+    elif language in ("C++", "C++ Header", "C", "C/C++ Header"):
+        _extract_cpp_tree_dependencies(root, code_bytes, deps)
+    elif language == "C#":
+        _extract_csharp_tree_dependencies(root, code_bytes, deps)
+    elif language == "Dart":
+        _extract_dart_tree_dependencies(root, code_bytes, deps)
 
     if not deps:
         from apps.api.src.services.parser.universal_parser import (
@@ -485,3 +495,131 @@ def _extract_go_dependencies(
                         )
         elif child.type in GO_CONTAINERS:
             _extract_go_dependencies(child, code_bytes, result)
+
+
+def _extract_java_tree_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type == "import_declaration":
+            line = code_bytes[:child.start_byte].count(b"\n") + 1
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace")
+            # import static? package.name.Class;
+            target = raw_text.replace("import", "").replace("static", "").replace(";", "").strip()
+            if target:
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=line,
+                        is_relative=False,
+                    )
+                )
+        elif c_type == "program":
+            _extract_java_tree_dependencies(child, code_bytes, result)
+
+
+def _extract_rust_tree_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type == "use_declaration":
+            line = code_bytes[:child.start_byte].count(b"\n") + 1
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace")
+            target = raw_text.replace("use", "").replace("pub", "").replace(";", "").strip()
+            if target:
+                is_rel = target.startswith("crate::") or target.startswith("super::") or target.startswith("self::")
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=line,
+                        is_relative=is_rel,
+                    )
+                )
+        elif c_type == "source_file":
+            _extract_rust_tree_dependencies(child, code_bytes, result)
+
+
+def _extract_cpp_tree_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type == "preproc_include":
+            line = code_bytes[:child.start_byte].count(b"\n") + 1
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace")
+            target = raw_text.replace("#include", "").strip().strip("<>\"'")
+            if target:
+                is_rel = '"' in raw_text or target.startswith("./") or target.startswith("../")
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.REQUIRE,
+                        line_number=line,
+                        is_relative=is_rel,
+                    )
+                )
+        elif c_type == "translation_unit":
+            _extract_cpp_tree_dependencies(child, code_bytes, result)
+
+
+def _extract_csharp_tree_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type == "using_directive":
+            line = code_bytes[:child.start_byte].count(b"\n") + 1
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace")
+            target = raw_text.replace("using", "").replace("static", "").replace("global", "").replace(";", "").strip()
+            if target:
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=line,
+                        is_relative=False,
+                    )
+                )
+        elif c_type in ("compilation_unit", "namespace_declaration"):
+            _extract_csharp_tree_dependencies(child, code_bytes, result)
+
+
+def _extract_dart_tree_dependencies(
+    node: Any,
+    code_bytes: bytes,
+    result: list[ExtractedDependency],
+) -> None:
+    for child in getattr(node, "children", []):
+        c_type = getattr(child, "type", "")
+        if c_type in ("import_specification", "export_specification"):
+            line = code_bytes[:child.start_byte].count(b"\n") + 1
+            raw_text = code_bytes[child.start_byte : child.end_byte].decode("utf-8", errors="replace")
+            # Extract uri from string literal
+            import re
+            m = re.search(r"['\"]([^'\"]+)['\"]", raw_text)
+            if m:
+                target = m.group(1)
+                is_rel = target.startswith("./") or target.startswith("../") or not (target.startswith("package:") or target.startswith("dart:"))
+                result.append(
+                    ExtractedDependency(
+                        raw_target=target,
+                        dependency_type=DependencyType.IMPORT,
+                        line_number=line,
+                        is_relative=is_rel,
+                    )
+                )
+        elif c_type == "program":
+            _extract_dart_tree_dependencies(child, code_bytes, result)
+
