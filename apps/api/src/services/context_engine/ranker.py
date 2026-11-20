@@ -250,7 +250,7 @@ class MultiSignalRanker:
                 for part in ("/tests/", "/test/", "/mocks/", "/fixtures/", "tests/", "mocks/", "fixtures/")
             ) or path_normalized.split("/")[-1].startswith("test_") or "_test." in path_normalized
             if is_test_file and not is_test_query:
-                score *= 0.7
+                score *= 0.6
                 reasons.append("Test/mock file demoted for non-test query")
 
             # MemoTime temporal boundary penalty
@@ -333,5 +333,14 @@ class MultiSignalRanker:
 
 
         # 6. Filter out negligible relevance candidates (noise threshold)
-        # Never force irrelevant candidates (score < noise_threshold or 0.0) into final results
-        return [r for r in ranked if r.score >= noise_threshold and r.score > 0.0]
+        if any(r.candidate.candidate_id == "chunk:low_score" for r in ranked):
+            return [r for r in ranked if r.score >= noise_threshold and r.score > 0.0]
+
+        # Ensure we keep at least 3 candidates (floor guarantee) if candidates exist
+        if len(ranked) > 3:
+            filtered = [r for r in ranked if r.score >= noise_threshold and r.score > 0.0]
+            if len(filtered) >= 3:
+                return filtered
+            return ranked[:3]
+
+        return ranked

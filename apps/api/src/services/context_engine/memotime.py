@@ -1397,7 +1397,7 @@ class MemoTimeService:
         has_current = bool(re.search(r"\b(current|currently|latest|now|present|active|today)\b", q_lower))
         has_historical = bool(
             re.search(
-                r"\b(previous|previously|past|earlier|former|prior|superseded|deprecated|older|original|originally|initial|initially|introduced|origin|legacy|historical)\b",
+                r"\b(previous|previously|past|earlier|former|prior|superseded|deprecated|older|original|originally|initial|initially|introduced|origin|legacy|historical|historically)\b",
                 q_lower,
             )
         )
@@ -1584,7 +1584,7 @@ class MemoTimeService:
             )
 
         # 3. BEFORE: Constrained prior to commit, date, or event
-        if has_before:
+        if has_before and (len(parsed_dates) >= 1 or len(commits_found) >= 1 or not has_historical):
             d_end = parsed_dates[0] if parsed_dates else None
             c_ref = commits_found[0] if commits_found else None
             constraint = TemporalConstraint(

@@ -492,28 +492,30 @@ class ContextAssembler:
                 f"```\n{truncated_content}\n```\n"
             )
 
-            # Check budget
+            # Check budget with floor guarantee (at least 3 candidates if available)
+            min_floor = min(3, len(ranked_candidates))
             if current_chars + len(candidate_section) > char_budget:
-                remaining = char_budget - current_chars
-                if remaining > 250 and used_count == 0:
-                    overhead = len(candidate_section) - len(truncated_content)
-                    snippet_trim = max(100, remaining - overhead - 40)
-                    truncated_content = compact_content[:snippet_trim] + "\n... [truncated to budget]"
-                    candidate_section = (
-                        f"### [{cand.entity_type}] {cand.path}\n"
-                        f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
-                        f"{scope_info}"
-                        f"{temporal_status}"
-                        f"{commit_info}"
-                        f"{relationship_info}"
-                        f"{facts_info}"
-                        f"{rels_info}"
-                        f"- Relevance Score: {r.score}\n"
-                        f"- Code / Evidence Snippet:\n"
-                        f"```\n{truncated_content}\n```\n"
-                    )
-                else:
+                if used_count >= min_floor:
                     break
+                remaining = char_budget - current_chars
+                overhead = len(candidate_section) - len(truncated_content)
+                if remaining > overhead + 60:
+                    snippet_trim = max(80, remaining - overhead - 20)
+                    if len(compact_content) > snippet_trim:
+                        truncated_content = compact_content[:snippet_trim] + "\n... [truncated to budget]"
+                        candidate_section = (
+                            f"### [{cand.entity_type}] {cand.path}\n"
+                            f"- Entity: {cand.name} (Lines {cand.start_line}-{cand.end_line})\n"
+                            f"{scope_info}"
+                            f"{temporal_status}"
+                            f"{commit_info}"
+                            f"{relationship_info}"
+                            f"{facts_info}"
+                            f"{rels_info}"
+                            f"- Relevance Score: {r.score}\n"
+                            f"- Code / Evidence Snippet:\n"
+                            f"```\n{truncated_content}\n```\n"
+                        )
 
             sections.append(candidate_section)
             current_chars += len(candidate_section)

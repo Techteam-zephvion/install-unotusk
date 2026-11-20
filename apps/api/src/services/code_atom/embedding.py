@@ -379,7 +379,7 @@ def get_code_embedding_backend(strict_semantic: bool = False) -> CodeEmbeddingBa
         # Provider requested as voyage/production, but key is missing
         if app_env == "production" or strict_semantic:
             raise ValueError(
-                f"Production semantic embedding provider '{provider}' requested, but VOYAGE_API_KEY is not configured."
+                f"Production embedding provider '{provider}' requested, but VOYAGE_API_KEY is not configured."
             )
 
         logger.warning(
