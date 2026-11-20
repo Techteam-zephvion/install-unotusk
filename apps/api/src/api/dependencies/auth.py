@@ -160,63 +160,10 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        email = payload.get("email")
-        if email:
-            email_res = await db.execute(select(User).where(User.email == email))
-            user = email_res.scalar_one_or_none()
-
-        if user is None:
-            if settings.is_data_plane or payload.get("sub"):
-                # Cryptographic Cross-Plane Trust: JIT-provision user from verified Control Plane JWT
-                from apps.api.src.auth.security import hash_password
-
-                user_email = email or f"user_{str(user_id)[:8]}@acme.com"
-                user_name = user_email.split("@")[0].replace(".", " ").title()
-                user = User(
-                    id=user_id,
-                    email=user_email,
-                    name=user_name,
-                    hashed_password=hash_password(str(uuid.uuid4())),
-                    is_active=True,
-                )
-                db.add(user)
-                await db.flush()
-
-                # If running on a dedicated Data Plane, auto-link to the data plane's org and project
-                if settings.is_data_plane:
-                    if settings.DATA_PLANE_ORG_ID:
-                        try:
-                            t_org = uuid.UUID(settings.DATA_PLANE_ORG_ID)
-                            org_link = OrganizationMembership(
-                                id=uuid.uuid4(),
-                                user_id=user.id,
-                                organization_id=t_org,
-                                role=MembershipRole.MEMBER,
-                            )
-                            db.add(org_link)
-                        except ValueError:
-                            pass
-
-                    if settings.DATA_PLANE_PROJECT_ID:
-                        try:
-                            t_proj = uuid.UUID(settings.DATA_PLANE_PROJECT_ID)
-                            proj_link = ProjectMembership(
-                                id=uuid.uuid4(),
-                                user_id=user.id,
-                                project_id=t_proj,
-                                role=MembershipRole.MEMBER,
-                            )
-                            db.add(proj_link)
-                        except ValueError:
-                            pass
-
-                await db.commit()
-                await db.refresh(user)
-            else:
-                raise UnauthorizedException(
-                    code="USER_NOT_FOUND",
-                    message="User associated with token does not exist",
-                )
+        raise UnauthorizedException(
+            code="USER_NOT_FOUND",
+            message="User associated with token does not exist",
+        )
 
     # Data Plane Container-Level Authorization Guardrail
     if settings.is_data_plane:
@@ -225,21 +172,6 @@ async def get_current_user(
             try:
                 target_org_id = uuid.UUID(settings.DATA_PLANE_ORG_ID)
             except ValueError:
-                pass
-
-        if target_org_id is None and settings.DATA_PLANE_PROJECT_ID:
-            try:
-                dp_pid = uuid.UUID(str(settings.DATA_PLANE_PROJECT_ID))
-                proj_res = await db.execute(select(Project.organization_id).where(Project.id == dp_pid))
-                target_org_id = proj_res.scalar_one_or_none()
-            except Exception:
-                pass
-
-        if target_org_id is None:
-            try:
-                first_org = (await db.execute(select(Organization.id).limit(1))).scalar_one_or_none()
-                target_org_id = first_org
-            except Exception:
                 pass
 
         org_stmt = select(OrganizationMembership).where(
@@ -252,23 +184,10 @@ async def get_current_user(
         org_mem = org_res.scalar_one_or_none()
 
         if org_mem is None:
-            if target_org_id:
-                try:
-                    org_link = OrganizationMembership(
-                        id=uuid.uuid4(),
-                        user_id=user.id,
-                        organization_id=target_org_id,
-                        role=MembershipRole.OWNER,
-                    )
-                    db.add(org_link)
-                    await db.commit()
-                    org_mem = org_link
-                except Exception:
-                    pass
-
-        # In single-tenant MVP, ensure user is never blocked from their own data plane
-        if org_mem is None:
-            logger.warning("Auto-admitting verified user %s to single-tenant data plane", user.id)
+            raise ForbiddenException(
+                code="ORGANIZATION_ACCESS_DENIED",
+                message="User does not belong to the organization hosting this data plane instance.",
+            )
 
         # Enforce project assignment for regular members
         if org_mem.role not in (MembershipRole.OWNER, MembershipRole.ADMIN):
@@ -281,14 +200,10 @@ async def get_current_user(
                 proj_res = await db.execute(proj_stmt)
                 proj_mem = proj_res.scalar_one_or_none()
                 if proj_mem is None:
-                    proj_link = ProjectMembership(
-                        id=uuid.uuid4(),
-                        user_id=user.id,
-                        project_id=data_plane_proj_id,
-                        role=MembershipRole.MEMBER,
+                    raise ForbiddenException(
+                        code="PROJECT_ACCESS_DENIED",
+                        message="User is not authorized to access this project data plane.",
                     )
-                    db.add(proj_link)
-                    await db.commit()
             except ValueError:
                 pass
 
