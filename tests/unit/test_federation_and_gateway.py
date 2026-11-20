@@ -11,6 +11,7 @@ from apps.api.src.config.settings import settings
 from apps.api.src.core.data_plane_middleware import DataPlaneSecurityMiddleware
 from apps.api.src.core.federation import (
     derive_canonical_project_id,
+    derive_data_plane_secret,
     mint_federation_token,
     sign_cluster_sync_payload,
     verify_cluster_sync_signature,
@@ -60,6 +61,14 @@ def test_federation_token_mint_and_verify():
     other_proj_id = uuid.uuid4()
     rejected_claims = verify_federation_token(token, other_proj_id)
     assert rejected_claims is None
+
+    # 3. Test derived secret key generation and consistency
+    sec1 = derive_data_plane_secret("my-master-secret", "swastha-yoga")
+    sec2 = derive_data_plane_secret("my-master-secret", "Swastha-Yoga")
+    sec3 = derive_data_plane_secret("my-master-secret", "other-project")
+    assert sec1 == sec2
+    assert sec1 != sec3
+    assert len(sec1) == 64
 
 
 def test_cluster_sync_hmac_signing_and_verification():

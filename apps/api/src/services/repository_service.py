@@ -339,6 +339,53 @@ class RepositoryService:
         )
 
     @staticmethod
+    async def trigger_ingestion_system(
+        session: AsyncSession,
+        project_id: uuid.UUID,
+        repository_id: uuid.UUID,
+        override_local_dir: str | None = None,
+    ) -> IngestTriggerResponse:
+        repo_query = select(Repository).where(
+            Repository.id == repository_id,
+            Repository.project_id == project_id,
+        )
+        repo_res = await session.execute(repo_query)
+        repo = repo_res.scalar_one_or_none()
+        if repo is None:
+            raise NotFoundException(code="REPOSITORY_NOT_FOUND", message="Repository not found")
+
+        # Create new Snapshot
+        snapshot = RepositorySnapshot(
+            repository_id=repo.id,
+            branch=repo.default_branch,
+            status=SnapshotStatus.QUEUED,
+        )
+        session.add(snapshot)
+        await session.commit()
+        await session.refresh(snapshot)
+
+        # Enqueue background task
+        try:
+            await TaskDispatcher.enqueue(
+                task_name="ingest_repository",
+                payload={
+                    "snapshot_id": str(snapshot.id),
+                    "override_local_dir": override_local_dir,
+                },
+            )
+        except Exception:
+            # If Redis connection fails, run synchronously as fallback
+            from apps.api.src.services.ingestion_service import IngestionService
+
+            await IngestionService.run_ingestion(snapshot.id, override_local_dir=override_local_dir)
+
+        return IngestTriggerResponse(
+            snapshot_id=snapshot.id,
+            status=SnapshotStatus.QUEUED,
+            message="Repository ingestion started successfully",
+        )
+
+    @staticmethod
     async def get_ingestion_status(
         session: AsyncSession,
         user_id: uuid.UUID,

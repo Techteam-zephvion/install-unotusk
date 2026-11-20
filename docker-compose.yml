@@ -73,7 +73,7 @@ services:
       - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-unotusk}
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=${AUTH_SECRET:-insecure-dev-secret-please-change-in-production-min-32-chars-long}
-      - CLUSTER_FEDERATION_SECRET=${CLUSTER_FEDERATION_SECRET:-unotusk-shared-cluster-secret-key-2026}
+      - CLUSTER_FEDERATION_SECRET=${CLUSTER_FEDERATION_SECRET:-${AUTH_SECRET}}
       - DATA_PLANE_HOST=${DATA_PLANE_HOST:-host.docker.internal}
       - LLM_PROVIDER=${LLM_PROVIDER:-groq}
       - GROQ_API_KEY=${GROQ_API_KEY:-}

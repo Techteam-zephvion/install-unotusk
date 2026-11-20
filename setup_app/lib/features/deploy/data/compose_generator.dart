@@ -76,7 +76,7 @@ services:
       - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=\${AUTH_SECRET}
-      - CLUSTER_FEDERATION_SECRET=\${CLUSTER_FEDERATION_SECRET:-unotusk-shared-cluster-secret-key-2026}
+      - CLUSTER_FEDERATION_SECRET=\${CLUSTER_FEDERATION_SECRET}
       - CONTROL_PLANE_URL=\${CONTROL_PLANE_URL:-http://host.docker.internal:28000}
       - DATA_PLANE_HOST=\${DATA_PLANE_HOST:-host.docker.internal}
       - DATA_PLANE_PROJECT_SLUG=${config.serverName.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9_-]'), '-')}

@@ -1,3 +1,5 @@
+import os
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -133,10 +135,26 @@ class Settings(BaseSettings):
 
     @property
     def effective_federation_secret(self) -> str:
-        return (
-            self.CLUSTER_FEDERATION_SECRET
-            or "unotusk-shared-cluster-secret-key-2026"
-        ).strip()
+        if self.CLUSTER_FEDERATION_SECRET and self.CLUSTER_FEDERATION_SECRET.strip():
+            return self.CLUSTER_FEDERATION_SECRET.strip()
+
+        # Check host authority file if present
+        try:
+            home = os.path.expanduser("~")
+            key_file = os.path.join(home, ".unotusk", "cluster_authority.key")
+            if os.path.exists(key_file):
+                with open(key_file, encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        return content
+        except Exception:
+            pass
+
+        # Use AUTH_SECRET if defined
+        if self.AUTH_SECRET and self.AUTH_SECRET.strip():
+            return self.AUTH_SECRET.strip()
+
+        return "unotusk-shared-cluster-secret-key-2026"
 
     @property
     def is_data_plane(self) -> bool:
