@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -571,7 +572,7 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
                       text: widget.text,
                       palette: bubblePalette,
                       selectable: true,
-                      baseStyle: UnoTypography.body(
+                      baseStyle: GoogleFonts.inter(
                         color: bubbleText,
                         fontSize: 14.8,
                         height: 1.5,
@@ -676,7 +677,7 @@ class _ResponseCardState extends State<_ResponseCard> {
                   ),
                   palette: p,
                   selectable: true,
-                  baseStyle: UnoTypography.body(
+                  baseStyle: GoogleFonts.inter(
                     color: p.isDark
                         ? p.text.withValues(alpha: 0.90)
                         : p.text.withValues(alpha: 0.92),

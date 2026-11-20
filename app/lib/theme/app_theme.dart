@@ -301,7 +301,7 @@ class UnoTypography {
     double letterSpacing = 0.5,
     double? height,
   }) {
-    return AppFonts.mono(
+    return GoogleFonts.ibmPlexMono(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
@@ -318,7 +318,7 @@ class UnoTypography {
     double? letterSpacing,
     FontStyle fontStyle = FontStyle.normal,
   }) {
-    return AppFonts.body(
+    return GoogleFonts.inter(
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,

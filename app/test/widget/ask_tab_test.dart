@@ -57,6 +57,7 @@ class _FakeWorkspaceRepository extends Fake implements WorkspaceRepository {
     String? conversationId,
     String thinkingTier = 'warm',
     bool? enableStructureAwareStarRag,
+    String? branch,
   }) async {
     return GroundedAnswer(
       conversationId: 'c1',
