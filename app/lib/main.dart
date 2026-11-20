@@ -227,31 +227,15 @@ class _AppShellState extends State<AppShell> {
       _appStage = 'workspace';
     });
     
-    // Automatic Port Shift and Login for Desktop-Driven Multi-Server Navigation
+    // Multi-Plane Navigation: When switching to a dedicated Project Data Plane,
+    // the existing authenticated token is cryptographically verified across planes.
     if (project.port != null) {
       final currentHost = Uri.parse(ApiService.baseUrl).host;
       final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {
         ApiService.setBaseUrl(targetUrl, persist: false);
-        try {
-          // Signup acts as auto-login via our modified backend
-          await ApiService.createOrganisation(
-            fullName: _user.name,
-            orgName: 'Acme Corporation',
-            password: 'password123',
-            role: _user.role,
-            email: _user.email,
-          );
-        } catch (_) {
-          try {
-            await ApiService.login(
-              email: _user.email,
-              password: 'password123',
-            );
-          } catch (_) {}
-        }
         
-        // After logging into the target server, fetch its real project UUID
+        // After connecting to the target server, fetch its real project UUID using current JWT
         try {
           final serverProjects = await ApiService.fetchProjects();
           if (serverProjects.isNotEmpty) {

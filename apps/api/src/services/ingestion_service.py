@@ -255,14 +255,15 @@ class IngestionService:
 
                     extracted_symbols_count = 0
 
-                    if f_info["parser_supported"] and content:
+                    if not f_info["is_binary"] and content:
                         tree = parse_code(content, f_info["language"])
-                        if tree is not None:
-                            content_lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
-                            # Extract symbols
-                            extracted_symbols = extract_symbols_from_tree(
-                                tree, content, f_info["language"]
-                            )
+                        content_lines = (
+                            content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
+                        )
+                        # Extract symbols (Tree-Sitter AST or Universal Regex & Brace Extractor)
+                        extracted_symbols = extract_symbols_from_tree(
+                            tree, content, f_info["language"]
+                        )
                             extracted_symbols_count = len(extracted_symbols)
                             for sym in extracted_symbols:
                                 clean_sym_name = _clean_null(sym.name) or ""

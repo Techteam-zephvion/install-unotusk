@@ -68,20 +68,24 @@ def extract_symbols_from_tree(
     code_bytes: bytes,
     language: str,
 ) -> list[ExtractedSymbol]:
-    """Extracts structural symbols from source code."""
+    """Extracts structural symbols from source code via native Tree-Sitter or Universal Fallback."""
     symbols: list[ExtractedSymbol] = []
 
     if language == "Python":
-        return _extract_python_ast_symbols(code_bytes)
+        symbols = _extract_python_ast_symbols(code_bytes)
+    elif tree is not None:
+        root = tree.root_node
+        if language in ("TypeScript", "TypeScript/TSX", "JavaScript", "JavaScript/JSX"):
+            _extract_js_ts_symbols(root, code_bytes, "", symbols)
+        elif language == "Go":
+            _extract_go_symbols(root, code_bytes, "", symbols)
 
-    if tree is None:
-        return symbols
+    # Phase B: Universal Regex & Brace/Indentation Chunker Fallback
+    # Active for Dart, Rust, Java, Kotlin, Swift, C++, PHP, Ruby, etc., or when AST has 0 symbols
+    if not symbols:
+        from apps.api.src.services.parser.universal_parser import extract_universal_symbols
 
-    root = tree.root_node
-    if language in ("TypeScript", "TypeScript/TSX", "JavaScript", "JavaScript/JSX"):
-        _extract_js_ts_symbols(root, code_bytes, "", symbols)
-    elif language == "Go":
-        _extract_go_symbols(root, code_bytes, "", symbols)
+        symbols = extract_universal_symbols(code_bytes, language)
 
     return symbols
 

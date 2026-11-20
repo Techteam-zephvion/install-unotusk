@@ -62,11 +62,24 @@ def extract_dependencies_from_tree(
         return _extract_js_ts_dependencies(code_bytes)
 
     if tree is None:
+        if not deps:
+            from apps.api.src.services.parser.universal_parser import (
+                extract_universal_dependencies,
+            )
+
+            deps = extract_universal_dependencies(code_bytes, language)
         return deps
 
     root = tree.root_node
     if language == "Go":
         _extract_go_dependencies(root, code_bytes, deps)
+
+    if not deps:
+        from apps.api.src.services.parser.universal_parser import (
+            extract_universal_dependencies,
+        )
+
+        deps = extract_universal_dependencies(code_bytes, language)
 
     return deps
 

@@ -45,10 +45,63 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise UnauthorizedException(
-            code="USER_NOT_FOUND",
-            message="User associated with token does not exist",
-        )
+        email = payload.get("email")
+        if email:
+            email_res = await db.execute(select(User).where(User.email == email))
+            user = email_res.scalar_one_or_none()
+
+        if user is None:
+            if settings.is_data_plane or payload.get("sub"):
+                # Cryptographic Cross-Plane Trust: JIT-provision user from verified Control Plane JWT
+                from apps.api.src.auth.security import hash_password
+
+                user_email = email or f"user_{str(user_id)[:8]}@acme.com"
+                user_name = user_email.split("@")[0].replace(".", " ").title()
+                user = User(
+                    id=user_id,
+                    email=user_email,
+                    name=user_name,
+                    hashed_password=hash_password(str(uuid.uuid4())),
+                    is_active=True,
+                )
+                db.add(user)
+                await db.flush()
+
+                # If running on a dedicated Data Plane, auto-link to the data plane's org and project
+                if settings.is_data_plane:
+                    if settings.DATA_PLANE_ORG_ID:
+                        try:
+                            t_org = uuid.UUID(settings.DATA_PLANE_ORG_ID)
+                            org_link = OrganizationMembership(
+                                id=uuid.uuid4(),
+                                user_id=user.id,
+                                organization_id=t_org,
+                                role=MembershipRole.MEMBER,
+                            )
+                            db.add(org_link)
+                        except ValueError:
+                            pass
+
+                    if settings.DATA_PLANE_PROJECT_ID:
+                        try:
+                            t_proj = uuid.UUID(settings.DATA_PLANE_PROJECT_ID)
+                            proj_link = ProjectMembership(
+                                id=uuid.uuid4(),
+                                user_id=user.id,
+                                project_id=t_proj,
+                                role=MembershipRole.MEMBER,
+                            )
+                            db.add(proj_link)
+                        except ValueError:
+                            pass
+
+                await db.commit()
+                await db.refresh(user)
+            else:
+                raise UnauthorizedException(
+                    code="USER_NOT_FOUND",
+                    message="User associated with token does not exist",
+                )
 
     # Data Plane Container-Level Authorization Guardrail
     if settings.is_data_plane:
