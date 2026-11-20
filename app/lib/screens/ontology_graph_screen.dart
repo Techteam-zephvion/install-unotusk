@@ -4,15 +4,20 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/mermaid_diagram.dart';
 
 class OntologyGraphScreen extends StatefulWidget {
   final UnoPalette palette;
   final ValueChanged<String>? onNavigateToFile;
+  final String? projectId;
+  final String? projectName;
 
   const OntologyGraphScreen({
     super.key,
     required this.palette,
     this.onNavigateToFile,
+    this.projectId,
+    this.projectName,
   });
 
   @override
@@ -28,11 +33,22 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
 
   final TransformationController _transformController = TransformationController();
   double _currentZoom = 1.0;
+  bool _isLoading = true;
+  String _activeViewMode = 'diagram'; // 'diagram' or 'graph'
+  String _mermaidCode = '';
 
   @override
   void initState() {
     super.initState();
     _loadOntology();
+  }
+
+  @override
+  void didUpdateWidget(OntologyGraphScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId || oldWidget.projectName != widget.projectName) {
+      _loadOntology();
+    }
   }
 
   @override
@@ -42,18 +58,103 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
   }
 
   void _loadOntology() async {
-    final nodes = await ApiService.fetchOntologyNodes();
-    final edges = await ApiService.fetchOntologyEdges();
-    if (mounted) {
-      setState(() {
-        _nodes = nodes;
-        _edges = edges;
-        _positions.clear();
-        for (final n in nodes) {
-          _positions[n.id] = Offset(n.cx, n.cy);
-        }
-      });
+    setState(() => _isLoading = true);
+    try {
+      final pid = widget.projectId;
+      final pName = widget.projectName ?? ApiService.activeProject?.name ?? 'Project';
+
+      final nodes = await ApiService.fetchOntologyNodes(projectId: pid);
+      final edges = await ApiService.fetchOntologyEdges(projectId: pid);
+
+      String cleanCode = '';
+      try {
+        final repoCtx = await ApiService.fetchRepositoryContext(pid);
+        final files = repoCtx.files.map((f) => f.path).toList();
+
+        final synth = ApiService.synthesizeMermaidDiagram(
+          content: '',
+          question: 'system architecture diagram and component topology for $pName',
+          citations: files.take(8).toList(),
+          evidence: [],
+        );
+        final mMatch = RegExp(r'```mermaid([\s\S]*?)```').firstMatch(synth);
+        cleanCode = mMatch != null ? mMatch.group(1)!.trim() : synth;
+      } catch (_) {}
+
+      if (cleanCode.isEmpty) {
+        cleanCode = '''
+flowchart TD
+    subgraph UI ["User Interface & Presentation Layer"]
+        F_0["Client App / Web Shell"]
+    end
+    subgraph API ["Routing & API Layer"]
+        F_1[":28000 Gateway & Auth Router"]
+    end
+    subgraph Logic ["Domain Logic & Intelligence"]
+        F_2["Context & Discovery Engine"]
+    end
+    subgraph Data ["Data & Persistence Layer"]
+        F_3[("PostgreSQL 16 & pgvector")]
+    end
+    F_0 -->|invokes| F_1
+    F_1 -->|routes to| F_2
+    F_2 -->|persists/queries| F_3
+    classDef ui fill:#1E293B,stroke:#38BDF8,stroke-width:1.5px,color:#F8FAFC;
+    classDef api fill:#2A1B3D,stroke:#A855F7,stroke-width:1.5px,color:#F8FAFC;
+    classDef domain fill:#1A2E26,stroke:#10B981,stroke-width:1.5px,color:#F8FAFC;
+    classDef data fill:#332200,stroke:#F59E0B,stroke-width:1.5px,color:#F8FAFC;
+    class F_0 ui;
+    class F_1 api;
+    class F_2 domain;
+    class F_3 data;
+''';
+      }
+
+      if (mounted) {
+        setState(() {
+          _nodes = nodes;
+          _edges = edges;
+          _mermaidCode = cleanCode;
+          _positions.clear();
+          for (final n in nodes) {
+            _positions[n.id] = Offset(n.cx, n.cy);
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildViewModeButton(String mode, String label, IconData icon, UnoPalette p) {
+    final active = _activeViewMode == mode;
+    return InkWell(
+      onTap: () => setState(() => _activeViewMode = mode),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? p.accent.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: active ? p.accent : p.textSec),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: UnoTypography.mono(
+                color: active ? p.accent : p.textSec,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Color _getNodeColor(int id) {
@@ -192,41 +293,145 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
                       ],
                     ),
                   ),
-                  if (_nodes.isNotEmpty) ...[
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: p.bgElevated.withValues(alpha: 0.75),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: p.div),
-                      ),
-                      child: Text(
-                        '${_nodes.length} entities  ·  ${_edges.length} relationships',
-                        style: UnoTypography.mono(
-                          color: p.accentMuted,
-                          fontSize: 11,
-                          letterSpacing: 0.2,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: p.bgElevated.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: p.div),
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildViewModeButton('diagram', 'Architecture Diagram', LucideIcons.layoutGrid, p),
+                            const SizedBox(width: 4),
+                            _buildViewModeButton('graph', '2D Topology Graph', LucideIcons.gitFork, p),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      if (_activeViewMode == 'graph' && _nodes.isNotEmpty) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: p.bgElevated.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: p.div),
+                          ),
+                          child: Text(
+                            '${_nodes.length} entities  ·  ${_edges.length} relationships',
+                            style: UnoTypography.mono(
+                              color: p.accentMuted,
+                              fontSize: 11,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Interactive 2D Graph Canvas Container
+              // Content Body
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: p.sectionGradient,
-                    border: Border.all(color: p.div),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    children: [
-                      // Interactive Pan / Zoom / Drag Canvas
+                child: _isLoading
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: p.accent,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Mapping system architecture for ${(widget.projectName != null && widget.projectName!.isNotEmpty) ? formatDisplayTitle(widget.projectName!) : "project"}...',
+                              style: UnoTypography.mono(color: p.textSec, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _activeViewMode == 'diagram'
+                        ? Container(
+                            decoration: BoxDecoration(
+                              gradient: p.sectionGradient,
+                              border: Border.all(color: p.div),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            clipBehavior: Clip.antiAlias,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(LucideIcons.layoutGrid, size: 14, color: p.accent),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'System Architecture Blueprint — ${(widget.projectName != null && widget.projectName!.isNotEmpty) ? formatDisplayTitle(widget.projectName!) : "Active Project"}',
+                                        style: UnoTypography.body(color: p.text, fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  MermaidDiagram(
+                                    code: _mermaidCode,
+                                    palette: p,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              gradient: p.sectionGradient,
+                              border: Border.all(color: p.div),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _nodes.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(LucideIcons.gitFork, size: 36, color: p.textMuted),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'No entities indexed yet for this project.',
+                                          style: UnoTypography.body(color: p.text, fontSize: 14, fontWeight: FontWeight.w500),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Trigger an ingestion reindex or view the Architecture Diagram tab above.',
+                                          style: UnoTypography.mono(color: p.textSec, fontSize: 11),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        ElevatedButton.icon(
+                                          onPressed: () => _loadOntology(),
+                                          icon: const Icon(LucideIcons.refreshCw, size: 13),
+                                          label: const Text('Refresh Architecture'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: p.accent,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : Stack(
+                                    children: [
+                                      // Interactive Pan / Zoom / Drag Canvas
                       InteractiveViewer(
                         transformationController: _transformController,
                         minScale: 0.4,

@@ -756,10 +756,16 @@ class _AppShellState extends State<AppShell> {
       case 'graph':
         return OntologyGraphScreen(
           palette: palette,
+          projectId: _openedProject?.id,
+          projectName: _openedProjectName,
           onNavigateToFile: (path) => _handleCitationTap(path, null),
         );
       case 'feed':
-        return IngestionFeedScreen(palette: palette);
+        return IngestionFeedScreen(
+          palette: palette,
+          projectId: _openedProject?.id,
+          projectName: _openedProjectName,
+        );
       case 'admin':
         return AdminScreen(
           palette: palette,

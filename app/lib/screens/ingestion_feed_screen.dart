@@ -8,8 +8,15 @@ import '../widgets/badges.dart';
 
 class IngestionFeedScreen extends StatefulWidget {
   final UnoPalette palette;
+  final String? projectId;
+  final String? projectName;
 
-  const IngestionFeedScreen({super.key, required this.palette});
+  const IngestionFeedScreen({
+    super.key,
+    required this.palette,
+    this.projectId,
+    this.projectName,
+  });
 
   @override
   State<IngestionFeedScreen> createState() => _IngestionFeedScreenState();
@@ -28,6 +35,14 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
   }
 
   @override
+  void didUpdateWidget(IngestionFeedScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId || oldWidget.projectName != widget.projectName) {
+      _loadData();
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
@@ -35,10 +50,18 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
 
   void _loadData() async {
     final projects = await ApiService.fetchProjects();
-    final activities = await ApiService.fetchActivities();
+    final activities = await ApiService.fetchActivities(projectId: widget.projectId);
     if (mounted) {
       setState(() {
-        _projects = projects;
+        if (widget.projectId != null || (widget.projectName != null && widget.projectName!.isNotEmpty)) {
+          final matched = projects.where((p) =>
+              (widget.projectId != null && p.id.toLowerCase() == widget.projectId!.toLowerCase()) ||
+              (widget.projectName != null && p.name.toLowerCase() == widget.projectName!.toLowerCase())
+          ).toList();
+          _projects = matched.isNotEmpty ? matched : (projects.isNotEmpty ? [projects.first] : []);
+        } else {
+          _projects = projects;
+        }
         _activities = activities;
       });
     }
@@ -120,7 +143,9 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Ingestion Pipeline',
+                    (widget.projectName != null && widget.projectName!.isNotEmpty)
+                        ? 'Ingestion Pipeline — ${formatDisplayTitle(widget.projectName!)}'
+                        : 'Ingestion Pipeline',
                     style: UnoTypography.headingSerif(
                       color: p.text,
                       fontSize: 26,
@@ -142,15 +167,16 @@ class _IngestionFeedScreenState extends State<IngestionFeedScreen> {
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final isWide = constraints.maxWidth > 580;
+                        final count = _projects.length;
                         return GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: isWide ? 2 : 1,
+                            crossAxisCount: count == 1 ? 1 : (isWide ? 2 : 1),
                             crossAxisSpacing: 14,
                             mainAxisSpacing: 14,
-                            childAspectRatio: isWide ? 1.7 : 2.0,
+                            childAspectRatio: count == 1 ? (isWide ? 3.0 : 1.9) : (isWide ? 1.7 : 2.0),
                           ),
                           itemCount: _projects.length,
                           itemBuilder: (context, index) {
