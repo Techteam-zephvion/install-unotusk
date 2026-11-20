@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 import abc
 import posixpath
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from apps.api.src.models.chunk import CodeChunk
-from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.enums import (
     FindingCategory,
     FindingConfidence,
     FindingSeverity,
 )
-from apps.api.src.models.file import RepositoryFile
-from apps.api.src.models.symbol import CodeSymbol
+
+if TYPE_CHECKING:
+    from apps.api.src.models.chunk import CodeChunk
+    from apps.api.src.models.dependency import CodeDependency
+    from apps.api.src.models.file import RepositoryFile
+    from apps.api.src.models.symbol import CodeSymbol
 
 
 @dataclass
@@ -90,24 +94,57 @@ class DiscoveryContext:
         if target_raw.startswith(".") and src_path:
             src_dir = posixpath.dirname(src_path)
             candidate_base = posixpath.normpath(posixpath.join(src_dir, target_raw))
-            for ext in ("", ".py", ".ts", ".tsx", ".js", ".jsx"):
+            for ext in (
+                "",
+                ".py",
+                ".ts",
+                ".tsx",
+                ".js",
+                ".jsx",
+                ".dart",
+                ".go",
+                ".rs",
+                ".java",
+                ".cpp",
+                ".c",
+                ".h",
+                ".hpp",
+                ".cs",
+                ".kt",
+                ".swift",
+            ):
                 cand = candidate_base + ext
                 if cand in self.file_by_path:
                     return cand
-            for idx in ("/index.ts", "/index.js", "/index.tsx", "/index.jsx", "/__init__.py"):
+            for idx in ("/index.ts", "/index.js", "/index.tsx", "/index.jsx", "/__init__.py", "/mod.rs"):
                 cand = candidate_base + idx
                 if cand in self.file_by_path:
                     return cand
 
-        # Dot-notated module import (e.g. src.auth.service -> src/auth/service.py)
+        # Dart package resolution e.g. package:unotusk/services/api_service.dart -> lib/services/api_service.dart
+        if target_raw.startswith("package:"):
+            parts = target_raw.split("/", 1)
+            if len(parts) == 2:
+                subpath = parts[1]
+                for cand in (f"lib/{subpath}", f"app/lib/{subpath}", f"setup_app/lib/{subpath}"):
+                    if cand in self.file_by_path:
+                        return cand
+                for p in self.file_by_path:
+                    if p.endswith(f"lib/{subpath}") or p.endswith(subpath):
+                        return p
+
+        # Dot-notated or slash-notated module / package import (e.g. src.auth.service -> src/auth/service.py, pkg.logger -> pkg/logger/logger.go)
         target_as_slash = target_raw.replace(".", "/")
         for p in self.file_by_path:
             p_no_ext = posixpath.splitext(p)[0]
+            p_dir = posixpath.dirname(p)
             if (
                 p == target_raw
                 or p.endswith("/" + target_raw)
                 or p_no_ext == target_as_slash
                 or p_no_ext.endswith("/" + target_as_slash)
+                or p_dir == target_as_slash
+                or p_dir.endswith("/" + target_as_slash)
             ):
                 return p
 

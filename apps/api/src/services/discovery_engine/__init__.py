@@ -3,7 +3,11 @@ from apps.api.src.services.discovery_engine.base import (
     DiscoveryAnalyzer,
     DiscoveryContext,
 )
-from apps.api.src.services.discovery_engine.engine import ProjectDiscoveryEngine
+
+try:
+    from apps.api.src.services.discovery_engine.engine import ProjectDiscoveryEngine
+except ImportError:
+    ProjectDiscoveryEngine = None  # type: ignore[assignment]
 
 __all__ = [
     "CandidateFinding",

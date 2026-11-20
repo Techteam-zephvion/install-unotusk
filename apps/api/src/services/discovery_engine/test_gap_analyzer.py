@@ -56,6 +56,8 @@ class TestGapAnalyzer(DiscoveryAnalyzer):
                 f"{base_name}_test",
                 f"{base_name}.test",
                 f"{base_name}.spec",
+                f"{base_name}test",
+                f"test{base_name}",
             ]
 
             has_test = any(any(pat in tp for pat in expected_test_patterns) for tp in test_paths)
