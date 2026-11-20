@@ -68,8 +68,8 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
 
       String cleanCode = '';
       try {
-        final repoCtx = await ApiService.fetchRepositoryContext(pid);
-        final files = repoCtx.files.map((f) => f.path).toList();
+        final projectFiles = await ApiService.fetchProjectFiles(pid);
+        final files = projectFiles.map((f) => f.path).toList();
 
         final synth = ApiService.synthesizeMermaidDiagram(
           content: '',

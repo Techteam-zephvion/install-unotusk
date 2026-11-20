@@ -2149,9 +2149,8 @@ class ApiService {
     // Fallback: build architectural ontology nodes from repository files, symbols, or active project
     try {
       final pid = _resolveProjectId(projectId);
-      final repoCtx = await fetchRepositoryContext(pid);
-      final files = repoCtx.files;
-      final symbols = repoCtx.symbols;
+      final files = await fetchProjectFiles(pid);
+      final symbols = await fetchProjectSymbols(pid);
       final List<OntologyNode> synthNodes = [];
       final List<List<int>> synthEdges = [];
       int idx = 0;
