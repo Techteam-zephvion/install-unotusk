@@ -1968,8 +1968,69 @@ class _AuthScreenState extends State<AuthScreen>
                     const SizedBox(height: 12),
                     _buildCenteredInputBox(
                       controller: controller,
-                      hintText: 'http://127.0.0.1:28000',
+                      hintText: 'http://10.0.0.43:28000',
                       isCardLight: isCardLight,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        InkWell(
+                          onTap: () => setDialogState(() => controller.text = 'http://10.0.0.43:28000'),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: (isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite).withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '10.0.0.43:28000',
+                              style: GoogleFonts.ibmPlexMono(
+                                fontSize: 11,
+                                color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
+                              ),
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => setDialogState(() => controller.text = 'http://10.0.0.59:28000'),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: (isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite).withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '10.0.0.59:28000',
+                              style: GoogleFonts.ibmPlexMono(
+                                fontSize: 11,
+                                color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
+                              ),
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => setDialogState(() => controller.text = 'http://127.0.0.1:28000'),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: (isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite).withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '127.0.0.1:28000',
+                              style: GoogleFonts.ibmPlexMono(
+                                fontSize: 11,
+                                color: isCardLight ? _AuthColors.obsidianNavy : _AuthColors.pureWhite,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Material(

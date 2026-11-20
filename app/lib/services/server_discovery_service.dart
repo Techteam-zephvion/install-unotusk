@@ -97,7 +97,8 @@ class ServerDiscoveryService {
       localCandidates.add('http://$myLanIp:$defaultControlPlanePort');
     }
 
-    // Known Linux server peer IP
+    // Active & Known Linux server peer IPs
+    localCandidates.add('http://10.0.0.43:$defaultControlPlanePort');
     localCandidates.add('http://10.0.0.59:$defaultControlPlanePort');
 
     final uniqueLocal = localCandidates.toSet().toList();
@@ -199,6 +200,7 @@ class ServerDiscoveryService {
     // Prioritize known peers and common DHCP ranges
     final targetIps = <String>[];
     if (prefix == '10.0.0') {
+      targetIps.add('10.0.0.43'); // Active Linux server IP
       targetIps.add('10.0.0.59'); // Known Linux server IP
     }
 

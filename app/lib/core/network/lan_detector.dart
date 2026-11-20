@@ -121,6 +121,13 @@ class LanDetector {
   }
 
   Future<String?> getPrimaryLanIp() async {
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        return host;
+      }
+      return '10.0.0.43';
+    }
     final addresses = await getAvailableLanAddresses();
     if (addresses.isNotEmpty) {
       return addresses.first.ip;

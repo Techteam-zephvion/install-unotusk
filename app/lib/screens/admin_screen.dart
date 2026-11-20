@@ -820,6 +820,15 @@ class _AdminScreenState extends State<AdminScreen> {
                     Text('Presets: ', style: UnoTypography.body(color: widget.palette.textSec, fontSize: 11.5)),
                     InkWell(
                       onTap: () {
+                        _serverController.text = 'http://10.0.0.43:28000';
+                        ApiService.setBaseUrl('http://10.0.0.43:28000');
+                        setState(() {});
+                      },
+                      child: Text('LAN (10.0.0.43)', style: UnoTypography.mono(color: widget.palette.accent, fontSize: 11)),
+                    ),
+                    const SizedBox(width: 14),
+                    InkWell(
+                      onTap: () {
                         _serverController.text = 'http://10.0.0.59:28000';
                         ApiService.setBaseUrl('http://10.0.0.59:28000');
                         setState(() {});
