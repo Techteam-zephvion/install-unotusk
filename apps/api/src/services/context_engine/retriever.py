@@ -12,51 +12,13 @@ from apps.api.src.models.dependency import CodeDependency
 from apps.api.src.models.file import RepositoryFile
 from apps.api.src.models.snapshot import RepositorySnapshot
 from apps.api.src.models.symbol import CodeSymbol
+from apps.api.src.services.context_engine.embeddings import (
+    CONCEPT_CLUSTERS,
+    WORD_TO_CONCEPTS,
+    compute_cosine_similarity,
+    generate_text_embedding,
+)
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
-
-
-def compute_cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    if not vec1 or not vec2 or len(vec1) != len(vec2):
-        return 0.0
-    dot = sum(a * b for a, b in zip(vec1, vec2, strict=False))
-    norm1 = sum(a * a for a in vec1) ** 0.5
-    norm2 = sum(b * b for b in vec2) ** 0.5
-    if norm1 == 0.0 or norm2 == 0.0:
-        return 0.0
-    return dot / (norm1 * norm2)
-
-
-def generate_text_embedding(text: str, dim: int = 1536) -> list[float]:
-    """Generates a deterministic normalized semantic embedding vector for code or text."""
-    if not text or not text.strip():
-        return [0.0] * dim
-
-    vec = [0.0] * dim
-    tokens = re.findall(r"[A-Za-z0-9_]+|[^\s\w]", text.lower())
-    if not tokens:
-        return [0.0] * dim
-
-    for token in tokens:
-        if len(token) < 2:
-            continue
-        h = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
-        idx = h % dim
-        sign = 1.0 if (h >> 1) & 1 else -1.0
-        vec[idx] += sign * (1.5 if len(token) > 3 else 1.0)
-
-        subwords = token.split("_")
-        if len(subwords) > 1:
-            for sw in subwords:
-                if len(sw) >= 2:
-                    h_sw = int(hashlib.md5(sw.encode("utf-8")).hexdigest(), 16)
-                    idx_sw = h_sw % dim
-                    sign_sw = 1.0 if (h_sw >> 1) & 1 else -1.0
-                    vec[idx_sw] += sign_sw * 0.8
-
-    norm = sum(x * x for x in vec) ** 0.5
-    if norm == 0.0:
-        return [0.0] * dim
-    return [round(x / norm, 6) for x in vec]
 
 
 @dataclass

@@ -206,7 +206,7 @@ class IngestionService:
                                 "is_test": is_test,
                                 "line_count": line_count,
                                 "parser_supported": parser_supported,
-                                "content_bytes": content_bytes,
+                                "full_path": full_path,
                             }
                         )
 
@@ -245,7 +245,14 @@ class IngestionService:
                 created_symbols_list: list[tuple[str, CodeSymbol]] = []
                 for f_info in discovered_files:
                     repo_file = created_files_map[f_info["path"]]
-                    content = f_info["content_bytes"]
+                    content = b""
+                    if not f_info["is_binary"] and os.path.exists(f_info["full_path"]):
+                        try:
+                            with open(f_info["full_path"], "rb") as f:
+                                content = f.read()
+                        except Exception as read_err:
+                            logger.warning("Could not read file %s: %s", f_info["full_path"], read_err)
+
                     extracted_symbols_count = 0
 
                     if f_info["parser_supported"] and content:
@@ -353,35 +360,59 @@ class IngestionService:
                             for dep in extracted_deps:
                                 raw_deps_to_create.append((repo_file.id, dep))
 
-                    # For config files, documentation, or files with no symbols, store file header chunk
+                    # For config files, documentation, or unsupported/non-symbol languages (Dart, Rust, Java, C++, Swift, etc.)
+                    # Store sliding-window chunks covering the entire file beyond line 100
                     if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
-                        lines = _clean_null(content.decode("utf-8", errors="replace")).splitlines()[:100]
-                        if lines:
-                            file_chunk_content = _clean_null("\n".join(lines)) or ""
-                            file_embedding = generate_atom_code_embedding(
-                                commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
-                                content=file_chunk_content,
-                                file_path=_clean_null(repo_file.path) or "",
-                                symbol_name=None,
-                            )
-                            file_chunk = CodeChunk(
-                                id=uuid.uuid4(),
-                                snapshot_id=snapshot.id,
-                                file_id=repo_file.id,
-                                symbol_id=None,
-                                chunk_type="CONFIG"
-                                if f_info["filename"].endswith(
-                                    (".json", ".yml", ".yaml", ".toml", ".txt", ".md")
+                        all_lines = _clean_null(content.decode("utf-8", errors="replace")).splitlines()
+                        if all_lines:
+                            window_size = 100
+                            step_size = 80
+                            max_chunks = 50  # Index up to 4,000 lines per file
+                            chunk_idx = 0
+
+                            for start_idx in range(0, len(all_lines), step_size):
+                                if chunk_idx >= max_chunks:
+                                    break
+                                chunk_lines = all_lines[start_idx : start_idx + window_size]
+                                if not chunk_lines:
+                                    break
+
+                                file_chunk_content = _clean_null("\n".join(chunk_lines)) or ""
+                                file_embedding = generate_atom_code_embedding(
+                                    commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                    content=file_chunk_content,
+                                    file_path=_clean_null(repo_file.path) or "",
+                                    symbol_name=None,
                                 )
-                                else "MODULE",
-                                name=_clean_null(f_info["filename"]) or "",
-                                path=_clean_null(repo_file.path) or "",
-                                content=file_chunk_content,
-                                start_line=1,
-                                end_line=len(lines),
-                                embedding=file_embedding,
-                            )
-                            session.add(file_chunk)
+                                start_line = start_idx + 1
+                                end_line = start_idx + len(chunk_lines)
+                                chunk_label = (
+                                    _clean_null(f_info["filename"]) or ""
+                                    if chunk_idx == 0
+                                    else f"{_clean_null(f_info['filename']) or ''} [L{start_line}-L{end_line}]"
+                                )
+                                file_chunk = CodeChunk(
+                                    id=uuid.uuid4(),
+                                    snapshot_id=snapshot.id,
+                                    file_id=repo_file.id,
+                                    symbol_id=None,
+                                    chunk_type="CONFIG"
+                                    if f_info["filename"].endswith(
+                                        (".json", ".yml", ".yaml", ".toml", ".txt", ".md")
+                                    )
+                                    else "MODULE",
+                                    name=chunk_label,
+                                    path=_clean_null(repo_file.path) or "",
+                                    content=file_chunk_content,
+                                    start_line=start_line,
+                                    end_line=end_line,
+                                    embedding=file_embedding,
+                                )
+                                session.add(file_chunk)
+                                chunk_idx += 1
+
+                                if start_idx + window_size >= len(all_lines):
+                                    break
 
                     processed_count += 1
                     if processed_count % 50 == 0:
