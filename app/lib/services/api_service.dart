@@ -24,6 +24,37 @@ class ApiService {
   static final ValueNotifier<List<RecentChat>> recentChatsNotifier =
       ValueNotifier<List<RecentChat>>([]);
 
+  static Set<String> _deletedChatIds = {};
+  static Set<String> _pinnedChatIds = {};
+  static Map<String, String> _customChatTitles = {};
+  static Set<String> _archivedChatIds = {};
+  static bool _localPrefsLoaded = false;
+
+  static Future<void> _loadLocalPrefs() async {
+    if (_localPrefsLoaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _deletedChatIds = (prefs.getStringList('unotusk_deleted_chats') ?? []).toSet();
+      _pinnedChatIds = (prefs.getStringList('unotusk_pinned_chats') ?? []).toSet();
+      _archivedChatIds = (prefs.getStringList('unotusk_archived_chats') ?? []).toSet();
+      final customJson = prefs.getString('unotusk_renamed_chats');
+      if (customJson != null && customJson.isNotEmpty) {
+        _customChatTitles = Map<String, String>.from(jsonDecode(customJson));
+      }
+      _localPrefsLoaded = true;
+    } catch (_) {}
+  }
+
+  static Future<void> _saveLocalPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('unotusk_deleted_chats', _deletedChatIds.toList());
+      await prefs.setStringList('unotusk_pinned_chats', _pinnedChatIds.toList());
+      await prefs.setStringList('unotusk_archived_chats', _archivedChatIds.toList());
+      await prefs.setString('unotusk_renamed_chats', jsonEncode(_customChatTitles));
+    } catch (_) {}
+  }
+
   static List<RecentChat> get recordedChats => List.unmodifiable(_recordedChats);
   static List<RecentChat> get allRecentChats => List.unmodifiable(_allRecentChats);
 
@@ -76,6 +107,12 @@ class ApiService {
   /// Removes a chat from recent history
   static void removeRecentChat(dynamic id) {
     final strId = id.toString();
+    _deletedChatIds.add(strId);
+    _archivedChatIds.remove(strId);
+    _pinnedChatIds.remove(strId);
+    _customChatTitles.remove(strId);
+    _saveLocalPrefs();
+
     _recordedChats.removeWhere((c) => c.id.toString() == strId);
     _allRecentChats.removeWhere((c) => c.id.toString() == strId);
     recentChatsNotifier.value = List.of(_allRecentChats);
@@ -84,6 +121,9 @@ class ApiService {
   /// Renames a chat in recent history
   static void renameRecentChat(dynamic id, String newTitle) {
     final strId = id.toString();
+    _customChatTitles[strId] = newTitle;
+    _saveLocalPrefs();
+
     for (var list in [_recordedChats, _allRecentChats]) {
       final idx = list.indexWhere((c) => c.id.toString() == strId);
       if (idx != -1) {
@@ -105,9 +145,11 @@ class ApiService {
   /// Toggles pin state of a chat
   static void togglePinRecentChat(dynamic id) {
     final strId = id.toString();
+    bool willBePinned = false;
     for (var list in [_recordedChats, _allRecentChats]) {
       final idx = list.indexWhere((c) => c.id.toString() == strId);
       if (idx != -1) {
+        willBePinned = !list[idx].isPinned;
         list[idx] = RecentChat(
           id: list[idx].id,
           title: list[idx].title,
@@ -115,11 +157,18 @@ class ApiService {
           time: list[idx].time,
           projectId: list[idx].projectId,
           messageCount: list[idx].messageCount,
-          isPinned: !list[idx].isPinned,
+          isPinned: willBePinned,
           isArchived: list[idx].isArchived,
         );
       }
     }
+    if (willBePinned) {
+      _pinnedChatIds.add(strId);
+    } else {
+      _pinnedChatIds.remove(strId);
+    }
+    _saveLocalPrefs();
+
     _allRecentChats.sort((a, b) {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
@@ -1516,6 +1565,7 @@ class ApiService {
 
   /// Fetches recent conversation threads from http://10.0.0.59:28000/api/v1/projects/{id}/conversations
   static Future<List<RecentChat>> fetchRecentChats({String? projectId}) async {
+    await _loadLocalPrefs();
     try {
       final pid = _resolveProjectId(projectId);
       final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations?archived=false');
@@ -1523,16 +1573,26 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final List<dynamic> list = jsonDecode(res.body);
-        final serverChats = list.map((item) {
+        final serverChats = <RecentChat>[];
+        for (final item in list) {
           final m = item as Map<String, dynamic>;
           final id = m['id']?.toString() ?? '';
-          final title = m['title']?.toString() ?? 'Conversation';
+
+          // Drop locally deleted or archived chats
+          if (_deletedChatIds.contains(id)) continue;
+          if (_archivedChatIds.contains(id)) continue;
+
+          var title = m['title']?.toString() ?? 'Conversation';
+          if (_customChatTitles.containsKey(id)) {
+            title = _customChatTitles[id]!;
+          }
+
           final createdAtStr = m['created_at']?.toString() ?? '';
           final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
-          final isPinned = m['is_pinned'] == true;
+          final isPinned = _pinnedChatIds.contains(id) || m['is_pinned'] == true;
           final isArchived = m['is_archived'] == true;
 
-          return RecentChat(
+          serverChats.add(RecentChat(
             id: id,
             title: title,
             ago: _formatTimeAgo(createdAt),
@@ -1541,12 +1601,15 @@ class ApiService {
             isPinned: isPinned,
             isArchived: isArchived,
             projectId: pid,
-          );
-        }).toList();
+          ));
+        }
 
         // Merge newly recorded chats that may not yet be returned from the server
         final merged = <RecentChat>[...serverChats];
         for (final rec in _recordedChats) {
+          final recId = rec.id.toString();
+          if (_deletedChatIds.contains(recId)) continue;
+          if (_archivedChatIds.contains(recId)) continue;
           if (!merged.any((s) => s.id == rec.id || s.title == rec.title)) {
             merged.insert(0, rec);
           }
@@ -1565,13 +1628,20 @@ class ApiService {
       debugPrint('[ApiService] fetchRecentChats error: $e');
     }
 
+    await _loadLocalPrefs();
     if (_allRecentChats.isNotEmpty) {
+      _allRecentChats.removeWhere((c) =>
+          _deletedChatIds.contains(c.id.toString()) ||
+          _archivedChatIds.contains(c.id.toString()));
       recentChatsNotifier.value = List.of(_allRecentChats);
       return List.of(_allRecentChats);
     }
 
-    // Fallback: return only chats recorded in this session (no mock data)
+    // Fallback: return only chats recorded in this session (filtered by local deletions)
     final fallback = <RecentChat>[..._recordedChats];
+    fallback.removeWhere((c) =>
+        _deletedChatIds.contains(c.id.toString()) ||
+        _archivedChatIds.contains(c.id.toString()));
     fallback.sort((a, b) {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
@@ -1585,6 +1655,7 @@ class ApiService {
 
   /// Fetches archived conversation threads from http://10.0.0.59:28000
   static Future<List<ArchivedChat>> fetchArchivedChats({String? projectId}) async {
+    await _loadLocalPrefs();
     try {
       final pid = _resolveProjectId(projectId);
       final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations?archived=true');
@@ -1592,21 +1663,43 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final List<dynamic> list = jsonDecode(res.body);
-        return list.map((item) {
+        final result = <ArchivedChat>[];
+        for (final item in list) {
           final m = item as Map<String, dynamic>;
           final id = m['id']?.toString() ?? '';
-          final title = m['title']?.toString() ?? 'Thread';
+          if (_deletedChatIds.contains(id)) continue;
+
+          var title = m['title']?.toString() ?? 'Thread';
+          if (_customChatTitles.containsKey(id)) {
+            title = _customChatTitles[id]!;
+          }
+
           final createdAtStr = m['created_at']?.toString() ?? '';
           final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
           final count = (m['message_count'] as num?)?.toInt() ?? 0;
 
-          return ArchivedChat(
+          result.add(ArchivedChat(
             id: id,
             title: title,
             date: '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}',
             messages: count,
-          );
-        }).toList();
+          ));
+        }
+
+        // Also add any locally archived chats that server hasn't marked archived yet
+        for (final id in _archivedChatIds) {
+          if (_deletedChatIds.contains(id)) continue;
+          if (!result.any((c) => c.id == id)) {
+            final title = _customChatTitles[id] ?? 'Archived conversation';
+            result.insert(0, ArchivedChat(
+              id: id,
+              title: title,
+              date: 'Recently',
+              messages: 1,
+            ));
+          }
+        }
+        return result;
       }
     } catch (e) {
       debugPrint('[ApiService] fetchArchivedChats error: $e');
@@ -1621,6 +1714,10 @@ class ApiService {
     String newTitle, {
     String? projectId,
   }) async {
+    final strId = conversationId.toString();
+    await _loadLocalPrefs();
+    _customChatTitles[strId] = newTitle;
+    _saveLocalPrefs();
     renameRecentChat(conversationId, newTitle);
     if (conversationId.startsWith('temp-')) return true;
 
@@ -1632,6 +1729,7 @@ class ApiService {
         headers: _headers,
         body: jsonEncode({'title': newTitle}),
       ).timeout(_timeout);
+      debugPrint('[ApiService] renameConversation: status=${res.statusCode}, body=${res.body}');
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('[ApiService] renameConversation error: $e');
@@ -1646,6 +1744,14 @@ class ApiService {
     String? projectId,
   }) async {
     final strId = conversationId.toString();
+    await _loadLocalPrefs();
+    if (isPinned) {
+      _pinnedChatIds.add(strId);
+    } else {
+      _pinnedChatIds.remove(strId);
+    }
+    _saveLocalPrefs();
+
     for (var list in [_recordedChats, _allRecentChats]) {
       final idx = list.indexWhere((c) => c.id.toString() == strId);
       if (idx != -1) {
@@ -1678,6 +1784,7 @@ class ApiService {
         headers: _headers,
         body: jsonEncode({'is_pinned': isPinned}),
       ).timeout(_timeout);
+      debugPrint('[ApiService] togglePinConversation: status=${res.statusCode}, body=${res.body}');
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('[ApiService] togglePinConversation error: $e');
@@ -1692,11 +1799,16 @@ class ApiService {
     String? projectId,
   }) async {
     final strId = conversationId.toString();
+    await _loadLocalPrefs();
     if (archive) {
+      _archivedChatIds.add(strId);
       _recordedChats.removeWhere((c) => c.id.toString() == strId);
       _allRecentChats.removeWhere((c) => c.id.toString() == strId);
       recentChatsNotifier.value = List.of(_allRecentChats);
+    } else {
+      _archivedChatIds.remove(strId);
     }
+    _saveLocalPrefs();
 
     if (conversationId.startsWith('temp-')) return true;
 
@@ -1708,9 +1820,9 @@ class ApiService {
         headers: _headers,
         body: jsonEncode({'is_archived': archive}),
       ).timeout(_timeout);
+      debugPrint('[ApiService] archiveConversation: status=${res.statusCode}, body=${res.body}');
 
       if (!archive) {
-        // Reload recent chats on unarchive
         await fetchRecentChats(projectId: pid);
       }
       return res.statusCode == 200;
@@ -1732,6 +1844,7 @@ class ApiService {
       final pid = _resolveProjectId(projectId);
       final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations/$conversationId');
       final res = await _client.delete(uri, headers: _headers).timeout(_timeout);
+      debugPrint('[ApiService] deleteConversation: status=${res.statusCode}, body=${res.body}');
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
       debugPrint('[ApiService] deleteConversation error: $e');
