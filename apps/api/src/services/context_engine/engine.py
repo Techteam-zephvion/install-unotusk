@@ -80,41 +80,76 @@ class ProjectContextEngine:
         )
 
         # 3b. STAR-RAG Temporal Rule Graph Retrieval
-        use_star_rag = (
+        use_star_rag_flag = (
             enable_star_rag
             if enable_star_rag is not None
             else getattr(settings, "STAR_RAG_ENABLED", False)
         )
-        star_rag_diagnostics: dict[str, Any] = {}
-        star_rag_applied = False
-        if use_star_rag:
-            try:
-                from apps.api.src.services.context_engine.star_rag import StarRagContextService
+        from apps.api.src.services.context_engine.star_rag import (
+            StarRagContextService,
+            TemporalStarRagRouter,
+        )
 
-                star_res = StarRagContextService.run_star_rag_pipeline(
+        should_route_temporal, temporal_route_reason = (
+            TemporalStarRagRouter.should_route_to_temporal_star_rag(
+                query_text=question,
+                analyzed_query=analyzed,
+                flag_enabled=use_star_rag_flag,
+                force_temporal_star_rag=(enable_star_rag is True),
+            )
+        )
+
+        star_rag_diagnostics: dict[str, Any] = {
+            "routing_decision": temporal_route_reason,
+            "selective_routing_applied": True,
+        }
+        star_rag_applied = False
+        temporal_star_rag_evidence: list[dict[str, Any]] = []
+
+        if should_route_temporal:
+            try:
+                star_res = await StarRagContextService.run_star_rag_pipeline_async(
                     candidates=expanded_candidates,
                     analyzed_query=analyzed,
                     query_text=question,
+                    session=session,
+                    snapshot_id=snapshot_id,
+                    repository_id=repository_id,
                 )
                 expanded_candidates = star_res.candidates
                 star_rag_applied = not star_res.is_fallback
-                star_rag_diagnostics = {
-                    "is_fallback": star_res.is_fallback,
-                    "fallback_reason": star_res.fallback_reason,
-                    "top_rules_count": len(star_res.top_rules),
-                    "rule_nodes_count": len(star_res.rule_nodes),
-                    "selected_edges_count": len(star_res.selected_edges),
-                    "initial_mdl_cost": round(star_res.initial_mdl_cost, 2),
-                    "final_mdl_cost": round(star_res.final_mdl_cost, 2),
-                }
+                star_rag_diagnostics.update(
+                    {
+                        "is_fallback": star_res.is_fallback,
+                        "fallback_reason": star_res.fallback_reason,
+                        "top_rules_count": len(star_res.top_rules),
+                        "rule_nodes_count": len(star_res.rule_nodes),
+                        "selected_edges_count": len(star_res.selected_edges),
+                        "initial_mdl_cost": round(star_res.initial_mdl_cost, 2),
+                        "final_mdl_cost": round(star_res.final_mdl_cost, 2),
+                        "ranked_events_count": len(star_res.ranked_events),
+                        "temporal_evidence_count": len(star_res.temporal_evidence),
+                    }
+                )
+                if not star_res.is_fallback and star_res.temporal_evidence:
+                    temporal_star_rag_evidence = star_res.temporal_evidence
             except Exception as exc:
                 star_rag_applied = False
-                star_rag_diagnostics = {
-                    "exception_occurred": True,
+                star_rag_diagnostics.update(
+                    {
+                        "exception_occurred": True,
+                        "is_fallback": True,
+                        "fallback_reason": str(exc),
+                        "error": str(exc),
+                    }
+                )
+        else:
+            star_rag_diagnostics.update(
+                {
                     "is_fallback": True,
-                    "fallback_reason": str(exc),
-                    "error": str(exc),
+                    "fallback_reason": temporal_route_reason,
                 }
+            )
 
         # 3c. MemoTime Operator-Aware Temporal Retrieval (arXiv:2510.13614: "MemoTime: Memory-Augmented Temporal Knowledge Graph Enhanced Large Language Model Reasoning")
         use_memotime = (
@@ -348,6 +383,7 @@ class ProjectContextEngine:
             ranked_candidates=ranked,
             proof_chains=proof_chains,
             evidence_paths=struct_evidence_paths,
+            temporal_evidence=temporal_star_rag_evidence,
         )
 
         # 5b. Retrieve Customer Project Knowledge
@@ -534,8 +570,10 @@ class ProjectContextEngine:
                 "top_score": ranked[0].score if ranked else 0.0,
                 "memotime_used": memotime_success if use_memotime else False,
                 "memotime_diagnostics": memotime_diagnostics,
-                "star_rag_used": star_rag_applied if use_star_rag else False,
+                "star_rag_used": star_rag_applied if should_route_temporal else False,
                 "star_rag_diagnostics": star_rag_diagnostics,
+                "star_rag_temporal_evidence_count": len(temporal_star_rag_evidence),
+                "star_rag_temporal_routing_decision": temporal_route_reason,
                 "structure_aware_star_rag_used": (
                     struct_star_rag_applied if should_route_star else False
                 ),

@@ -315,6 +315,15 @@ class ClaudeProvider(LLMProvider):
                         f"{i}. **Structural Call Path**: `{path_str}`\n"
                         f"   Traces call hierarchy and execution flow through: `{first_file}`."
                     )
+                elif ev_type == "temporal_event":
+                    ts_str = ev.get("timestamp") or "Historical"
+                    c_sha = (ev.get("commit_sha") or "")[:8]
+                    c_str = f" [Commit: {c_sha}]" if c_sha else ""
+                    rel_path = ev.get("relationship_path") or f"{ev.get('subject')} {ev.get('relation')} {ev.get('object')}"
+                    lines.append(
+                        f"{i}. **Historical Event ({ts_str}){c_str}**: `{rel_path}`\n"
+                        f"   File: `{ev.get('file', 'Unknown')}` | Detail: {ev.get('snippet', '')}"
+                    )
                 else:
                     sym_name = f" (`{ev['symbol']}`)" if ev.get("symbol") else ""
                     ev_file = ev.get("file") or ev.get("file_path") or "Unknown"

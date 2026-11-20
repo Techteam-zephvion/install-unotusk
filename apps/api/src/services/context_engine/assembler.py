@@ -36,6 +36,7 @@ class ContextAssembler:
         max_tokens: int | None = None,
         proof_chains: list[Any] | None = None,
         evidence_paths: list[Any] | None = None,
+        temporal_evidence: list[dict[str, Any]] | None = None,
     ) -> AssembledContext:
         budget_tokens = max_tokens or settings.CONTEXT_BUDGET_TOKENS
         # Approximate 4 characters per token
@@ -314,9 +315,49 @@ class ContextAssembler:
                         related_entities.add(tn)
 
         # -------------------------------------------------------------
+        # 1c. Format Temporal Historical Evidence (STAR-RAG)
+        # -------------------------------------------------------------
+        current_temp_chars = 0
+        if temporal_evidence:
+            temporal_budget_chars = min(int(char_budget * 0.25), 3000)
+            temp_lines = [
+                "## HISTORICAL TEMPORAL EVIDENCE (STAR-RAG)",
+                "The following events represent verified historical repository changes and relationships.",
+                "Distinguish historical implementations and previous states from current code.",
+                "",
+            ]
+            for idx, tev in enumerate(temporal_evidence, start=1):
+                ev_ts = tev.get("timestamp") or "Historical"
+                c_sha = (tev.get("commit_sha") or "")[:8]
+                c_tag = f" [Commit: {c_sha}]" if c_sha else ""
+                s_rel_o = tev.get("relationship_path") or f"{tev.get('subject')} {tev.get('relation')} {tev.get('object')}"
+                f_path = tev.get("file") or "Unknown"
+                snippet = tev.get("snippet", "")
+                change_type = tev.get("change_type") or "CHANGE"
+
+                event_block = (
+                    f"{idx}. **[{change_type}] {s_rel_o}**{c_tag}\n"
+                    f"   - Timestamp: {ev_ts} (UTC)\n"
+                    f"   - File: `{f_path}` (Lines {tev.get('lines', '1-20')})\n"
+                    f"   - Temporal Status: HISTORICAL\n"
+                    f"   - Detail: {snippet}\n"
+                )
+                if current_temp_chars + len(event_block) <= temporal_budget_chars:
+                    temp_lines.append(event_block)
+                    current_temp_chars += len(event_block)
+                    evidence_items.append(tev)
+                    if tev.get("subject"):
+                        related_entities.add(tev["subject"])
+                    if tev.get("object"):
+                        related_entities.add(tev["object"])
+
+            if len(temp_lines) > 4:
+                sections.append("\n".join(temp_lines))
+
+        # -------------------------------------------------------------
         # 2. Format Candidate Code Chunks
         # -------------------------------------------------------------
-        current_chars += current_proof_chars + current_path_chars
+        current_chars += current_proof_chars + current_path_chars + current_temp_chars
 
         for r in ranked_candidates:
             cand = r.candidate

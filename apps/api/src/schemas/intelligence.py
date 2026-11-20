@@ -62,6 +62,10 @@ class GroundedAskRequest(BaseModel):
         default=None,
         description="Optional override for structure-aware STAR-RAG retrieval (default inherits settings.STRUCTURE_AWARE_STAR_RAG_ENABLED)",
     )
+    enable_star_rag: bool | None = Field(
+        default=None,
+        description="Optional override for temporal STAR-RAG retrieval (default inherits settings.STAR_RAG_ENABLED)",
+    )
 
     @field_validator("question")
     @classmethod

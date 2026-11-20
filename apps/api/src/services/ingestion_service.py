@@ -383,15 +383,33 @@ class IngestionService:
                         await session.commit()
 
                 # 4.5. ATOM DECOMPOSITION & CHUNK INTEGRATION: Extract & Map Atomic Code Changes to CodeChunk
-                if commit_artifact is None and source_dir:
-                    commit_artifact = extract_git_commit_artifact(source_dir, fallback_sha=commit_sha)
-
+                commit_artifacts: list[GitCommitArtifact] = []
                 if commit_artifact:
-                    commit_artifact.snapshot_id = snapshot.id
-                    commit_artifact.project_id = repository.project_id
-                    commit_artifact.repository_id = repository.id
-                    if commit_artifact.commit_sha and commit_artifact.commit_sha != "unknown":
-                        snapshot.commit_sha = commit_artifact.commit_sha
+                    commit_artifacts = [commit_artifact]
+                elif source_dir:
+                    try:
+                        from apps.api.src.services.code_atom.git_extractor import (
+                            extract_incremental_commit_artifacts,
+                        )
+
+                        commit_artifacts = extract_incremental_commit_artifacts(
+                            repo_dir=source_dir,
+                            target_commit_sha="HEAD",
+                            max_commits=100,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Incremental git history extraction bypassed: {e}")
+                        commit_artifacts = []
+
+                    if not commit_artifacts:
+                        single = extract_git_commit_artifact(source_dir, fallback_sha=commit_sha)
+                        if single:
+                            commit_artifacts = [single]
+
+                if commit_artifacts:
+                    latest_art = commit_artifacts[-1]
+                    if latest_art.commit_sha and latest_art.commit_sha != "unknown":
+                        snapshot.commit_sha = latest_art.commit_sha
 
                     symbol_catalog = [
                         {
@@ -411,37 +429,46 @@ class IngestionService:
                         symbols_map[s.name] = s
 
                     decomposer = CodeAtomDecomposer()
-                    decomp_result = decomposer.decompose(
-                        commit_artifact, symbol_catalog=symbol_catalog
-                    )
+                    for art in commit_artifacts:
+                        art.snapshot_id = snapshot.id
+                        art.project_id = repository.project_id
+                        art.repository_id = repository.id
 
-                    atom_chunks = resolve_and_map_atomic_changes(
-                        changes=decomp_result.changes,
-                        snapshot_id=snapshot.id,
-                        files_map=created_files_map,
-                        symbols_map=symbols_map,
-                        session=session,
-                    )
-                    for atom_chunk in atom_chunks:
-                        session.add(atom_chunk)
-
-                    # 4.6. EvoKG Temporal Knowledge Graph Persistence
-                    from apps.api.src.config.settings import settings
-                    if getattr(settings, 'EVOKG_ENABLED', False) and getattr(decomp_result, 'relations', None):
-                        from apps.api.src.services.evokg import EvoKGPersistenceService
-                        evokg_service = EvoKGPersistenceService()
-                        files_id_map = {p: rf.id for p, rf in created_files_map.items()}
-                        syms_id_map = {s.name: s.id for _, s in created_symbols_list}
-                        await evokg_service.persist_relations(
-                            session=session,
-                            repository_id=repository.id,
-                            relations=decomp_result.relations,
-                            branch=snapshot.branch,
-                            snapshot_id=snapshot.id,
-                            commit_sha=snapshot.commit_sha,
-                            files_map=files_id_map,
-                            symbols_map=syms_id_map,
+                        decomp_result = decomposer.decompose(
+                            art, symbol_catalog=symbol_catalog
                         )
+
+                        atom_chunks = resolve_and_map_atomic_changes(
+                            changes=decomp_result.changes,
+                            snapshot_id=snapshot.id,
+                            files_map=created_files_map,
+                            symbols_map=symbols_map,
+                            session=session,
+                        )
+                        for atom_chunk in atom_chunks:
+                            session.add(atom_chunk)
+
+                        # 4.6. EvoKG Temporal Knowledge Graph Persistence
+                        from apps.api.src.config.settings import settings
+
+                        if getattr(settings, "EVOKG_ENABLED", False) and getattr(
+                            decomp_result, "relations", None
+                        ):
+                            from apps.api.src.services.evokg import EvoKGPersistenceService
+
+                            evokg_service = EvoKGPersistenceService()
+                            files_id_map = {p: rf.id for p, rf in created_files_map.items()}
+                            syms_id_map = {s.name: s.id for _, s in created_symbols_list}
+                            await evokg_service.persist_relations(
+                                session=session,
+                                repository_id=repository.id,
+                                relations=decomp_result.relations,
+                                branch=snapshot.branch,
+                                snapshot_id=snapshot.id,
+                                commit_sha=art.commit_sha,
+                                files_map=files_id_map,
+                                symbols_map=syms_id_map,
+                            )
 
                     await session.flush()
 
