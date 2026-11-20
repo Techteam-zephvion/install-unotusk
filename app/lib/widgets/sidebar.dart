@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
 import '../models/models.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'unotusk_logo.dart';
 import 'user_menu_popup.dart';
@@ -217,6 +218,115 @@ class _UnoSidebarState extends State<UnoSidebar>
                                   ),
                                 ),
                                 if (i == 0) const SizedBox(height: 10),
+                              ],
+                              if (t > 0.05) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    color: p.div.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                Opacity(
+                                  opacity: labelOpacity,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(6, 4, 4, 6),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          'Recent chats',
+                                          style: UnoTypography.mono(
+                                            color: p.textMuted,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.4,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                ValueListenableBuilder<List<RecentChat>>(
+                                  valueListenable: ApiService.recentChatsNotifier,
+                                  builder: (context, chats, _) {
+                                    if (chats.isEmpty) {
+                                      return Opacity(
+                                        opacity: labelOpacity,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 8),
+                                          child: Text(
+                                            'No recent chats',
+                                            style: UnoTypography.body(
+                                              color: p.textMuted,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: chats.map((chat) {
+                                        final isActive = widget.activeConversationId ==
+                                            chat.id.toString();
+                                        return Padding(
+                                          key: ValueKey('pad_${chat.id}_${chat.isPinned}_${chat.title}'),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 1.5),
+                                          child: _RecentChatRow(
+                                            key: ValueKey('row_${chat.id}_${chat.isPinned}_${chat.title}'),
+                                            chat: chat,
+                                            isActive: isActive,
+                                            palette: p,
+                                            isDark: isDark,
+                                            expandT: t,
+                                            labelOpacity: labelOpacity,
+                                            innerWidth: innerWidth,
+                                            expandedInnerWidth:
+                                                _expandedInnerWidth,
+                                            onTap: () => widget
+                                                .onLoadRecentChat(chat.id),
+                                            onRename: (newTitle) =>
+                                                ApiService.renameConversation(
+                                              chat.id.toString(),
+                                              newTitle,
+                                              projectId: chat.projectId ?? widget.projectId,
+                                            ),
+                                            onTogglePin: () =>
+                                                ApiService.togglePinConversation(
+                                              chat.id.toString(),
+                                              !chat.isPinned,
+                                              projectId: chat.projectId ?? widget.projectId,
+                                            ),
+                                            onArchive: () {
+                                              if (widget.activeConversationId ==
+                                                  chat.id.toString()) {
+                                                widget.onNewQuery();
+                                              }
+                                              ApiService.archiveConversation(
+                                                chat.id.toString(),
+                                                archive: true,
+                                                projectId: chat.projectId ?? widget.projectId,
+                                              );
+                                            },
+                                            onDelete: () {
+                                              if (widget.activeConversationId ==
+                                                  chat.id.toString()) {
+                                                widget.onNewQuery();
+                                              }
+                                              ApiService.deleteConversation(
+                                                chat.id.toString(),
+                                                projectId: chat.projectId ?? widget.projectId,
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  },
+                                ),
                               ],
                             ],
                           ),
@@ -1242,6 +1352,522 @@ class _UnifiedUserFooterState extends State<_UnifiedUserFooter> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  Recent Chat Item Row with Hover Actions and Context Menu
+// ─────────────────────────────────────────────────────────
+class _RecentChatRow extends StatefulWidget {
+  final RecentChat chat;
+  final bool isActive;
+  final UnoPalette palette;
+  final bool isDark;
+  final double expandT;
+  final double labelOpacity;
+  final double innerWidth;
+  final double expandedInnerWidth;
+  final VoidCallback onTap;
+  final Function(String) onRename;
+  final VoidCallback onTogglePin;
+  final VoidCallback onArchive;
+  final VoidCallback onDelete;
+
+  const _RecentChatRow({
+    super.key,
+    required this.chat,
+    required this.isActive,
+    required this.palette,
+    required this.isDark,
+    required this.expandT,
+    required this.labelOpacity,
+    required this.innerWidth,
+    required this.expandedInnerWidth,
+    required this.onTap,
+    required this.onRename,
+    required this.onTogglePin,
+    required this.onArchive,
+    required this.onDelete,
+  });
+
+  @override
+  State<_RecentChatRow> createState() => _RecentChatRowState();
+}
+
+class _RecentChatRowState extends State<_RecentChatRow> {
+  bool _hovered = false;
+  bool _btnHovered = false;
+  bool _menuOpen = false;
+
+  void _showRenameDialog() {
+    final textController = TextEditingController(text: widget.chat.title);
+    final isDark = widget.isDark;
+    final cardBg = isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
+    final borderColor =
+        isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: borderColor),
+        ),
+        title: Text(
+          'Rename conversation',
+          style: UnoTypography.body(
+            color: widget.palette.text,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          style: UnoTypography.body(
+            color: widget.palette.text,
+            fontSize: 13,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Enter chat title',
+            hintStyle: UnoTypography.body(
+              color: widget.palette.textSec,
+              fontSize: 13,
+            ),
+            filled: true,
+            fillColor: widget.palette.bgElevated,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.palette.div),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.palette.accent, width: 1.5),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          onSubmitted: (val) {
+            final t = val.trim();
+            if (t.isNotEmpty) {
+              Navigator.of(ctx).pop();
+              widget.onRename(t);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: UnoTypography.body(
+                  color: widget.palette.textSec, fontSize: 13),
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: widget.palette.accent,
+              foregroundColor:
+                  widget.isDark ? const Color(0xFF0B1020) : Colors.white,
+            ),
+            onPressed: () {
+              final t = textController.text.trim();
+              if (t.isNotEmpty) {
+                Navigator.of(ctx).pop();
+                widget.onRename(t);
+              }
+            },
+            child: Text(
+              'Save',
+              style: UnoTypography.body(
+                color: widget.isDark ? const Color(0xFF0B1020) : Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog() {
+    final isDark = widget.isDark;
+    final cardBg = isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF);
+    final borderColor =
+        isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: borderColor),
+        ),
+        title: Text(
+          'Delete chat?',
+          style: UnoTypography.body(
+            color: widget.palette.text,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${widget.chat.title}"? This cannot be undone.',
+          style: UnoTypography.body(
+            color: widget.palette.textSec,
+            fontSize: 13,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: UnoTypography.body(
+                  color: widget.palette.textSec, fontSize: 13),
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              widget.onDelete();
+            },
+            child: Text(
+              'Delete',
+              style: UnoTypography.body(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<PopupMenuEntry<String>> _buildMenuItems(dynamic p, bool isPinned) {
+    return [
+      PopupMenuItem<String>(
+        value: 'pin',
+        height: 36,
+        child: Row(
+          children: [
+            Icon(LucideIcons.pin, size: 14, color: p.text),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                isPinned ? 'Unpin' : 'Pin to top',
+                style: UnoTypography.body(color: p.text, fontSize: 13),
+              ),
+            ),
+            Text(
+              'P',
+              style: UnoTypography.mono(color: p.textMuted, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'rename',
+        height: 36,
+        child: Row(
+          children: [
+            Icon(LucideIcons.pencil, size: 14, color: p.text),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Rename',
+                style: UnoTypography.body(color: p.text, fontSize: 13),
+              ),
+            ),
+            Text(
+              'R',
+              style: UnoTypography.mono(color: p.textMuted, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'archive',
+        height: 36,
+        child: Row(
+          children: [
+            Icon(LucideIcons.archive, size: 14, color: p.text),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Archive',
+                style: UnoTypography.body(color: p.text, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(height: 8),
+      PopupMenuItem<String>(
+        value: 'delete',
+        height: 36,
+        child: Row(
+          children: [
+            const Icon(LucideIcons.trash2, size: 14, color: Color(0xFFEF4444)),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Delete',
+                style: UnoTypography.body(
+                  color: const Color(0xFFEF4444),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            Text(
+              'D',
+              style: UnoTypography.mono(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.7),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  void _handleMenuAction(String value) {
+    switch (value) {
+      case 'pin':
+        widget.onTogglePin();
+        break;
+      case 'rename':
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showRenameDialog();
+        });
+        break;
+      case 'archive':
+        widget.onArchive();
+        break;
+      case 'delete':
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showDeleteDialog();
+        });
+        break;
+    }
+  }
+
+  void _showContextMenuAt(Offset globalPosition) async {
+    final isDark = widget.isDark;
+    final p = widget.palette;
+    final isPinned = widget.chat.isPinned;
+
+    setState(() => _menuOpen = true);
+
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) {
+      setState(() => _menuOpen = false);
+      return;
+    }
+
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(globalPosition, globalPosition),
+      Offset.zero & overlay.size,
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      position: position,
+      color: isDark ? const Color(0xFF161A29) : const Color(0xFFFFFFFF),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF2E313C) : const Color(0xFFE4DFD6),
+        ),
+      ),
+      elevation: 14,
+      shadowColor: Colors.black.withValues(alpha: isDark ? 0.5 : 0.18),
+      items: _buildMenuItems(p, isPinned),
+    );
+
+    if (mounted) {
+      setState(() => _menuOpen = false);
+    }
+
+    if (selected != null) {
+      _handleMenuAction(selected);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.palette;
+    final isDark = widget.isDark;
+    final active = widget.isActive;
+    final isPinned = widget.chat.isPinned;
+
+    final hoverBase =
+        isDark ? const Color(0xFFE9DFD0) : const Color(0xFF0B1020);
+    final bgColor = active
+        ? p.bgElevated
+        : hoverBase.withValues(alpha: _hovered ? 0.055 : 0.0);
+
+    final borderColor = active
+        ? (isDark ? p.accent.withValues(alpha: 0.20) : p.div)
+        : Colors.transparent;
+
+    final textColor = active ? p.text : (_hovered ? p.text : p.textSec);
+
+    final showBtn = _hovered || _btnHovered || active || _menuOpen;
+    final btnOpacity = showBtn ? 1.0 : 0.35;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onSecondaryTapUp: (details) =>
+            _showContextMenuAt(details.globalPosition),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          child: Row(
+            children: [
+              // Left clickable area: Icon + Title (Left-click opens chat)
+              Expanded(
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: widget.onTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        // Pin indicator or chat icon
+                        if (isPinned)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Icon(
+                              LucideIcons.pin,
+                              size: 13,
+                              color: p.accent,
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Icon(
+                              LucideIcons.messageSquare,
+                              size: 13,
+                              color: active
+                                  ? p.accent
+                                  : p.textMuted.withValues(alpha: 0.6),
+                            ),
+                          ),
+
+                        // Title
+                        Expanded(
+                          child: Text(
+                            widget.chat.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: UnoTypography.body(
+                              color: textColor,
+                              fontSize: 12.5,
+                              fontWeight:
+                                  active ? FontWeight.w500 : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Contextual Action Button (...) - ALWAYS INTERACTIVE & INDEPENDENT
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _btnHovered = true),
+                onExit: (_) => setState(() => _btnHovered = false),
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 120),
+                    opacity: btnOpacity,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        popupMenuTheme: PopupMenuThemeData(
+                          color: isDark
+                              ? const Color(0xFF161A29)
+                              : const Color(0xFFFFFFFF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF2E313C)
+                                  : const Color(0xFFE4DFD6),
+                            ),
+                          ),
+                          elevation: 14,
+                          shadowColor: Colors.black
+                              .withValues(alpha: isDark ? 0.5 : 0.18),
+                        ),
+                      ),
+                      child: PopupMenuButton<String>(
+                        tooltip: '',
+                        padding: EdgeInsets.zero,
+                        position: PopupMenuPosition.under,
+                        offset: const Offset(0, 4),
+                        onOpened: () => setState(() => _menuOpen = true),
+                        onCanceled: () => setState(() => _menuOpen = false),
+                        onSelected: (value) {
+                          setState(() => _menuOpen = false);
+                          _handleMenuAction(value);
+                        },
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: (_menuOpen || _btnHovered)
+                                ? (isDark
+                                    ? const Color(0xFF2E313C)
+                                    : const Color(0xFFE4DFD6))
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            LucideIcons.ellipsis,
+                            size: 15,
+                            color: (_hovered || _btnHovered || _menuOpen || active)
+                                ? p.text
+                                : p.textSec,
+                          ),
+                        ),
+                        itemBuilder: (context) => _buildMenuItems(p, isPinned),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

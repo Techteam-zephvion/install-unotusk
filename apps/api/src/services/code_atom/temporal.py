@@ -29,6 +29,10 @@ TEMPORAL_KEYWORDS = {
     "diffs",
     "commits",
     "commit",
+    "commint",
+    "commints",
+    "comit",
+    "committ",
     "revision",
     "revisions",
     "blame",
@@ -45,6 +49,8 @@ TEMPORAL_KEYWORDS = {
 }
 
 TEMPORAL_REGEX_PATTERNS = [
+    re.compile(r"\b(last|latest|recent|newest)\s+(commit|commint|comit|change|update|push)\b", re.I),
+    re.compile(r"\bwhen\s+.*?\b(commit|commint|comit|pushed|updated|modified|added|changed)\b", re.I),
     re.compile(r"\b(how|what)\s+(did|has|have|was|were)\s+.*?\b(change|evolve|modify|update|differ|introduced?)\b", re.I),
     re.compile(r"\b(who|when)\s+.*?\b(changed|added|removed|deleted|created|modified|wrote|committed|introduced)\b", re.I),
     re.compile(r"\b(evolution|history|changes|commits|timeline)\s+of\b", re.I),

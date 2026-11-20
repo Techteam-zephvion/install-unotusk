@@ -139,6 +139,7 @@ class RecentChat {
   final String time;
   final int messageCount;
   bool isPinned;
+  bool isArchived;
   String? projectId;
 
   RecentChat({
@@ -148,6 +149,7 @@ class RecentChat {
     required this.time,
     this.messageCount = 0,
     this.isPinned = false,
+    this.isArchived = false,
     this.projectId,
   });
 
@@ -264,6 +266,8 @@ class ReasoningModel {
   final List<String> citations;
   final List<EvidenceItem> evidence;
   final Map<String, dynamic>? debugSignals;
+  final double? durationSeconds;
+  final String? reasoningText;
 
   const ReasoningModel({
     required this.compositeScore,
@@ -273,6 +277,8 @@ class ReasoningModel {
     required this.citations,
     this.evidence = const [],
     this.debugSignals,
+    this.durationSeconds,
+    this.reasoningText,
   });
 }
 

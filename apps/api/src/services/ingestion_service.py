@@ -244,138 +244,174 @@ class IngestionService:
 
                     if f_info["parser_supported"] and content:
                         tree = parse_code(content, f_info["language"])
-                        if tree is not None:
-                            content_lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
-                            # Extract symbols
-                            extracted_symbols = extract_symbols_from_tree(
-                                tree, content, f_info["language"]
+                        content_lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
+                        # Extract symbols (Tier 1 AST or Tier 2 Universal Structural Parser)
+                        extracted_symbols = extract_symbols_from_tree(
+                            tree, content, f_info["language"]
+                        )
+                        extracted_symbols_count = len(extracted_symbols)
+                        for sym in extracted_symbols:
+                            clean_sym_name = _clean_null(sym.name) or ""
+                            clean_sym_qual = _clean_null(sym.qualified_name)
+                            code_sym = CodeSymbol(
+                                id=uuid.uuid4(),
+                                file_id=repo_file.id,
+                                name=clean_sym_name,
+                                symbol_type=sym.symbol_type,
+                                qualified_name=clean_sym_qual,
+                                start_line=sym.start_line,
+                                end_line=sym.end_line,
+                                symbol_metadata=_clean_dict_null(sym.metadata),
                             )
-                            extracted_symbols_count = len(extracted_symbols)
-                            for sym in extracted_symbols:
-                                clean_sym_name = _clean_null(sym.name) or ""
-                                clean_sym_qual = _clean_null(sym.qualified_name)
-                                code_sym = CodeSymbol(
+                            session.add(code_sym)
+                            created_symbols_list.append((f_info["path"], code_sym))
+
+                            # Create code chunk for top-level symbol
+                            if 1 <= sym.start_line <= len(content_lines):
+                                sym_lines = content_lines[
+                                    sym.start_line - 1 : min(sym.end_line, len(content_lines))
+                                ]
+                                sym_chunk_content = _clean_null("\n".join(sym_lines)) or ""
+                                sym_embedding = generate_atom_code_embedding(
+                                    commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                    content=sym_chunk_content,
+                                    file_path=_clean_null(repo_file.path) or "",
+                                    symbol_name=clean_sym_name or None,
+                                )
+                                sym_chunk = CodeChunk(
                                     id=uuid.uuid4(),
+                                    snapshot_id=snapshot.id,
                                     file_id=repo_file.id,
+                                    symbol_id=code_sym.id,
+                                    chunk_type=sym.symbol_type.value,
                                     name=clean_sym_name,
-                                    symbol_type=sym.symbol_type,
-                                    qualified_name=clean_sym_qual,
+                                    path=_clean_null(repo_file.path) or "",
+                                    content=sym_chunk_content,
                                     start_line=sym.start_line,
                                     end_line=sym.end_line,
-                                    symbol_metadata=_clean_dict_null(sym.metadata),
+                                    embedding=sym_embedding,
                                 )
-                                session.add(code_sym)
-                                created_symbols_list.append((f_info["path"], code_sym))
+                                session.add(sym_chunk)
 
-                                # Create code chunk for top-level symbol
-                                if 1 <= sym.start_line <= len(content_lines):
-                                    sym_lines = content_lines[
-                                        sym.start_line - 1 : min(sym.end_line, len(content_lines))
+                            # Children (e.g. methods within class)
+                            for child_sym in sym.children:
+                                clean_child_name = _clean_null(child_sym.name) or ""
+                                clean_child_qual = _clean_null(child_sym.qualified_name)
+                                child_code_sym = CodeSymbol(
+                                    id=uuid.uuid4(),
+                                    file_id=repo_file.id,
+                                    name=clean_child_name,
+                                    symbol_type=child_sym.symbol_type,
+                                    qualified_name=clean_child_qual,
+                                    start_line=child_sym.start_line,
+                                    end_line=child_sym.end_line,
+                                    parent_symbol_id=code_sym.id,
+                                    symbol_metadata=_clean_dict_null(child_sym.metadata),
+                                )
+                                session.add(child_code_sym)
+                                created_symbols_list.append((f_info["path"], child_code_sym))
+
+                                if 1 <= child_sym.start_line <= len(content_lines):
+                                    child_lines = content_lines[
+                                        child_sym.start_line - 1 : min(
+                                            child_sym.end_line, len(content_lines)
+                                        )
                                     ]
-                                    sym_chunk_content = _clean_null("\n".join(sym_lines)) or ""
-                                    sym_embedding = generate_atom_code_embedding(
+                                    child_chunk_content = _clean_null("\n".join(child_lines)) or ""
+                                    child_embedding = generate_atom_code_embedding(
                                         commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
-                                        content=sym_chunk_content,
+                                        content=child_chunk_content,
                                         file_path=_clean_null(repo_file.path) or "",
-                                        symbol_name=clean_sym_name or None,
+                                        symbol_name=clean_child_name or None,
                                     )
-                                    sym_chunk = CodeChunk(
+                                    child_chunk = CodeChunk(
                                         id=uuid.uuid4(),
                                         snapshot_id=snapshot.id,
                                         file_id=repo_file.id,
-                                        symbol_id=code_sym.id,
-                                        chunk_type=sym.symbol_type.value,
-                                        name=clean_sym_name,
-                                        path=_clean_null(repo_file.path) or "",
-                                        content=sym_chunk_content,
-                                        start_line=sym.start_line,
-                                        end_line=sym.end_line,
-                                        embedding=sym_embedding,
-                                    )
-                                    session.add(sym_chunk)
-
-                                # Children (e.g. methods within class)
-                                for child_sym in sym.children:
-                                    clean_child_name = _clean_null(child_sym.name) or ""
-                                    clean_child_qual = _clean_null(child_sym.qualified_name)
-                                    child_code_sym = CodeSymbol(
-                                        id=uuid.uuid4(),
-                                        file_id=repo_file.id,
+                                        symbol_id=child_code_sym.id,
+                                        chunk_type=child_sym.symbol_type.value,
                                         name=clean_child_name,
-                                        symbol_type=child_sym.symbol_type,
-                                        qualified_name=clean_child_qual,
+                                        path=_clean_null(repo_file.path) or "",
+                                        content=child_chunk_content,
                                         start_line=child_sym.start_line,
                                         end_line=child_sym.end_line,
-                                        parent_symbol_id=code_sym.id,
-                                        symbol_metadata=_clean_dict_null(child_sym.metadata),
+                                        embedding=child_embedding,
                                     )
-                                    session.add(child_code_sym)
-                                    created_symbols_list.append((f_info["path"], child_code_sym))
+                                    session.add(child_chunk)
 
-                                    if 1 <= child_sym.start_line <= len(content_lines):
-                                        child_lines = content_lines[
-                                            child_sym.start_line - 1 : min(
-                                                child_sym.end_line, len(content_lines)
-                                            )
-                                        ]
-                                        child_chunk_content = _clean_null("\n".join(child_lines)) or ""
-                                        child_embedding = generate_atom_code_embedding(
-                                            commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
-                                            content=child_chunk_content,
-                                            file_path=_clean_null(repo_file.path) or "",
-                                            symbol_name=clean_child_name or None,
-                                        )
-                                        child_chunk = CodeChunk(
-                                            id=uuid.uuid4(),
-                                            snapshot_id=snapshot.id,
-                                            file_id=repo_file.id,
-                                            symbol_id=child_code_sym.id,
-                                            chunk_type=child_sym.symbol_type.value,
-                                            name=clean_child_name,
-                                            path=_clean_null(repo_file.path) or "",
-                                            content=child_chunk_content,
-                                            start_line=child_sym.start_line,
-                                            end_line=child_sym.end_line,
-                                            embedding=child_embedding,
-                                        )
-                                        session.add(child_chunk)
+                        # Extract dependencies / imports (Tier 1 AST or Tier 2 Universal Structural Extractor)
+                        extracted_deps = extract_dependencies_from_tree(
+                            tree, content, f_info["language"]
+                        )
+                        for dep in extracted_deps:
+                            raw_deps_to_create.append((repo_file.id, dep))
 
-                            # Extract dependencies / imports
-                            extracted_deps = extract_dependencies_from_tree(
-                                tree, content, f_info["language"]
-                            )
-                            for dep in extracted_deps:
-                                raw_deps_to_create.append((repo_file.id, dep))
-
-                    # For config files, documentation, or files with no symbols, store file header chunk
+                    # For config files, documentation, flat scripts, or files with no symbols, store sliding-window chunks (zero truncation)
                     if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
-                        lines = _clean_null(content.decode("utf-8", errors="replace")).splitlines()[:100]
-                        if lines:
-                            file_chunk_content = _clean_null("\n".join(lines)) or ""
-                            file_embedding = generate_atom_code_embedding(
-                                commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
-                                content=file_chunk_content,
-                                file_path=_clean_null(repo_file.path) or "",
-                                symbol_name=None,
-                            )
-                            file_chunk = CodeChunk(
-                                id=uuid.uuid4(),
-                                snapshot_id=snapshot.id,
-                                file_id=repo_file.id,
-                                symbol_id=None,
-                                chunk_type="CONFIG"
+                        raw_decoded = content.decode("utf-8", errors="replace").replace("\x00", "")
+                        all_lines = raw_decoded.splitlines()
+                        total_lines = len(all_lines)
+                        if total_lines > 0:
+                            chunk_size = 120
+                            overlap = 20
+                            step = chunk_size - overlap  # 100-line progression
+
+                            chunk_type = (
+                                "CONFIG"
                                 if f_info["filename"].endswith(
-                                    (".json", ".yml", ".yaml", ".toml", ".txt", ".md")
+                                    (
+                                        ".json",
+                                        ".yml",
+                                        ".yaml",
+                                        ".toml",
+                                        ".txt",
+                                        ".md",
+                                        ".env",
+                                        ".xml",
+                                        ".ini",
+                                        ".conf",
+                                        ".properties",
+                                    )
                                 )
-                                else "MODULE",
-                                name=_clean_null(f_info["filename"]) or "",
-                                path=_clean_null(repo_file.path) or "",
-                                content=file_chunk_content,
-                                start_line=1,
-                                end_line=len(lines),
-                                embedding=file_embedding,
+                                else "MODULE"
                             )
-                            session.add(file_chunk)
+
+                            for chunk_idx, start_idx in enumerate(range(0, total_lines, step)):
+                                end_idx = min(start_idx + chunk_size, total_lines)
+                                slice_lines = all_lines[start_idx:end_idx]
+                                if not slice_lines:
+                                    break
+
+                                file_chunk_content = _clean_null("\n".join(slice_lines)) or ""
+                                chunk_name = (
+                                    f"{_clean_null(f_info['filename'])} [L{start_idx + 1}-L{end_idx}]"
+                                    if total_lines > chunk_size
+                                    else (_clean_null(f_info["filename"]) or "")
+                                )
+                                file_embedding = generate_atom_code_embedding(
+                                    commit_message=snapshot.commit_sha
+                                    if snapshot and snapshot.commit_sha
+                                    else None,
+                                    content=file_chunk_content,
+                                    file_path=_clean_null(repo_file.path) or "",
+                                    symbol_name=None,
+                                )
+                                file_chunk = CodeChunk(
+                                    id=uuid.uuid4(),
+                                    snapshot_id=snapshot.id,
+                                    file_id=repo_file.id,
+                                    symbol_id=None,
+                                    chunk_type=chunk_type,
+                                    name=chunk_name,
+                                    path=_clean_null(repo_file.path) or "",
+                                    content=file_chunk_content,
+                                    start_line=start_idx + 1,
+                                    end_line=end_idx,
+                                    embedding=file_embedding,
+                                )
+                                session.add(file_chunk)
+                                if end_idx >= total_lines:
+                                    break
 
                     processed_count += 1
                     if processed_count % 50 == 0:

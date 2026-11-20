@@ -110,9 +110,18 @@ EXTENSION_LANGUAGE_MAP = {
     ".dart": "Dart",
     ".rb": "Ruby",
     ".php": "PHP",
+    ".scala": "Scala",
+    ".lua": "Lua",
+    ".ex": "Elixir",
+    ".exs": "Elixir",
+    ".groovy": "Groovy",
+    ".gradle": "Groovy",
+    ".proto": "Protobuf",
+    ".graphql": "GraphQL",
+    ".gql": "GraphQL",
 }
 
-# Parser supported languages (Tree-sitter)
+# Parser supported languages (Tier 1 AST & Tier 2 Universal Structural Heuristics)
 PARSER_SUPPORTED_LANGUAGES = {
     "Python",
     "TypeScript",
@@ -120,6 +129,32 @@ PARSER_SUPPORTED_LANGUAGES = {
     "JavaScript",
     "JavaScript/JSX",
     "Go",
+    "Dart",
+    "Java",
+    "Kotlin",
+    "Rust",
+    "C#",
+    "C",
+    "C++",
+    "C/C++ Header",
+    "C++ Header",
+    "PHP",
+    "Ruby",
+    "Swift",
+    "SQL",
+    "Shell",
+    "Scala",
+    "Lua",
+    "Elixir",
+    "Groovy",
+    "JSON",
+    "YAML",
+    "TOML",
+    "Markdown",
+    "HTML",
+    "CSS",
+    "SCSS",
+    "XML",
 }
 
 
@@ -166,8 +201,20 @@ def is_file_test(relative_path: str) -> bool:
     if (
         base.startswith("test_")
         or base.endswith("_test.py")
+        or base.endswith("_test.dart")
+        or base.endswith("_test.go")
         or base.endswith(".test.ts")
         or base.endswith(".spec.ts")
+        or base.endswith(".test.js")
+        or base.endswith(".spec.js")
+        or base.endswith(".test.tsx")
+        or base.endswith(".spec.tsx")
+        or base.endswith(".test.jsx")
+        or base.endswith(".spec.jsx")
+        or base.endswith("test.java")
+        or base.endswith("tests.java")
+        or base.endswith("test.kt")
+        or base.endswith("tests.kt")
     ):
         return True
     return False

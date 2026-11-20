@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import time
 from typing import Any
 
 from apps.api.src.config.settings import settings
@@ -21,6 +22,39 @@ from apps.api.src.services.llm.thinking_policy import (
 )
 
 logger = logging.getLogger("unotusk-llm-groq")
+
+RE_THINK_TAGS = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
+RE_THOUGHT_TAGS = re.compile(r"<thought>(.*?)</thought>", re.DOTALL | re.IGNORECASE)
+
+
+def sanitize_llm_output(text: str, max_chars: int = 32_000) -> str:
+    """
+    Sanitize LLM output:
+    1. Strip null bytes (\x00) to protect database text columns.
+    2. Normalize non-printable control characters while preserving \n, \r, \t.
+    3. Enforce maximum character bound with clean truncation marker.
+    4. Auto-balance unclosed markdown code blocks (```) to prevent rendering breakage.
+    """
+    if not text:
+        return "No response generated."
+
+    # 1. Strip null bytes
+    text = text.replace("\x00", "")
+
+    # 2. Strip non-printable control characters
+    text = "".join(
+        c for c in text if c in ("\n", "\r", "\t") or (ord(c) >= 32 and ord(c) != 127)
+    )
+
+    # 3. Cap length if exceeding max_chars
+    if len(text) > max_chars:
+        text = text[:max_chars].rstrip() + "\n\n... [Response capped to safe length boundary]"
+        # 4. Auto-close unclosed markdown code fence
+        fence_count = text.count("```")
+        if fence_count % 2 != 0:
+            text += "\n```"
+
+    return text.strip() or "No response generated."
 
 
 class GroqProvider(LLMProvider):
@@ -45,9 +79,7 @@ class GroqProvider(LLMProvider):
         conversation_history: list[dict[str, str]] | None = None,
         thinking_tier: str | None = None,
     ) -> GroundedAnswer:
-
-
-
+        start_time = time.time()
         policy = get_thinking_policy(thinking_tier)
         customer_notes = extract_customer_notes(project_context)
         integration_notes = extract_integration_notes(project_context)
@@ -77,6 +109,7 @@ class GroqProvider(LLMProvider):
                     "thinking_tier": policy.tier.value,
                     "evidence_count": len(evidence_items),
                     "max_relevance": max_rel,
+                    "latency_sec": round(time.time() - start_time, 2),
                 },
             )
 
@@ -131,11 +164,15 @@ class GroqProvider(LLMProvider):
                     safe_context = safe_context[:max_ctx_chars] + "\n... [context trimmed to stay within rate limit]"
 
                 user_prompt = (
+                    f"## CURRENT TARGET USER QUESTION (MUST ANSWER THIS DIRECTLY):\n"
+                    f"{question}\n\n"
                     f"## PROJECT CONTEXT EVIDENCE\n\n"
                     f"{safe_context}\n\n"
-                    f"## USER QUESTION\n"
-                    f"{question}\n\n"
-                    f"Please provide an evidence-grounded answer based strictly on the above context."
+                    f"## STRICT OUTPUT INSTRUCTIONS:\n"
+                    f"1. Directly answer the CURRENT TARGET USER QUESTION: \"{question}\".\n"
+                    f"2. Do NOT answer previous conversation turns or summarize the repository unless specifically requested in the current question.\n"
+                    f"3. Provide ONLY your final, professional answer intended for the user. Do NOT output your internal planning thoughts, scratchpad checklists, or self-monologue (such as 'We need to answer...', 'Need maybe mention...', 'OBSERVED: ...').\n"
+                    f"4. If the question asks about repository commits, dates, or git history that are not contained in the context evidence above, clearly state that commit records are not present in the current indexed snapshot."
                 )
                 q_lower = question.lower()
                 if any(k in q_lower for k in ("diagram", "architecture", "flowchart", "workflow", "design", "sequence", "graph", "structure", "spec", "overview", "components")):
@@ -195,13 +232,19 @@ class GroqProvider(LLMProvider):
                                 continue
                         raise
 
+                reasoning_parts: list[str] = []
                 raw_msg = response.choices[0].message if (response and response.choices) else None
                 content = None
                 if raw_msg:
                     content = raw_msg.content
+                    # Check reasoning attributes
+                    if hasattr(raw_msg, "reasoning") and raw_msg.reasoning:
+                        reasoning_parts.append(str(raw_msg.reasoning).strip())
+                    elif hasattr(raw_msg, "reasoning_content") and raw_msg.reasoning_content:
+                        reasoning_parts.append(str(raw_msg.reasoning_content).strip())
                     # If content is empty but model produced reasoning output, use it
-                    if not content and hasattr(raw_msg, "reasoning") and raw_msg.reasoning:
-                        content = raw_msg.reasoning
+                    if not content and reasoning_parts:
+                        content = reasoning_parts[0]
 
                 # If still empty, perform fallback generation on fallback model
                 if (not content or not content.strip()) and create_kwargs.get("model") != "llama-3.1-8b-instant":
@@ -217,17 +260,56 @@ class GroqProvider(LLMProvider):
                     except Exception as retry_err:
                         logger.warning(f"Fallback retry failed: {retry_err}")
 
-                content = content or "No response generated."
+                # Extract and strip <think> / <thought> tags from content
+                if content:
+                    for m in RE_THINK_TAGS.finditer(content):
+                        if m.group(1).strip():
+                            reasoning_parts.append(m.group(1).strip())
+                    for m in RE_THOUGHT_TAGS.finditer(content):
+                        if m.group(1).strip():
+                            reasoning_parts.append(m.group(1).strip())
+                    content = RE_THINK_TAGS.sub("", content)
+                    content = RE_THOUGHT_TAGS.sub("", content).strip()
+
+                # Detect and isolate unbracketed internal planning scratchpad (e.g. "We need answer user's request...", "Need maybe mention...")
+                if content and re.match(r"^\s*(?:We need (?:to )?answer|Need (?:maybe )?mention|I need to answer|The user is asking|Planning:)", content, re.IGNORECASE):
+                    lines = content.split("\n")
+                    clean_lines: list[str] = []
+                    scratch_lines: list[str] = []
+                    is_past_scratchpad = False
+
+                    for line in lines:
+                        trimmed = line.strip()
+                        if not is_past_scratchpad:
+                            # The real answer begins when standard markdown headings, mermaid blocks, or formal answers start
+                            if trimmed.startswith("###") or trimmed.startswith("##") or trimmed.startswith("#") or trimmed.startswith("```mermaid") or trimmed.startswith("**Answer") or (trimmed.startswith("**") and "observed" not in trimmed.lower()):
+                                is_past_scratchpad = True
+                                clean_lines.append(line)
+                            else:
+                                scratch_lines.append(line)
+                        else:
+                            clean_lines.append(line)
+
+                    if clean_lines:
+                        raw_scratch = "\n".join(scratch_lines).strip()
+                        if raw_scratch:
+                            reasoning_parts.append(raw_scratch)
+                        content = "\n".join(clean_lines).strip()
+
+                clean_content = sanitize_llm_output(content or "No response generated.", max_chars=32000)
+                extracted_reasoning = "\n\n".join(reasoning_parts).strip()
+                clean_reasoning = sanitize_llm_output(extracted_reasoning, max_chars=16000) if extracted_reasoning else None
+                latency_sec = round(time.time() - start_time, 2)
 
                 prompt_tokens = (
                     response.usage.prompt_tokens if response and response.usage else len(project_context) // 4
                 )
                 completion_tokens = (
-                    response.usage.completion_tokens if response and response.usage else len(content) // 4
+                    response.usage.completion_tokens if response and response.usage else len(clean_content) // 4
                 )
 
                 return GroundedAnswer(
-                    content=content,
+                    content=clean_content,
                     evidence=evidence_items,
                     related_entities=related_entities,
                     confidence=confidence,
@@ -239,6 +321,8 @@ class GroqProvider(LLMProvider):
                         "evidence_count": len(evidence_items),
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
+                        "latency_sec": latency_sec,
+                        "reasoning_text": clean_reasoning,
                     },
                 )
             except Exception as e:
@@ -266,6 +350,7 @@ class GroqProvider(LLMProvider):
                     "model": self.model,
                     "provider": "groq",
                     "error": last_error_reason,
+                    "latency_sec": round(time.time() - start_time, 2),
                 },
             )
 
@@ -292,6 +377,7 @@ class GroqProvider(LLMProvider):
                 "reasoning_effort": policy.groq_reasoning_effort,
                 "evidence_count": len(evidence_items),
                 "error_reason": last_error_reason,
+                "latency_sec": round(time.time() - start_time, 2),
             },
         )
 

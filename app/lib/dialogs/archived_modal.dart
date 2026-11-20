@@ -180,38 +180,50 @@ class _ArchivedModalState extends State<ArchivedModal> {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: UnoTypography.body(
-                                          color: widget.palette.text,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
+                                  child: InkWell(
+                                    onTap: widget.onSelectChat != null
+                                        ? () {
+                                            widget.onClose();
+                                            widget.onSelectChat!(item.id);
+                                          }
+                                        : null,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: UnoTypography.body(
+                                            color: widget.palette.text,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        'Archived ${item.date} · ${item.messages} messages',
-                                        style: UnoTypography.mono(
-                                          color: widget.palette.textSec,
-                                          fontSize: 11,
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          'Archived ${item.date} · ${item.messages} messages',
+                                          style: UnoTypography.mono(
+                                            color: widget.palette.textSec,
+                                            fontSize: 11,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 OutlinedButton(
-                                  onPressed: () {
+                                  onPressed: () async {
                                     setState(() {
                                       _chats.removeWhere(
                                           (c) => c.id == item.id);
                                     });
+                                    await ApiService.archiveConversation(
+                                        item.id.toString(),
+                                        archive: false);
                                   },
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(color: widget.palette.div),
@@ -234,11 +246,55 @@ class _ArchivedModalState extends State<ArchivedModal> {
                                 IconButton(
                                   icon: const Icon(LucideIcons.trash2,
                                       size: 15, color: Color(0xFFEF4444)),
-                                  onPressed: () {
-                                    setState(() {
-                                      _chats.removeWhere(
-                                          (c) => c.id == item.id);
-                                    });
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        backgroundColor: widget.palette.bgSurface,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                          side: BorderSide(color: widget.palette.div),
+                                        ),
+                                        title: Text('Delete conversation?',
+                                            style: UnoTypography.body(
+                                                color: widget.palette.text,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 16)),
+                                        content: Text(
+                                            'Are you sure you want to delete "${item.title}"? This cannot be undone.',
+                                            style: UnoTypography.body(
+                                                color: widget.palette.textSec,
+                                                fontSize: 13)),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: Text('Cancel',
+                                                style: UnoTypography.body(
+                                                    color: widget.palette.textSec,
+                                                    fontSize: 13)),
+                                          ),
+                                          FilledButton(
+                                            style: FilledButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color(0xFFEF4444)),
+                                            onPressed: () => Navigator.of(ctx).pop(true),
+                                            child: Text('Delete',
+                                                style: UnoTypography.body(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      setState(() {
+                                        _chats.removeWhere(
+                                            (c) => c.id == item.id);
+                                      });
+                                      await ApiService.deleteConversation(
+                                          item.id.toString());
+                                    }
                                   },
                                 ),
                               ],

@@ -37,6 +37,25 @@ logger = logging.getLogger("unotusk-api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME} in [{settings.APP_ENV}] mode...")
+    try:
+        from sqlalchemy import text
+        from apps.api.src.db.session import engine
+        if engine:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;")
+                )
+                await conn.execute(
+                    text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE;")
+                )
+                await conn.execute(
+                    text("CREATE INDEX IF NOT EXISTS ix_conversations_is_archived ON conversations (is_archived);")
+                )
+                await conn.execute(
+                    text("CREATE INDEX IF NOT EXISTS ix_conversations_is_pinned ON conversations (is_pinned);")
+                )
+    except Exception as e:
+        logger.warning(f"Database column self-check notice: {e}")
     yield
     logger.info(f"Shutting down {settings.APP_NAME}...")
 

@@ -49,3 +49,17 @@ legacy/
 docs/Unotusk MVP Design/*
 # Chat sessions
 sessions/
+
+# Root Flutter artifacts (App is in app/)
+/.dart_tool/
+/.flutter-plugins-dependencies
+/.metadata
+/unotusk_flutter_app.iml
+/backend_openapi.json
+/android/
+/ios/
+/windows/
+/lib/
+/assets/
+/analysis_options.yaml
+

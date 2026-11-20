@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,7 @@ from apps.api.src.schemas.intelligence import (
     ContextSearchResponse,
     ConversationCreate,
     ConversationRead,
+    ConversationUpdate,
     FeatureSpecificationResponse,
     FeatureSpecRequest,
     GroundedAnswerResponse,
@@ -98,6 +100,7 @@ async def create_conversation(
 )
 async def list_conversations(
     project_id: str,
+    archived: bool | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ConversationRead]:
@@ -106,6 +109,51 @@ async def list_conversations(
         session=db,
         user_id=current_user.id,
         project_id=resolved_id,
+        archived=archived,
+    )
+
+
+@router.patch(
+    "/projects/{project_id}/conversations/{conversation_id}",
+    response_model=ConversationRead,
+    summary="Update conversation title, archive status, or pinned state",
+)
+async def update_conversation(
+    project_id: str,
+    conversation_id: uuid.UUID,
+    payload: ConversationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ConversationRead:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await IntelligenceService.update_conversation(
+        session=db,
+        user_id=current_user.id,
+        project_id=resolved_id,
+        conversation_id=conversation_id,
+        title=payload.title,
+        is_archived=payload.is_archived,
+        is_pinned=payload.is_pinned,
+    )
+
+
+@router.delete(
+    "/projects/{project_id}/conversations/{conversation_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a conversation and all its messages permanently",
+)
+async def delete_conversation(
+    project_id: str,
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+    return await IntelligenceService.delete_conversation(
+        session=db,
+        user_id=current_user.id,
+        project_id=resolved_id,
+        conversation_id=conversation_id,
     )
 
 
