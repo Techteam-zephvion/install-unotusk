@@ -2278,29 +2278,25 @@ class ApiService {
     return ProjectRepositoryContext(
       repository: RepositoryInfo(
         id: 'repo-$pid',
-        projectId: pid,
-        provider: 'GITHUB',
-        owner: 'Techteam-zephvion',
         name: activeProject?.name ?? 'swastha-yoga',
         fullName: 'Techteam-zephvion/${activeProject?.slug ?? activeProject?.name ?? 'swastha-yoga'}',
         defaultBranch: 'main',
-        url: 'https://github.com/Techteam-zephvion/${activeProject?.slug ?? activeProject?.name ?? 'swastha-yoga'}',
-        isPrivate: false,
+        htmlUrl: 'https://github.com/Techteam-zephvion/${activeProject?.slug ?? activeProject?.name ?? 'swastha-yoga'}',
       ),
-      activeSnapshot: SnapshotInfo(
+      activeSnapshot: ActiveSnapshot(
         id: 'snap-$pid',
         repositoryId: 'repo-$pid',
-        commitSha: '7f9a2e38c1b4d091a',
+        commitHash: '7f9a2e38c1b4d091a',
         branch: 'main',
         status: 'READY',
         totalFiles: 9,
-        processedFiles: 9,
+        totalBytes: 8500,
       ),
-      metrics: ProjectMetrics(
+      metrics: const ProjectContextMetrics(
         totalFiles: 9,
         totalSloc: 480,
-        totalSymbols: 34,
-        totalDependencies: 16,
+        symbolsCount: 34,
+        dependenciesCount: 16,
         totalFindings: 0,
       ),
     );

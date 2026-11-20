@@ -104,8 +104,8 @@ class ServerDiscoveryService {
     final uniqueLocal = localCandidates.toSet().toList();
     addLog('Probing local endpoints: ${uniqueLocal.join(', ')}');
 
-    // Probe local candidates concurrently with 800ms timeout
-    final probeFutures = uniqueLocal.map((url) => _probeCandidate(url, timeoutMs: 800));
+    // Probe local candidates concurrently with 2500ms timeout for cross-device LAN reliability
+    final probeFutures = uniqueLocal.map((url) => _probeCandidate(url, timeoutMs: 2500));
     final probeResults = await Future.wait(probeFutures);
 
     for (int i = 0; i < probeResults.length; i++) {
@@ -243,16 +243,13 @@ class ServerDiscoveryService {
     }
   }
 
-  Future<bool> _probeCandidate(String baseUrl, {int timeoutMs = 1000}) async {
+  Future<bool> _probeCandidate(String baseUrl, {int timeoutMs = 2500}) async {
     final cleaned = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     try {
       final uri = Uri.parse('$cleaned/health');
       final res = await _client.get(uri).timeout(Duration(milliseconds: timeoutMs));
       if (res.statusCode == 200) {
-        final body = res.body.toLowerCase();
-        if (body.contains('"status"') && (body.contains('"ok"') || body.contains('ok'))) {
-          return true;
-        }
+        return true;
       }
     } catch (_) {}
     return false;
