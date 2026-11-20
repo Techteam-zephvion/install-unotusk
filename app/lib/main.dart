@@ -249,32 +249,37 @@ class _AppShellState extends State<AppShell> {
       final targetUrl = 'http://$currentHost:${project.port}';
       if (ApiService.baseUrl != targetUrl) {
         ApiService.setBaseUrl(targetUrl, persist: false);
-        
-        // After connecting to the target server, fetch its real project UUID using current JWT
-        try {
-          final serverProjects = await ApiService.fetchProjects();
-          if (serverProjects.isNotEmpty) {
-            final targetServerProj = serverProjects.firstWhere(
-              (p) =>
-                  p.id.toLowerCase() == project.id.toLowerCase() ||
-                  p.name.toLowerCase() == project.name.toLowerCase(),
-              orElse: () => project,
-            );
-            project = project.copyWith(
-              id: targetServerProj.id.isNotEmpty ? targetServerProj.id : project.id,
-              repositoryName: (targetServerProj.repositoryName != null && targetServerProj.repositoryName!.isNotEmpty)
-                  ? targetServerProj.repositoryName
-                  : project.repositoryName,
-              defaultBranch: targetServerProj.defaultBranch ?? project.defaultBranch,
-            );
-            setState(() {
-              _openedProject = project;
-              _openedProjectName = project.name;
-            });
-          }
-        } catch (_) {}
       }
     }
+
+    // Always synchronize the real project UUID on the target server to prevent DATAPLANEBOUNDARYVIOLATION
+    try {
+      final serverProjects = await ApiService.fetchProjects();
+      if (serverProjects.isNotEmpty) {
+        final targetServerProj = serverProjects.firstWhere(
+          (p) =>
+              p.id.toLowerCase() == project.id.toLowerCase() ||
+              p.name.toLowerCase() == project.name.toLowerCase(),
+          orElse: () =>
+              serverProjects.length == 1 ? serverProjects.first : project,
+        );
+        project = project.copyWith(
+          id: targetServerProj.id.isNotEmpty
+              ? targetServerProj.id
+              : project.id,
+          repositoryName: (targetServerProj.repositoryName != null &&
+                  targetServerProj.repositoryName!.isNotEmpty)
+              ? targetServerProj.repositoryName
+              : project.repositoryName,
+          defaultBranch:
+              targetServerProj.defaultBranch ?? project.defaultBranch,
+        );
+        setState(() {
+          _openedProject = project;
+          _openedProjectName = project.name;
+        });
+      }
+    } catch (_) {}
 
     ApiService.setActiveProject(project);
   }
@@ -394,6 +399,13 @@ class _AppShellState extends State<AppShell> {
       );
 
       if (!mounted) return;
+
+      // Sync active project if ApiService resolved or self-healed to a different server UUID
+      if (ApiService.activeProject != null &&
+          _openedProject != null &&
+          ApiService.activeProject!.id != _openedProject!.id) {
+        _openedProject = _openedProject!.copyWith(id: ApiService.activeProject!.id);
+      }
 
       // Update the active conversation ID with the permanent UUID assigned by the server
       if (responseData.conversationId != null && responseData.conversationId!.isNotEmpty) {

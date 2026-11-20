@@ -253,7 +253,41 @@ class ApiService {
       };
 
   static String _resolveProjectId([String? explicitId]) {
-    if (explicitId != null && explicitId.isNotEmpty) return explicitId;
+    if (explicitId != null && explicitId.isNotEmpty) {
+      if (cachedProjects.isNotEmpty) {
+        // If exact ID match exists on this server, use it
+        final exactMatch = cachedProjects
+            .where((p) => p.id.toLowerCase() == explicitId.toLowerCase())
+            .firstOrNull;
+        if (exactMatch != null) return exactMatch.id;
+
+        // If ID does not exist on this server, try matching activeProject by name or slug
+        if (activeProject != null) {
+          final nameMatch = cachedProjects
+              .where((p) =>
+                  p.name.toLowerCase() == activeProject!.name.toLowerCase() ||
+                  (p.repositoryName != null &&
+                      activeProject!.repositoryName != null &&
+                      p.repositoryName!.toLowerCase() ==
+                          activeProject!.repositoryName!.toLowerCase()))
+              .firstOrNull;
+          if (nameMatch != null) {
+            activeProject = activeProject!.copyWith(id: nameMatch.id);
+            return nameMatch.id;
+          }
+        }
+
+        // On a dedicated single-project Data Plane server, use the single configured project
+        if (cachedProjects.length == 1) {
+          final singleProj = cachedProjects.first;
+          if (activeProject != null) {
+            activeProject = activeProject!.copyWith(id: singleProj.id);
+          }
+          return singleProj.id;
+        }
+      }
+      return explicitId;
+    }
     if (activeProject != null) return activeProject!.id;
     if (cachedProjects.isNotEmpty) return cachedProjects.first.id;
     throw Exception(
@@ -1056,9 +1090,53 @@ class ApiService {
       final errorBody = res.body;
       try {
         final errJson = jsonDecode(errorBody);
-        final msg = errJson['error']?['message'] ?? errorBody;
+        final errMap = errJson['error'] as Map<String, dynamic>?;
+        final errCode = errMap?['code']?.toString().toUpperCase();
+
+        // Self-heal Data Plane boundary violations by auto-resolving server's allowed project ID
+        if (res.statusCode == 403 &&
+            (errCode == 'DATAPLANEBOUNDARYVIOLATION' ||
+                errCode == 'DATA_PLANE_BOUNDARY_VIOLATION')) {
+          final details = errMap?['details'] as Map<String, dynamic>?;
+          String? correctId;
+          if (details != null) {
+            if (details['data_plane_project_id'] != null) {
+              correctId = details['data_plane_project_id'].toString();
+            } else {
+              final refs = details['allowedrefs'] ?? details['allowed_refs'];
+              if (refs is List) {
+                for (final r in refs) {
+                  final s = r.toString();
+                  if (RegExp(
+                          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+                      .hasMatch(s)) {
+                    correctId = s;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          if (correctId != null && correctId.isNotEmpty && correctId != pid) {
+            if (activeProject != null) {
+              activeProject = activeProject!.copyWith(id: correctId);
+            }
+            return await askQuestionDetailed(
+              projectId: correctId,
+              question: question,
+              conversationId: conversationId,
+              thinkingTier: thinkingTier,
+              thinkingEnabled: thinkingEnabled,
+              enableStructureAwareStarRag: enableStructureAwareStarRag,
+              branch: branch,
+            );
+          }
+        }
+
+        final msg = errMap?['message'] ?? errorBody;
         throw Exception(msg);
-      } catch (_) {
+      } catch (e) {
+        if (e.toString().contains('Exception:')) rethrow;
         throw Exception('Server returned HTTP ${res.statusCode}: $errorBody');
       }
     }
