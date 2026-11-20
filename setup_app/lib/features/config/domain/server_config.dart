@@ -113,7 +113,7 @@ class ServerConfig {
     buffer.writeln('AUTH_SECRET=$authSecret');
     buffer.writeln('NEXT_PUBLIC_API_URL=$serverUrl');
     buffer.writeln('CONTROL_PLANE_URL=http://127.0.0.1:28000');
-    buffer.writeln('CLUSTER_FEDERATION_SECRET=$authSecret');
+    buffer.writeln('CLUSTER_FEDERATION_SECRET=unotusk-shared-cluster-secret-key-2026');
     if (repoUrl.isNotEmpty) buffer.writeln('TARGET_REPO_URL=$repoUrl');
 
     // Primary Provider Setting

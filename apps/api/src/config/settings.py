@@ -133,7 +133,10 @@ class Settings(BaseSettings):
 
     @property
     def effective_federation_secret(self) -> str:
-        return (self.CLUSTER_FEDERATION_SECRET or self.AUTH_SECRET).strip()
+        return (
+            self.CLUSTER_FEDERATION_SECRET
+            or "unotusk-shared-cluster-secret-key-2026"
+        ).strip()
 
     @property
     def is_data_plane(self) -> bool:

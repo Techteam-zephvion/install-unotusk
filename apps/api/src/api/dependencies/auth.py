@@ -26,7 +26,7 @@ async def get_current_user(
 ) -> User:
     # 1. Fast-Path: Control-Plane-Signed Federation Token on Data Plane
     fed_token = request.headers.get("X-Unotusk-Federation-Token") if request else None
-    if fed_token and settings.is_data_plane and settings.DATA_PLANE_PROJECT_ID:
+    if fed_token and settings.is_data_plane and (settings.DATA_PLANE_PROJECT_ID or settings.DATA_PLANE_PROJECT_SLUG):
         claims = verify_federation_token(
             fed_token,
             settings.DATA_PLANE_PROJECT_SLUG or settings.DATA_PLANE_PROJECT_ID,
