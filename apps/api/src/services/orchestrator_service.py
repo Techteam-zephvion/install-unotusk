@@ -47,9 +47,16 @@ class OrchestratorService:
             "SYNC_DATABASE_URL": settings.SYNC_DATABASE_URL,
             "REDIS_URL": settings.REDIS_URL,
             "AUTH_SECRET": settings.AUTH_SECRET,
+            "CLUSTER_FEDERATION_SECRET": settings.effective_federation_secret,
+            "CONTROL_PLANE_URL": settings.CONTROL_PLANE_URL,
             "DATA_PLANE_PROJECT_ID": str(project_id),
             "DATA_PLANE_ORG_ID": str(organization_id),
             "SERVER_PORT": str(port),
+            "LLM_PROVIDER": settings.LLM_PROVIDER,
+            "GROQ_API_KEY": settings.GROQ_API_KEY or "",
+            "GROQ_MODEL": settings.GROQ_MODEL,
+            "ANTHROPIC_API_KEY": settings.ANTHROPIC_API_KEY or "",
+            "ANTHROPIC_MODEL": settings.ANTHROPIC_MODEL,
         }
 
         try:

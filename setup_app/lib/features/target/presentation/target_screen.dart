@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/uno_palette.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../wizard/presentation/wizard_controller.dart';
@@ -29,17 +29,16 @@ class TargetScreen extends ConsumerWidget {
             children: [
               // Title & Subtitle
               Text(
-                'Where should Unotusk run?',
-                style: UnoTypography.brandSerif(
-                  palette: palette,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w400,
+                'Deployment Destination',
+                style: AppFonts.display(
+                  fontSize: 28,
+                  color: palette.text,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Select the environment where you want to deploy Unotusk Server.',
-                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                'Select the environment where you want to deploy your Unotusk Server instance.',
+                style: AppFonts.body(
                   color: palette.textSec,
                   fontSize: 13.5,
                 ),
@@ -95,8 +94,9 @@ class TargetScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           targetState.validationError!,
-                          style: AppTextStyles.bodySmallOf(context).copyWith(
+                          style: AppFonts.body(
                             color: palette.error,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -108,8 +108,20 @@ class TargetScreen extends ConsumerWidget {
 
               const SizedBox(height: 32),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  AppButton(
+                    label: 'Back',
+                    variant: AppButtonVariant.secondary,
+                    icon: Icons.arrow_back_rounded,
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        wizardNotifier.previousStep();
+                      }
+                    },
+                  ),
                   AppButton(
                     label: 'Continue',
                     icon: Icons.arrow_forward_rounded,
@@ -175,16 +187,15 @@ class TargetScreen extends ConsumerWidget {
               children: [
                 Text(
                   type.label,
-                  style: AppTextStyles.h3Of(context).copyWith(
+                  style: AppFonts.youngSerif(
                     color: isSelected ? palette.accent : palette.text,
-                    fontWeight: FontWeight.w600,
                     fontSize: 15,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   type.description,
-                  style: AppTextStyles.bodySmallOf(context).copyWith(
+                  style: AppFonts.body(
                     color: palette.textSec,
                     fontSize: 12.5,
                   ),
@@ -212,7 +223,7 @@ class TargetScreen extends ConsumerWidget {
                       height: 8,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Color(0xFF0B1020),
                           shape: BoxShape.circle,
                         ),
                       ),

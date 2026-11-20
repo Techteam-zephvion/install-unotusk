@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_fonts.dart';
 import '../../../../core/theme/uno_palette.dart';
-import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/wizard_step.dart';
 
 class WizardStepHeader extends StatelessWidget {
@@ -55,7 +55,7 @@ class WizardStepHeader extends StatelessWidget {
                     badgeBorder = Border.all(color: palette.live.withValues(alpha: 0.4));
                   } else if (isCurrent) {
                     badgeBg = palette.accent;
-                    badgeText = Colors.white;
+                    badgeText = const Color(0xFF0B1020);
                     textColor = palette.text;
                   } else {
                     badgeBg = palette.bgElevated;
@@ -80,7 +80,7 @@ class WizardStepHeader extends StatelessWidget {
                               ? Icon(Icons.check, size: 13, color: palette.live)
                               : Text(
                                   '$stepNum',
-                                  style: TextStyle(
+                                  style: AppFonts.mono(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                     color: badgeText,
@@ -91,7 +91,7 @@ class WizardStepHeader extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         step.label,
-                        style: AppTextStyles.labelOf(context).copyWith(
+                        style: AppFonts.body(
                           color: textColor,
                           fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
                           fontSize: 12.5,
@@ -100,7 +100,7 @@ class WizardStepHeader extends StatelessWidget {
                       if (step.index < WizardStep.values.length - 1) ...[
                         const SizedBox(width: 10),
                         Container(
-                          width: 16,
+                          width: 18,
                           height: 1,
                           color: isCompleted
                               ? palette.accent.withValues(alpha: 0.5)
@@ -127,11 +127,11 @@ class WizardStepHeader extends StatelessWidget {
             ),
           ),
 
-          // Complete left back button (symbol only)
+          // Complete left back button with icon & text
           if (onBack != null)
             Positioned(
               left: 20,
-              child: _StepBackBtn(
+              child: _StepBackButton(
                 onTap: onBack,
                 palette: palette,
               ),
@@ -142,21 +142,21 @@ class WizardStepHeader extends StatelessWidget {
   }
 }
 
-/// Sleek icon-only back button placed at the complete left of the page
-class _StepBackBtn extends StatefulWidget {
+/// Sleek, labeled back button placed at the top-left of the wizard header
+class _StepBackButton extends StatefulWidget {
   final VoidCallback? onTap;
   final UnoPalette palette;
 
-  const _StepBackBtn({
+  const _StepBackButton({
     required this.onTap,
     required this.palette,
   });
 
   @override
-  State<_StepBackBtn> createState() => _StepBackBtnState();
+  State<_StepBackButton> createState() => _StepBackButtonState();
 }
 
-class _StepBackBtnState extends State<_StepBackBtn> {
+class _StepBackButtonState extends State<_StepBackButton> {
   bool _isHovered = false;
 
   @override
@@ -169,26 +169,37 @@ class _StepBackBtnState extends State<_StepBackBtn> {
       onExit: (_) => setState(() => _isHovered = false),
       cursor: isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: Tooltip(
-        message: 'Back',
+        message: 'Navigate to previous step',
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            width: 28,
-            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: _isHovered ? p.accent.withValues(alpha: 0.15) : p.bgElevated,
               border: Border.all(
                 color: _isHovered ? p.accent.withValues(alpha: 0.5) : p.div,
               ),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Center(
-              child: Icon(
-                Icons.arrow_back_rounded,
-                size: 16,
-                color: _isHovered ? p.accent : p.text,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.arrow_back_rounded,
+                  size: 15,
+                  color: _isHovered ? p.accent : p.text,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'Back',
+                  style: AppFonts.body(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _isHovered ? p.accent : p.text,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

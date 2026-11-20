@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/uno_palette.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../wizard/presentation/wizard_controller.dart';
@@ -28,16 +28,16 @@ class NetworkCheckScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Network Check',
-                style: UnoTypography.brandSerif(
-                  palette: palette,
-                  fontSize: 21,
+                'Network Topology Verification',
+                style: AppFonts.display(
+                  fontSize: 28,
+                  color: palette.text,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 'Detecting LAN interface, IP endpoints, and verifying firewall reachability.',
-                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                style: AppFonts.body(
                   color: palette.textSec,
                   fontSize: 13.5,
                 ),
@@ -56,34 +56,44 @@ class NetworkCheckScreen extends ConsumerWidget {
                 _buildFailureBanner(context, checkState.items.firstWhere((i) => i.status.isFailed)),
               ],
               const SizedBox(height: 32),
-              Wrap(
-                alignment: WrapAlignment.end,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 10,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (checkState.hasCriticalFailure)
-                    AppButton(
-                      label: 'Retry',
-                      variant: AppButtonVariant.secondary,
-                      icon: Icons.refresh_rounded,
-                      onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
-                    ),
                   AppButton(
-                    label: 'Continue',
-                    icon: Icons.arrow_forward_rounded,
-                    isLoading: checkState.isRunning,
-                    onPressed: checkState.isAllPassed
-                        ? () {
-                            if (checkState.detectedIp != null) {
-                              ref.read(configControllerProvider.notifier).updateLanIp(checkState.detectedIp!);
-                              if (checkState.availablePort != null) {
-                                ref.read(configControllerProvider.notifier).updateServerPort(checkState.availablePort!.toString());
+                    label: 'Back',
+                    variant: AppButtonVariant.secondary,
+                    icon: Icons.arrow_back_rounded,
+                    onPressed: checkState.isRunning ? null : () => wizardNotifier.previousStep(),
+                  ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: [
+                      if (checkState.hasCriticalFailure)
+                        AppButton(
+                          label: 'Retry Network Check',
+                          variant: AppButtonVariant.secondary,
+                          icon: Icons.refresh_rounded,
+                          onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
+                        ),
+                      AppButton(
+                        label: 'Continue',
+                        icon: Icons.arrow_forward_rounded,
+                        isLoading: checkState.isRunning,
+                        onPressed: checkState.isAllPassed
+                            ? () {
+                                if (checkState.detectedIp != null) {
+                                  ref.read(configControllerProvider.notifier).updateLanIp(checkState.detectedIp!);
+                                  if (checkState.availablePort != null) {
+                                    ref.read(configControllerProvider.notifier).updateServerPort(checkState.availablePort!.toString());
+                                  }
+                                }
+                                wizardNotifier.nextStep();
                               }
-                            }
-                            wizardNotifier.nextStep();
-                          }
-                        : null,
+                            : null,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -141,7 +151,7 @@ class NetworkCheckScreen extends ConsumerWidget {
               children: [
                 Text(
                   item.title,
-                  style: AppTextStyles.bodyMediumOf(context).copyWith(
+                  style: AppFonts.body(
                     fontWeight: FontWeight.w500,
                     fontSize: 13.5,
                     color: item.status.isFailed ? palette.error : palette.text,
@@ -151,7 +161,7 @@ class NetworkCheckScreen extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     item.failureMessage!,
-                    style: AppTextStyles.bodySmallOf(context).copyWith(
+                    style: AppFonts.body(
                       color: palette.error,
                       fontSize: 12,
                     ),
@@ -161,9 +171,9 @@ class NetworkCheckScreen extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     item.description,
-                    style: AppTextStyles.bodySmallOf(context).copyWith(
-                      color: palette.textSec,
-                      fontSize: 12,
+                    style: AppFonts.mono(
+                      color: palette.accent,
+                      fontSize: 11.5,
                     ),
                   ),
                 ],
@@ -194,7 +204,7 @@ class NetworkCheckScreen extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 '${failedItem.title} Failed',
-                style: AppTextStyles.h3Of(context).copyWith(color: palette.error),
+                style: AppFonts.youngSerif(color: palette.error, fontSize: 16),
               ),
             ],
           ),
@@ -202,7 +212,7 @@ class NetworkCheckScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               failedItem.remediationHint!,
-              style: AppTextStyles.bodyMediumOf(context).copyWith(
+              style: AppFonts.body(
                 color: palette.text,
                 fontSize: 13,
               ),

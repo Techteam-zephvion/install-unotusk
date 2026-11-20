@@ -33,7 +33,9 @@ class AppButton extends StatelessWidget {
         width: 16,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: variant == AppButtonVariant.primary ? Colors.white : palette.accent,
+          color: variant == AppButtonVariant.primary
+              ? const Color(0xFF0B1020)
+              : palette.accent,
         ),
       );
     } else if (icon != null) {
@@ -57,16 +59,16 @@ class AppButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0B1020),
             disabledBackgroundColor: palette.accent.withValues(alpha: 0.4),
-            disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
+            disabledForegroundColor: const Color(0xFF0B1020).withValues(alpha: 0.7),
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
             textStyle: AppTextStyles.label.copyWith(
-              color: Colors.white,
+              color: const Color(0xFF0B1020),
               fontWeight: FontWeight.w600,
               fontSize: 13.5,
             ),

@@ -7,6 +7,7 @@ class AppConstants {
   static const int defaultRedisPort = 6379;
   static const String defaultDbName = 'unotusk';
   static const String defaultDbUser = 'postgres';
-  static const String defaultGroqModel = 'qwen/qwen3.8-27b';
+  static const String defaultGroqModel = 'openai/gpt-oss-120b';
   static const String defaultClaudeModel = 'claude-3-5-sonnet-20241022';
+  static const String defaultOpenRouterModel = 'openrouter/free';
 }

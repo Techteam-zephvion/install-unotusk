@@ -157,8 +157,12 @@ class GroqProvider(LLMProvider):
                 # Cap context characters based on model capacity:
                 # 70B has a tight 6,000 TPM limit; cap context to 7,500 chars to prevent 429s.
                 # 8B / 9B has a 30,000 TPM limit; allow up to 28,000 chars (~7k tokens).
-                model_name = self.model or "llama-3.1-8b-instant"
-                max_ctx_chars = 7500 if "70b" in model_name.lower() else 28000
+                model_name = self.model or "qwen/qwen3.8-27b"
+                max_ctx_chars = (
+                    7500
+                    if any(k in model_name.lower() for k in ("70b", "qwen", "27b", "120b"))
+                    else 28000
+                )
                 safe_context = project_context
                 if len(safe_context) > max_ctx_chars:
                     safe_context = safe_context[:max_ctx_chars] + "\n... [context trimmed to stay within rate limit]"
@@ -200,36 +204,30 @@ class GroqProvider(LLMProvider):
 
                 max_retries = 3
                 response = None
-                # Multi-tier fallback models with high independent TPM quotas:
-                fallback_models = ["llama-3.1-8b-instant", "gemma2-9b-it"]
                 for attempt in range(max_retries):
                     try:
                         response = await self._client.chat.completions.create(**create_kwargs)
                         break
                     except Exception as err:
                         err_str = str(err)
-                        is_rate_limit = "429" in err_str or "rate_limit" in err_str.lower() or "tokens per minute" in err_str.lower()
-                        if is_rate_limit:
-                            # Immediately failover across model tiers to bypass exhausted quota
-                            current_m = create_kwargs["model"]
-                            next_model = None
-                            for fb in fallback_models:
-                                if fb != current_m:
-                                    next_model = fb
-                                    break
-                            if next_model:
-                                logger.warning(
-                                    f"Groq {current_m} rate limit hit; failing over to {next_model} (high quota)..."
-                                )
-                                create_kwargs["model"] = next_model
-                                create_kwargs.pop("reasoning_effort", None)
-                                create_kwargs.pop("reasoning_format", None)
-                                continue
-                            else:
-                                wait_sec = 2 * (attempt + 1)
-                                logger.warning(f"Groq rate limit hit, retrying in {wait_sec}s...")
-                                await asyncio.sleep(wait_sec)
-                                continue
+                        is_rate_limit = (
+                            "429" in err_str
+                            or "rate_limit" in err_str.lower()
+                            or "tokens per minute" in err_str.lower()
+                            or "413" in err_str
+                            or "too large" in err_str.lower()
+                        )
+                        if is_rate_limit and attempt < max_retries - 1:
+                            if "413" in err_str or "too large" in err_str.lower():
+                                current_prompt = create_kwargs["messages"][-1]["content"]
+                                if len(current_prompt) > 4000:
+                                    create_kwargs["messages"][-1]["content"] = (
+                                        current_prompt[:4000] + "\n... [context trimmed]"
+                                    )
+                            wait_sec = 2 * (attempt + 1)
+                            logger.warning(f"Groq rate limit hit, retrying in {wait_sec}s...")
+                            await asyncio.sleep(wait_sec)
+                            continue
                         raise
 
                 reasoning_parts: list[str] = []
@@ -334,8 +332,30 @@ class GroqProvider(LLMProvider):
         else:
             last_error_reason = "No API key configured"
 
-        # If live API fails, return explicit notice instead of synthetic mock data
+        # If live API fails, attempt automatic failover to OpenRouter before showing error
         if last_error_reason and "No API key configured" not in last_error_reason:
+            if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip():
+                try:
+                    logger.warning(
+                        f"Groq API call failed ({last_error_reason}); initiating automatic failover to OpenRouter..."
+                    )
+                    from apps.api.src.services.llm.openrouter import OpenRouterProvider
+
+                    openrouter_provider = OpenRouterProvider()
+                    failover_ans = await openrouter_provider.generate_grounded_answer(
+                        question=question,
+                        project_context=project_context,
+                        evidence_items=evidence_items,
+                        related_entities=related_entities,
+                        conversation_history=conversation_history,
+                        thinking_tier=thinking_tier,
+                    )
+                    failover_ans.debug_signals["failover_from"] = "groq"
+                    failover_ans.debug_signals["groq_error"] = last_error_reason
+                    return failover_ans
+                except Exception as fo_err:
+                    logger.error(f"OpenRouter failover also failed: {fo_err}")
+
             error_notice = (
                 f"### Groq Service Notice\n\n"
                 f"The AI model request could not be completed: `{last_error_reason}`.\n\n"
@@ -546,7 +566,7 @@ class GroqProvider(LLMProvider):
         import json
         max_retries = 2
         # Use high-throughput 8B model for lightweight metadata extraction to preserve 70B quota
-        json_model = "llama-3.1-8b-instant"
+        json_model = self.model or "qwen/qwen3.8-27b"
         for attempt in range(max_retries + 1):
             try:
                 response = await self._client.chat.completions.create(
@@ -567,5 +587,14 @@ class GroqProvider(LLMProvider):
                     await asyncio.sleep(wait_sec)
                     continue
                 logger.error(f"Groq generate_json error: {e}")
+                if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip():
+                    try:
+                        logger.warning("Falling back to OpenRouter for generate_json...")
+                        from apps.api.src.services.llm.openrouter import OpenRouterProvider
+
+                        openrouter_provider = OpenRouterProvider()
+                        return await openrouter_provider.generate_json(system_prompt, user_prompt)
+                    except Exception as fo_err:
+                        logger.error(f"OpenRouter generate_json fallback failed: {fo_err}")
                 return {}
         return {}

@@ -4,6 +4,7 @@ from apps.api.src.config.settings import settings
 from apps.api.src.services.llm.base import LLMProvider
 from apps.api.src.services.llm.claude import ClaudeProvider
 from apps.api.src.services.llm.groq import GroqProvider
+from apps.api.src.services.llm.openrouter import OpenRouterProvider
 
 logger = logging.getLogger("unotusk-llm-factory")
 
@@ -12,7 +13,7 @@ def get_llm_provider(provider: str | None = None) -> LLMProvider:
     """
     Returns configured LLM provider explicitly based on settings.LLM_PROVIDER
     or explicit provider parameter.
-    Supported: 'groq', 'claude' (or 'anthropic'), 'offline'.
+    Supported: 'groq', 'claude' (or 'anthropic'), 'openrouter', 'offline'.
     Raises ValueError for unsupported providers.
     """
     provider_name = (provider or settings.LLM_PROVIDER or "offline").strip().lower()
@@ -21,13 +22,15 @@ def get_llm_provider(provider: str | None = None) -> LLMProvider:
         return GroqProvider()
     elif provider_name in ("claude", "anthropic"):
         return ClaudeProvider()
+    elif provider_name == "openrouter":
+        return OpenRouterProvider()
     elif provider_name == "offline":
         return ClaudeProvider(api_key="")
     else:
         logger.error(f"Unsupported LLM provider: '{provider_name}'")
         raise ValueError(
             f"Unsupported LLM provider: '{provider_name}'. "
-            f"Supported providers are: 'groq', 'claude' (or 'anthropic'), 'offline'."
+            f"Supported providers are: 'groq', 'claude' (or 'anthropic'), 'openrouter', 'offline'."
         )
 
 

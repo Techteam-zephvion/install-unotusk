@@ -24,28 +24,50 @@ class DesktopScaffold extends ConsumerWidget {
     final palette = UnoPalette.of(context);
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
+    final displayTitle = title ?? 'Unotusk Server Manager';
 
     return Scaffold(
       backgroundColor: palette.bgBase,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar matching Employee App Window Title Bar exactly (Image 5)
+            // Top Window Title Bar with subtle divider
             Container(
-              height: 36,
-              color: palette.bgBase,
+              height: 40,
+              decoration: BoxDecoration(
+                color: palette.bgSurface,
+                border: Border(
+                  bottom: BorderSide(color: palette.div),
+                ),
+              ),
               child: Row(
                 children: [
                   const SizedBox(width: 14),
-                  // Official Unotusk Logo from Employee App
                   UnotuskLogo(size: 16, onDark: palette.isDark),
                   const SizedBox(width: 8),
                   Text(
-                    title ?? 'Unotusk Server Manager',
+                    displayTitle,
                     style: UnoTypography.brandSerif(
                       palette: palette,
-                      fontSize: 13,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: palette.bgElevated,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: palette.div),
+                    ),
+                    child: Text(
+                      'SERVER SETUP',
+                      style: UnoTypography.mono(
+                        color: palette.textSec,
+                        fontSize: 9.5,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                   // Draggable Window Area in the middle
@@ -57,7 +79,7 @@ class DesktopScaffold extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Theme Toggle Button (Dark / Light)
+                  // Theme Toggle Button
                   Tooltip(
                     message: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
                     child: InkWell(
@@ -86,14 +108,16 @@ class DesktopScaffold extends ConsumerWidget {
                   ],
                   const SizedBox(width: 6),
                   // Native-style Frameless Window Controls
-                  DesktopWindowControls(palette: palette, height: 36),
+                  DesktopWindowControls(palette: palette, height: 40),
                 ],
               ),
             ),
-            // Main Content Area
+            // Main Canvas with Page Gradient
             Expanded(
               child: Container(
-                color: palette.bgBase,
+                decoration: BoxDecoration(
+                  gradient: palette.pageGradient,
+                ),
                 child: body,
               ),
             ),

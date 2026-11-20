@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../../target/domain/target_config.dart';
 import '../domain/check_item.dart';
 
@@ -66,6 +67,7 @@ class EnvironmentValidator {
         _httpHealthChecker = httpHealthChecker ?? _defaultHttpHealthChecker;
 
   static Future<bool> _defaultSocketTester(String host, int port) async {
+    if (kIsWeb) return true;
     try {
       final socket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
       await socket.close();
@@ -76,6 +78,7 @@ class EnvironmentValidator {
   }
 
   static Future<bool> _defaultHttpHealthChecker(String host, int port) async {
+    if (kIsWeb) return false;
     try {
       final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 1500);
       final request = await client.getUrl(Uri.parse('http://$host:$port/health'));

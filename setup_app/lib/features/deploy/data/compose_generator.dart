@@ -3,9 +3,6 @@ import '../../config/domain/server_config.dart';
 class ComposeGenerator {
   /// Generates a Docker Compose configuration for production using prebuilt images.
   static String generateProductionCompose(ServerConfig config, {required String imageVersion}) {
-    final apiKeyVar = config.llmProvider == LlmProviderType.groq ? "GROQ_API_KEY" : "ANTHROPIC_API_KEY";
-    final modelVar = config.llmProvider == LlmProviderType.groq ? "GROQ_MODEL" : "ANTHROPIC_MODEL";
-
     final String apiImage;
     final String workerImage;
     if (imageVersion == '0.1.0' || imageVersion == 'local') {
@@ -63,6 +60,8 @@ services:
   api:
     image: $apiImage
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       migration:
         condition: service_completed_successfully
@@ -77,9 +76,18 @@ services:
       - SYNC_DATABASE_URL=\${SYNC_DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=\${AUTH_SECRET}
+      - CLUSTER_FEDERATION_SECRET=\${CLUSTER_FEDERATION_SECRET:-unotusk-shared-cluster-secret-key-2026}
+      - CONTROL_PLANE_URL=\${CONTROL_PLANE_URL:-http://host.docker.internal:28000}
+      - DATA_PLANE_HOST=\${DATA_PLANE_HOST:-host.docker.internal}
+      - DATA_PLANE_PROJECT_SLUG=${config.serverName.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9_-]'), '-')}
       - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
-      - $apiKeyVar=\${$apiKeyVar}
-      - $modelVar=\${$modelVar}
+      - GROQ_API_KEY=\${GROQ_API_KEY}
+      - GROQ_MODEL=\${GROQ_MODEL:-openai/gpt-oss-120b}
+      - OPENROUTER_API_KEY=\${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=\${OPENROUTER_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      - ANTHROPIC_API_KEY=\${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=\${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - BACKUP_LLM_PROVIDER=\${BACKUP_LLM_PROVIDER:-openrouter}
       - SERVER_PORT=${config.serverPort}
       - TARGET_REPO_URL=\${TARGET_REPO_URL:-}
     volumes:
@@ -112,8 +120,13 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - AUTH_SECRET=\${AUTH_SECRET}
       - LLM_PROVIDER=\${LLM_PROVIDER:-groq}
-      - $apiKeyVar=\${$apiKeyVar}
-      - $modelVar=\${$modelVar}
+      - GROQ_API_KEY=\${GROQ_API_KEY}
+      - GROQ_MODEL=\${GROQ_MODEL:-openai/gpt-oss-120b}
+      - OPENROUTER_API_KEY=\${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=\${OPENROUTER_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      - ANTHROPIC_API_KEY=\${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=\${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - BACKUP_LLM_PROVIDER=\${BACKUP_LLM_PROVIDER:-openrouter}
       - TARGET_REPO_URL=\${TARGET_REPO_URL:-}
       - QUEUE_NAME=unotusk_tasks
     networks:

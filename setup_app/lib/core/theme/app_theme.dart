@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_fonts.dart';
 import 'app_text_styles.dart';
 import 'uno_palette.dart';
 
@@ -14,12 +15,13 @@ class AppTheme {
       brightness: isDark ? Brightness.dark : Brightness.light,
       scaffoldBackgroundColor: palette.bgBase,
       canvasColor: palette.bgBase,
+      textTheme: AppFonts.textTheme(),
       colorScheme: ColorScheme(
         brightness: isDark ? Brightness.dark : Brightness.light,
         primary: palette.accent,
-        onPrimary: Colors.white,
+        onPrimary: const Color(0xFF0B1020),
         secondary: palette.output,
-        onSecondary: Colors.white,
+        onSecondary: const Color(0xFF0B1020),
         error: palette.error,
         onError: Colors.white,
         surface: palette.bgSurface,
@@ -72,14 +74,14 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0B1020),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           textStyle: AppTextStyles.label.copyWith(
-            color: Colors.white,
+            color: const Color(0xFF0B1020),
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),

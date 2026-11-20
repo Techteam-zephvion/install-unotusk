@@ -7,7 +7,7 @@ from apps.api.src.schemas.report import ReportDocument
 logger = logging.getLogger("unotusk-report")
 
 
-SUPPORTED_REPORT_PROVIDERS = {"groq", "claude", "anthropic", "offline"}
+SUPPORTED_REPORT_PROVIDERS = {"groq", "claude", "anthropic", "openrouter", "offline"}
 
 
 class ReportSynthesizer:
@@ -37,6 +37,12 @@ class ReportSynthesizer:
         self.anthropic_model = (
             model if self.provider in ("claude", "anthropic") else settings.ANTHROPIC_MODEL
         )
+        self.openrouter_api_key = (
+            api_key if self.provider == "openrouter" else settings.OPENROUTER_API_KEY
+        )
+        self.openrouter_model = (
+            model if self.provider == "openrouter" else settings.OPENROUTER_MODEL
+        )
 
         self._groq_client = None
         self._anthropic_client = None
@@ -62,7 +68,7 @@ class ReportSynthesizer:
 
     async def synthesize(self, doc: ReportDocument) -> ReportDocument:
         """
-        Enhances executive summary narrative and descriptions using configured LLM (Groq or Claude/Anthropic).
+        Enhances executive summary narrative and descriptions using configured LLM (Groq, OpenRouter, or Claude/Anthropic).
         Guarantees deterministic fallback if LLM fails, times out, or returns invalid JSON.
         """
         if self.provider == "groq" and (
@@ -73,6 +79,8 @@ class ReportSynthesizer:
             self._anthropic_client or (self._client and hasattr(self._client, "messages"))
         ):
             return await self._synthesize_with_claude(doc)
+        elif self.provider == "openrouter" and self.openrouter_api_key:
+            return await self._synthesize_with_openrouter(doc)
 
         logger.info("Remote LLM client unavailable; using deterministic report document directly.")
         return doc
@@ -141,6 +149,12 @@ class ReportSynthesizer:
             logger.info("Successfully synthesized executive summary with Groq.")
 
         except Exception as exc:
+            if self.openrouter_api_key:
+                logger.warning(
+                    f"Groq report synthesis failed ({exc}); falling back to OpenRouter...",
+                    exc_info=False,
+                )
+                return await self._synthesize_with_openrouter(doc)
             logger.warning(
                 f"Groq report synthesis failed ({exc}); falling back to deterministic report.",
                 exc_info=False,
@@ -183,6 +197,54 @@ class ReportSynthesizer:
 
         return doc
 
+    async def _synthesize_with_openrouter(self, doc: ReportDocument) -> ReportDocument:
+        import httpx
+
+        try:
+            facts_payload = self._build_facts_payload(doc)
+            prompt = (
+                f"Assembled Deterministic Facts:\n{json.dumps(facts_payload, indent=2)}\n\n"
+                "Synthesize the executive summary fields adhering strictly to the above facts."
+            )
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "HTTP-Referer": "https://unotusk.com",
+                "X-Title": "Unotusk Intelligence",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": self.openrouter_model or "openrouter/free",
+                "messages": [
+                    {"role": "system", "content": self._get_system_instruction()},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.1,
+            }
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data["choices"][0]["message"]["content"]
+                    cleaned = content.strip()
+                    if "```json" in cleaned:
+                        cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+                    elif "```" in cleaned:
+                        cleaned = cleaned.split("```")[1].split("```")[0].strip()
+                    parsed = json.loads(cleaned)
+                    self._apply_parsed_synthesis(doc, parsed)
+                    logger.info("Successfully synthesized executive summary with OpenRouter.")
+        except Exception as exc:
+            logger.warning(
+                f"OpenRouter report synthesis failed ({exc}); falling back to deterministic report.",
+                exc_info=False,
+            )
+        return doc
+
     def _apply_parsed_synthesis(self, doc: ReportDocument, parsed: dict) -> None:
         if isinstance(parsed, dict) and (
             "executive_summary_text" in parsed or "project_summary" in parsed
@@ -213,6 +275,11 @@ class GroqReportSynthesizer(ReportSynthesizer):
         super().__init__(provider="groq", api_key=api_key, model=model)
 
 
+class OpenRouterReportSynthesizer(ReportSynthesizer):
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+        super().__init__(provider="openrouter", api_key=api_key, model=model)
+
+
 def get_report_synthesizer(
     provider: str | None = None,
     api_key: str | None = None,
@@ -221,7 +288,7 @@ def get_report_synthesizer(
     """
     Factory function returning the configured ReportSynthesizer dynamically based on
     settings.LLM_PROVIDER or explicit provider parameter.
-    Supported: 'groq', 'claude', 'anthropic', 'offline'.
+    Supported: 'groq', 'claude', 'anthropic', 'openrouter', 'offline'.
     Raises ValueError for unsupported providers.
     """
     selected_provider = (provider or settings.LLM_PROVIDER or "offline").strip().lower()
@@ -231,12 +298,14 @@ def get_report_synthesizer(
         return ClaudeReportSynthesizer(api_key=api_key, model=model)
     elif selected_provider == "anthropic":
         return AnthropicReportSynthesizer(api_key=api_key, model=model)
+    elif selected_provider == "openrouter":
+        return OpenRouterReportSynthesizer(api_key=api_key, model=model)
     elif selected_provider == "offline":
         return ReportSynthesizer(provider="offline")
     else:
         logger.error(f"Unsupported LLM provider for report synthesis: '{selected_provider}'")
         raise ValueError(
             f"Unsupported LLM provider: '{selected_provider}'. "
-            f"Supported providers are: 'groq', 'claude' (or 'anthropic'), 'offline'."
+            f"Supported providers are: 'groq', 'claude' (or 'anthropic'), 'openrouter', 'offline'."
         )
 

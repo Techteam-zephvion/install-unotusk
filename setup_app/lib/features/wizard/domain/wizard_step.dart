@@ -30,11 +30,8 @@ enum WizardStep {
   }
 
   bool get canGoBack {
-    // Cannot go back on welcome, during installation, or when ready
-    return this != WizardStep.welcome &&
-        this != WizardStep.install &&
-        this != WizardStep.verify &&
-        this != WizardStep.ready;
+    // Can go back on all steps except welcome and during active installation
+    return this != WizardStep.welcome && this != WizardStep.install;
   }
 
   bool get isExecutionStep {

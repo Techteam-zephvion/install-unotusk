@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/uno_palette.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../wizard/presentation/wizard_controller.dart';
@@ -28,16 +28,16 @@ class ServerCheckScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Check Server',
-                style: UnoTypography.brandSerif(
-                  palette: palette,
-                  fontSize: 21,
+                'Environment Preflight Verification',
+                style: AppFonts.display(
+                  fontSize: 28,
+                  color: palette.text,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Checking machine readiness, ports, and prerequisites before installation.',
-                style: AppTextStyles.bodyMediumOf(context).copyWith(
+                'Validating system container engine, memory allocation, and OS prerequisites.',
+                style: AppFonts.body(
                   color: palette.textSec,
                   fontSize: 13.5,
                 ),
@@ -56,35 +56,45 @@ class ServerCheckScreen extends ConsumerWidget {
                 _buildFailureBanner(context, checkState.items.firstWhere((i) => i.status.isFailed)),
               ],
               const SizedBox(height: 32),
-              Wrap(
-                alignment: WrapAlignment.end,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 10,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (checkState.hasCriticalFailure)
-                    AppButton(
-                      label: 'Retry',
-                      variant: AppButtonVariant.secondary,
-                      icon: Icons.refresh_rounded,
-                      onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
-                    ),
-                  if (checkState.hasOnlyPortConflict && checkState.isExistingUnotuskActive)
-                    AppButton(
-                      label: 'Use Existing Server',
-                      variant: AppButtonVariant.secondary,
-                      icon: Icons.check_circle_outline_rounded,
-                      onPressed: checkState.isRunning
-                          ? null
-                          : () => wizardNotifier.setStep(WizardStep.verify),
-                    ),
                   AppButton(
-                    label: checkState.hasOnlyPortConflict ? 'Configure Alternate Port' : 'Continue',
-                    icon: Icons.arrow_forward_rounded,
-                    isLoading: checkState.isRunning,
-                    onPressed: (checkState.isAllPassed || checkState.hasOnlyPortConflict)
-                        ? () => wizardNotifier.nextStep()
-                        : null,
+                    label: 'Back',
+                    variant: AppButtonVariant.secondary,
+                    icon: Icons.arrow_back_rounded,
+                    onPressed: checkState.isRunning ? null : () => wizardNotifier.previousStep(),
+                  ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: [
+                      if (checkState.hasCriticalFailure)
+                        AppButton(
+                          label: 'Retry Checks',
+                          variant: AppButtonVariant.secondary,
+                          icon: Icons.refresh_rounded,
+                          onPressed: checkState.isRunning ? null : () => checkNotifier.runChecks(),
+                        ),
+                      if (checkState.hasOnlyPortConflict && checkState.isExistingUnotuskActive)
+                        AppButton(
+                          label: 'Use Existing Server',
+                          variant: AppButtonVariant.secondary,
+                          icon: Icons.check_circle_outline_rounded,
+                          onPressed: checkState.isRunning
+                              ? null
+                              : () => wizardNotifier.setStep(WizardStep.verify),
+                        ),
+                      AppButton(
+                        label: checkState.hasOnlyPortConflict ? 'Configure Alternate Port' : 'Continue',
+                        icon: Icons.arrow_forward_rounded,
+                        isLoading: checkState.isRunning,
+                        onPressed: (checkState.isAllPassed || checkState.hasOnlyPortConflict)
+                            ? () => wizardNotifier.nextStep()
+                            : null,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -142,7 +152,7 @@ class ServerCheckScreen extends ConsumerWidget {
               children: [
                 Text(
                   item.title,
-                  style: AppTextStyles.bodyMediumOf(context).copyWith(
+                  style: AppFonts.body(
                     fontWeight: FontWeight.w500,
                     fontSize: 13.5,
                     color: item.status.isFailed ? palette.error : palette.text,
@@ -152,7 +162,7 @@ class ServerCheckScreen extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     item.failureMessage!,
-                    style: AppTextStyles.bodySmallOf(context).copyWith(
+                    style: AppFonts.body(
                       color: palette.error,
                       fontSize: 12,
                     ),
@@ -185,7 +195,7 @@ class ServerCheckScreen extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 '${failedItem.title} Failed',
-                style: AppTextStyles.h3Of(context).copyWith(color: palette.error),
+                style: AppFonts.youngSerif(color: palette.error, fontSize: 16),
               ),
             ],
           ),
@@ -193,7 +203,7 @@ class ServerCheckScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               failedItem.remediationHint!,
-              style: AppTextStyles.bodyMediumOf(context).copyWith(
+              style: AppFonts.body(
                 color: palette.text,
                 fontSize: 13,
               ),

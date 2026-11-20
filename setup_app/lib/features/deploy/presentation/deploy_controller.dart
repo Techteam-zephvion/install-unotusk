@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/utils/platform_environment.dart';
 import '../../config/presentation/config_controller.dart';
 import '../../target/presentation/target_controller.dart';
 import '../../manager/data/server_registry.dart';
@@ -59,7 +62,7 @@ class DeployController extends StateNotifier<DeployState> {
     final target = ref.read(targetControllerProvider).config;
     final config = ref.read(configControllerProvider).config;
     final serverRegistry = ServerRegistry();
-    final homeDir = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+    final homeDir = PlatformEnvironment.homeDir;
     final deployDir = '$homeDir/.unotusk/servers/${config.serverName}';
 
     state = state.copyWith(
@@ -115,11 +118,26 @@ class DeployController extends StateNotifier<DeployState> {
           };
         }).toList();
 
+        const federationSecret = String.fromEnvironment(
+          'CLUSTER_FEDERATION_SECRET',
+          defaultValue: 'unotusk-shared-cluster-secret-key-2026',
+        );
+        final rawJson = jsonEncode({'servers': syncList});
+        final ts = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+        final msgBytes = utf8.encode('$ts.$rawJson');
+        final hmacSha256 = Hmac(sha256, utf8.encode(federationSecret));
+        final sig = hmacSha256.convert(msgBytes).toString();
+
         final dio = Dio();
         await dio.post(
           'http://127.0.0.1:28000/api/v1/projects/sync-servers',
-          data: {'servers': syncList},
+          data: rawJson,
           options: Options(
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Unotusk-Timestamp': ts,
+              'X-Unotusk-Cluster-Signature': sig,
+            },
             sendTimeout: const Duration(seconds: 3),
             receiveTimeout: const Duration(seconds: 3),
           ),

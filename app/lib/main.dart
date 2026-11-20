@@ -242,75 +242,14 @@ class _AppShellState extends State<AppShell> {
       _appStage = 'workspace';
     });
     
-    // Multi-Plane Navigation: When switching to a dedicated Project Data Plane,
-    // the existing authenticated token is cryptographically verified across planes.
-    if (project.port != null) {
-      final currentHost = Uri.parse(ApiService.baseUrl).host;
-      final targetUrl = 'http://$currentHost:${project.port}';
-      if (ApiService.baseUrl != targetUrl) {
-        ApiService.setBaseUrl(targetUrl, persist: false);
-      }
-    }
-
-    // Always synchronize the real project UUID on the target server to prevent DATAPLANEBOUNDARYVIOLATION
-    try {
-      final serverProjects = await ApiService.fetchProjects();
-      if (serverProjects.isNotEmpty) {
-        final targetServerProj = serverProjects.firstWhere(
-          (p) =>
-              p.id.toLowerCase() == project.id.toLowerCase() ||
-              p.name.toLowerCase() == project.name.toLowerCase(),
-          orElse: () =>
-              serverProjects.length == 1 ? serverProjects.first : project,
-        );
-        project = project.copyWith(
-          id: targetServerProj.id.isNotEmpty
-              ? targetServerProj.id
-              : project.id,
-          repositoryName: (targetServerProj.repositoryName != null &&
-                  targetServerProj.repositoryName!.isNotEmpty)
-              ? targetServerProj.repositoryName
-              : project.repositoryName,
-          defaultBranch:
-              targetServerProj.defaultBranch ?? project.defaultBranch,
-        );
-        setState(() {
-          _openedProject = project;
-          _openedProjectName = project.name;
-        });
-      }
-    } catch (_) {}
-
+    // Control Plane Gateway (:28000) routes /api/v1/projects/{project.id}/*
+    // automatically using the user's Control Plane JWT. No password123 login!
     ApiService.setActiveProject(project);
     ApiService.fetchRecentChats(projectId: project.id);
   }
 
-  void _handleBackToProjects() async {
+  void _handleBackToProjects() {
     _clearTimers();
-    
-    // Revert to Control Plane Server
-    final currentHost = Uri.parse(ApiService.baseUrl).host;
-    final controlPlaneUrl = 'http://$currentHost:28000';
-    if (ApiService.baseUrl != controlPlaneUrl) {
-      ApiService.setBaseUrl(controlPlaneUrl);
-      try {
-        await ApiService.createOrganisation(
-          fullName: _user.name,
-          orgName: 'Acme Corporation',
-          password: 'password123',
-          role: _user.role,
-          email: _user.email,
-        );
-      } catch (_) {
-        try {
-          await ApiService.login(
-            email: _user.email,
-            password: 'password123',
-          );
-        } catch (_) {}
-      }
-    }
-
     setState(() {
       _activeConversationId = null;
       _messages.clear();

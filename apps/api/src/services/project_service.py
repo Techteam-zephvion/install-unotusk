@@ -146,6 +146,35 @@ class ProjectService:
         return project_read
 
     @staticmethod
+    def _is_port_listening(port: int, timeout: float = 0.25) -> bool:
+        """Returns True if the TCP port is listening on the data plane host or localhost."""
+        import socket
+        try:
+            from apps.api.src.config.settings import settings
+            host = settings.DATA_PLANE_HOST or "host.docker.internal"
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            pass
+
+        # In non-container or localhost dev environments, probe 127.0.0.1
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+                return True
+        except OSError:
+            pass
+        return False
+
+    @staticmethod
+    def _is_project_live(port: int | None, docker_ports: dict[int, str] | None = None) -> bool:
+        """Returns True only if the dedicated data-plane container or socket is actively running."""
+        if port is None:
+            return False
+        if docker_ports and docker_ports.get(port) == "running":
+            return True
+        return ProjectService._is_port_listening(port)
+
+    @staticmethod
     def _get_live_docker_ports() -> dict[int, str]:
         """Returns map of host_port -> state ('running', 'stopped') for unotusk containers."""
         res: dict[int, str] = {}
@@ -206,11 +235,11 @@ class ProjectService:
             rows = result.all()
             output = []
             for proj, p_role in rows:
-                if proj.port is not None and proj.port in docker_ports:
-                    d_state = docker_ports[proj.port]
-                    if d_state == "running" and proj.status != ProjectStatus.READY:
+                if proj.port is not None:
+                    is_live = ProjectService._is_project_live(proj.port, docker_ports)
+                    if is_live and proj.status != ProjectStatus.READY:
                         proj.status = ProjectStatus.READY
-                    elif d_state != "running" and proj.status == ProjectStatus.READY:
+                    elif not is_live and proj.status != ProjectStatus.STOPPED:
                         proj.status = ProjectStatus.STOPPED
 
                 p_read = ProjectRead.model_validate(proj)
@@ -236,11 +265,11 @@ class ProjectService:
             rows = result.all()
             output = []
             for proj, p_role in rows:
-                if proj.port is not None and proj.port in docker_ports:
-                    d_state = docker_ports[proj.port]
-                    if d_state == "running" and proj.status != ProjectStatus.READY:
+                if proj.port is not None:
+                    is_live = ProjectService._is_project_live(proj.port, docker_ports)
+                    if is_live and proj.status != ProjectStatus.READY:
                         proj.status = ProjectStatus.READY
-                    elif d_state != "running" and proj.status == ProjectStatus.READY:
+                    elif not is_live and proj.status != ProjectStatus.STOPPED:
                         proj.status = ProjectStatus.STOPPED
 
                 p_read = ProjectRead.model_validate(proj)
@@ -300,6 +329,13 @@ class ProjectService:
                 message="You do not have permission to access this project",
             )
 
+        if project.port is not None:
+            is_live = ProjectService._is_project_live(project.port)
+            if is_live and project.status != ProjectStatus.READY:
+                project.status = ProjectStatus.READY
+            elif not is_live and project.status != ProjectStatus.STOPPED:
+                project.status = ProjectStatus.STOPPED
+
         p_read = ProjectRead.model_validate(project)
         p_read.role = proj_mem.role if proj_mem else org_mem.role
         if project.repositories:
@@ -327,9 +363,7 @@ class ProjectService:
             )
         organization_id = org_mem.organization_id
 
-        stale_slugs = {"orca", "syncguard", "unotusk-core"}
-
-        # 2. Clean up stale mock projects (do NOT delete real user projects)
+        # 2. Fetch existing projects (no destructive deletions of active slugs)
         existing_projects_query = (
             select(Project)
             .options(selectinload(Project.repositories))
@@ -337,15 +371,7 @@ class ProjectService:
         )
         existing_res = await session.execute(existing_projects_query)
         existing_projects = list(existing_res.scalars().all())
-
-        for p in existing_projects:
-            if p.slug in stale_slugs:
-                await session.delete(p)
-        await session.flush()
-
-        # Re-fetch remaining projects
-        existing_res = await session.execute(existing_projects_query)
-        existing_projects = list(existing_res.scalars().all())
+        existing_by_id = {p.id: p for p in existing_projects}
         existing_by_port = {p.port: p for p in existing_projects if p.port is not None}
         existing_by_name = {p.name.lower(): p for p in existing_projects}
 
@@ -353,7 +379,11 @@ class ProjectService:
             is_running = server.state.lower() in ("running", "active", "degraded")
             target_status = ProjectStatus.READY if is_running else ProjectStatus.STOPPED
 
-            proj = existing_by_port.get(server.port) or existing_by_name.get(server.name.lower())
+            proj = (
+                (existing_by_id.get(server.project_id) if server.project_id else None)
+                or existing_by_port.get(server.port)
+                or existing_by_name.get(server.name.lower())
+            )
             if proj is not None:
                 proj.name = server.name.strip()
                 proj.port = server.port
@@ -361,7 +391,7 @@ class ProjectService:
                 if server.description:
                     proj.description = server.description
             else:
-                base_slug = slugify(server.name)
+                base_slug = server.slug or slugify(server.name)
                 slug = base_slug
                 slug_check = await session.execute(
                     select(Project).where(
@@ -369,10 +399,25 @@ class ProjectService:
                         Project.slug == slug,
                     )
                 )
-                if slug_check.scalar_one_or_none() is not None:
+                if slug_check.scalar_one_or_none() is not None and not server.project_id:
                     slug = f"{base_slug}-{uuid.uuid4().hex[:4]}"
 
+                from apps.api.src.config.settings import settings
+                from apps.api.src.core.federation import derive_canonical_project_id
+                from apps.api.src.models.organization import Organization
+
+                org = await session.get(Organization, organization_id)
+                org_slug = (
+                    org.slug
+                    if (org and isinstance(getattr(org, "slug", None), str))
+                    else settings.DATA_PLANE_ORG_SLUG
+                )
+                canonical_proj_id = server.project_id or derive_canonical_project_id(
+                    org_slug, slug
+                )
+
                 proj = Project(
+                    id=canonical_proj_id,
                     organization_id=organization_id,
                     name=server.name.strip(),
                     slug=slug,

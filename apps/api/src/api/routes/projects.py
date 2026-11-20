@@ -1,11 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.api.dependencies.auth import get_current_user, get_optional_current_user
 from apps.api.src.api.dependencies.database import get_db
+from apps.api.src.api.exceptions import UnauthorizedException
+from apps.api.src.core.federation import verify_cluster_sync_signature
 from apps.api.src.models.user import User
 from apps.api.src.schemas.project import (
     ProjectCreate,
@@ -23,10 +25,22 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 
 @router.post("/sync-servers", response_model=list[ProjectRead])
 async def sync_servers(
+    request: Request,
     data: ServerSyncRequest,
     current_user: User | None = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectRead]:
+    raw_body = await request.body()
+    ts_hdr = request.headers.get("X-Unotusk-Timestamp")
+    sig_hdr = request.headers.get("X-Unotusk-Cluster-Signature")
+    is_hmac_valid = verify_cluster_sync_signature(ts_hdr, sig_hdr, raw_body)
+
+    if current_user is None and not is_hmac_valid:
+        raise UnauthorizedException(
+            code="SYNC_AUTH_REQUIRED",
+            message="Requires Admin JWT or valid X-Unotusk-Cluster-Signature.",
+        )
+
     user_id = current_user.id if current_user else None
     if user_id is None:
         res = await db.execute(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../../../core/utils/platform_environment.dart';
 import '../../config/domain/server_config.dart';
 import '../../target/domain/target_config.dart';
 import '../../validation/data/environment_validator.dart';
@@ -108,7 +109,7 @@ class DeploymentEngine {
       }
 
       final envContent = effectiveConfig.generateEnvFileContent();
-      final serverVersion = Platform.environment['UNOTUSK_SERVER_VERSION'] ?? '0.1.0';
+      final serverVersion = PlatformEnvironment.get('UNOTUSK_SERVER_VERSION') ?? '0.1.0';
       final composeContent = ComposeGenerator.generateProductionCompose(
         effectiveConfig,
         imageVersion: serverVersion,
@@ -117,7 +118,7 @@ class DeploymentEngine {
       envFile.writeAsStringSync(envContent);
       // Restrict permissions on .env
       try {
-        if (!Platform.isWindows) {
+        if (!PlatformEnvironment.isWindows) {
           await _processExecutor('chmod', ['600', envFile.path]);
         }
       } catch (_) {}
@@ -209,7 +210,7 @@ class DeploymentEngine {
   }
 
   String _resolveDeploymentDir() {
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
+    final home = PlatformEnvironment.homeDir;
     return '$home/.unotusk/server';
   }
 
