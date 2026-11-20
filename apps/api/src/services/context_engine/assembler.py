@@ -345,7 +345,10 @@ class ContextAssembler:
                 if current_temp_chars + len(event_block) <= temporal_budget_chars:
                     temp_lines.append(event_block)
                     current_temp_chars += len(event_block)
-                    evidence_items.append(tev)
+                    formatted_tev = dict(tev)
+                    if "type" not in formatted_tev:
+                        formatted_tev["type"] = "temporal_event"
+                    evidence_items.append(formatted_tev)
                     if tev.get("subject"):
                         related_entities.add(tev["subject"])
                     if tev.get("object"):

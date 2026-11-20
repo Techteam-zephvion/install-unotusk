@@ -182,27 +182,58 @@ class _ChatScreenState extends State<ChatScreen> {
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: UnoTypography.displaySerif(
-                          palette: widget.palette,
-                          fontSize: 27,
-                          lineHeight: 1.15,
+                        style: GoogleFonts.youngSerif(
+                          fontSize: 34,
+                          color: widget.palette.text,
+                          letterSpacing: -0.7,
+                          height: 1.15,
+                          shadows: [
+                            Shadow(
+                              color: widget.palette.text.withValues(
+                                alpha: widget.palette.isDark ? 0.22 : 0.07,
+                              ),
+                              blurRadius: 16,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.projectName != null &&
-                                widget.projectName!.isNotEmpty
-                            ? 'Investigate ${formatDisplayTitle(widget.projectName!)}, architecture, or code decisions'
-                            : 'Investigate your project, architecture, or code decisions',
+                      const SizedBox(height: 10),
+                      Text.rich(
+                        TextSpan(
+                          style: GoogleFonts.inter(
+                            color: widget.palette.textSec,
+                            fontSize: 16.0,
+                            height: 1.5,
+                            letterSpacing: 0.1,
+                          ),
+                          children: [
+                            const TextSpan(text: 'Investigate '),
+                            if (widget.projectName != null &&
+                                widget.projectName!.isNotEmpty) ...[
+                              TextSpan(
+                                text: formatDisplayTitle(widget.projectName!),
+                                style: GoogleFonts.inter(
+                                  color: widget.palette.text,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              const TextSpan(
+                                  text: ', architecture, or code decisions'),
+                            ] else ...[
+                              const TextSpan(
+                                text:
+                                    'your project, architecture, or code decisions',
+                              ),
+                            ],
+                          ],
+                        ),
                         textAlign: TextAlign.center,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: UnoTypography.body(
-                          color: widget.palette.textSec,
-                          fontSize: 14.5,
-                        ),
                       ),
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 28),
                       ChatInputBox(
                         controller: _inputController,
                         palette: widget.palette,

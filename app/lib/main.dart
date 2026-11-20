@@ -254,8 +254,14 @@ class _AppShellState extends State<AppShell> {
         try {
           final serverProjects = await ApiService.fetchProjects();
           if (serverProjects.isNotEmpty) {
-            final targetServerProj = serverProjects.first;
-            project = targetServerProj.copyWith(
+            final targetServerProj = serverProjects.firstWhere(
+              (p) =>
+                  p.id.toLowerCase() == project.id.toLowerCase() ||
+                  p.name.toLowerCase() == project.name.toLowerCase(),
+              orElse: () => project,
+            );
+            project = project.copyWith(
+              id: targetServerProj.id.isNotEmpty ? targetServerProj.id : project.id,
               repositoryName: (targetServerProj.repositoryName != null && targetServerProj.repositoryName!.isNotEmpty)
                   ? targetServerProj.repositoryName
                   : project.repositoryName,
@@ -263,6 +269,7 @@ class _AppShellState extends State<AppShell> {
             );
             setState(() {
               _openedProject = project;
+              _openedProjectName = project.name;
             });
           }
         } catch (_) {}

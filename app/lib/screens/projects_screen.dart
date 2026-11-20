@@ -232,7 +232,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
               !validNames.contains(id.toLowerCase()));
         }
 
-        _projects.clear();
+        final updatedProjects = <ProjectItem>[];
         for (final p in serverProjects) {
           final isRunning = p.upsStatus.toUpperCase() != 'STOPPED' &&
               p.upsStatus.toUpperCase() != 'DELETED' &&
@@ -240,15 +240,32 @@ class _ProjectsScreenState extends State<ProjectsScreen>
           if (isRunning &&
               (ApiService.connectedProjectIds.contains(p.id) ||
                   ApiService.connectedProjectIds.contains(p.name))) {
-            _projects.add(p);
+            updatedProjects.add(p);
           }
         }
-        ApiService.savePersistedConnectedProjects();
-        
-        ApiService.connectedWorkspaceProjects
-          ..clear()
-          ..addAll(_projects);
-        widget.onConnectedProjectsChanged?.call(_projects);
+
+        // Avoid list rebuilding and flickering if project list is identical
+        bool hasChanges = _projects.length != updatedProjects.length;
+        if (!hasChanges) {
+          for (int i = 0; i < _projects.length; i++) {
+            if (_projects[i].id != updatedProjects[i].id ||
+                _projects[i].upsStatus != updatedProjects[i].upsStatus ||
+                _projects[i].ingestionStatus != updatedProjects[i].ingestionStatus) {
+              hasChanges = true;
+              break;
+            }
+          }
+        }
+        if (hasChanges) {
+          _projects
+            ..clear()
+            ..addAll(updatedProjects);
+          ApiService.savePersistedConnectedProjects();
+          ApiService.connectedWorkspaceProjects
+            ..clear()
+            ..addAll(_projects);
+          widget.onConnectedProjectsChanged?.call(_projects);
+        }
       });
     } catch (e) {
       if (!mounted) return;
