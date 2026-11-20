@@ -37,6 +37,7 @@ class ProjectContextEngine:
         enable_evoreasoner: bool | None = None,
         enable_structure_aware_star_rag: bool | None = None,
         force_structure_aware_star_rag: bool = False,
+        force_temporal_star_rag: bool = False,
     ) -> GroundedAnswer:
         # 1. Query Analysis
         analyzed = await analyze_query_async(question)
@@ -132,7 +133,7 @@ class ProjectContextEngine:
                 query_text=question,
                 analyzed_query=analyzed,
                 flag_enabled=use_star_rag_flag,
-                force_temporal_star_rag=(enable_star_rag is True),
+                force_temporal_star_rag=force_temporal_star_rag,
             )
         )
 

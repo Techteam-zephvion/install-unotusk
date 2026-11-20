@@ -133,6 +133,7 @@ class FunctionGraph:
     edges: list[FunctionGraphEdge] = field(default_factory=list)
     out_edges: dict[str, list[FunctionGraphEdge]] = field(default_factory=dict)
     in_edges: dict[str, list[FunctionGraphEdge]] = field(default_factory=dict)
+    _edge_keys: set[tuple[str, str, str, int]] = field(default_factory=set, repr=False)
 
     def add_node(self, node: FunctionGraphNode) -> None:
         self.nodes[node.node_id] = node
@@ -142,6 +143,15 @@ class FunctionGraph:
             self.in_edges[node.node_id] = []
 
     def add_edge(self, edge: FunctionGraphEdge) -> None:
+        rel_val = (
+            edge.relation_type.value
+            if hasattr(edge.relation_type, "value")
+            else str(edge.relation_type)
+        )
+        edge_key = (edge.source_id, edge.target_id, rel_val, edge.line_number)
+        if edge_key in self._edge_keys:
+            return
+        self._edge_keys.add(edge_key)
         self.edges.append(edge)
         self.out_edges.setdefault(edge.source_id, []).append(edge)
         self.in_edges.setdefault(edge.target_id, []).append(edge)
