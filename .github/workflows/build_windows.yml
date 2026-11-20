@@ -19,6 +19,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: "3.47.9"
           channel: 'stable'
           cache: true
 
@@ -26,19 +27,26 @@ jobs:
         run: flutter config --enable-windows-desktop
 
       - name: Install dependencies
+        working-directory: app
         run: flutter pub get
 
       - name: Run unit & widget tests
+        working-directory: app
         run: flutter test
 
       - name: Build Windows Executable (.exe)
+        working-directory: app
         run: flutter build windows --release
 
       - name: Package Release into ZIP
         shell: pwsh
         run: |
           # Detect release folder (supports both modern x64 and older paths)
-          if (Test-Path "build\windows\x64\runner\Release") {
+          if (Test-Path "app\build\windows\x64\runner\Release") {
+            $releaseDir = "app\build\windows\x64\runner\Release"
+          } elseif (Test-Path "app\build\windows\runner\Release") {
+            $releaseDir = "app\build\windows\runner\Release"
+          } elseif (Test-Path "build\windows\x64\runner\Release") {
             $releaseDir = "build\windows\x64\runner\Release"
           } elseif (Test-Path "build\windows\runner\Release") {
             $releaseDir = "build\windows\runner\Release"
