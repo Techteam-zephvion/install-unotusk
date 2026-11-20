@@ -2182,7 +2182,7 @@ class ApiService {
           cy: 0,
           label: s.name.length > 14 ? '${s.name.substring(0, 12)}…' : s.name,
           type: type,
-          subtitle: s.qualifiedName ?? s.name,
+          subtitle: s.qualifiedName.isNotEmpty ? s.qualifiedName : s.name,
         ));
         idx++;
       }
@@ -2507,7 +2507,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchRepositoryContext(healedId);
+          return await fetchRepositoryContext(healedId);
         }
       }
 
@@ -2539,7 +2539,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchProjectFiles(healedId, limit);
+          return await fetchProjectFiles(healedId, limit);
         }
       }
 
@@ -2566,7 +2566,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchFileDetail(fileId, healedId);
+          return await fetchFileDetail(fileId, healedId);
         }
       }
 
@@ -2590,7 +2590,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchProjectSymbols(healedId, limit);
+          return await fetchProjectSymbols(healedId, limit);
         }
       }
 
@@ -2615,7 +2615,7 @@ class ApiService {
       if (res.statusCode == 403) {
         final healedId = await _tryHealBoundaryViolation(res, pid);
         if (healedId != null) {
-          return fetchProjectDependencies(healedId, limit);
+          return await fetchProjectDependencies(healedId, limit);
         }
       }
 

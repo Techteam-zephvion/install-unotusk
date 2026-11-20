@@ -2,7 +2,6 @@ import hashlib
 import logging
 import os
 import shutil
-import tempfile
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -693,7 +692,7 @@ class IngestionService:
                                 else "MODULE"
                             )
 
-                            for chunk_idx, start_idx in enumerate(range(0, total_lines, step)):
+                            for _chunk_idx, start_idx in enumerate(range(0, total_lines, step)):
                                 end_idx = min(start_idx + chunk_size, total_lines)
                                 slice_lines = all_lines[start_idx:end_idx]
                                 if not slice_lines:

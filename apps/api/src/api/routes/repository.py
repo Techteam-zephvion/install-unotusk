@@ -1,7 +1,7 @@
 import asyncio
-from datetime import datetime, timezone
 import json
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
@@ -185,7 +185,7 @@ async def stream_ingestion_progress(
                     "branch": snapshot.branch if snapshot else "main",
                     "total_files": total_files,
                     "processed_files": processed_files,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
 
                 yield f"data: {json.dumps(payload)}\n\n"

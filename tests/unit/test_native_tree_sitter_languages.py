@@ -12,7 +12,6 @@ enums_mod = importlib.machinery.SourceFileLoader(
 ).load_module()
 sys.modules["apps.api.src.models.enums"] = enums_mod
 
-from apps.api.src.models.enums import DependencyType, SymbolType
 from apps.api.src.services.parser.dependency_extractor import (
     extract_dependencies_from_tree,
 )

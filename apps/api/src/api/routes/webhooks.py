@@ -66,7 +66,7 @@ async def handle_github_webhook(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Malformed JSON payload",
-        )
+        ) from None
 
     event_type = x_github_event.lower()
 

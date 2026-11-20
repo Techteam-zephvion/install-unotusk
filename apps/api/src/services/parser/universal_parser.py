@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from apps.api.src.models.enums import DependencyType, SymbolType
 from apps.api.src.services.parser.dependency_extractor import ExtractedDependency

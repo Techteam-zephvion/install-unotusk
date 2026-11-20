@@ -15,14 +15,10 @@ enums_mod = importlib.machinery.SourceFileLoader(
 sys.modules["apps.api.src.models.enums"] = enums_mod
 
 from apps.api.src.models.enums import (
-    DependencyType,
     FindingCategory,
     FindingSeverity,
-    SymbolType,
 )
-from apps.api.src.services.discovery_engine.architecture_analyzer import ArchitectureAnalyzer
 from apps.api.src.services.discovery_engine.base import (
-    CandidateFinding,
     DiscoveryContext,
 )
 from apps.api.src.services.discovery_engine.circular_dependency_analyzer import (

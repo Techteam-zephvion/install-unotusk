@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from datetime import UTC, datetime
@@ -7,7 +8,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.api.exceptions import (
-    ForbiddenException,
     NotFoundException,
 )
 from apps.api.src.core.security_vault import decrypt_secret, encrypt_secret
@@ -44,6 +44,8 @@ from apps.api.src.schemas.repository import RepositoryRead, RepositorySelectRequ
 from apps.api.src.schemas.snapshot import IngestTriggerResponse, SnapshotRead
 from apps.api.src.services.github_client import GitHubClient
 from apps.api.src.workers.dispatcher import TaskDispatcher
+
+logger = logging.getLogger(__name__)
 
 
 class RepositoryService:
@@ -774,7 +776,7 @@ class RepositoryService:
             file_on_disk = os.path.join(repo_dir, file.path)
             if os.path.exists(file_on_disk) and os.path.isfile(file_on_disk):
                 try:
-                    with open(file_on_disk, "r", encoding="utf-8", errors="replace") as f:
+                    with open(file_on_disk, encoding="utf-8", errors="replace") as f:
                         full_content = f.read()
                 except Exception as read_err:
                     logger.warning("Could not read file from disk %s: %s", file_on_disk, read_err)

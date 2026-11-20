@@ -88,20 +88,20 @@ def generate_text_embedding(text: str, dim: int = 1536) -> list[float]:
                     vec[idx_sw] += sign_sw * 0.8
                     if sw in WORD_TO_CONCEPTS:
                         for c in WORD_TO_CONCEPTS[sw]:
-                            h_c = int(hashlib.md5(f"concept_{c}".encode("utf-8")).hexdigest(), 16)
+                            h_c = int(hashlib.md5(f"concept_{c}".encode()).hexdigest(), 16)
                             vec[h_c % dim] += 2.0
 
         # 3. Semantic Concept Cluster projection
         if token in WORD_TO_CONCEPTS:
             for c in WORD_TO_CONCEPTS[token]:
-                h_c = int(hashlib.md5(f"concept_{c}".encode("utf-8")).hexdigest(), 16)
+                h_c = int(hashlib.md5(f"concept_{c}".encode()).hexdigest(), 16)
                 vec[h_c % dim] += 2.5
 
         # 4. Character 3-grams for morphological similarity
         if len(token) >= 4:
             for i in range(len(token) - 2):
                 ngram = token[i : i + 3]
-                h_ng = int(hashlib.md5(f"ng_{ngram}".encode("utf-8")).hexdigest(), 16)
+                h_ng = int(hashlib.md5(f"ng_{ngram}".encode()).hexdigest(), 16)
                 vec[h_ng % dim] += 0.3
 
     norm = math.sqrt(sum(x * x for x in vec))

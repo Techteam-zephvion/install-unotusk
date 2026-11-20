@@ -15,9 +15,9 @@ enums_mod = importlib.machinery.SourceFileLoader(
 sys.modules["apps.api.src.models.enums"] = enums_mod
 
 # Provide lightweight settings module mock if pydantic is not installed in testing environment
-try:
-    import pydantic
-except ImportError:
+import importlib.util
+
+if importlib.util.find_spec("pydantic") is None:
     dummy_settings_mod = types.ModuleType("apps.api.src.config.settings")
     class _MockSettings:
         CONTEXT_BUDGET_TOKENS = 8000
@@ -35,9 +35,6 @@ from datetime import UTC, datetime
 from apps.api.src.models.enums import (
     FindingCategory,
     FindingSeverity,
-    KnowledgeCategory,
-    KnowledgeClass,
-    ReportStatus,
     SymbolType,
 )
 from apps.api.src.services.context_engine.embeddings import generate_text_embedding

@@ -706,9 +706,9 @@ def extract_universal_symbols(code_bytes: bytes, language: str) -> list[Extracte
     # 5. Assemble Hierarchy: Place methods inside containers
     containers.sort(key=lambda c: (c[1], -c[2]))
 
-    for f_start, f_open, f_close, fn_sym in functions:
+    for _f_start, f_open, f_close, fn_sym in functions:
         enclosing_container = None
-        for c_start, c_open, c_close, c_sym in containers:
+        for _c_start, c_open, c_close, c_sym in containers:
             if c_open < f_open and f_close <= c_close:
                 enclosing_container = c_sym
 
