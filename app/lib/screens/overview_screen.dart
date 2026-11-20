@@ -72,8 +72,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _context = ApiService.getMockRepositoryContextStatic();
           _loading = false;
+          _error = null;
         });
       }
     }

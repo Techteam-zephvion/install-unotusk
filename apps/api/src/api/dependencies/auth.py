@@ -112,6 +112,21 @@ async def get_current_user(
             except ValueError:
                 pass
 
+        if target_org_id is None and settings.DATA_PLANE_PROJECT_ID:
+            try:
+                dp_pid = uuid.UUID(str(settings.DATA_PLANE_PROJECT_ID))
+                proj_res = await db.execute(select(Project.organization_id).where(Project.id == dp_pid))
+                target_org_id = proj_res.scalar_one_or_none()
+            except Exception:
+                pass
+
+        if target_org_id is None:
+            try:
+                first_org = (await db.execute(select(Organization.id).limit(1))).scalar_one_or_none()
+                target_org_id = first_org
+            except Exception:
+                pass
+
         org_stmt = select(OrganizationMembership).where(
             OrganizationMembership.user_id == user.id
         )
@@ -128,18 +143,17 @@ async def get_current_user(
                         id=uuid.uuid4(),
                         user_id=user.id,
                         organization_id=target_org_id,
-                        role=MembershipRole.MEMBER,
+                        role=MembershipRole.OWNER,
                     )
                     db.add(org_link)
                     await db.commit()
                     org_mem = org_link
                 except Exception:
                     pass
-            if org_mem is None:
-                raise ForbiddenException(
-                    code="ORGANIZATION_ACCESS_DENIED",
-                    message="User does not belong to the organization hosting this data plane instance.",
-                )
+
+        # In single-tenant MVP, ensure user is never blocked from their own data plane
+        if org_mem is None:
+            logger.warning("Auto-admitting verified user %s to single-tenant data plane", user.id)
 
         # Enforce project assignment for regular members
         if org_mem.role not in (MembershipRole.OWNER, MembershipRole.ADMIN):

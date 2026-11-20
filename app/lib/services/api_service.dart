@@ -2165,6 +2165,10 @@ class ApiService {
   static List<ProjectFile> getMockProjectFilesStatic([String? projectId]) =>
       _getMockProjectFiles(projectId ?? 'active');
 
+  /// Public accessor for fallback mock repository context
+  static ProjectRepositoryContext getMockRepositoryContextStatic([String? projectId]) =>
+      _getMockRepositoryContext(projectId ?? 'active');
+
   /// Fetches project files with boundary self-healing and mock fallback
   static Future<List<ProjectFile>> fetchProjectFiles([String? projectId, int limit = 500]) async {
     final pid = _resolveProjectId(projectId);
