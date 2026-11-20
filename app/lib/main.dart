@@ -132,6 +132,21 @@ class _AppShellState extends State<AppShell> {
   bool _sidebarOpen = true;
   String _activeView = 'chat'; // chat, spec-history, graph, feed, admin
   String _defaultSettingsTab = 'general';
+  String? _targetFilePath;
+  int? _targetFileLine;
+
+  void _handleCitationTap(String file, String? lines) {
+    int? line;
+    if (lines != null && lines.isNotEmpty) {
+      final clean = lines.replaceAll(RegExp(r'[^0-9\-]'), '').split('-').first.trim();
+      line = int.tryParse(clean);
+    }
+    setState(() {
+      _targetFilePath = file;
+      _targetFileLine = line;
+      _activeView = 'files';
+    });
+  }
 
   String? _activeConversationId;
   final List<ChatMessage> _messages = [];
@@ -758,7 +773,11 @@ class _AppShellState extends State<AppShell> {
           onNavigateView: (v) => setState(() => _activeView = v),
         );
       case 'files':
-        return FilesScreen(palette: palette);
+        return FilesScreen(
+          palette: palette,
+          initialFilePath: _targetFilePath,
+          initialLine: _targetFileLine,
+        );
       case 'discoveries':
         return DiscoveriesScreen(
           palette: palette,
@@ -770,12 +789,15 @@ class _AppShellState extends State<AppShell> {
       case 'knowledge':
         return KnowledgeScreen(
           palette: palette,
-          onNavigateToFile: (path) => setState(() => _activeView = 'files'),
+          onNavigateToFile: (path) => _handleCitationTap(path, null),
         );
       case 'spec-history':
         return SpecHistoryScreen(palette: palette);
       case 'graph':
-        return OntologyGraphScreen(palette: palette);
+        return OntologyGraphScreen(
+          palette: palette,
+          onNavigateToFile: (path) => _handleCitationTap(path, null),
+        );
       case 'feed':
         return IngestionFeedScreen(palette: palette);
       case 'admin':
@@ -795,6 +817,7 @@ class _AppShellState extends State<AppShell> {
           onSubmitQuery: _handleSubmitQuery,
           userName: _user.name,
           projectName: _openedProjectName,
+          onCitationTap: _handleCitationTap,
         );
     }
   }

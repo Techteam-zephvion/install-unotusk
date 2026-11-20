@@ -1,28 +1,44 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
 class OntologyGraphScreen extends StatefulWidget {
   final UnoPalette palette;
+  final ValueChanged<String>? onNavigateToFile;
 
-  const OntologyGraphScreen({super.key, required this.palette});
+  const OntologyGraphScreen({
+    super.key,
+    required this.palette,
+    this.onNavigateToFile,
+  });
 
   @override
   State<OntologyGraphScreen> createState() => _OntologyGraphScreenState();
 }
 
 class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
-  // Default selected node: 0 (OIDC Decis…) to match the reference view
   int? _hoveredNodeId = 0;
+  int? _draggingNodeId;
   List<OntologyNode> _nodes = [];
   List<List<int>> _edges = [];
+  final Map<int, Offset> _positions = {};
+
+  final TransformationController _transformController = TransformationController();
+  double _currentZoom = 1.0;
 
   @override
   void initState() {
     super.initState();
     _loadOntology();
+  }
+
+  @override
+  void dispose() {
+    _transformController.dispose();
+    super.dispose();
   }
 
   void _loadOntology() async {
@@ -32,6 +48,10 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
       setState(() {
         _nodes = nodes;
         _edges = edges;
+        _positions.clear();
+        for (final n in nodes) {
+          _positions[n.id] = Offset(n.cx, n.cy);
+        }
       });
     }
   }
@@ -51,61 +71,63 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
       case 8:
         return const Color(0xFFE06C75); // Rose Pink (Tickets / Threads)
       case 6:
-        return const Color(0xFF9E9E94); // Warm Gray / Tan (Persons)
+      case 9:
+        return const Color(0xFF9E9E94); // Warm Gray / Tan (Persons / Packages)
       default:
-        return const Color(0xFF9E9E94);
+        return const Color(0xFF5B8FF9);
     }
   }
 
-  /// Computes transform (scale, offsetX, offsetY) from the actual bounding box
-  /// of all nodes so every node and label fits cleanly inside the frame with
-  /// zero scrolling and zero clipping at any window size.
-  ({double scale, double offsetX, double offsetY}) _computeViewportTransform(
-      Size size) {
-    if (_nodes.isEmpty) {
-      return (scale: 1.0, offsetX: 0.0, offsetY: 0.0);
+  /// Finds all upstream caller nodes (who depends on selected node)
+  List<int> _getCallerNodeIds(int targetId) {
+    final callers = <int>[];
+    for (final edge in _edges) {
+      if (edge.length >= 2 && edge[1] == targetId) {
+        callers.add(edge[0]);
+      }
     }
-
-    double minX = _nodes.first.cx;
-    double maxX = _nodes.first.cx;
-    double minY = _nodes.first.cy;
-    double maxY = _nodes.first.cy;
-
-    for (final n in _nodes) {
-      if (n.cx < minX) minX = n.cx;
-      if (n.cx > maxX) maxX = n.cx;
-      if (n.cy < minY) minY = n.cy;
-      if (n.cy > maxY) maxY = n.cy;
-    }
-
-    final spanX = math.max(maxX - minX, 120.0);
-    final spanY = math.max(maxY - minY, 120.0);
-
-    const padX = 64.0;
-    const padTop = 34.0;
-    const padBottom = 48.0;
-
-    final availW = math.max(size.width - padX * 2, 80.0);
-    final availH = math.max(size.height - padTop - padBottom, 80.0);
-
-    final scale = math.min(availW / spanX, availH / spanY);
-    final drawnW = spanX * scale;
-    final drawnH = spanY * scale;
-
-    final offsetX = padX + (availW - drawnW) / 2 - minX * scale;
-    final offsetY = padTop + (availH - drawnH) / 2 - minY * scale;
-
-    return (scale: scale, offsetX: offsetX, offsetY: offsetY);
+    return callers;
   }
 
-  int? _hitTestNode(Offset localPos, double scale, double offsetX, double offsetY) {
+  /// Finds all downstream callee nodes (what selected node depends on)
+  List<int> _getCalleeNodeIds(int targetId) {
+    final callees = <int>[];
+    for (final edge in _edges) {
+      if (edge.length >= 2 && edge[0] == targetId) {
+        callees.add(edge[1]);
+      }
+    }
+    return callees;
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _currentZoom = (_currentZoom * 1.25).clamp(0.4, 3.0);
+      _transformController.value = Matrix4.diagonal3Values(_currentZoom, _currentZoom, 1.0);
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _currentZoom = (_currentZoom / 1.25).clamp(0.4, 3.0);
+      _transformController.value = Matrix4.diagonal3Values(_currentZoom, _currentZoom, 1.0);
+    });
+  }
+
+  void _resetZoom() {
+    setState(() {
+      _currentZoom = 1.0;
+      _transformController.value = Matrix4.identity();
+    });
+  }
+
+  int? _hitTestNode(Offset localPos) {
     int? hitId;
-    double bestDistSq = 1200.0;
+    double bestDistSq = 900.0; // 30px hit radius
     for (final node in _nodes) {
-      final nx = node.cx * scale + offsetX;
-      final ny = node.cy * scale + offsetY;
-      final dx = localPos.dx - nx;
-      final dy = localPos.dy - ny;
+      final pos = _positions[node.id] ?? Offset(node.cx, node.cy);
+      final dx = localPos.dx - pos.dx;
+      final dy = localPos.dy - pos.dy;
       final distSq = dx * dx + dy * dy;
       if (distSq < bestDistSq) {
         bestDistSq = distSq;
@@ -118,6 +140,9 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.palette;
+    final selectedNode = _nodes.where((n) => n.id == _hoveredNodeId).firstOrNull;
+    final callers = _hoveredNodeId != null ? _getCallerNodeIds(_hoveredNodeId!) : <int>[];
+    final callees = _hoveredNodeId != null ? _getCalleeNodeIds(_hoveredNodeId!) : <int>[];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 20, 28, 22),
@@ -127,7 +152,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Compact Editorial Header Row
+              // Header Row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -137,7 +162,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'ARCHITECTURE',
+                          'ARCHITECTURE & ONTOLOGY',
                           style: UnoTypography.mono(
                             color: p.textMuted,
                             fontSize: 10.5,
@@ -146,7 +171,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Architecture',
+                          'Interactive Graph Visualizer',
                           style: UnoTypography.headingSerif(
                             color: p.text,
                             fontSize: 25,
@@ -156,7 +181,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Entity relationships indexed across commits, tickets, threads, and decisions.',
+                          'Pan, zoom, drag nodes, and inspect live caller/callee dependencies across codebase entities.',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: UnoTypography.body(
@@ -170,15 +195,14 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
                   if (_nodes.isNotEmpty) ...[
                     const SizedBox(width: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 11, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
                       decoration: BoxDecoration(
                         color: p.bgElevated.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: p.div),
                       ),
                       child: Text(
-                        '${_nodes.length} entities  ·  ${_edges.length} links',
+                        '${_nodes.length} entities  ·  ${_edges.length} relationships',
                         style: UnoTypography.mono(
                           color: p.accentMuted,
                           fontSize: 11,
@@ -191,7 +215,7 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Main Graph Container — Fills remaining viewport height cleanly (no scroll)
+              // Interactive 2D Graph Canvas Container
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -200,57 +224,262 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size =
-                          Size(constraints.maxWidth, constraints.maxHeight);
-                      final vp = _computeViewportTransform(size);
-
-                      return MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        onHover: (event) {
-                          final hit = _hitTestNode(
-                            event.localPosition,
-                            vp.scale,
-                            vp.offsetX,
-                            vp.offsetY,
-                          );
-                          if (hit != null && hit != _hoveredNodeId) {
-                            setState(() => _hoveredNodeId = hit);
-                          }
-                        },
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapUp: (details) {
-                            final tappedId = _hitTestNode(
-                              details.localPosition,
-                              vp.scale,
-                              vp.offsetX,
-                              vp.offsetY,
+                  child: Stack(
+                    children: [
+                      // Interactive Pan / Zoom / Drag Canvas
+                      InteractiveViewer(
+                        transformationController: _transformController,
+                        minScale: 0.4,
+                        maxScale: 3.0,
+                        boundaryMargin: const EdgeInsets.all(500),
+                        panEnabled: _draggingNodeId == null,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final size = Size(
+                              math.max(constraints.maxWidth, 900),
+                              math.max(constraints.maxHeight, 560),
                             );
-                            if (tappedId != null) {
-                              setState(() {
-                                _hoveredNodeId =
-                                    _hoveredNodeId == tappedId ? 0 : tappedId;
-                              });
-                            }
+
+                            return MouseRegion(
+                              cursor: _draggingNodeId != null
+                                  ? SystemMouseCursors.grabbing
+                                  : SystemMouseCursors.grab,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onPanStart: (details) {
+                                  final hit = _hitTestNode(details.localPosition);
+                                  if (hit != null) {
+                                    setState(() {
+                                      _draggingNodeId = hit;
+                                      _hoveredNodeId = hit;
+                                    });
+                                  }
+                                },
+                                onPanUpdate: (details) {
+                                  if (_draggingNodeId != null) {
+                                    setState(() {
+                                      final current = _positions[_draggingNodeId!] ?? Offset.zero;
+                                      _positions[_draggingNodeId!] = current + details.delta;
+                                    });
+                                  }
+                                },
+                                onPanEnd: (_) {
+                                  setState(() => _draggingNodeId = null);
+                                },
+                                onTapUp: (details) {
+                                  final tapped = _hitTestNode(details.localPosition);
+                                  if (tapped != null) {
+                                    setState(() {
+                                      _hoveredNodeId =
+                                          _hoveredNodeId == tapped ? null : tapped;
+                                    });
+                                  }
+                                },
+                                child: CustomPaint(
+                                  size: size,
+                                  painter: _InteractiveOntologyGraphPainter(
+                                    nodes: _nodes,
+                                    edges: _edges,
+                                    positions: _positions,
+                                    hoveredNodeId: _hoveredNodeId,
+                                    callers: callers,
+                                    callees: callees,
+                                    palette: p,
+                                    getNodeColor: _getNodeColor,
+                                  ),
+                                ),
+                              ),
+                            );
                           },
-                          child: CustomPaint(
-                            size: size,
-                            painter: _OntologyGraphPainter(
-                              nodes: _nodes,
-                              edges: _edges,
-                              hoveredNodeId: _hoveredNodeId,
-                              palette: p,
-                              scale: vp.scale,
-                              offsetX: vp.offsetX,
-                              offsetY: vp.offsetY,
-                              getNodeColor: _getNodeColor,
+                        ),
+                      ),
+
+                      // Canvas Floating Controls (Zoom In, Zoom Out, Reset, Legend)
+                      Positioned(
+                        top: 14,
+                        right: 14,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: p.bgElevated.withValues(alpha: 0.90),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: p.div),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(LucideIcons.zoomIn, size: 16),
+                                tooltip: 'Zoom In',
+                                color: p.text,
+                                onPressed: _zoomIn,
+                              ),
+                              Container(width: 1, height: 18, color: p.div),
+                              IconButton(
+                                icon: const Icon(LucideIcons.zoomOut, size: 16),
+                                tooltip: 'Zoom Out',
+                                color: p.text,
+                                onPressed: _zoomOut,
+                              ),
+                              Container(width: 1, height: 18, color: p.div),
+                              IconButton(
+                                icon: const Icon(LucideIcons.rotateCcw, size: 15),
+                                tooltip: 'Reset View',
+                                color: p.text,
+                                onPressed: _resetZoom,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Floating Interactive Legend
+                      Positioned(
+                        bottom: 14,
+                        left: 14,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: p.bgElevated.withValues(alpha: 0.88),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: p.div),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildLegendDot(const Color(0xFF5BA495), 'Callers (Upstream)'),
+                              const SizedBox(width: 12),
+                              _buildLegendDot(const Color(0xFFE5A93C), 'Callees (Downstream)'),
+                              const SizedBox(width: 12),
+                              _buildLegendDot(p.accent, 'Selected Entity'),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Sliding Node Detail Inspector Panel
+                      if (selectedNode != null)
+                        Positioned(
+                          top: 14,
+                          left: 14,
+                          child: Container(
+                            width: 290,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: p.bgElevated.withValues(alpha: 0.96),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: p.accent.withValues(alpha: 0.40)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.20),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: _getNodeColor(selectedNode.id),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        selectedNode.label,
+                                        style: UnoTypography.body(
+                                          color: p.text,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: () => setState(() => _hoveredNodeId = null),
+                                      child: Icon(LucideIcons.x, size: 14, color: p.textMuted),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  selectedNode.subtitle ?? selectedNode.type,
+                                  style: UnoTypography.mono(
+                                    color: p.textSec,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Divider(height: 1, color: p.div),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Callers (Inbound): ${callers.length}',
+                                      style: UnoTypography.mono(
+                                        color: const Color(0xFF5BA495),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Callees (Outbound): ${callees.length}',
+                                      style: UnoTypography.mono(
+                                        color: const Color(0xFFE5A93C),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (widget.onNavigateToFile != null) ...[
+                                  const SizedBox(height: 12),
+                                  InkWell(
+                                    onTap: () => widget.onNavigateToFile?.call(selectedNode.subtitle ?? selectedNode.label),
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: p.accent.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: p.accent.withValues(alpha: 0.35)),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(LucideIcons.fileCode, size: 13, color: p.accent),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Inspect in Files Browser',
+                                            style: UnoTypography.body(
+                                              color: p.accent,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    },
+                    ],
                   ),
                 ),
               ),
@@ -260,26 +489,47 @@ class _OntologyGraphScreenState extends State<OntologyGraphScreen> {
       ),
     );
   }
+
+  Widget _buildLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: UnoTypography.mono(
+            color: widget.palette.textSec,
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _OntologyGraphPainter extends CustomPainter {
+class _InteractiveOntologyGraphPainter extends CustomPainter {
   final List<OntologyNode> nodes;
   final List<List<int>> edges;
+  final Map<int, Offset> positions;
   final int? hoveredNodeId;
+  final List<int> callers;
+  final List<int> callees;
   final UnoPalette palette;
-  final double scale;
-  final double offsetX;
-  final double offsetY;
   final Color Function(int) getNodeColor;
 
-  _OntologyGraphPainter({
+  _InteractiveOntologyGraphPainter({
     required this.nodes,
     required this.edges,
+    required this.positions,
     required this.hoveredNodeId,
+    required this.callers,
+    required this.callees,
     required this.palette,
-    required this.scale,
-    required this.offsetX,
-    required this.offsetY,
     required this.getNodeColor,
   });
 
@@ -288,90 +538,126 @@ class _OntologyGraphPainter extends CustomPainter {
     if (nodes.isEmpty) return;
 
     final isDark = palette.isDark;
-    final inactiveEdgeColor =
-        isDark ? palette.div : palette.div.withValues(alpha: 0.6);
-    final activeEdgeColor = palette.accent;
-
-    // ─────────────────────────────────────────────────────────
-    // 1. Draw Inactive Edges (behind)
-    // ─────────────────────────────────────────────────────────
     final inactiveEdgePaint = Paint()
-      ..color = inactiveEdgeColor
+      ..color = isDark ? palette.div.withValues(alpha: 0.45) : palette.div.withValues(alpha: 0.6)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
-    for (final edge in edges) {
-      if (edge[0] >= nodes.length || edge[1] >= nodes.length) continue;
-      final from = nodes[edge[0]];
-      final to = nodes[edge[1]];
-
-      final isHighlight = (hoveredNodeId != null &&
-          (hoveredNodeId == from.id || hoveredNodeId == to.id));
-
-      if (!isHighlight) {
-        final p1 = Offset(from.cx * scale + offsetX, from.cy * scale + offsetY);
-        final p2 = Offset(to.cx * scale + offsetX, to.cy * scale + offsetY);
-        canvas.drawLine(p1, p2, inactiveEdgePaint);
-      }
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // 2. Draw Active Edges (highlighted in terracotta)
-    // ─────────────────────────────────────────────────────────
-    final activeEdgePaint = Paint()
-      ..color = activeEdgeColor
-      ..strokeWidth = 2.0
+    final callerEdgePaint = Paint()
+      ..color = const Color(0xFF5BA495)
+      ..strokeWidth = 2.4
       ..style = PaintingStyle.stroke;
 
+    final calleeEdgePaint = Paint()
+      ..color = const Color(0xFFE5A93C)
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke;
+
+    final activeEdgePaint = Paint()
+      ..color = palette.accent
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke;
+
+    // 1. Draw Inactive Background Edges
     for (final edge in edges) {
-      if (edge[0] >= nodes.length || edge[1] >= nodes.length) continue;
-      final from = nodes[edge[0]];
-      final to = nodes[edge[1]];
+      if (edge.length < 2) continue;
+      final fromId = edge[0];
+      final toId = edge[1];
 
-      final isHighlight = (hoveredNodeId != null &&
-          (hoveredNodeId == from.id || hoveredNodeId == to.id));
+      final isCaller = hoveredNodeId != null && toId == hoveredNodeId;
+      final isCallee = hoveredNodeId != null && fromId == hoveredNodeId;
+      final isGeneralActive = hoveredNodeId != null && (fromId == hoveredNodeId || toId == hoveredNodeId);
 
-      if (isHighlight) {
-        final p1 = Offset(from.cx * scale + offsetX, from.cy * scale + offsetY);
-        final p2 = Offset(to.cx * scale + offsetX, to.cy * scale + offsetY);
-        canvas.drawLine(p1, p2, activeEdgePaint);
+      if (!isCaller && !isCallee && !isGeneralActive) {
+        final p1 = positions[fromId];
+        final p2 = positions[toId];
+        if (p1 != null && p2 != null) {
+          canvas.drawLine(p1, p2, inactiveEdgePaint);
+        }
       }
     }
 
-    // ─────────────────────────────────────────────────────────
-    // 3. Draw Unselected Nodes (Hollow circles + monospace label)
-    // ─────────────────────────────────────────────────────────
+    // 2. Draw Active / Caller / Callee Highlighted Edges
+    for (final edge in edges) {
+      if (edge.length < 2) continue;
+      final fromId = edge[0];
+      final toId = edge[1];
+
+      final isCaller = hoveredNodeId != null && toId == hoveredNodeId;
+      final isCallee = hoveredNodeId != null && fromId == hoveredNodeId;
+      final isGeneralActive = hoveredNodeId != null && (fromId == hoveredNodeId || toId == hoveredNodeId);
+
+      if (isCaller || isCallee || isGeneralActive) {
+        final p1 = positions[fromId];
+        final p2 = positions[toId];
+        if (p1 != null && p2 != null) {
+          final paintToUse = isCaller
+              ? callerEdgePaint
+              : (isCallee ? calleeEdgePaint : activeEdgePaint);
+          canvas.drawLine(p1, p2, paintToUse);
+
+          // Draw direction indicator dot
+          final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+          canvas.drawCircle(mid, 3.0, Paint()..color = paintToUse.color);
+        }
+      }
+    }
+
+    // 3. Draw Nodes
     for (final node in nodes) {
-      if (node.id == hoveredNodeId) continue; // Drawn in step 4
+      final center = positions[node.id] ?? Offset(node.cx, node.cy);
+      final isSelected = node.id == hoveredNodeId;
+      final isCaller = callers.contains(node.id);
+      final isCallee = callees.contains(node.id);
+      final isDimmed = hoveredNodeId != null && !isSelected && !isCaller && !isCallee;
 
-      final center =
-          Offset(node.cx * scale + offsetX, node.cy * scale + offsetY);
-      final color = getNodeColor(node.id);
-      const radius = 7.0;
+      final baseColor = isCaller
+          ? const Color(0xFF5BA495)
+          : (isCallee ? const Color(0xFFE5A93C) : getNodeColor(node.id));
 
-      // Inner fill matches card background so line underneath is clipped
-      final innerPaint = Paint()
-        ..color = palette.bgSurface
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(center, radius, innerPaint);
+      final radius = isSelected ? 12.0 : (isCaller || isCallee ? 9.5 : 7.0);
 
-      // Hollow ring stroke
-      final strokePaint = Paint()
-        ..color = color
-        ..strokeWidth = 2.0
-        ..style = PaintingStyle.stroke;
-      canvas.drawCircle(center, radius, strokePaint);
+      // Node shadow / glow
+      if (isSelected || isCaller || isCallee) {
+        canvas.drawCircle(
+          center,
+          radius + 4.0,
+          Paint()
+            ..color = baseColor.withValues(alpha: 0.35)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        );
+      }
 
-      // Monospace label below
+      // Outer node ring
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = isDimmed ? baseColor.withValues(alpha: 0.25) : baseColor
+          ..style = PaintingStyle.fill,
+      );
+
+      // Inner core
+      canvas.drawCircle(
+        center,
+        radius * 0.45,
+        Paint()
+          ..color = palette.bgBase
+          ..style = PaintingStyle.fill,
+      );
+
+      // Text label
       final textSpan = TextSpan(
         text: node.label,
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 9.5,
-          color: palette.textSec,
-          letterSpacing: 0.2,
+        style: UnoTypography.mono(
+          color: isDimmed
+              ? palette.textMuted.withValues(alpha: 0.45)
+              : (isSelected ? palette.text : palette.textSec),
+          fontSize: isSelected ? 12 : 10,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
         ),
       );
+
       final textPainter = TextPainter(
         text: textSpan,
         textDirection: TextDirection.ltr,
@@ -379,89 +665,13 @@ class _OntologyGraphPainter extends CustomPainter {
 
       textPainter.paint(
         canvas,
-        Offset(center.dx - textPainter.width / 2, center.dy + 14.0),
+        Offset(center.dx - textPainter.width / 2, center.dy + radius + 4),
       );
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // 4. Draw Selected Active Node (Solid circle + glow + pill badge)
-    // ─────────────────────────────────────────────────────────
-    if (hoveredNodeId != null) {
-      final activeIndex = nodes.indexWhere((n) => n.id == hoveredNodeId);
-      if (activeIndex != -1) {
-        final activeNode = nodes[activeIndex];
-        final center = Offset(
-            activeNode.cx * scale + offsetX, activeNode.cy * scale + offsetY);
-        const radius = 8.5;
-
-        // Glow halo (radial blur)
-        final glowPaint = Paint()
-          ..color = palette.accent.withValues(alpha: 0.38)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
-        canvas.drawCircle(center, 22.0, glowPaint);
-
-        // Solid accent circle
-        final fillPaint = Paint()
-          ..color = palette.accent
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(center, radius, fillPaint);
-
-        // Pill badge background with monospace label
-        final textSpan = TextSpan(
-          text: activeNode.label,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 10.0,
-            fontWeight: FontWeight.w600,
-            color: palette.text,
-            letterSpacing: 0.2,
-          ),
-        );
-        final textPainter = TextPainter(
-          text: textSpan,
-          textDirection: TextDirection.ltr,
-        )..layout();
-
-        final pillCenter = Offset(center.dx, center.dy + 18.0);
-        final pillRect = Rect.fromCenter(
-          center: pillCenter,
-          width: textPainter.width + 12.0,
-          height: textPainter.height + 6.0,
-        );
-        final rrect =
-            RRect.fromRectAndRadius(pillRect, const Radius.circular(4.0));
-
-        // Pill background
-        final pillBgPaint = Paint()
-          ..color = palette.bgBase
-          ..style = PaintingStyle.fill;
-        canvas.drawRRect(rrect, pillBgPaint);
-
-        // Pill border
-        final pillBorderPaint = Paint()
-          ..color = palette.div
-          ..strokeWidth = 1.0
-          ..style = PaintingStyle.stroke;
-        canvas.drawRRect(rrect, pillBorderPaint);
-
-        // Center text inside the pill
-        textPainter.paint(
-          canvas,
-          Offset(pillCenter.dx - textPainter.width / 2,
-              pillCenter.dy - textPainter.height / 2),
-        );
-      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _OntologyGraphPainter oldDelegate) {
-    return oldDelegate.hoveredNodeId != hoveredNodeId ||
-        oldDelegate.palette != palette ||
-        oldDelegate.scale != scale ||
-        oldDelegate.offsetX != offsetX ||
-        oldDelegate.offsetY != offsetY ||
-        oldDelegate.nodes != nodes ||
-        oldDelegate.edges != edges;
+  bool shouldRepaint(covariant _InteractiveOntologyGraphPainter oldDelegate) {
+    return true;
   }
 }

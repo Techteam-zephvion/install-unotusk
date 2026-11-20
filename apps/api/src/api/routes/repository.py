@@ -1,6 +1,10 @@
+import asyncio
+from datetime import datetime, timezone
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.api.dependencies.auth import get_current_user
@@ -117,6 +121,93 @@ async def get_ingestion_status(
     resolved_id = await ProjectService.resolve_project_id(db, project_id)
     return await RepositoryService.get_ingestion_status(
         db, current_user.id, resolved_id, ingestion_id
+    )
+
+
+@router.get("/ingestion/stream")
+async def stream_ingestion_progress(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Server-Sent Events (SSE) stream yielding real-time ingestion status and progress."""
+    resolved_id = await ProjectService.resolve_project_id(db, project_id)
+
+    async def event_generator():
+        phase_map = {
+            "QUEUED": (0, 0.05, "Ingestion queued in background worker"),
+            "CLONING": (1, 0.20, "Fetching Git tree and verifying commit references"),
+            "SCANNING": (2, 0.40, "Enumerating directories and filtering source files"),
+            "PARSING": (3, 0.65, "Extracting AST functions, classes, and imports"),
+            "INDEXING": (4, 0.85, "Generating vector embeddings and graph edges"),
+            "COMPLETED": (5, 1.0, "Intelligence Engine Online"),
+            "READY": (5, 1.0, "Intelligence Engine Online"),
+            "FAILED": (-1, 0.0, "Ingestion failed or stopped"),
+        }
+
+        for _ in range(180):  # Keep SSE connection open for up to 3 minutes
+            try:
+                ctx = await RepositoryService.get_repository_context(db, current_user.id, resolved_id)
+                snapshot = ctx.active_snapshot
+
+                status_val = "READY"
+                if snapshot:
+                    status_val = (
+                        snapshot.status.value
+                        if hasattr(snapshot.status, "value")
+                        else str(snapshot.status)
+                    )
+                status_upper = status_val.upper()
+
+                phase_idx, progress_pct, phase_desc = phase_map.get(
+                    status_upper, (0, 0.1, status_upper)
+                )
+
+                total_files = getattr(snapshot, "total_files", 0) or 0
+                processed_files = (
+                    getattr(snapshot, "processed_files", 0)
+                    or getattr(snapshot, "parsed_files", 0)
+                    or 0
+                )
+
+                if total_files > 0 and status_upper in ("PARSING", "SCANNING", "INDEXING"):
+                    dynamic_pct = min(0.95, max(progress_pct, processed_files / total_files))
+                else:
+                    dynamic_pct = progress_pct
+
+                payload = {
+                    "project_id": str(resolved_id),
+                    "status": status_upper,
+                    "phase": phase_idx,
+                    "progress": round(dynamic_pct, 3),
+                    "phase_description": phase_desc,
+                    "commit_sha": snapshot.commit_sha if snapshot else None,
+                    "branch": snapshot.branch if snapshot else "main",
+                    "total_files": total_files,
+                    "processed_files": processed_files,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+
+                yield f"data: {json.dumps(payload)}\n\n"
+
+                if status_upper in ("READY", "COMPLETED", "FAILED"):
+                    await asyncio.sleep(4)
+                else:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'ERROR', 'error': str(e)})}\n\n"
+                await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

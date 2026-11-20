@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -21,7 +22,15 @@ enum FileContentViewMode {
 /// formatted JSON, syntax-highlighted code, and AST symbol inspection.
 class FilesScreen extends StatefulWidget {
   final UnoPalette palette;
-  const FilesScreen({super.key, required this.palette});
+  final String? initialFilePath;
+  final int? initialLine;
+
+  const FilesScreen({
+    super.key,
+    required this.palette,
+    this.initialFilePath,
+    this.initialLine,
+  });
 
   @override
   State<FilesScreen> createState() => _FilesScreenState();
@@ -35,12 +44,14 @@ class _FilesScreenState extends State<FilesScreen> {
   List<FileNode> _fileTree = [];
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _codeVerticalScrollController = ScrollController();
   bool _loading = true;
   String? _error;
 
   String? _selectedFileId;
   FileDetail? _fileDetail;
   bool _loadingDetail = false;
+  int? _targetLine;
 
   FileContentViewMode _viewMode = FileContentViewMode.rendered;
   final bool _wrapLines = false;
@@ -51,13 +62,39 @@ class _FilesScreenState extends State<FilesScreen> {
   @override
   void initState() {
     super.initState();
+    _targetLine = widget.initialLine;
     _loadFiles();
+  }
+
+  @override
+  void didUpdateWidget(covariant FilesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialFilePath != oldWidget.initialFilePath ||
+        widget.initialLine != oldWidget.initialLine) {
+      _targetLine = widget.initialLine;
+      if (widget.initialFilePath != null && _rawFiles.isNotEmpty) {
+        _locateAndSelectFile(widget.initialFilePath!, targetLine: widget.initialLine);
+      }
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _codeVerticalScrollController.dispose();
     super.dispose();
+  }
+
+  void _locateAndSelectFile(String targetPath, {int? targetLine}) {
+    final target = targetPath.toLowerCase().replaceAll('\\', '/').trim();
+    final matched = _rawFiles.where((f) {
+      final p = f.path.toLowerCase().replaceAll('\\', '/');
+      return p == target || p.endsWith(target) || target.endsWith(p);
+    }).firstOrNull;
+
+    if (matched != null) {
+      _onFileSelected(matched, targetLine: targetLine);
+    }
   }
 
   Future<void> _loadFiles() async {
@@ -74,8 +111,9 @@ class _FilesScreenState extends State<FilesScreen> {
         _loading = false;
       });
 
-      // Auto-select README.md or the first file for an immediate polished first impression
-      if (_selectedFileId == null && files.isNotEmpty) {
+      if (widget.initialFilePath != null && widget.initialFilePath!.isNotEmpty) {
+        _locateAndSelectFile(widget.initialFilePath!, targetLine: widget.initialLine);
+      } else if (_selectedFileId == null && files.isNotEmpty) {
         final readme = files
             .where((f) => f.filename.toLowerCase().startsWith('readme'))
             .firstOrNull;
@@ -90,11 +128,14 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
-  Future<void> _onFileSelected(ProjectFile file) async {
+  Future<void> _onFileSelected(ProjectFile file, {int? targetLine}) async {
     final ext = file.extension.toLowerCase();
-    final defaultMode = (ext == '.md' || ext == '.markdown' || ext == '.json' || ext == '.svg')
-        ? FileContentViewMode.rendered
-        : FileContentViewMode.source;
+    final isCodeOrTarget = targetLine != null && targetLine > 0;
+    final defaultMode = isCodeOrTarget
+        ? FileContentViewMode.source
+        : ((ext == '.md' || ext == '.markdown' || ext == '.json' || ext == '.svg')
+            ? FileContentViewMode.rendered
+            : FileContentViewMode.source);
 
     setState(() {
       _selectedFileId = file.id;
@@ -102,6 +143,7 @@ class _FilesScreenState extends State<FilesScreen> {
       _viewMode = defaultMode;
       _copied = false;
       _symbolFilter = '';
+      _targetLine = targetLine;
     });
 
     try {
@@ -111,6 +153,20 @@ class _FilesScreenState extends State<FilesScreen> {
         _fileDetail = detail;
         _loadingDetail = false;
       });
+
+      // If targetLine is set, smoothly auto-scroll code viewer to that line
+      if (targetLine != null && targetLine > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_codeVerticalScrollController.hasClients) {
+            final targetOffset = math.max(0.0, (targetLine - 3) * 20.0);
+            _codeVerticalScrollController.animateTo(
+              targetOffset,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -989,6 +1045,7 @@ class _FilesScreenState extends State<FilesScreen> {
     final gutterWidth = (lines.length > 999) ? 56.0 : 44.0;
 
     return SingleChildScrollView(
+      controller: _codeVerticalScrollController,
       scrollDirection: Axis.vertical,
       child: SingleChildScrollView(
         scrollDirection: _wrapLines ? Axis.vertical : Axis.horizontal,
@@ -1009,8 +1066,11 @@ class _FilesScreenState extends State<FilesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: List.generate(lines.length, (idx) {
-                    return SizedBox(
+                    final isTarget = _targetLine != null && (idx + 1) == _targetLine;
+                    return Container(
                       height: 20.0,
+                      color: isTarget ? p.accent.withValues(alpha: 0.22) : Colors.transparent,
+                      alignment: Alignment.centerRight,
                       child: Padding(
                         padding: const EdgeInsets.only(right: 10),
                         child: Text(
@@ -1018,7 +1078,8 @@ class _FilesScreenState extends State<FilesScreen> {
                           style: TextStyle(
                             fontFamily: 'JetBrains Mono',
                             fontSize: 11,
-                            color: p.textSec.withValues(alpha: 0.5),
+                            fontWeight: isTarget ? FontWeight.w700 : FontWeight.w400,
+                            color: isTarget ? p.accent : p.textSec.withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -1034,8 +1095,19 @@ class _FilesScreenState extends State<FilesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: List.generate(lines.length, (idx) {
                   final line = lines[idx];
-                  return SizedBox(
+                  final isTarget = _targetLine != null && (idx + 1) == _targetLine;
+                  return Container(
                     height: 20.0,
+                    decoration: isTarget
+                        ? BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border(
+                              left: BorderSide(color: p.accent, width: 2.5),
+                            ),
+                          )
+                        : null,
+                    padding: isTarget ? const EdgeInsets.only(left: 4) : EdgeInsets.zero,
                     child: SelectableText.rich(
                       TextSpan(
                         children: isJson

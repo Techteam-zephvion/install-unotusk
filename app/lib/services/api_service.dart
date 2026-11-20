@@ -2325,6 +2325,47 @@ class ApiService {
     return {'status': 'UNKNOWN'};
   }
 
+  /// Real-time Server-Sent Events (SSE) stream for ingestion progress (EMP-P0-01)
+  static Stream<Map<String, dynamic>> streamIngestionProgress([String? projectId]) async* {
+    final pid = _resolveProjectId(projectId);
+    final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/ingestion/stream');
+    final req = http.Request('GET', uri);
+    _headers.forEach((k, v) => req.headers[k] = v);
+    req.headers['Accept'] = 'text/event-stream';
+    req.headers['Cache-Control'] = 'no-cache';
+
+    try {
+      final streamedResponse = await _client.send(req);
+      if (streamedResponse.statusCode != 200) {
+        return;
+      }
+
+      String buffer = '';
+      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+        buffer += chunk;
+        final lines = buffer.split('\n');
+        buffer = lines.removeLast();
+
+        for (final line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            final jsonStr = trimmed.substring(5).trim();
+            if (jsonStr.isNotEmpty) {
+              try {
+                final data = jsonDecode(jsonStr);
+                if (data is Map<String, dynamic>) {
+                  yield data;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Stream closed or error
+    }
+  }
+
   // ─────────────────────────────────────────────────────────
   //  Workspace RBAC & Project Membership (Phase 1)
   // ─────────────────────────────────────────────────────────

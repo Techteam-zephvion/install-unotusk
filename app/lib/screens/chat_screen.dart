@@ -51,6 +51,7 @@ class ChatScreen extends StatefulWidget {
 
   final String? userName;
   final String? projectName;
+  final void Function(String file, String? lines)? onCitationTap;
 
   const ChatScreen({
     super.key,
@@ -60,6 +61,7 @@ class ChatScreen extends StatefulWidget {
     required this.onSubmitQuery,
     this.userName,
     this.projectName,
+    this.onCitationTap,
   });
 
   @override
@@ -415,6 +417,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: _ResponseCard(
           data: msg.data!,
           palette: widget.palette,
+          onCitationTap: widget.onCitationTap,
         ),
       );
     }
@@ -589,8 +592,13 @@ class _UserQueryBubbleState extends State<_UserQueryBubble>
 class _ResponseCard extends StatefulWidget {
   final QueryResponseData data;
   final UnoPalette palette;
+  final void Function(String file, String? lines)? onCitationTap;
 
-  const _ResponseCard({required this.data, required this.palette});
+  const _ResponseCard({
+    required this.data,
+    required this.palette,
+    this.onCitationTap,
+  });
 
   @override
   State<_ResponseCard> createState() => _ResponseCardState();
@@ -833,18 +841,35 @@ class _ResponseCardState extends State<_ResponseCard> {
                               spacing: 6,
                               runSpacing: 6,
                               children: reasoning.citations.map((cite) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3.5),
-                                  decoration: BoxDecoration(
-                                    color: hoverBase.withValues(alpha: 0.045),
+                                return Tooltip(
+                                  message: 'Jump to $cite in Files tab',
+                                  child: InkWell(
+                                    onTap: () => widget.onCitationTap?.call(cite, null),
                                     borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    cite,
-                                    style: UnoTypography.mono(
-                                      color: p.text,
-                                      fontSize: 11,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3.5),
+                                      decoration: BoxDecoration(
+                                        color: hoverBase.withValues(alpha: 0.05),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: p.accent.withValues(alpha: 0.25)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(LucideIcons.fileCode,
+                                              size: 11, color: p.accent),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            cite,
+                                            style: UnoTypography.mono(
+                                              color: p.text,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );
@@ -860,45 +885,65 @@ class _ResponseCardState extends State<_ResponseCard> {
                             content: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: reasoning.evidence.take(5).map((ev) {
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 6),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: hoverBase.withValues(alpha: 0.035),
+                                return Tooltip(
+                                  message: 'Jump to ${ev.file}${ev.lines != null ? ':${ev.lines}' : ''} in Files tab',
+                                  child: InkWell(
+                                    onTap: () => widget.onCitationTap?.call(ev.file, ev.lines),
                                     borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        ev.file +
-                                            (ev.lines != null
-                                                ? ':${ev.lines}'
-                                                : ''),
-                                        style: UnoTypography.mono(
-                                          color: p.text,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: hoverBase.withValues(alpha: 0.04),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: p.accent.withValues(alpha: 0.20)),
                                       ),
-                                      if (ev.snippet != null &&
-                                          ev.snippet!.isNotEmpty) ...[
-                                        const SizedBox(height: 5),
-                                        Text(
-                                          ev.snippet!,
-                                          style: UnoTypography.mono(
-                                            color: p.textSec,
-                                            fontSize: 10.5,
-                                            height: 1.45,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(LucideIcons.code,
+                                                  size: 12, color: p.accent),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  ev.file +
+                                                      (ev.lines != null
+                                                          ? ':${ev.lines}'
+                                                          : ''),
+                                                  style: UnoTypography.mono(
+                                                    color: p.text,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              Icon(LucideIcons.arrowUpRight,
+                                                  size: 12, color: p.accent),
+                                            ],
                                           ),
-                                          maxLines: 4,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ],
+                                          if (ev.snippet != null &&
+                                              ev.snippet!.isNotEmpty) ...[
+                                            const SizedBox(height: 5),
+                                            Text(
+                                              ev.snippet!,
+                                              style: UnoTypography.mono(
+                                                color: p.textSec,
+                                                fontSize: 10.5,
+                                                height: 1.45,
+                                              ),
+                                              maxLines: 4,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 );
                               }).toList(),

@@ -5,6 +5,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../services/api_service.dart';
 import '../../../projects/data/project_repository.dart';
 import '../../../projects/domain/project.dart';
 import '../../../projects/presentation/projects_controller.dart';
@@ -29,22 +30,68 @@ class IngestionProgressView extends ConsumerStatefulWidget {
 
 class _IngestionProgressViewState extends ConsumerState<IngestionProgressView> {
   Timer? _pollTimer;
+  StreamSubscription<Map<String, dynamic>>? _sseSub;
+  double _liveProgress = 0.0;
+  String? _liveStatus;
+  int? _livePhase;
+  int _totalFiles = 0;
+  int _processedFiles = 0;
   bool _isRetrying = false;
   String? _retryError;
 
   @override
   void initState() {
     super.initState();
-    _startPolling();
+    _startSSEStream();
   }
 
   @override
   void dispose() {
+    _sseSub?.cancel();
     _pollTimer?.cancel();
     super.dispose();
   }
 
+  void _startSSEStream() {
+    _sseSub?.cancel();
+    try {
+      _sseSub = ApiService.streamIngestionProgress(widget.project.id).listen(
+        (data) {
+          if (!mounted) return;
+          final status = data['status'] as String? ?? 'READY';
+          final progress = (data['progress'] as num?)?.toDouble() ?? 0.0;
+          final phase = data['phase'] as int?;
+          final total = data['total_files'] as int? ?? 0;
+          final processed = data['processed_files'] as int? ?? 0;
+
+          setState(() {
+            _liveStatus = status;
+            _liveProgress = progress;
+            _livePhase = phase;
+            _totalFiles = total;
+            _processedFiles = processed;
+          });
+
+          if (status == 'READY' || status == 'COMPLETED') {
+            ref.invalidate(selectedProjectProvider(widget.project.id));
+            ref.invalidate(projectContextProvider(widget.project.id));
+          }
+        },
+        onError: (_) {
+          _startPolling();
+        },
+        onDone: () {
+          _startPolling();
+        },
+        cancelOnError: false,
+      );
+    } catch (_) {
+      _startPolling();
+    }
+  }
+
   void _startPolling() {
+    if (_pollTimer != null && _pollTimer!.isActive) return;
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!mounted) return;
       ref.invalidate(selectedProjectProvider(widget.project.id));
@@ -104,10 +151,11 @@ class _IngestionProgressViewState extends ConsumerState<IngestionProgressView> {
 
   @override
   Widget build(BuildContext context) {
-    final currentStatus = widget.snapshot?.status.toUpperCase() ??
+    final statusStr = _liveStatus ??
+        widget.snapshot?.status.toUpperCase() ??
         (widget.project.status.toUpperCase() == 'READY' ? 'READY' : 'CLONING');
-    final isFailed = currentStatus == 'FAILED' || widget.project.status.toUpperCase() == 'ERROR';
-    final activePhase = _getPhaseIndex(currentStatus);
+    final isFailed = statusStr == 'FAILED' || widget.project.status.toUpperCase() == 'ERROR';
+    final activePhase = _livePhase ?? _getPhaseIndex(statusStr);
 
     final phases = [
       {'key': 'CLONING', 'title': 'Cloning Codebase', 'desc': 'Fetching Git tree and verifying commit references'},
@@ -177,7 +225,53 @@ class _IngestionProgressViewState extends ConsumerState<IngestionProgressView> {
                     : 'Unotusk is building an AST symbol hierarchy and dependency graph. Evidentiary intelligence will unlock as soon as indexing completes.',
                 style: AppTextStyles.bodySmall,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Smooth Real-time SSE Progress Indicator (EMP-P0-01)
+              if (!isFailed && activePhase < 4) ...[
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.0, end: _liveProgress.clamp(0.05, 1.0)),
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, val, _) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _totalFiles > 0
+                                  ? 'Indexed $_processedFiles of $_totalFiles files'
+                                  : 'Real-time ingestion active...',
+                              style: AppTextStyles.caption.copyWith(color: AppColors.slate600),
+                            ),
+                            Text(
+                              '${(val * 100).toInt()}%',
+                              style: AppTextStyles.mono(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: val > 0 ? val : null,
+                            minHeight: 5,
+                            backgroundColor: AppColors.slate200,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Phase List
               Column(

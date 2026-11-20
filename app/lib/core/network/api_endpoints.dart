@@ -13,6 +13,7 @@ class ApiEndpoints {
   static String projectSelectRepository(String projectId) => '/projects/$projectId/repositories/select';
   static String projectTriggerIngest(String projectId, String repositoryId) => '/projects/$projectId/repositories/$repositoryId/ingest';
   static String projectIngestionStatus(String projectId, String ingestionId) => '/projects/$projectId/ingestions/$ingestionId';
+  static String projectIngestionStream(String projectId) => '/projects/$projectId/ingestion/stream';
   static String projectSnapshots(String projectId) => '/projects/$projectId/snapshots';
   static String projectRepositoryContext(String projectId) => '/projects/$projectId/repository';
   static String projectFiles(String projectId, {int limit = 500}) => '/projects/$projectId/files?limit=$limit';

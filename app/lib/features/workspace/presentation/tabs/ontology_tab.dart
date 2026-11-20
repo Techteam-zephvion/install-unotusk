@@ -222,24 +222,28 @@ class _OntologyTabState extends ConsumerState<OntologyTab> {
                           );
                         }
 
-                        return LayoutBuilder(
-                          builder: (context, constraints) {
-                            final width = constraints.maxWidth;
-                            final height = constraints.maxHeight;
-                            final positionedNodes = _calculateLayout(graph.nodes, width, height);
+                        return InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 2.5,
+                          boundaryMargin: const EdgeInsets.all(300),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width = constraints.maxWidth;
+                              final height = constraints.maxHeight;
+                              final positionedNodes = _calculateLayout(graph.nodes, width, height);
 
-                            return Stack(
-                              children: [
-                                // Edges Custom Painter
-                                CustomPaint(
-                                  size: Size(width, height),
-                                  painter: _RealGraphPainter(
-                                    positionedNodes: positionedNodes,
-                                    edges: graph.edges,
-                                    hoveredNodeId: _hoveredNodeId,
-                                    selectedNodeId: _selectedNode?.id,
+                              return Stack(
+                                children: [
+                                  // Edges Custom Painter
+                                  CustomPaint(
+                                    size: Size(width, height),
+                                    painter: _RealGraphPainter(
+                                      positionedNodes: positionedNodes,
+                                      edges: graph.edges,
+                                      hoveredNodeId: _hoveredNodeId,
+                                      selectedNodeId: _selectedNode?.id,
+                                    ),
                                   ),
-                                ),
 
                                 // Interactive Nodes
                                 ...positionedNodes.values.map((pNode) {
@@ -338,7 +342,8 @@ class _OntologyTabState extends ConsumerState<OntologyTab> {
                               ],
                             );
                           },
-                        );
+                        ),
+                      );
                       },
                     ),
                   ),
