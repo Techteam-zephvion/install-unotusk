@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -24,7 +23,7 @@ class ChatScreen extends StatefulWidget {
     'What are the primary components in this repository?',
     'Explain the database migration flow and schema',
     'How does authentication and OIDC discovery work?',
-    'What services are exposed over the local network?',
+    'What services are exposed over the LAN on port 28000?',
   ];
 
   static const List<HeroCardItem> heroCards = [
@@ -44,7 +43,7 @@ class ChatScreen extends StatefulWidget {
       icon: LucideIcons.cpu,
     ),
     HeroCardItem(
-      title: 'Audit LAN network connectivity and services',
+      title: 'Audit LAN network connectivity and ports',
       tag: 'TELEMETRY',
       icon: LucideIcons.network,
     ),
@@ -86,11 +85,38 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  String _getGreeting() {
+  String _getGreetingHeadline(String name) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    final List<String> phrases;
+
+    if (hour >= 5 && hour < 12) {
+      phrases = [
+        'Morning, $name. What are we tracing?',
+        'Coffee’s ready. What’s the merge?',
+        'Let’s make sense of the code, $name.',
+      ];
+    } else if (hour >= 12 && hour < 17) {
+      phrases = [
+        'Afternoon, $name. Got a merge to untangle?',
+        'Let’s trace it, $name.',
+        'Which decision are we unpacking?',
+      ];
+    } else if (hour >= 17 && hour < 22) {
+      phrases = [
+        'Evening, $name. Any last merge?',
+        'Let’s review today’s changes.',
+        'One more trace before you sign off?',
+      ];
+    } else {
+      phrases = [
+        'Late night, $name. Let’s trace it.',
+        'Night shift. What’s breaking?',
+        'Quiet hours. What are we digging into?',
+      ];
+    }
+
+    final slot = (DateTime.now().minute ~/ 15) % phrases.length;
+    return phrases[slot];
   }
 
   void _handleSubmit() {
@@ -125,7 +151,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildHero() {
     final name = widget.userName != null && widget.userName!.isNotEmpty
         ? widget.userName!
-        : 'Developer';
+        : 'Dev Lead';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -149,58 +175,31 @@ class _ChatScreenState extends State<ChatScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        '${_getGreeting()}, $name',
+                        _getGreetingHeadline(name),
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.youngSerif(
-                          fontSize: 38,
-                          color: widget.palette.text,
-                          letterSpacing: -0.7,
-                          height: 1.15,
-                          shadows: [
-                            Shadow(
-                              color: widget.palette.text.withValues(
-                                alpha: widget.palette.isDark ? 0.22 : 0.07,
-                              ),
-                              blurRadius: 16,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: UnoTypography.displaySerif(
+                          palette: widget.palette,
+                          fontSize: 27,
+                          lineHeight: 1.15,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Text.rich(
-                        TextSpan(
-                          style: GoogleFonts.inter(
-                            color: widget.palette.textSec,
-                            fontSize: 16.5,
-                            height: 1.5,
-                            letterSpacing: 0.1,
-                          ),
-                          children: [
-                            const TextSpan(text: 'Investigate '),
-                            if (widget.projectName != null &&
-                                widget.projectName!.isNotEmpty) ...[
-                              TextSpan(
-                                text: formatDisplayTitle(widget.projectName!),
-                                style: GoogleFonts.inter(
-                                  color: widget.palette.text,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.1,
-                                ),
-                              ),
-                              const TextSpan(
-                                  text: ', architecture, or code decisions'),
-                            ] else ...[
-                              const TextSpan(
-                                text:
-                                    'your project, architecture, or code decisions',
-                              ),
-                            ],
-                          ],
-                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.projectName != null &&
+                                widget.projectName!.isNotEmpty
+                            ? 'Investigate ${formatDisplayTitle(widget.projectName!)}, architecture, or code decisions'
+                            : 'Investigate your project, architecture, or code decisions',
                         textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: UnoTypography.body(
+                          color: widget.palette.textSec,
+                          fontSize: 14.5,
+                        ),
                       ),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 26),
                       ChatInputBox(
                         controller: _inputController,
                         palette: widget.palette,
