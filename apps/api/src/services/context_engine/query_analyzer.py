@@ -19,6 +19,7 @@ class AnalyzedQuery:
     negation_keywords: list[str] = field(default_factory=list)
     structured_temporal_intent: Any | None = None
     is_architectural_query: bool = False
+    analysis_metrics: dict[str, Any] = field(default_factory=dict)
 
 
 # Conjunctions that don't flip polarity or provide semantic code discrimination
@@ -232,15 +233,42 @@ def analyze_query(query: str) -> AnalyzedQuery:
 
 
 async def analyze_query_async(query: str) -> AnalyzedQuery:
+    import asyncio
+    import logging
+    import time
+
+    t0 = time.perf_counter()
     base = analyze_query(query)
+    det_ms = round((time.perf_counter() - t0) * 1000, 2)
 
     from apps.api.src.config.settings import settings
+
     provider_name = (settings.LLM_PROVIDER or "offline").strip().lower()
-    if provider_name == "offline":
+
+    # Fast-path check:
+    # If deterministic analyzer found explicit symbols, file paths, or 3+ keywords with concept keywords,
+    # or architectural / temporal markers, we have high specificity and bypass external LLM expansion.
+    has_symbols = bool(base.symbol_candidates)
+    has_paths = bool(base.path_candidates)
+    has_rich_keywords = len(base.keywords) >= 3 and bool(base.concept_keywords)
+    is_specialized = base.is_architectural_query or base.is_temporal
+
+    fast_path = has_symbols or has_paths or has_rich_keywords or is_specialized
+
+    if provider_name == "offline" or fast_path:
+        base.analysis_metrics = {
+            "deterministic_ms": det_ms,
+            "llm_expansion_ms": 0.0,
+            "fast_path": True if fast_path else False,
+            "provider": provider_name,
+        }
         return base
 
+    llm_ms = 0.0
+    t_llm = time.perf_counter()
     try:
         from apps.api.src.services.llm.factory import get_llm_provider
+
         provider = get_llm_provider(provider_name)
         system_prompt = (
             "You are a code intent analyzer. Extract the search intent from the query. "
@@ -249,15 +277,31 @@ async def analyze_query_async(query: str) -> AnalyzedQuery:
             "'path_candidates' (list of file names/paths), "
             "'concept_keywords' (list of broader architectural concepts like database, auth, api)."
         )
-        res = await provider.generate_json(system_prompt, query)
+        res = await asyncio.wait_for(
+            provider.generate_json(system_prompt, query),
+            timeout=1.5,
+        )
 
         if res:
             base.keywords = list(dict.fromkeys(base.keywords + res.get("keywords", [])))
-            base.symbol_candidates = list(dict.fromkeys(base.symbol_candidates + res.get("symbol_candidates", [])))
-            base.path_candidates = list(dict.fromkeys(base.path_candidates + res.get("path_candidates", [])))
-            base.concept_keywords = list(dict.fromkeys(base.concept_keywords + res.get("concept_keywords", [])))
+            base.symbol_candidates = list(
+                dict.fromkeys(base.symbol_candidates + res.get("symbol_candidates", []))
+            )
+            base.path_candidates = list(
+                dict.fromkeys(base.path_candidates + res.get("path_candidates", []))
+            )
+            base.concept_keywords = list(
+                dict.fromkeys(base.concept_keywords + res.get("concept_keywords", []))
+            )
     except Exception as e:
-        import logging
         logging.getLogger("unotusk-query-analyzer").warning(f"LLM query expansion failed: {e}")
+    finally:
+        llm_ms = round((time.perf_counter() - t_llm) * 1000, 2)
 
+    base.analysis_metrics = {
+        "deterministic_ms": det_ms,
+        "llm_expansion_ms": llm_ms,
+        "fast_path": False,
+        "provider": provider_name,
+    }
     return base

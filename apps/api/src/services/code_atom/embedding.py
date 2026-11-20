@@ -4,7 +4,7 @@ import os
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -41,6 +41,11 @@ class CodeEmbeddingBackend(ABC):
     def dimension(self) -> int:
         """Expected output vector dimension."""
         ...
+
+    @property
+    def is_synthetic(self) -> bool:
+        """Indicates if embeddings are deterministic synthetic vectors rather than neural embeddings."""
+        return False
 
     @abstractmethod
     def generate_embedding(
@@ -93,6 +98,10 @@ class DevelopmentCodeEmbeddingBackend(CodeEmbeddingBackend):
     @property
     def dimension(self) -> int:
         return DEFAULT_VECTOR_DIM
+
+    @property
+    def is_synthetic(self) -> bool:
+        return True
 
     def generate_embedding(
         self,
@@ -340,15 +349,15 @@ class VoyageCodeEmbeddingBackend(CodeEmbeddingBackend):
         return res[0] if res else None
 
 
-def get_code_embedding_backend() -> CodeEmbeddingBackend:
+def get_code_embedding_backend(strict_semantic: bool = False) -> CodeEmbeddingBackend:
     """
     Resolves the active Code-Lane embedding backend according to configuration.
 
     - If VOYAGE_API_KEY is configured and provider is set to 'voyage' / 'production',
       activates the Voyage AI production backend.
     - If provider is set to 'voyage' / 'production' but key is missing:
-      - In production (APP_ENV == 'production'), raises ValueError (fail-fast policy).
-      - In non-production, logs a clear warning and falls back to DevelopmentCodeEmbeddingBackend.
+      - In production (APP_ENV == 'production') or if strict_semantic=True, raises ValueError.
+      - In non-production without strict_semantic, logs a clear warning and falls back to DevelopmentCodeEmbeddingBackend.
     - If provider is set to 'development', 'offline', or 'test', uses DevelopmentCodeEmbeddingBackend.
     - If an unsupported provider is requested, raises ValueError.
     """
@@ -368,19 +377,23 @@ def get_code_embedding_backend() -> CodeEmbeddingBackend:
             )
 
         # Provider requested as voyage/production, but key is missing
-        if app_env == "production":
+        if app_env == "production" or strict_semantic:
             raise ValueError(
-                f"Production embedding provider '{provider}' requested, but VOYAGE_API_KEY is not configured."
+                f"Production semantic embedding provider '{provider}' requested, but VOYAGE_API_KEY is not configured."
             )
 
         logger.warning(
             "Embedding provider '%s' requested, but VOYAGE_API_KEY is not configured. "
-            "Falling back to development deterministic synthesizer.",
+            "Falling back to development deterministic synthesizer (synthetic vectors).",
             provider,
         )
         return DevelopmentCodeEmbeddingBackend()
 
     if provider in ("development", "offline", "test"):
+        if strict_semantic:
+            raise ValueError(
+                f"Strict semantic embeddings requested, but configured provider is synthetic '{provider}'."
+            )
         return DevelopmentCodeEmbeddingBackend()
 
     logger.error("Unsupported embedding provider: '%s'", provider)
@@ -388,6 +401,17 @@ def get_code_embedding_backend() -> CodeEmbeddingBackend:
         f"Unsupported embedding provider: '{provider}'. "
         f"Supported providers are: 'voyage', 'production', 'development', 'offline', 'test'."
     )
+
+
+def get_embedding_provenance(backend: CodeEmbeddingBackend | None = None) -> dict[str, Any]:
+    """Returns provenance metadata for the active embedding backend."""
+    active = backend or get_code_embedding_backend()
+    return {
+        "provider": active.provider_name,
+        "model": active.model_name,
+        "dimension": active.dimension,
+        "is_synthetic": getattr(active, "is_synthetic", False),
+    }
 
 
 def generate_code_embedding(

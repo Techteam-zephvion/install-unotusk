@@ -427,9 +427,6 @@ class MultiSignalRetriever:
                 except Exception:
                     effective_query_embedding = None
 
-                if effective_query_embedding is None:
-                    effective_query_embedding = generate_text_embedding(query_text)
-
         if effective_query_embedding is not None:
             scored_vector_chunks = []
             bind = getattr(session, "bind", None)
