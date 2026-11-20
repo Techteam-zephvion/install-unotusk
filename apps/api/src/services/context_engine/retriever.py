@@ -16,9 +16,21 @@ except ImportError:
     or_ = select = AsyncSession = None  # type: ignore[assignment]
     CodeChunk = CodeDependency = RepositoryFile = RepositorySnapshot = CodeSymbol = None  # type: ignore[assignment]
 from apps.api.src.services.context_engine.embeddings import (
+    CONCEPT_CLUSTERS,
+    WORD_TO_CONCEPTS,
     compute_cosine_similarity,
+    generate_text_embedding,
 )
 from apps.api.src.services.context_engine.query_analyzer import AnalyzedQuery
+
+__all__ = [
+    "CONCEPT_CLUSTERS",
+    "WORD_TO_CONCEPTS",
+    "MultiSignalRetriever",
+    "RetrievedCandidate",
+    "compute_cosine_similarity",
+    "generate_text_embedding",
+]
 
 
 @dataclass
