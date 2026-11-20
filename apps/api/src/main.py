@@ -38,25 +38,27 @@ logger = logging.getLogger("unotusk-api")
 async def bootstrap_data_plane_on_startup() -> None:
     import urllib.parse
     import uuid
+
     import httpx
     from sqlalchemy import select
+
     from apps.api.src.core.federation import (
         derive_canonical_project_id,
         sign_cluster_sync_payload,
     )
     from apps.api.src.db.session import AsyncSessionLocal
+    from apps.api.src.models.enums import (
+        IntegrationProvider,
+        IntegrationStatus,
+        ProjectStatus,
+    )
+    from apps.api.src.models.integration import Integration
     from apps.api.src.models.organization import Organization
     from apps.api.src.models.project import Project
     from apps.api.src.models.repository import Repository
     from apps.api.src.models.snapshot import RepositorySnapshot
-    from apps.api.src.models.enums import (
-        ProjectStatus,
-        IntegrationProvider,
-        IntegrationStatus,
-    )
-    from apps.api.src.models.integration import Integration
-    from apps.api.src.services.slug import slugify
     from apps.api.src.services.repository_service import RepositoryService
+    from apps.api.src.services.slug import slugify
 
     if AsyncSessionLocal is None:
         return

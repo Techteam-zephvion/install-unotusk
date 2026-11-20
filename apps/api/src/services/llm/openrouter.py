@@ -165,7 +165,7 @@ class OpenRouterProvider(LLMProvider):
                             if attempt < max_retries - 1:
                                 await asyncio.sleep(2)
                                 continue
-                            raise RuntimeError(f"OpenRouter connection error: {exc}")
+                            raise RuntimeError(f"OpenRouter connection error: {exc}") from exc
 
                 if res and "choices" in res and res["choices"]:
                     raw_msg = res["choices"][0].get("message", {})

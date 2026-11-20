@@ -96,7 +96,7 @@ def test_cluster_sync_hmac_signing_and_verification():
 @pytest.mark.asyncio
 async def test_data_plane_security_middleware_slug_and_boundary_guard():
     canonical_id = derive_canonical_project_id("acme-corporation", "swastha-yoga")
-    
+
     # Configure settings for a data plane instance
     orig_id = settings.DATA_PLANE_PROJECT_ID
     orig_slug = settings.DATA_PLANE_PROJECT_SLUG
@@ -179,12 +179,13 @@ async def test_data_plane_security_middleware_slug_and_boundary_guard():
 @pytest.mark.asyncio
 async def test_data_plane_gateway_middleware(monkeypatch):
     from unittest.mock import AsyncMock, MagicMock
-    from apps.api.src.core.data_plane_gateway import DataPlaneGatewayMiddleware
+
     from apps.api.src.auth.security import create_access_token
+    from apps.api.src.core.data_plane_gateway import DataPlaneGatewayMiddleware
+    from apps.api.src.models.enums import MembershipRole
+    from apps.api.src.models.membership import OrganizationMembership
     from apps.api.src.models.project import Project
     from apps.api.src.models.user import User
-    from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
-    from apps.api.src.models.enums import MembershipRole
 
     user_id = uuid.uuid4()
     org_id = uuid.uuid4()
@@ -280,7 +281,7 @@ async def test_data_plane_gateway_middleware(monkeypatch):
         content=b'{"answer":"Federated answer from data plane"}',
         headers={"content-type": "application/json"},
     )
-    
+
     async def mock_client_request(self, *args, **kwargs):
         # Verify the outgoing request contains X-Unotusk-Federation-Token
         assert "X-Unotusk-Federation-Token" in kwargs.get("headers", {})
@@ -298,12 +299,13 @@ async def test_data_plane_gateway_middleware(monkeypatch):
 @pytest.mark.asyncio
 async def test_jit_identity_upsert_handles_organization_slug_and_memberships():
     from unittest.mock import MagicMock
+
     from apps.api.src.api.dependencies.auth import get_current_user
+    from apps.api.src.models.enums import MembershipRole
+    from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
     from apps.api.src.models.organization import Organization
     from apps.api.src.models.project import Project
     from apps.api.src.models.user import User
-    from apps.api.src.models.membership import OrganizationMembership, ProjectMembership
-    from apps.api.src.models.enums import MembershipRole
 
     user_id = uuid.uuid4()
     org_cp_id = uuid.uuid4()

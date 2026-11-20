@@ -52,6 +52,7 @@ def test_llm_factory_routing(monkeypatch):
 @pytest.mark.asyncio
 async def test_groq_to_openrouter_failover_on_rate_limit(monkeypatch):
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from apps.api.src.services.llm.base import GroundedAnswer
 
     monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "mock-openrouter-key")

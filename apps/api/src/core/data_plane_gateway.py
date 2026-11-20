@@ -6,8 +6,8 @@ from collections.abc import Callable
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import select
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from apps.api.src.auth.security import decode_access_token
 from apps.api.src.config.settings import settings
