@@ -273,12 +273,16 @@ class MultiSignalRanker:
             # 5d. Code AST definition boost for real class, method, function, and interface symbols
             chunk_type = str(cand.metadata.get("chunk_type", "")).upper()
             is_code_definition = (
-                cand.entity_type == "CHUNK"
-                and chunk_type in ("CLASS", "METHOD", "FUNCTION", "INTERFACE", "STRUCT", "TYPE")
-            ) or (cand.symbol_id is not None)
+                cand.entity_type == "SYMBOL"
+                or (
+                    cand.entity_type == "CHUNK"
+                    and chunk_type in ("CLASS", "METHOD", "FUNCTION", "INTERFACE", "STRUCT", "TYPE")
+                )
+                or (cand.symbol_id is not None)
+            )
             if is_code_definition:
                 score *= 1.8
-                type_label = chunk_type or "SYMBOL"
+                type_label = chunk_type or cand.entity_type
                 reasons.append(f"AST code definition boost ({type_label})")
 
             # MemoTime temporal boundary penalty

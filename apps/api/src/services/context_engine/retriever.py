@@ -4,14 +4,18 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
+try:
+    from sqlalchemy import or_, select
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.src.models.chunk import CodeChunk
-from apps.api.src.models.dependency import CodeDependency
-from apps.api.src.models.file import RepositoryFile
-from apps.api.src.models.snapshot import RepositorySnapshot
-from apps.api.src.models.symbol import CodeSymbol
+    from apps.api.src.models.chunk import CodeChunk
+    from apps.api.src.models.dependency import CodeDependency
+    from apps.api.src.models.file import RepositoryFile
+    from apps.api.src.models.snapshot import RepositorySnapshot
+    from apps.api.src.models.symbol import CodeSymbol
+except ImportError:
+    or_ = select = AsyncSession = None  # type: ignore[assignment]
+    CodeChunk = CodeDependency = RepositoryFile = RepositorySnapshot = CodeSymbol = None  # type: ignore[assignment]
 from apps.api.src.services.context_engine.embeddings import (
     CONCEPT_CLUSTERS,
     WORD_TO_CONCEPTS,
@@ -92,7 +96,7 @@ def _extract_chunk_metadata(chunk: CodeChunk) -> dict[str, Any]:
 
 
 DEFINITION_PATTERN = re.compile(
-    r"""^\s*(?:def\s+|class\s+|function\s+|fn\s+|export\s+(?:default\s+)?(?:class|function|const|let|var|type|interface)\s+|type\s+|interface\s+|pub\s+(?:fn|struct|enum|trait)\s+)""",
+    r"""^\s*(?:(?:public|private|protected|static|final|async|override|virtual|const|export|default|pub)\s+)*(?:(?:def|class|function|func|fn|struct|enum|interface|type|trait|mixin|extension|record)\s+[a-zA-Z0-9_]+|(?:\w+\s+)+[a-zA-Z0-9_]+\s*\()""",
     re.MULTILINE,
 )
 
