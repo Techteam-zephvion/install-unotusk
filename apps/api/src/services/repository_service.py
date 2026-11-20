@@ -581,7 +581,7 @@ class RepositoryService:
         project = await RepositoryService._verify_project_access(session, user_id, project_id)
 
         f_query = (
-            select(RepositoryFile)
+            select(RepositoryFile, Repository, RepositorySnapshot)
             .join(RepositorySnapshot, RepositorySnapshot.id == RepositoryFile.snapshot_id)
             .join(Repository, Repository.id == RepositorySnapshot.repository_id)
             .where(
@@ -590,9 +590,10 @@ class RepositoryService:
             )
         )
         f_res = await session.execute(f_query)
-        file = f_res.scalar_one_or_none()
-        if file is None:
+        row = f_res.first()
+        if row is None:
             raise NotFoundException(code="FILE_NOT_FOUND", message="File not found in project")
+        file, repo, snapshot = row
 
         # Get symbols in this file
         sym_query = (
@@ -646,8 +647,32 @@ class RepositoryService:
         chunk_res = await session.execute(chunk_query)
         chunks = [CodeChunkRead.model_validate(c) for c in chunk_res.scalars().all()]
 
+        # 1. Attempt raw file retrieval directly from persistent git clone / disk
         full_content = None
-        if chunks:
+        repo_dir = RepositoryService._resolve_repo_working_dir(repo)
+        if repo_dir and os.path.exists(repo_dir):
+            file_on_disk = os.path.join(repo_dir, file.path)
+            if os.path.exists(file_on_disk) and os.path.isfile(file_on_disk):
+                try:
+                    with open(file_on_disk, "r", encoding="utf-8", errors="replace") as f:
+                        full_content = f.read()
+                except Exception as read_err:
+                    logger.warning("Could not read file from disk %s: %s", file_on_disk, read_err)
+
+            if full_content is None and snapshot and snapshot.commit_sha:
+                try:
+                    from apps.api.src.services.git_operations import GitOperationsService
+
+                    raw = await GitOperationsService.get_file_content_at_commit(
+                        repo_dir, snapshot.commit_sha, file.path
+                    )
+                    if raw is not None:
+                        full_content = raw
+                except Exception as git_err:
+                    logger.debug("Git show fallback failed: %s", git_err)
+
+        # 2. Fallback to database chunks if disk/git mirror is unavailable
+        if full_content is None and chunks:
             file_chunks = [c for c in chunks if c.chunk_type == "file"]
             if file_chunks:
                 full_content = file_chunks[0].content
@@ -782,12 +807,14 @@ class RepositoryService:
     @staticmethod
     def _resolve_repo_working_dir(repo: Repository) -> str:
         cache_base = os.getenv("UNOTUSK_REPOS_DIR", "/tmp/unotusk-repos")
-        candidate = os.path.join(cache_base, repo.name)
-        if os.path.exists(candidate) and os.path.isdir(candidate):
-            return candidate
+        slug = repo.full_name.replace("/", "_") if repo.full_name else repo.name
+        for candidate_name in [slug, repo.name]:
+            candidate = os.path.join(cache_base, candidate_name)
+            if os.path.exists(candidate) and os.path.isdir(candidate):
+                return candidate
         if os.path.exists(".git"):
             return os.getcwd()
-        return candidate
+        return os.path.join(cache_base, slug)
 
     @staticmethod
     async def get_git_branches(

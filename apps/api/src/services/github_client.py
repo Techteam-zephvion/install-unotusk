@@ -231,3 +231,65 @@ class GitHubClient:
                 raise RuntimeError("Git clone timed out") from None
             raise
 
+    def sync_or_clone_repository(
+        self,
+        clone_url: str,
+        target_dir: str,
+        branch: str | None = None,
+    ) -> str:
+        """
+        Clones repository if not present; if already cloned, fetches latest updates,
+        checks out requested branch, pulls changes, and returns commit SHA.
+        """
+        git_dir = os.path.join(target_dir, ".git")
+        if os.path.exists(git_dir):
+            try:
+                # 1. Fetch latest
+                fetch_cmd = ["git", "fetch", "origin", "--prune"]
+                if self.token and "github.com" in clone_url:
+                    fetch_cmd = ["git", "-c", f"http.extraHeader=Authorization: Bearer {self.token}"] + fetch_cmd[1:]
+
+                res = subprocess.run(
+                    fetch_cmd,
+                    cwd=target_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                if res.returncode == 0:
+                    # 2. Checkout branch if specified
+                    if branch:
+                        subprocess.run(
+                            ["git", "checkout", branch],
+                            cwd=target_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        pull_cmd = ["git", "pull", "origin", branch]
+                        if self.token and "github.com" in clone_url:
+                            pull_cmd = ["git", "-c", f"http.extraHeader=Authorization: Bearer {self.token}"] + pull_cmd[1:]
+                        subprocess.run(
+                            pull_cmd,
+                            cwd=target_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                        )
+
+                    # 3. Extract commit SHA
+                    sha_res = subprocess.run(
+                        ["git", "rev-parse", "HEAD"],
+                        cwd=target_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if sha_res.returncode == 0 and sha_res.stdout.strip():
+                        return sha_res.stdout.strip()
+            except Exception:
+                # Fallback to fresh clone if existing directory is corrupted
+                shutil.rmtree(target_dir, ignore_errors=True)
+
+        return self.clone_repository(clone_url, target_dir, branch)
+

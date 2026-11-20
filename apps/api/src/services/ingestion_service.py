@@ -123,19 +123,25 @@ class IngestionService:
 
             temp_dir = None
             try:
-                # 2. Retrieval / Clone
+                # 2. Retrieval / Persistent Clone
                 if override_local_dir and os.path.exists(override_local_dir):
                     source_dir = override_local_dir
                     commit_sha = "local-dev-commit"
                 else:
-                    temp_dir = tempfile.mkdtemp(prefix="unotusk-repo-")
+                    repos_base = os.getenv("UNOTUSK_REPOS_DIR", "/tmp/unotusk-repos")
+                    os.makedirs(repos_base, exist_ok=True)
+                    repo_slug = (
+                        repository.full_name.replace("/", "_")
+                        if repository.full_name
+                        else repository.name
+                    )
+                    source_dir = os.path.join(repos_base, repo_slug)
                     client = GitHubClient(token=github_token)
-                    commit_sha = client.clone_repository(
+                    commit_sha = client.sync_or_clone_repository(
                         clone_url=repository.url,
-                        target_dir=temp_dir,
+                        target_dir=source_dir,
                         branch=snapshot.branch,
                     )
-                    source_dir = temp_dir
 
                 snapshot.commit_sha = commit_sha
                 snapshot.status = SnapshotStatus.SCANNING
