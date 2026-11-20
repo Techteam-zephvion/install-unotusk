@@ -561,10 +561,8 @@ class IngestionService:
 
                     if not f_info["is_binary"] and content:
                         tree = parse_code(content, f_info["language"])
-                        content_lines = (
-                            content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
-                        )
-                        # Extract symbols (Tree-Sitter AST or Universal Regex & Brace Extractor)
+                        content_lines = content.decode("utf-8", errors="replace").replace("\x00", "").splitlines()
+                        # Extract symbols (Tier 1 AST or Tier 2 Universal Structural Parser)
                         extracted_symbols = extract_symbols_from_tree(
                             tree, content, f_info["language"]
                         )
@@ -596,7 +594,7 @@ class IngestionService:
                                     content=sym_chunk_content,
                                     file_path=_clean_null(repo_file.path) or "",
                                     symbol_name=clean_sym_name or None,
-                                    )
+                                )
                                 sym_chunk = CodeChunk(
                                     id=uuid.uuid4(),
                                     snapshot_id=snapshot.id,
@@ -658,65 +656,78 @@ class IngestionService:
                                     )
                                     session.add(child_chunk)
 
-                        # Extract dependencies / imports
+                        # Extract dependencies / imports (Tier 1 AST or Tier 2 Universal Structural Extractor)
                         extracted_deps = extract_dependencies_from_tree(
                             tree, content, f_info["language"]
                         )
                         for dep in extracted_deps:
                             raw_deps_to_create.append((repo_file.id, dep))
 
-                    # For config files, documentation, or unsupported/non-symbol languages (Dart, Rust, Java, C++, Swift, etc.)
-                    # Store sliding-window chunks covering the entire file beyond line 100
+                    # For config files, documentation, flat scripts, or files with no symbols, store sliding-window chunks (zero truncation)
                     if extracted_symbols_count == 0 and content and not f_info["is_binary"]:
-                        all_lines = _clean_null(content.decode("utf-8", errors="replace")).splitlines()
-                        if all_lines:
-                            window_size = 100
-                            step_size = 80
-                            max_chunks = 50  # Index up to 4,000 lines per file
-                            chunk_idx = 0
+                        raw_decoded = content.decode("utf-8", errors="replace").replace("\x00", "")
+                        all_lines = raw_decoded.splitlines()
+                        total_lines = len(all_lines)
+                        if total_lines > 0:
+                            chunk_size = 120
+                            overlap = 20
+                            step = chunk_size - overlap  # 100-line progression
 
-                            for start_idx in range(0, len(all_lines), step_size):
-                                if chunk_idx >= max_chunks:
-                                    break
-                                chunk_lines = all_lines[start_idx : start_idx + window_size]
-                                if not chunk_lines:
+                            chunk_type = (
+                                "CONFIG"
+                                if f_info["filename"].endswith(
+                                    (
+                                        ".json",
+                                        ".yml",
+                                        ".yaml",
+                                        ".toml",
+                                        ".txt",
+                                        ".md",
+                                        ".env",
+                                        ".xml",
+                                        ".ini",
+                                        ".conf",
+                                        ".properties",
+                                    )
+                                )
+                                else "MODULE"
+                            )
+
+                            for chunk_idx, start_idx in enumerate(range(0, total_lines, step)):
+                                end_idx = min(start_idx + chunk_size, total_lines)
+                                slice_lines = all_lines[start_idx:end_idx]
+                                if not slice_lines:
                                     break
 
-                                file_chunk_content = _clean_null("\n".join(chunk_lines)) or ""
+                                file_chunk_content = _clean_null("\n".join(slice_lines)) or ""
+                                chunk_name = (
+                                    f"{_clean_null(f_info['filename'])} [L{start_idx + 1}-L{end_idx}]"
+                                    if total_lines > chunk_size
+                                    else (_clean_null(f_info["filename"]) or "")
+                                )
                                 file_embedding = generate_atom_code_embedding(
-                                    commit_message=snapshot.commit_sha if snapshot and snapshot.commit_sha else None,
+                                    commit_message=snapshot.commit_sha
+                                    if snapshot and snapshot.commit_sha
+                                    else None,
                                     content=file_chunk_content,
                                     file_path=_clean_null(repo_file.path) or "",
                                     symbol_name=None,
-                                )
-                                start_line = start_idx + 1
-                                end_line = start_idx + len(chunk_lines)
-                                chunk_label = (
-                                    _clean_null(f_info["filename"]) or ""
-                                    if chunk_idx == 0
-                                    else f"{_clean_null(f_info['filename']) or ''} [L{start_line}-L{end_line}]"
                                 )
                                 file_chunk = CodeChunk(
                                     id=uuid.uuid4(),
                                     snapshot_id=snapshot.id,
                                     file_id=repo_file.id,
                                     symbol_id=None,
-                                    chunk_type="CONFIG"
-                                    if f_info["filename"].endswith(
-                                        (".json", ".yml", ".yaml", ".toml", ".txt", ".md")
-                                    )
-                                    else "MODULE",
-                                    name=chunk_label,
+                                    chunk_type=chunk_type,
+                                    name=chunk_name,
                                     path=_clean_null(repo_file.path) or "",
                                     content=file_chunk_content,
-                                    start_line=start_line,
-                                    end_line=end_line,
+                                    start_line=start_idx + 1,
+                                    end_line=end_idx,
                                     embedding=file_embedding,
                                 )
                                 session.add(file_chunk)
-                                chunk_idx += 1
-
-                                if start_idx + window_size >= len(all_lines):
+                                if end_idx >= total_lines:
                                     break
 
                     processed_count += 1

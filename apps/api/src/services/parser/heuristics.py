@@ -110,6 +110,15 @@ EXTENSION_LANGUAGE_MAP = {
     ".dart": "Dart",
     ".rb": "Ruby",
     ".php": "PHP",
+    ".scala": "Scala",
+    ".lua": "Lua",
+    ".ex": "Elixir",
+    ".exs": "Elixir",
+    ".groovy": "Groovy",
+    ".gradle": "Groovy",
+    ".proto": "Protobuf",
+    ".graphql": "GraphQL",
+    ".gql": "GraphQL",
 }
 
 # Primary Main Languages targeted for Native Tree-sitter AST parsing (TRUE condition in flowchart)
@@ -130,9 +139,6 @@ PRIMARY_TREE_SITTER_LANGUAGES = {
     "C#",
 }
 
-# Parser supported languages (Tree-sitter)
-PARSER_SUPPORTED_LANGUAGES = PRIMARY_TREE_SITTER_LANGUAGES
-
 # Secondary Languages handled via Universal Regex / Indentation / Brace Chunker (NO condition in flowchart)
 SECONDARY_UNIVERSAL_LANGUAGES = {
     "Kotlin",
@@ -141,6 +147,10 @@ SECONDARY_UNIVERSAL_LANGUAGES = {
     "Ruby",
     "Shell",
     "SQL",
+    "Scala",
+    "Lua",
+    "Elixir",
+    "Groovy",
     "HTML",
     "CSS",
     "SCSS",
@@ -150,6 +160,9 @@ SECONDARY_UNIVERSAL_LANGUAGES = {
     "TOML",
     "Markdown",
 }
+
+# All parser-supported languages (Tier 1 AST & Tier 2 Universal Structural Heuristics)
+PARSER_SUPPORTED_LANGUAGES = PRIMARY_TREE_SITTER_LANGUAGES | SECONDARY_UNIVERSAL_LANGUAGES
 
 
 def is_native_tree_sitter_target(language: str) -> bool:
@@ -201,8 +214,20 @@ def is_file_test(relative_path: str) -> bool:
     if (
         base.startswith("test_")
         or base.endswith("_test.py")
+        or base.endswith("_test.dart")
+        or base.endswith("_test.go")
         or base.endswith(".test.ts")
         or base.endswith(".spec.ts")
+        or base.endswith(".test.js")
+        or base.endswith(".spec.js")
+        or base.endswith(".test.tsx")
+        or base.endswith(".spec.tsx")
+        or base.endswith(".test.jsx")
+        or base.endswith(".spec.jsx")
+        or base.endswith("test.java")
+        or base.endswith("tests.java")
+        or base.endswith("test.kt")
+        or base.endswith("tests.kt")
     ):
         return True
     return False

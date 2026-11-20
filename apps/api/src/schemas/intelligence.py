@@ -70,7 +70,6 @@ class GroundedAskRequest(BaseModel):
         default=None,
         description="Optional override for temporal STAR-RAG retrieval (default inherits settings.STAR_RAG_ENABLED)",
     )
-    )
 
     @field_validator("question")
     @classmethod
@@ -112,10 +111,18 @@ class ConversationCreate(BaseModel):
     initial_question: str | None = Field(default=None, max_length=2000)
 
 
+class ConversationUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=255)
+    is_archived: bool | None = None
+    is_pinned: bool | None = None
+
+
 class ConversationRead(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     title: str
+    is_archived: bool = False
+    is_pinned: bool = False
     created_at: datetime
     updated_at: datetime
     message_count: int = 0

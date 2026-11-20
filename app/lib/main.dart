@@ -282,6 +282,7 @@ class _AppShellState extends State<AppShell> {
     } catch (_) {}
 
     ApiService.setActiveProject(project);
+    ApiService.fetchRecentChats(projectId: project.id);
   }
 
   void _handleBackToProjects() async {
@@ -768,7 +769,8 @@ class _AppShellState extends State<AppShell> {
               palette: palette,
               onClose: () => setState(() => _archivedModalOpen = false),
               onSelectChat: (id) {
-                // optionally load chat
+                setState(() => _archivedModalOpen = false);
+                _loadRecentChat(id);
               },
             ),
 

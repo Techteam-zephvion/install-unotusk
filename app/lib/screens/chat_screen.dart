@@ -788,6 +788,15 @@ class _ResponseCardState extends State<_ResponseCard> {
     final hoverBase =
         isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0A0F20);
     final isActive = _thoughtExpanded || _thoughtHovered;
+    final duration = reasoning.durationSeconds ??
+        (reasoning.debugSignals?['latency_sec'] as num?)?.toDouble();
+    final hasReasoningTrace = reasoning.reasoningText != null &&
+        reasoning.reasoningText!.trim().isNotEmpty;
+    final thoughtLabel = duration != null
+        ? (hasReasoningTrace
+            ? 'Thought for ${duration.toStringAsFixed(1)}s'
+            : 'Grounded in ${duration.toStringAsFixed(1)}s')
+        : (hasReasoningTrace ? 'Thought process' : 'Evidence grounding');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -818,7 +827,7 @@ class _ResponseCardState extends State<_ResponseCard> {
                   ),
                   const SizedBox(width: 7),
                   Text(
-                    'Thought for 2.6s',
+                    thoughtLabel,
                     style: UnoTypography.body(
                       color: isActive ? p.text : p.textSec,
                       fontSize: 12.5,
@@ -863,6 +872,30 @@ class _ResponseCardState extends State<_ResponseCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (reasoning.reasoningText != null &&
+                            reasoning.reasoningText!.trim().isNotEmpty)
+                          _buildReasoningRow(
+                            id: 'reasoning_content',
+                            icon: LucideIcons.brain,
+                            title: 'Model reasoning',
+                            summary: 'Chain-of-thought trace',
+                            content: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: hoverBase.withValues(alpha: 0.035),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: SelectableText(
+                                reasoning.reasoningText!.trim(),
+                                style: UnoTypography.mono(
+                                  color: p.textSec,
+                                  fontSize: 11,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
                         if (reasoning.citations.isNotEmpty)
                           _buildReasoningRow(
                             id: 'citations',

@@ -40,7 +40,8 @@ class ApiService {
 
   /// Updates a recorded recent chat ID once the server assigns a permanent UUID
   static void updateRecentChatId(String oldId, String newId, {String? newTitle}) {
-    final idxRecorded = _recordedChats.indexWhere((c) => c.id == oldId);
+    final strOldId = oldId.toString();
+    final idxRecorded = _recordedChats.indexWhere((c) => c.id.toString() == strOldId);
     if (idxRecorded != -1) {
       final old = _recordedChats[idxRecorded];
       _recordedChats[idxRecorded] = RecentChat(
@@ -50,10 +51,12 @@ class ApiService {
         time: old.time,
         projectId: old.projectId,
         messageCount: old.messageCount,
+        isPinned: old.isPinned,
+        isArchived: old.isArchived,
       );
     }
 
-    final idxAll = _allRecentChats.indexWhere((c) => c.id == oldId);
+    final idxAll = _allRecentChats.indexWhere((c) => c.id.toString() == strOldId);
     if (idxAll != -1) {
       final old = _allRecentChats[idxAll];
       _allRecentChats[idxAll] = RecentChat(
@@ -63,6 +66,8 @@ class ApiService {
         time: old.time,
         projectId: old.projectId,
         messageCount: old.messageCount,
+        isPinned: old.isPinned,
+        isArchived: old.isArchived,
       );
       recentChatsNotifier.value = List.of(_allRecentChats);
     }
@@ -71,8 +76,8 @@ class ApiService {
   /// Removes a chat from recent history
   static void removeRecentChat(dynamic id) {
     final strId = id.toString();
-    _recordedChats.removeWhere((c) => c.id == strId);
-    _allRecentChats.removeWhere((c) => c.id == strId);
+    _recordedChats.removeWhere((c) => c.id.toString() == strId);
+    _allRecentChats.removeWhere((c) => c.id.toString() == strId);
     recentChatsNotifier.value = List.of(_allRecentChats);
   }
 
@@ -80,9 +85,18 @@ class ApiService {
   static void renameRecentChat(dynamic id, String newTitle) {
     final strId = id.toString();
     for (var list in [_recordedChats, _allRecentChats]) {
-      final idx = list.indexWhere((c) => c.id == strId);
+      final idx = list.indexWhere((c) => c.id.toString() == strId);
       if (idx != -1) {
-        list[idx].title = newTitle;
+        list[idx] = RecentChat(
+          id: list[idx].id,
+          title: newTitle,
+          ago: list[idx].ago,
+          time: list[idx].time,
+          projectId: list[idx].projectId,
+          messageCount: list[idx].messageCount,
+          isPinned: list[idx].isPinned,
+          isArchived: list[idx].isArchived,
+        );
       }
     }
     recentChatsNotifier.value = List.of(_allRecentChats);
@@ -92,9 +106,18 @@ class ApiService {
   static void togglePinRecentChat(dynamic id) {
     final strId = id.toString();
     for (var list in [_recordedChats, _allRecentChats]) {
-      final idx = list.indexWhere((c) => c.id == strId);
+      final idx = list.indexWhere((c) => c.id.toString() == strId);
       if (idx != -1) {
-        list[idx].isPinned = !list[idx].isPinned;
+        list[idx] = RecentChat(
+          id: list[idx].id,
+          title: list[idx].title,
+          ago: list[idx].ago,
+          time: list[idx].time,
+          projectId: list[idx].projectId,
+          messageCount: list[idx].messageCount,
+          isPinned: !list[idx].isPinned,
+          isArchived: list[idx].isArchived,
+        );
       }
     }
     _allRecentChats.sort((a, b) {
@@ -987,6 +1010,7 @@ class ApiService {
       bodyPayload['branch'] = branch;
     }
 
+    final stopwatch = Stopwatch()..start();
     final res = await _client
         .post(
           uri,
@@ -994,6 +1018,8 @@ class ApiService {
           body: jsonEncode(bodyPayload),
         )
         .timeout(const Duration(seconds: 45));
+    stopwatch.stop();
+    final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
 
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -1015,18 +1041,76 @@ class ApiService {
           .toSet()
           .toList();
 
-      final topScore = (debugSignals['top_score'] as num?)?.toDouble() ?? 0.94;
-      final promptTokens = (debugSignals['prompt_tokens'] as num?)?.toInt() ?? 0;
-      final completionTokens = (debugSignals['completion_tokens'] as num?)?.toInt() ?? 0;
-
       // Extract related entities
       final relatedEntities = (data['related_entities'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           <String>[];
 
+      final backendLatency = (debugSignals['latency_sec'] as num?)?.toDouble();
+      final latencySec = backendLatency ?? elapsedSeconds;
+      final rawReasoningText = debugSignals['reasoning_text']?.toString();
+      final reasoningText = (rawReasoningText != null && rawReasoningText.trim().isNotEmpty)
+          ? rawReasoningText.trim()
+          : null;
+
+      // 1. Empirical Coverage: Proportional to snippet count, file breadth, and average relevance
+      final double countRatio = (evidenceItems.length / 15.0).clamp(0.20, 1.0);
+      final double fileRatio = citations.isEmpty ? 0.20 : (citations.length / 12.0).clamp(0.20, 1.0);
+      final double avgRelevance = evidenceItems.isNotEmpty
+          ? (evidenceItems.map((e) => e.relevance).reduce((a, b) => a + b) / evidenceItems.length).clamp(0.15, 1.0)
+          : 0.35;
+      final double coverageScore = (
+          (countRatio * 0.40) +
+          (fileRatio * 0.35) +
+          (avgRelevance * 0.25)
+      ).clamp(0.25, 0.98);
+
+      // 2. Empirical Structural: Proportional to active graph context connections & multi-hop routing
+      final double graphRatio = (relatedEntities.length / 12.0).clamp(0.20, 1.0);
       final bool isStarRag = debugSignals['structure_aware_star_rag_used'] == true ||
           debugSignals['star_rag_used'] == true;
+      final bool hasVector = debugSignals['vector_search_used'] == true;
+      final bool hasSemantic = debugSignals['semantic_match'] == true || debugSignals['semantic_search_used'] == true;
+      final double algoBonus = (isStarRag ? 0.20 : 0.08) + (hasVector ? 0.05 : 0.0) + (hasSemantic ? 0.05 : 0.0);
+      final double structuralScore = (
+          (graphRatio * 0.65) +
+          algoBonus +
+          (citations.length > 5 ? 0.08 : 0.03)
+      ).clamp(0.25, 0.98);
+
+      // 3. Empirical Directness: Precision of top-ranked evidence to the query terms
+      final rawTopScore = (debugSignals['top_score'] as num?)?.toDouble();
+      final double maxSnippetRel = evidenceItems.isNotEmpty
+          ? evidenceItems.map((e) => e.relevance).reduce((a, b) => a > b ? a : b).clamp(0.15, 1.0)
+          : 0.35;
+      final double normalizedTopScore = (rawTopScore != null && rawTopScore > 0.0)
+          ? (rawTopScore > 1.0 ? (0.60 + 0.38 * (1.0 - 1.0 / rawTopScore)) : rawTopScore).clamp(0.20, 0.99)
+          : maxSnippetRel;
+      final double directnessScore = (
+          (normalizedTopScore * 0.65) +
+          (maxSnippetRel * 0.35)
+      ).clamp(0.20, 0.99);
+
+      // 4. Empirical Authority: Confidence level + verifiable code provenance vs inferred text
+      final double confWeight = confidence == 'HIGH' ? 0.92 : (confidence == 'MEDIUM' ? 0.68 : 0.44);
+      final int codeSnippets = evidenceItems.where((e) => e.type == 'chunk' || e.type == 'symbol' || e.type == 'file').length;
+      final double codeRatio = evidenceItems.isNotEmpty ? (codeSnippets / evidenceItems.length) : 0.5;
+      final double authorityScore = (
+          (confWeight * 0.60) +
+          (codeRatio * 0.40)
+      ).clamp(0.25, 0.98);
+
+      // 5. Composite Verification Groundedness: Precision-weighted composite
+      final double compositeScore = (
+          (directnessScore * 0.35) +
+          (coverageScore * 0.25) +
+          (structuralScore * 0.20) +
+          (authorityScore * 0.20)
+      ).clamp(0.20, 0.99);
+
+      final promptTokens = (debugSignals['prompt_tokens'] as num?)?.toInt() ?? 0;
+      final completionTokens = (debugSignals['completion_tokens'] as num?)?.toInt() ?? 0;
       final routingPath = isStarRag
           ? const [
               'Query Analysis',
@@ -1045,12 +1129,12 @@ class ApiService {
             ];
 
       final reasoning = ReasoningModel(
-        compositeScore: topScore >= 0.8 ? topScore : 0.94,
+        compositeScore: compositeScore,
         components: [
-          ScoreComponent(label: 'Coverage', score: topScore >= 0.8 ? 0.96 : 0.88),
-          ScoreComponent(label: 'Directness', score: (topScore * 0.96).clamp(0.4, 0.99)),
-          ScoreComponent(label: 'Structural', score: isStarRag ? 0.96 : 0.88),
-          ScoreComponent(label: 'Authority', score: confidence == 'HIGH' ? 0.95 : 0.85),
+          ScoreComponent(label: 'Coverage', score: coverageScore),
+          ScoreComponent(label: 'Directness', score: directnessScore),
+          ScoreComponent(label: 'Structural', score: structuralScore),
+          ScoreComponent(label: 'Authority', score: authorityScore),
         ],
         routingPath: routingPath,
         ontologyEdges: relatedEntities.isNotEmpty
@@ -1063,6 +1147,8 @@ class ApiService {
                 : const []),
         evidence: evidenceItems,
         debugSignals: debugSignals,
+        durationSeconds: latencySec,
+        reasoningText: reasoningText,
       );
 
       final enrichedContent = synthesizeMermaidDiagram(
@@ -1514,7 +1600,7 @@ class ApiService {
   static Future<List<RecentChat>> fetchRecentChats({String? projectId}) async {
     try {
       final pid = _resolveProjectId(projectId);
-      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations');
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations?archived=false');
       final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
 
       if (res.statusCode == 200) {
@@ -1525,6 +1611,8 @@ class ApiService {
           final title = m['title']?.toString() ?? 'Conversation';
           final createdAtStr = m['created_at']?.toString() ?? '';
           final createdAt = DateTime.tryParse(createdAtStr) ?? DateTime.now();
+          final isPinned = m['is_pinned'] == true;
+          final isArchived = m['is_archived'] == true;
 
           return RecentChat(
             id: id,
@@ -1532,6 +1620,9 @@ class ApiService {
             ago: _formatTimeAgo(createdAt),
             time: _formatClockTime(createdAt),
             messageCount: (m['message_count'] as num?)?.toInt() ?? 0,
+            isPinned: isPinned,
+            isArchived: isArchived,
+            projectId: pid,
           );
         }).toList();
 
@@ -1542,6 +1633,11 @@ class ApiService {
             merged.insert(0, rec);
           }
         }
+        merged.sort((a, b) {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return 0;
+        });
         _allRecentChats.clear();
         _allRecentChats.addAll(merged);
         recentChatsNotifier.value = List.of(_allRecentChats);
@@ -1558,6 +1654,11 @@ class ApiService {
 
     // Fallback: return only chats recorded in this session (no mock data)
     final fallback = <RecentChat>[..._recordedChats];
+    fallback.sort((a, b) {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0;
+    });
     _allRecentChats.clear();
     _allRecentChats.addAll(fallback);
     recentChatsNotifier.value = List.of(_allRecentChats);
@@ -1568,7 +1669,7 @@ class ApiService {
   static Future<List<ArchivedChat>> fetchArchivedChats({String? projectId}) async {
     try {
       final pid = _resolveProjectId(projectId);
-      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations');
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations?archived=true');
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
 
       if (res.statusCode == 200) {
@@ -1594,6 +1695,130 @@ class ApiService {
     }
 
     return const [];
+  }
+
+  /// Renames a conversation thread in the database
+  static Future<bool> renameConversation(
+    String conversationId,
+    String newTitle, {
+    String? projectId,
+  }) async {
+    renameRecentChat(conversationId, newTitle);
+    if (conversationId.startsWith('temp-')) return true;
+
+    try {
+      final pid = _resolveProjectId(projectId);
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations/$conversationId');
+      final res = await _client.patch(
+        uri,
+        headers: _headers,
+        body: jsonEncode({'title': newTitle}),
+      ).timeout(_timeout);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[ApiService] renameConversation error: $e');
+      return false;
+    }
+  }
+
+  /// Toggles pin state of a conversation thread in the database
+  static Future<bool> togglePinConversation(
+    String conversationId,
+    bool isPinned, {
+    String? projectId,
+  }) async {
+    final strId = conversationId.toString();
+    for (var list in [_recordedChats, _allRecentChats]) {
+      final idx = list.indexWhere((c) => c.id.toString() == strId);
+      if (idx != -1) {
+        list[idx] = RecentChat(
+          id: list[idx].id,
+          title: list[idx].title,
+          ago: list[idx].ago,
+          time: list[idx].time,
+          projectId: list[idx].projectId,
+          messageCount: list[idx].messageCount,
+          isPinned: isPinned,
+          isArchived: list[idx].isArchived,
+        );
+      }
+    }
+    _allRecentChats.sort((a, b) {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0;
+    });
+    recentChatsNotifier.value = List.of(_allRecentChats);
+
+    if (conversationId.startsWith('temp-')) return true;
+
+    try {
+      final pid = _resolveProjectId(projectId);
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations/$conversationId');
+      final res = await _client.patch(
+        uri,
+        headers: _headers,
+        body: jsonEncode({'is_pinned': isPinned}),
+      ).timeout(_timeout);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[ApiService] togglePinConversation error: $e');
+      return false;
+    }
+  }
+
+  /// Archives or unarchives a conversation thread in the database
+  static Future<bool> archiveConversation(
+    String conversationId, {
+    bool archive = true,
+    String? projectId,
+  }) async {
+    final strId = conversationId.toString();
+    if (archive) {
+      _recordedChats.removeWhere((c) => c.id.toString() == strId);
+      _allRecentChats.removeWhere((c) => c.id.toString() == strId);
+      recentChatsNotifier.value = List.of(_allRecentChats);
+    }
+
+    if (conversationId.startsWith('temp-')) return true;
+
+    try {
+      final pid = _resolveProjectId(projectId);
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations/$conversationId');
+      final res = await _client.patch(
+        uri,
+        headers: _headers,
+        body: jsonEncode({'is_archived': archive}),
+      ).timeout(_timeout);
+
+      if (!archive) {
+        // Reload recent chats on unarchive
+        await fetchRecentChats(projectId: pid);
+      }
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[ApiService] archiveConversation error: $e');
+      return false;
+    }
+  }
+
+  /// Permanently deletes a conversation thread from the database
+  static Future<bool> deleteConversation(
+    String conversationId, {
+    String? projectId,
+  }) async {
+    removeRecentChat(conversationId);
+    if (conversationId.startsWith('temp-')) return true;
+
+    try {
+      final pid = _resolveProjectId(projectId);
+      final uri = Uri.parse('$baseUrl/api/v1/projects/$pid/conversations/$conversationId');
+      final res = await _client.delete(uri, headers: _headers).timeout(_timeout);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      debugPrint('[ApiService] deleteConversation error: $e');
+      return false;
+    }
   }
 
   /// Creates a new conversation thread on http://10.0.0.59:28000/api/v1/projects/{id}/conversations
@@ -1656,13 +1881,71 @@ class ApiService {
             final confidence = m['confidence']?.toString() ?? 'HIGH';
             final debugSignals = m['debug_signals'] as Map<String, dynamic>? ?? {};
 
+            final relEntities = (m['related_entities'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                <String>[];
+
+            final rawLatency = (debugSignals['latency_sec'] as num?)?.toDouble();
+            final rawReasoningText = debugSignals['reasoning_text']?.toString();
+            final topScore = (debugSignals['top_score'] as num?)?.toDouble();
+
+            final double countRatio = (evidenceItems.length / 15.0).clamp(0.20, 1.0);
+            final double fileRatio = citations.isEmpty ? 0.20 : (citations.length / 12.0).clamp(0.20, 1.0);
+            final double avgRelevance = evidenceItems.isNotEmpty
+                ? (evidenceItems.map((e) => e.relevance).reduce((a, b) => a + b) / evidenceItems.length).clamp(0.15, 1.0)
+                : 0.35;
+            final double cov = (
+                (countRatio * 0.40) +
+                (fileRatio * 0.35) +
+                (avgRelevance * 0.25)
+            ).clamp(0.25, 0.98);
+
+            final double graphRatio = (relEntities.length / 12.0).clamp(0.20, 1.0);
+            final bool isStarRag = debugSignals['structure_aware_star_rag_used'] == true ||
+                debugSignals['star_rag_used'] == true;
+            final bool hasVector = debugSignals['vector_search_used'] == true;
+            final bool hasSemantic = debugSignals['semantic_match'] == true || debugSignals['semantic_search_used'] == true;
+            final double algoBonus = (isStarRag ? 0.20 : 0.08) + (hasVector ? 0.05 : 0.0) + (hasSemantic ? 0.05 : 0.0);
+            final double structural = (
+                (graphRatio * 0.65) +
+                algoBonus +
+                (citations.length > 5 ? 0.08 : 0.03)
+            ).clamp(0.25, 0.98);
+
+            final double maxSnippetRel = evidenceItems.isNotEmpty
+                ? evidenceItems.map((e) => e.relevance).reduce((a, b) => a > b ? a : b).clamp(0.15, 1.0)
+                : 0.35;
+            final double normalizedTop = (topScore != null && topScore > 0.0)
+                ? (topScore > 1.0 ? (0.60 + 0.38 * (1.0 - 1.0 / topScore)) : topScore).clamp(0.20, 0.99)
+                : maxSnippetRel;
+            final double dir = (
+                (normalizedTop * 0.65) +
+                (maxSnippetRel * 0.35)
+            ).clamp(0.20, 0.99);
+
+            final double confWeight = confidence.toUpperCase() == 'HIGH' ? 0.92 : (confidence.toUpperCase() == 'MEDIUM' ? 0.68 : 0.44);
+            final int codeSnippets = evidenceItems.where((e) => e.type == 'chunk' || e.type == 'symbol' || e.type == 'file').length;
+            final double codeRatio = evidenceItems.isNotEmpty ? (codeSnippets / evidenceItems.length) : 0.5;
+            final double authority = (
+                (confWeight * 0.60) +
+                (codeRatio * 0.40)
+            ).clamp(0.25, 0.98);
+
+            final double comp = (
+                (dir * 0.35) +
+                (cov * 0.25) +
+                (structural * 0.20) +
+                (authority * 0.20)
+            ).clamp(0.20, 0.99);
+
             final reasoning = ReasoningModel(
-              compositeScore: 0.94,
-              components: const [
-                ScoreComponent(label: 'Coverage', score: 0.96),
-                ScoreComponent(label: 'Directness', score: 0.92),
-                ScoreComponent(label: 'Recency', score: 0.95),
-                ScoreComponent(label: 'Authority', score: 0.93),
+              compositeScore: comp,
+              components: [
+                ScoreComponent(label: 'Coverage', score: cov),
+                ScoreComponent(label: 'Directness', score: dir),
+                ScoreComponent(label: 'Structural', score: structural),
+                ScoreComponent(label: 'Authority', score: authority),
               ],
               routingPath: const [
                 'Semantic Search',
@@ -1670,7 +1953,7 @@ class ApiService {
                 'Ontology Graph',
                 'Synthesized Verification',
               ],
-              ontologyEdges: const [],
+              ontologyEdges: relEntities,
               citations: citations.isNotEmpty
                   ? citations
                   : (evidenceItems.isNotEmpty
@@ -1678,6 +1961,10 @@ class ApiService {
                       : const []),
               evidence: evidenceItems,
               debugSignals: debugSignals,
+              durationSeconds: rawLatency,
+              reasoningText: (rawReasoningText != null && rawReasoningText.trim().isNotEmpty)
+                  ? rawReasoningText.trim()
+                  : null,
             );
 
             messages.add(ChatMessage(

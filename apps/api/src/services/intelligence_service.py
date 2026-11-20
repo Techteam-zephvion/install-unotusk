@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.src.api.exceptions import BadRequestException, ForbiddenException, NotFoundException
@@ -353,8 +353,13 @@ class IntelligenceService:
         session: AsyncSession,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
+        archived: bool | None = None,
     ) -> list[ConversationRead]:
         project = await cls._verify_project_access(session, user_id, project_id)
+
+        conditions = [Conversation.project_id == project.id]
+        if archived is not None:
+            conditions.append(Conversation.is_archived == archived)
 
         stmt = (
             select(
@@ -362,9 +367,9 @@ class IntelligenceService:
                 func.count(Message.id).label("message_count"),
             )
             .outerjoin(Message, Message.conversation_id == Conversation.id)
-            .where(Conversation.project_id == project.id)
+            .where(*conditions)
             .group_by(Conversation.id)
-            .order_by(Conversation.updated_at.desc())
+            .order_by(Conversation.is_pinned.desc(), Conversation.updated_at.desc())
         )
         res = await session.execute(stmt)
 
@@ -375,12 +380,96 @@ class IntelligenceService:
                     id=conv.id,
                     project_id=conv.project_id,
                     title=conv.title,
+                    is_archived=conv.is_archived,
+                    is_pinned=conv.is_pinned,
                     created_at=conv.created_at,
                     updated_at=conv.updated_at,
                     message_count=count,
                 )
             )
         return results
+
+    @classmethod
+    async def update_conversation(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        title: str | None = None,
+        is_archived: bool | None = None,
+        is_pinned: bool | None = None,
+    ) -> ConversationRead:
+        project = await cls._verify_project_access(session, user_id, project_id)
+
+        stmt = select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.project_id == project.id,
+        )
+        res = await session.execute(stmt)
+        conversation = res.scalar_one_or_none()
+        if conversation is None:
+            raise NotFoundException(
+                code="CONVERSATION_NOT_FOUND",
+                message="Conversation not found",
+            )
+
+        if title is not None:
+            cleaned_title = title.strip()
+            if cleaned_title:
+                conversation.title = cleaned_title
+        if is_archived is not None:
+            conversation.is_archived = is_archived
+        if is_pinned is not None:
+            conversation.is_pinned = is_pinned
+
+        conversation.updated_at = utc_now()
+        await session.commit()
+
+        cnt_stmt = select(func.count(Message.id)).where(Message.conversation_id == conversation.id)
+        cnt_res = await session.execute(cnt_stmt)
+        msg_count = cnt_res.scalar_one_or_none() or 0
+
+        return ConversationRead(
+            id=conversation.id,
+            project_id=conversation.project_id,
+            title=conversation.title,
+            is_archived=conversation.is_archived,
+            is_pinned=conversation.is_pinned,
+            created_at=conversation.created_at,
+            updated_at=conversation.updated_at,
+            message_count=msg_count,
+        )
+
+    @classmethod
+    async def delete_conversation(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        project = await cls._verify_project_access(session, user_id, project_id)
+
+        stmt = select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.project_id == project.id,
+        )
+        res = await session.execute(stmt)
+        conversation = res.scalar_one_or_none()
+        if conversation is None:
+            raise NotFoundException(
+                code="CONVERSATION_NOT_FOUND",
+                message="Conversation not found",
+            )
+
+        # Explicitly delete child messages first to avoid any async cascade or FK violation
+        await session.execute(
+            delete(Message).where(Message.conversation_id == conversation.id)
+        )
+        await session.delete(conversation)
+        await session.commit()
+        return {"success": True, "id": str(conversation_id)}
 
     @classmethod
     async def get_conversation_messages(
