@@ -1,6 +1,6 @@
 """add is_archived and is_pinned to conversations table
 
-Revision ID: 0014_conversation_archived_pinned
+Revision ID: 0014_conv_archived_pinned
 Revises: 0013_add_stopped_status
 Create Date: 2026-11-20 16:30:00.000000
 
@@ -10,7 +10,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0014_conversation_archived_pinned"
+revision: str = "0014_conv_archived_pinned"
 down_revision: str | Sequence[str] | None = "0013_add_stopped_status"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
