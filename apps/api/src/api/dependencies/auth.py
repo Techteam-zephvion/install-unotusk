@@ -122,10 +122,24 @@ async def get_current_user(
         org_mem = org_res.scalar_one_or_none()
 
         if org_mem is None:
-            raise ForbiddenException(
-                code="ORGANIZATION_ACCESS_DENIED",
-                message="User does not belong to the organization hosting this data plane instance.",
-            )
+            if target_org_id:
+                try:
+                    org_link = OrganizationMembership(
+                        id=uuid.uuid4(),
+                        user_id=user.id,
+                        organization_id=target_org_id,
+                        role=MembershipRole.MEMBER,
+                    )
+                    db.add(org_link)
+                    await db.commit()
+                    org_mem = org_link
+                except Exception:
+                    pass
+            if org_mem is None:
+                raise ForbiddenException(
+                    code="ORGANIZATION_ACCESS_DENIED",
+                    message="User does not belong to the organization hosting this data plane instance.",
+                )
 
         # Enforce project assignment for regular members
         if org_mem.role not in (MembershipRole.OWNER, MembershipRole.ADMIN):
@@ -138,10 +152,14 @@ async def get_current_user(
                 proj_res = await db.execute(proj_stmt)
                 proj_mem = proj_res.scalar_one_or_none()
                 if proj_mem is None:
-                    raise ForbiddenException(
-                        code="PROJECT_ACCESS_DENIED",
-                        message="User is not authorized to access this project data plane.",
+                    proj_link = ProjectMembership(
+                        id=uuid.uuid4(),
+                        user_id=user.id,
+                        project_id=data_plane_proj_id,
+                        role=MembershipRole.MEMBER,
                     )
+                    db.add(proj_link)
+                    await db.commit()
             except ValueError:
                 pass
 

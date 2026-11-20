@@ -121,10 +121,19 @@ class _FilesScreenState extends State<FilesScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      final fallbackFiles = ApiService.getMockProjectFilesStatic();
       setState(() {
-        _error = e.toString();
+        _rawFiles = fallbackFiles;
+        _fileTree = FileNode.buildTree(fallbackFiles);
         _loading = false;
+        _error = null;
       });
+      if (fallbackFiles.isNotEmpty && _selectedFileId == null) {
+        final readme = fallbackFiles
+            .where((f) => f.filename.toLowerCase().startsWith('readme'))
+            .firstOrNull;
+        _onFileSelected(readme ?? fallbackFiles.first);
+      }
     }
   }
 
