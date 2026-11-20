@@ -94,7 +94,9 @@ class DataPlaneSecurityMiddleware(BaseHTTPMiddleware):
                             "code": "DATA_PLANE_BOUNDARY_VIOLATION",
                             "message": "Cross-project access is prohibited.",
                             "details": {
+                                "requested_project_id": requested_ref,
                                 "requested_project_ref": requested_ref,
+                                "assigned_project_id": str(settings.DATA_PLANE_PROJECT_ID or ""),
                                 "allowed_refs": sorted(allowed_refs),
                             },
                         }
@@ -112,6 +114,8 @@ class DataPlaneSecurityMiddleware(BaseHTTPMiddleware):
         if settings.DATA_PLANE_PROJECT_SLUG:
             slug = str(settings.DATA_PLANE_PROJECT_SLUG)
             headers["X-Data-Plane-Project-Slug"] = slug
+        if settings.DATA_PLANE_ORG_ID:
+            headers["X-Data-Plane-Org-Id"] = str(settings.DATA_PLANE_ORG_ID)
         return headers
 
     def _inject_data_plane_headers(self, response: Response) -> None:
