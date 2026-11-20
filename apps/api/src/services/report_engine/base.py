@@ -1,13 +1,16 @@
-from dataclasses import dataclass, field
-from typing import Any
+from __future__ import annotations
 
-from apps.api.src.models.dependency import CodeDependency
-from apps.api.src.models.discovery_run import DiscoveryRun
-from apps.api.src.models.file import RepositoryFile
-from apps.api.src.models.finding import Finding
-from apps.api.src.models.project import Project
-from apps.api.src.models.snapshot import RepositorySnapshot
-from apps.api.src.models.symbol import CodeSymbol
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from apps.api.src.models.dependency import CodeDependency
+    from apps.api.src.models.discovery_run import DiscoveryRun
+    from apps.api.src.models.file import RepositoryFile
+    from apps.api.src.models.finding import Finding
+    from apps.api.src.models.project import Project
+    from apps.api.src.models.snapshot import RepositorySnapshot
+    from apps.api.src.models.symbol import CodeSymbol
 
 
 @dataclass

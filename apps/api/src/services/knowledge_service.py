@@ -79,15 +79,19 @@ class KnowledgeService:
         # Ensure embedding is generated for persistent RAG retrieval
         meta = dict(data.knowledge_metadata or {})
         if "embedding" not in meta:
+            embed_text = f"{data.title}\n{data.content}"
             try:
                 from apps.api.src.services.code_atom.embedding import generate_code_embedding
 
-                embed_text = f"{data.title}\n{data.content}"
                 emb = generate_code_embedding(embed_text, input_type="document")
                 if emb:
                     meta["embedding"] = emb
             except Exception:
                 pass
+            if "embedding" not in meta:
+                from apps.api.src.services.context_engine.embeddings import generate_text_embedding
+
+                meta["embedding"] = generate_text_embedding(embed_text)
 
         effective_source_type = getattr(data, "source_type", None) or "CUSTOMER"
 
@@ -311,16 +315,20 @@ class KnowledgeService:
         # Re-compute embedding if content or title changed, or if embedding missing
         meta = dict(item.knowledge_metadata or {})
         if content_changed or "embedding" not in meta:
+            embed_text = f"{item.title}\n{item.content}"
             try:
                 from apps.api.src.services.code_atom.embedding import generate_code_embedding
 
-                embed_text = f"{item.title}\n{item.content}"
                 emb = generate_code_embedding(embed_text, input_type="document")
                 if emb:
                     meta["embedding"] = emb
-                    item.knowledge_metadata = meta
             except Exception:
                 pass
+            if "embedding" not in meta:
+                from apps.api.src.services.context_engine.embeddings import generate_text_embedding
+
+                meta["embedding"] = generate_text_embedding(embed_text)
+            item.knowledge_metadata = meta
 
         item.updated_at = utc_now()
         await session.commit()

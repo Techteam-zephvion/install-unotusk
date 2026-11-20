@@ -59,7 +59,7 @@ class InterpretationEngine:
             if len(parts) > 1:
                 # Group by top-level or second-level folder if src/
                 prefix = parts[0]
-                if prefix in ("src", "apps", "packages", "services") and len(parts) > 2:
+                if prefix in ("src", "apps", "packages", "services", "app", "setup_app", "cmd", "pkg", "lib") and len(parts) > 2:
                     prefix = f"{parts[0]}/{parts[1]}"
                 area_files[prefix].append(f.path)
             else:

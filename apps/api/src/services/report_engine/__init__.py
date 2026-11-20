@@ -1,4 +1,7 @@
-from apps.api.src.services.report_engine.engine import ProjectReportEngine
+try:
+    from apps.api.src.services.report_engine.engine import ProjectReportEngine
+except ImportError:
+    ProjectReportEngine = None  # type: ignore[assignment]
 from apps.api.src.services.report_engine.synthesizer import (
     AnthropicReportSynthesizer,
     ClaudeReportSynthesizer,
